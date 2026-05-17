@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import Dispeech
+@testable import Dspeech
 
 struct TranscriptSegmentTests {
     @Test func lowConfidenceSegmentsRequireVerification() {

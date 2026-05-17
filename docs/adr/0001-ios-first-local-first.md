@@ -6,7 +6,7 @@ Accepted for prototype.
 
 ## Context
 
-Dispeech targets cockpit/ATC comprehension. Audio may include sensitive route, pilot, or operational data. Connectivity in flight can be unreliable. The first market/test group is expected to have iPhone/iPad hardware.
+Dspeech targets cockpit/ATC comprehension. Audio may include sensitive route, pilot, or operational data. Connectivity in flight can be unreliable. The first market/test group is expected to have iPhone/iPad hardware.
 
 ## Decision
 

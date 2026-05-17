@@ -28,14 +28,14 @@ struct ContentView: View {
                 }
                 .padding(28)
             }
-            .navigationTitle("Dispeech")
+            .navigationTitle("Dspeech")
             .toolbar(.hidden, for: .navigationBar)
         }
     }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Dispeech")
+            Text("Dspeech")
                 .font(.system(size: 46, weight: .bold, design: .rounded))
                 .foregroundStyle(.white)
                 .accessibilityIdentifier("app-title")

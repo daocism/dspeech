@@ -1,4 +1,4 @@
-# Dispeech architecture sketch
+# Dspeech architecture sketch
 
 ## North star
 

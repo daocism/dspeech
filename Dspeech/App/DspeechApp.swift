@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct DispeechApp: App {
+struct DspeechApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()

@@ -1,6 +1,10 @@
-# Dispeech iOS
+# Dspeech iOS
 
-Dispeech is an iOS-first aviation communication companion: receive-only cockpit/intercom audio capture, real-time ATC transcription, and optional translation while keeping the original transcript primary.
+Dspeech is an iOS-first aviation communication companion:
+
+Domain: `dspeech.com`.
+
+Dspeech is built for receive-only cockpit/intercom audio capture, real-time ATC transcription, and optional translation while keeping the original transcript primary.
 
 ## Current bootstrap
 
@@ -14,7 +18,7 @@ Dispeech is an iOS-first aviation communication companion: receive-only cockpit/
 
 ```bash
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
-xcodebuild -project Dispeech.xcodeproj -scheme Dispeech \
+xcodebuild -project Dspeech.xcodeproj -scheme Dspeech \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4' \
   CODE_SIGNING_ALLOWED=NO build test
 ```
