@@ -1,0 +1,11 @@
+.DS_Store
+xcuserdata/
+*.xcuserstate
+DerivedData/
+build/
+.swiftpm/
+.env
+.env.*
+*.m4a
+*.wav
+*.caf
