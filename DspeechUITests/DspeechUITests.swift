@@ -11,6 +11,6 @@ final class DspeechUITests: XCTestCase {
         app.launch()
 
         XCTAssertTrue(app.staticTexts["Dspeech"].waitForExistence(timeout: 8))
-        XCTAssertTrue(app.staticTexts["Receive-only ATC transcription prototype"].exists)
+        XCTAssertTrue(app.switches["translation-toggle"].exists)
     }
 }

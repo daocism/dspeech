@@ -10,6 +10,7 @@ struct TranscriptSegment: Identifiable, Equatable, Sendable {
     let id: UUID
     let startedAt: Date
     let text: String
+    let translatedText: String?
     let confidence: Double
     let sourceLanguageCode: String
     let source: Source
@@ -18,6 +19,7 @@ struct TranscriptSegment: Identifiable, Equatable, Sendable {
         id: UUID = UUID(),
         startedAt: Date = .now,
         text: String,
+        translatedText: String? = nil,
         confidence: Double,
         sourceLanguageCode: String,
         source: Source
@@ -25,6 +27,7 @@ struct TranscriptSegment: Identifiable, Equatable, Sendable {
         self.id = id
         self.startedAt = startedAt
         self.text = text
+        self.translatedText = translatedText
         self.confidence = confidence
         self.sourceLanguageCode = sourceLanguageCode
         self.source = source
