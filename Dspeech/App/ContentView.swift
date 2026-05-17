@@ -3,6 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @State private var viewModel = TranscriptDemoViewModel.demo
     @State private var showTranslation: Bool = true
+    @State private var showSettings: Bool = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -39,6 +40,9 @@ struct ContentView: View {
         }
         .statusBarHidden(true)
         .preferredColorScheme(.dark)
+        .sheet(isPresented: $showSettings) {
+            SettingsView()
+        }
     }
 
     private func controlBar(isLandscape: Bool) -> some View {
@@ -50,6 +54,8 @@ struct ContentView: View {
 
             Spacer()
 
+            settingsButton(isLandscape: isLandscape)
+
             Toggle(isOn: $showTranslation) {
                 Text("Перевод")
                     .font(.subheadline.weight(.medium))
@@ -60,6 +66,70 @@ struct ContentView: View {
             .fixedSize()
             .accessibilityIdentifier("translation-toggle")
         }
+    }
+
+    private func settingsButton(isLandscape: Bool) -> some View {
+        let diameter: CGFloat = isLandscape ? 32 : 36
+        return Button {
+            showSettings = true
+        } label: {
+            Image(systemName: "gearshape.fill")
+                .font(.system(size: isLandscape ? 15 : 17, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.9))
+                .frame(width: diameter, height: diameter)
+                .background(
+                    Circle()
+                        .fill(.white.opacity(0.12))
+                )
+                .overlay(
+                    Circle()
+                        .stroke(.white.opacity(0.18), lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
+        .contentShape(Circle())
+        .accessibilityIdentifier("settings-button")
+        .accessibilityLabel("Настройки")
+    }
+}
+
+struct SettingsView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Распознавание") {
+                    LabeledContent("Язык по умолчанию", value: "Авто")
+                    LabeledContent("Модель ASR", value: "Apple Speech")
+                }
+                Section("Перевод") {
+                    LabeledContent("Целевой язык", value: "Русский")
+                    LabeledContent("Провайдер", value: "Локальный")
+                }
+                Section("О приложении") {
+                    LabeledContent("Версия", value: Bundle.main.shortVersion)
+                }
+            }
+            .navigationTitle("Настройки")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Готово") {
+                        dismiss()
+                    }
+                    .accessibilityIdentifier("settings-done-button")
+                }
+            }
+        }
+        .accessibilityIdentifier("settings-sheet")
+        .preferredColorScheme(.dark)
+    }
+}
+
+private extension Bundle {
+    var shortVersion: String {
+        (infoDictionary?["CFBundleShortVersionString"] as? String) ?? "—"
     }
 }
 
