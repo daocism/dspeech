@@ -43,8 +43,10 @@ final class DspeechUITests: XCTestCase {
         XCTAssertTrue(cloudToggle.waitForExistence(timeout: 4))
         XCTAssertEqual(cloudToggle.value as? String, "0")
 
-        cloudToggle.tap()
-        XCTAssertEqual(cloudToggle.value as? String, "1")
+        cloudToggle.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+        let switchedOn = NSPredicate(format: "value == %@", "1")
+        expectation(for: switchedOn, evaluatedWith: cloudToggle, handler: nil)
+        waitForExpectations(timeout: 4)
 
         app.buttons["settings-done-button"].tap()
 
