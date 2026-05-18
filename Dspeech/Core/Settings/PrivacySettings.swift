@@ -29,7 +29,7 @@ protocol PrivacySettingsStorage: Sendable {
     func savePrivacyMode(_ mode: PrivacyMode)
 }
 
-struct UserDefaultsPrivacySettingsStorage: PrivacySettingsStorage {
+struct UserDefaultsPrivacySettingsStorage: PrivacySettingsStorage, @unchecked Sendable {
     static let privacyModeKey = "dspeech.privacy.mode.v1"
 
     let defaults: UserDefaults

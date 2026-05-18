@@ -97,7 +97,7 @@ struct ContentView: View {
 }
 
 struct PrivacyBadge: View {
-    let mode: ProcessingMode
+    let mode: PrivacyMode
     let isLandscape: Bool
 
     var body: some View {
@@ -146,7 +146,7 @@ struct SettingsView: View {
                 Section("Распознавание") {
                     LabeledContent("Язык по умолчанию", value: "Авто")
                     LabeledContent("Модель ASR", value: "Apple Speech")
-                    LabeledContent("Режим", value: privacy.processingMode.displayName)
+                    LabeledContent("Режим", value: privacy.mode.displayName)
                 }
                 Section("Перевод") {
                     LabeledContent("Целевой язык", value: "Русский")
