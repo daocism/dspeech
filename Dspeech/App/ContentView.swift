@@ -53,7 +53,7 @@ struct ContentView: View {
                 .foregroundStyle(.white)
                 .accessibilityIdentifier("app-title")
 
-            PrivacyBadge(mode: privacy.processingMode, isLandscape: isLandscape)
+            PrivacyBadge(mode: privacy.mode, isLandscape: isLandscape)
 
             Spacer()
 
