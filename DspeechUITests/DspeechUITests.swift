@@ -36,7 +36,7 @@ final class DspeechUITests: XCTestCase {
 
         let badge = app.staticTexts["privacy-badge"]
         XCTAssertTrue(badge.waitForExistence(timeout: 8))
-        XCTAssertEqual(badge.label, "LOCAL")
+        XCTAssertEqual(badge.label, "Локальная обработка")
 
         app.buttons["settings-button"].tap()
         let cloudToggle = app.switches["cloud-toggle"]
@@ -50,7 +50,7 @@ final class DspeechUITests: XCTestCase {
 
         let cloudBadge = app.staticTexts["privacy-badge"]
         XCTAssertTrue(cloudBadge.waitForExistence(timeout: 4))
-        XCTAssertEqual(cloudBadge.label, "CLOUD")
+        XCTAssertEqual(cloudBadge.label, "Облачная обработка (с согласия)")
     }
 
     @MainActor
