@@ -15,6 +15,8 @@
 		A00000000000000000000056 /* SpeechRecognitionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000048 /* SpeechRecognitionService.swift */; };
 		A00000000000000000000057 /* TranscriptSegmentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000049 /* TranscriptSegmentTests.swift */; };
 		A00000000000000000000058 /* DspeechUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000050 /* DspeechUITests.swift */; };
+		A00000000000000000000059 /* PrivacySettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000061 /* PrivacySettings.swift */; };
+		A00000000000000000000060 /* PrivacySettingsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000062 /* PrivacySettingsTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -34,6 +36,8 @@
 		A00000000000000000000048 /* SpeechRecognitionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechRecognitionService.swift; sourceTree = "<group>"; };
 		A00000000000000000000049 /* TranscriptSegmentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptSegmentTests.swift; sourceTree = "<group>"; };
 		A00000000000000000000050 /* DspeechUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DspeechUITests.swift; sourceTree = "<group>"; };
+		A00000000000000000000061 /* PrivacySettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacySettings.swift; sourceTree = "<group>"; };
+		A00000000000000000000062 /* PrivacySettingsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacySettingsTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -47,11 +51,12 @@
 		A00000000000000000000003 /* Products */ = {isa = PBXGroup; children = ( A00000000000000000000015 /* Dspeech.app */, A00000000000000000000016 /* DspeechTests.xctest */, A00000000000000000000017 /* DspeechUITests.xctest */, ); name = Products; sourceTree = "<group>"; };
 		A00000000000000000000004 /* Dspeech */ = {isa = PBXGroup; children = ( A00000000000000000000005 /* App */, A00000000000000000000006 /* Core */, ); path = Dspeech; sourceTree = "<group>"; };
 		A00000000000000000000005 /* App */ = {isa = PBXGroup; children = ( A00000000000000000000043 /* DspeechApp.swift */, A00000000000000000000044 /* ContentView.swift */, A00000000000000000000045 /* TranscriptDemoViewModel.swift */, ); path = App; sourceTree = "<group>"; };
-		A00000000000000000000006 /* Core */ = {isa = PBXGroup; children = ( A00000000000000000000007 /* Models */, A00000000000000000000008 /* Audio */, A00000000000000000000009 /* ASR */, ); path = Core; sourceTree = "<group>"; };
+		A00000000000000000000006 /* Core */ = {isa = PBXGroup; children = ( A00000000000000000000007 /* Models */, A00000000000000000000008 /* Audio */, A00000000000000000000009 /* ASR */, A00000000000000000000063 /* Settings */, ); path = Core; sourceTree = "<group>"; };
+		A00000000000000000000063 /* Settings */ = {isa = PBXGroup; children = ( A00000000000000000000061 /* PrivacySettings.swift */, ); path = Settings; sourceTree = "<group>"; };
 		A00000000000000000000007 /* Models */ = {isa = PBXGroup; children = ( A00000000000000000000046 /* TranscriptSegment.swift */, ); path = Models; sourceTree = "<group>"; };
 		A00000000000000000000008 /* Audio */ = {isa = PBXGroup; children = ( A00000000000000000000047 /* AudioCaptureService.swift */, ); path = Audio; sourceTree = "<group>"; };
 		A00000000000000000000009 /* ASR */ = {isa = PBXGroup; children = ( A00000000000000000000048 /* SpeechRecognitionService.swift */, ); path = ASR; sourceTree = "<group>"; };
-		A00000000000000000000010 /* DspeechTests */ = {isa = PBXGroup; children = ( A00000000000000000000049 /* TranscriptSegmentTests.swift */, ); path = DspeechTests; sourceTree = "<group>"; };
+		A00000000000000000000010 /* DspeechTests */ = {isa = PBXGroup; children = ( A00000000000000000000049 /* TranscriptSegmentTests.swift */, A00000000000000000000062 /* PrivacySettingsTests.swift */, ); path = DspeechTests; sourceTree = "<group>"; };
 		A00000000000000000000011 /* DspeechUITests */ = {isa = PBXGroup; children = ( A00000000000000000000050 /* DspeechUITests.swift */, ); path = DspeechUITests; sourceTree = "<group>"; };
 /* End PBXGroup section */
 
@@ -72,8 +77,8 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		A00000000000000000000018 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = ( A00000000000000000000051 /* DspeechApp.swift in Sources */, A00000000000000000000052 /* ContentView.swift in Sources */, A00000000000000000000053 /* TranscriptDemoViewModel.swift in Sources */, A00000000000000000000054 /* TranscriptSegment.swift in Sources */, A00000000000000000000055 /* AudioCaptureService.swift in Sources */, A00000000000000000000056 /* SpeechRecognitionService.swift in Sources */, ); runOnlyForDeploymentPostprocessing = 0; };
-		A00000000000000000000021 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = ( A00000000000000000000057 /* TranscriptSegmentTests.swift in Sources */, ); runOnlyForDeploymentPostprocessing = 0; };
+		A00000000000000000000018 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = ( A00000000000000000000051 /* DspeechApp.swift in Sources */, A00000000000000000000052 /* ContentView.swift in Sources */, A00000000000000000000053 /* TranscriptDemoViewModel.swift in Sources */, A00000000000000000000054 /* TranscriptSegment.swift in Sources */, A00000000000000000000055 /* AudioCaptureService.swift in Sources */, A00000000000000000000056 /* SpeechRecognitionService.swift in Sources */, A00000000000000000000059 /* PrivacySettings.swift in Sources */, ); runOnlyForDeploymentPostprocessing = 0; };
+		A00000000000000000000021 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = ( A00000000000000000000057 /* TranscriptSegmentTests.swift in Sources */, A00000000000000000000060 /* PrivacySettingsTests.swift in Sources */, ); runOnlyForDeploymentPostprocessing = 0; };
 		A00000000000000000000024 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = ( A00000000000000000000058 /* DspeechUITests.swift in Sources */, ); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXSourcesBuildPhase section */
 

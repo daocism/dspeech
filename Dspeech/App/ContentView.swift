@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var viewModel = TranscriptDemoViewModel.demo
+    @State private var privacy = PrivacySettings()
     @State private var showTranslation: Bool = true
     @State private var showSettings: Bool = false
 
@@ -41,7 +42,7 @@ struct ContentView: View {
         .statusBarHidden(true)
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showSettings) {
-            SettingsView()
+            SettingsView(privacy: privacy)
         }
     }
 
@@ -51,6 +52,8 @@ struct ContentView: View {
                 .font(.system(size: isLandscape ? 22 : 28, weight: .bold, design: .rounded))
                 .foregroundStyle(.white)
                 .accessibilityIdentifier("app-title")
+
+            PrivacyBadge(mode: privacy.processingMode, isLandscape: isLandscape)
 
             Spacer()
 
@@ -93,19 +96,64 @@ struct ContentView: View {
     }
 }
 
+struct PrivacyBadge: View {
+    let mode: ProcessingMode
+    let isLandscape: Bool
+
+    var body: some View {
+        let isLocal = mode == .localOnly
+        let tint: Color = isLocal ? .green : .orange
+        Text(mode.badgeText)
+            .font(.system(size: isLandscape ? 10 : 11, weight: .bold, design: .monospaced))
+            .foregroundStyle(tint)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(tint.opacity(0.16), in: Capsule())
+            .overlay(
+                Capsule().stroke(tint.opacity(0.45), lineWidth: 1)
+            )
+            .accessibilityIdentifier("privacy-badge")
+            .accessibilityLabel(isLocal ? "Локальная обработка" : "Облачная обработка (с согласия)")
+    }
+}
+
 struct SettingsView: View {
+    @Bindable var privacy: PrivacySettings
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    Toggle(isOn: $privacy.allowCloud) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Разрешить облачную обработку")
+                                .font(.body.weight(.medium))
+                            Text(privacy.allowCloud
+                                 ? "Аудио и расшифровки могут уходить с устройства."
+                                 : "Аудио остаётся на устройстве. Облако выключено.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .accessibilityIdentifier("cloud-toggle")
+                } header: {
+                    Text("Приватность")
+                } footer: {
+                    Text("По умолчанию Dspeech обрабатывает звук только локально. Облако включается явно и видно по бейджу LOCAL/CLOUD на главном экране.")
+                }
+
                 Section("Распознавание") {
                     LabeledContent("Язык по умолчанию", value: "Авто")
                     LabeledContent("Модель ASR", value: "Apple Speech")
+                    LabeledContent("Режим", value: privacy.processingMode.displayName)
                 }
                 Section("Перевод") {
                     LabeledContent("Целевой язык", value: "Русский")
-                    LabeledContent("Провайдер", value: "Локальный")
+                    LabeledContent(
+                        "Провайдер",
+                        value: privacy.allowCloud ? "Облако (по согласию)" : "Локальный"
+                    )
                 }
                 Section("О приложении") {
                     LabeledContent("Версия", value: Bundle.main.shortVersion)
