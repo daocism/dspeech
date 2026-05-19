@@ -1,55 +1,47 @@
-@preconcurrency import AVFoundation
 import Foundation
 
-/// Wraps `AVAudioSession.routeChangeNotification` into an
-/// `AsyncStream<AudioRoute>`: each system route change yields the now-active
-/// capture route as a pure domain ``AudioRoute``.
+/// Wraps route changes into an `AsyncStream<AudioRoute>`: each system route
+/// change yields the now-active capture route as a pure domain ``AudioRoute``,
+/// after the same trailing-debounce ``AppleAudioInputService/routeChanges()``
+/// applies (rapid USB-C plug/pull bursts coalesce to one route-display update
+/// instead of thrashing — closes `docs/handoff.md` W3-audio-tester escalation
+/// #3 / autopilot `fp=9d12d5f9513b`).
 ///
-/// This is the role-mandated low-level building block. The frozen
+/// This is the route-display feed. The frozen
 /// ``AudioInputService/routeChanges()`` deliberately surfaces the richer
-/// ``AudioRouteChange`` (reason + descriptor) — it is implemented in
-/// `AppleAudioInputService` rather than here, because losing the
-/// `newDeviceAvailable`/`oldDeviceUnavailable` reason at that boundary would
-/// degrade the architecture's "re-list on USB-C plug/pull" behavior
-/// (`docs/architecture-mvp-slice-2026-05-19.md` "Data flow per gate", F5). Both
-/// subscribe to the same multicast `NotificationCenter` name independently.
+/// ``AudioRouteChange`` (reason + descriptor) for the picker; this surfaces the
+/// pure ``AudioRoute`` for status display. Both consume the same architect-frozen
+/// ``AudioInputSessionPort/routeChangeEvents()`` seam, so neither reads
+/// `AVAudioSession` directly — the notification→route mapping and debounce are
+/// pure Core and host-unit-testable with an injected fake port (this closes the
+/// other half of testability escalation #1; the AVFoundation calls live only in
+/// ``AVFoundationAudioInputSessionPort``, DocC-cited on ``AppleAudioInputService``).
 ///
-/// ## API verification
-/// Context7 MCP unmounted in the mac24 headless env → verified against Apple
-/// official DocC JSON on 2026-05-19 (per `CLAUDE.md` "fetch current docs", as
-/// W1 recorded in `docs/handoff.md`). DocC path = library-id equivalent:
-/// - `documentation/avfaudio/avaudiosession/routechangenotification` —
-///   `class let routeChangeNotification: NSNotification.Name` (iOS 6, posted on
-///   a secondary thread; the `AsyncStream` bridges it to the consumer's actor).
-/// - `documentation/foundation/notificationcenter/notifications(named:object:)`
-///   — `@preconcurrency func notifications(named:object:) -> Notifications`
-///   (iOS 15); `object` left `nil` (route changes are single-session).
-/// - `documentation/avfaudio/avaudiosession/currentroute` +
-///   `documentation/avfaudio/avaudiosessionroutedescription/inputs` —
-///   `currentRoute.inputs: [AVAudioSessionPortDescription]` (iOS 6); mapped to
-///   ``AudioRoute`` via `AppleAudioInputService.route(from:)`.
+/// `Sendable`: the injected port is `Sendable`, the debounce closure is
+/// `@Sendable`; no AVFoundation type is held, so this file imports no
+/// AVFoundation at all.
 struct AudioRouteChangeObserver: Sendable {
-    private let session: AVAudioSession
+    private let port: any AudioInputSessionPort
+    private let debounce: Duration
+    private let sleep: @Sendable (Duration) async -> Void
 
-    init(session: AVAudioSession = .sharedInstance()) {
-        self.session = session
+    init(
+        port: any AudioInputSessionPort = AVFoundationAudioInputSessionPort(),
+        debounce: Duration = AppleAudioInputService.defaultRouteDebounce,
+        sleep: @escaping @Sendable (Duration) async -> Void = AppleAudioInputService.defaultSleep
+    ) {
+        self.port = port
+        self.debounce = debounce
+        self.sleep = sleep
     }
 
     func routes() -> AsyncStream<AudioRoute> {
-        AsyncStream<AudioRoute> { continuation in
-            let session = self.session
-            let task = Task {
-                let notifications = NotificationCenter.default.notifications(
-                    named: AVAudioSession.routeChangeNotification
-                )
-                for await _ in notifications {
-                    if let port = session.currentRoute.inputs.first {
-                        continuation.yield(AppleAudioInputService.route(from: port))
-                    }
-                }
-                continuation.finish()
-            }
-            continuation.onTermination = { _ in task.cancel() }
+        AppleAudioInputService.debounced(
+            port.routeChangeEvents(),
+            interval: debounce,
+            sleep: sleep
+        ) { event in
+            event.activePort.map(AppleAudioInputService.route(from:))
         }
     }
 }
