@@ -477,3 +477,108 @@ Zero hallucinations; every call is a compiler-resolved symbol, not a string lite
 - Integration already shipped: `AppleAudioInputService()` is injected into the Settings audio-source picker via the `SettingsSheet` introduced at `2998ed2`; `AudioRouteChangeObserver()` is available for the route-display feed; the W6 round-3 ESCALATED block records BLOCK-1 (`settings-button` XCUI hit point) as RESOLVED at `56f261c`. Test suite is 88/0/0 on the canonical destination at HEAD (per the W5 re-verify-on-Max block above, also re-confirmed in this re-dispatch's build).
 - No new files, no source diff, no `project.pbxproj` edit. Re-issuing the dispatch's prescribed atomic commit message `feat(audio): add AudioInputService with route-change stream` would create a duplicate of `1343876` and corrupt the atomic-commit knowledge record (git-workflow rule, same precedent the W5 re-dispatch-verify-no-op block above set). The only artifact produced by this re-dispatch is this `docs(handoff)` block, committed atomically with no push (per the dispatch).
 - Outstanding work (carryover, not in this dispatch's scope): the W6 round-3 ESCALATED block routes BLOCK-2 (missing W4b first-run / About test files) + MAJOR-3 / MAJOR-4 / MAJOR-5 to the tech-lead for an option-1/2/3 decision per `docs/REVIEW.md`. No audio-implementer action is pending.
+
+## W2 translation tester — 2026-05-20 (re-dispatch verify, no-op)
+
+This is a re-dispatch of the W2-translation-tester role. The original block above
+(2026-05-19, lines 160-193) stopped at `green_run_after_impl: PENDING` because
+W2a had not yet shipped the injectable decorator seam at the time of writing.
+W2a then shipped the seam at `4404511` ("feat(translation): add host-testable
+LocalTranslationService + pack-manager seam") and the W2 spec corpus turned
+GREEN without any spec weakening. This block re-verifies on the CLAUDE.md-
+canonical destination at the current HEAD `8a2774f` and records the GREEN run
+the original block could not — same precedent as the W5 re-verify-on-Max block
+(`8a2774f`) and the W3 re-dispatch-verify-no-op block (above, lines 444-479).
+
+### tests_added: 24 (18 + 6), 3 files — unchanged from the 2026-05-19 block
+- `DspeechTests/TranslationServiceTests.swift` — 18 `@Test` (Swift Testing).
+  availability(installed/downloadable/unsupported); emptyInput on empty +
+  whitespace-only; fail-fast (`backend.translate` NOT called when empty);
+  successful translate; the six error cases — `languagePackNotInstalled`,
+  `sourceLanguageUnsupported`, `targetLanguageUnsupported`,
+  `languagePairingUnsupported`, `sessionCancelled` (cancellation),
+  `engineFailure`; ≥10k-char input round-trip verbatim, no truncation;
+  `Locale.Language` identity preserved on `availability` + `translate`
+  (en-GB / zh-Hans / pt-BR); verbatim Unicode result; translate good pair after
+  an unsupported availability query (non-blocking — F3 "never blocks ASR").
+- `DspeechTests/TranslationLanguagePackManagerTests.swift` — 6 `@Test`.
+  prepare-success; `sessionCancelled` (sheet dismissed);
+  `languagePairingUnsupported` (uninstallable); `engineFailure`; exact
+  source/target locale forwarding; prepare invoked exactly once (no implicit
+  retry / silent re-download, ADR 0002).
+- `DspeechTests/Fakes/FakeTranslationBackend.swift` — deterministic
+  `FakeTranslationBackend: TranslationService` +
+  `FakeTranslationPackBackend: TranslationLanguagePackPreparer` +
+  `LanguagePair`. Scriptable status/error/result; records call counts /
+  locales / inputs. Zero `import Translation`; no clock, no random, no
+  network — the injected pure-Core seam (functional core, imperative shell).
+
+### red_run_initial: FAIL — preserved in git history at `6bf558f`
+- Commit `6bf558f` ("test(translation): red specs for TranslationService +
+  pack manager") is the original RED state. The DspeechTests module did not
+  compile because the injectable decorator seam (`LocalTranslationService` /
+  `TranslationLanguagePackManager`) did not yet exist in production — the
+  spec-first contract recorded in the 2026-05-19 W2-tester block. The failure
+  was structural, not a weakened assertion. TDD discipline held.
+
+### green_run_after_impl: PASS — re-verified on the canonical destination
+- Commit `4404511` ("feat(translation): add host-testable
+  LocalTranslationService + pack-manager seam") added the W2-tester-specified
+  decorator types in `Dspeech/Core/Translation/TranslationService.swift` (line
+  137: `struct LocalTranslationService: TranslationService`) and
+  `TranslationLanguagePackManager.swift` (line 102:
+  `struct TranslationLanguagePackManager: TranslationLanguagePackPreparer`),
+  matching the contract published in the 2026-05-19 W2-tester block
+  word-for-word (init shape + empty-input guard in the decorator, no second
+  availability precheck, locale identity propagated).
+- Re-verify run at current HEAD `8a2774f`:
+  `xcodebuild -project Dspeech.xcodeproj -scheme Dspeech -destination
+  'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4' CODE_SIGNING_ALLOWED=NO
+  -only-testing:DspeechTests/TranslationServiceTests
+  -only-testing:DspeechTests/TranslationLanguagePackManagerTests test`
+  → ** TEST SUCCEEDED **. All 24 specs pass (18/18 `TranslationServiceTests`
+  + 6/6 `TranslationLanguagePackManagerTests`); zero failures, zero skipped,
+  per-case ≤ 20 ms on the iPhone 17 Pro / iOS 26.4 simulator.
+
+### coverage_gaps (honest, unchanged from the original block — re-stated per the dispatch template)
+- `LanguageAvailability.Status` → `TranslationLanguageStatus` and Apple
+  `TranslationError` → `TranslationServiceError` mapping is NOT host-tested:
+  it lives in the un-fakeable `AppleTranslationService` /
+  `AppleTranslationLanguagePackManager` Apple shell (real Apple `Translation`
+  runtime). The 24 host specs deterministically exercise the pure-Core
+  decorator over the fake; the Apple-edge mapping is device/integration
+  surface — W7 / W10 / on-device verification, not host-suite.
+- No spec asserts that real `Task.cancel()` → `CancellationError` maps to
+  `.sessionCancelled`. Modelled deterministically via `FakeTranslationBackend
+  .translateError = .sessionCancelled` (the W2a shell maps both
+  `TranslationError.alreadyCancelled` and `CancellationError`, intentionally
+  untested at host level — non-deterministic against a real `TranslationSession`).
+- `TranslationPackSystemDownloadPort` (the W2a SwiftUI-seam port that drives
+  `.translationTask` / `prepareTranslation()`) is not exercised here: pack
+  acquisition UI is W5 + UITest territory, out of W2 domain scope (the host
+  fake covers the manager's pure-Core forwarding behaviour, which is what F3
+  contract demands).
+- Property-based tests not added. Swift Testing parameterized fit-locale-
+  identity tests would fit; example-based coverage chosen for the frozen
+  contract surface (16 distinct error/state cases exhaustively enumerated).
+  Same finding flagged as a possible W6 / W7 enhancement.
+
+### ready_for_integrator: yes — no-op
+- Integration already shipped: `LocalTranslationService(backend:
+  AppleTranslationService())` is the wiring `2998ed2` ("feat(app): integrate
+  Translation + Audio source + First-Run into main UI") landed; HEAD `8a2774f`
+  records the full suite at 88/0/0 on iPhone 17 Pro Max. The W6 round-3
+  ESCALATED block (`f4bdbfd`) lists BLOCK-1 as resolved at `56f261c` and the
+  carryover (BLOCK-2 + 3 MAJORs) is tech-lead-routed — none of those are W2
+  translation issues.
+- No new files, no source diff, no `project.pbxproj` edit. Re-issuing the
+  dispatch's prescribed `test(translation): red specs` / `test(translation):
+  green specs` commit messages would create duplicates of `6bf558f` (already
+  the RED state) and corrupt the atomic-commit knowledge record (git-workflow
+  rule, same precedent the W3 and W5 re-dispatch-verify-no-op blocks above
+  set). The only artifact produced by this re-dispatch is this `docs(handoff)`
+  block, committed atomically with no push (per the dispatch's "DO NOT push").
+- Outstanding work (carryover, not in this dispatch's scope): the W6 round-3
+  ESCALATED block routes BLOCK-2 (missing W4b first-run / About test files) +
+  MAJOR-3 / MAJOR-4 / MAJOR-5 to the tech-lead for an option-1/2/3 decision
+  per `docs/REVIEW.md`. No translation-tester action is pending.
