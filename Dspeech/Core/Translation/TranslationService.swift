@@ -114,3 +114,52 @@ struct AppleTranslationService: TranslationService {
         }
     }
 }
+
+/// Deterministically host-testable pure core in front of the un-fakeable Apple
+/// translation shell (``AppleTranslationService``) — the "functional core,
+/// imperative shell" split repo `CLAUDE.md` mandates.
+///
+/// ``AppleTranslationService`` constructs `LanguageAvailability()` /
+/// `TranslationSession` directly with no injection point, so the frozen
+/// ``TranslationService`` contract is only host-verifiable through this decorator
+/// over a faked backend (`DspeechTests/Fakes/FakeTranslationBackend.swift`). It is
+/// the binding integrator seam the W2 translation tester published
+/// (`docs/handoff.md`, "W2 translation tester" → *"Required testable seam …"*);
+/// production wiring is `LocalTranslationService(backend: AppleTranslationService())`
+/// (W5).
+///
+/// Imports no `Translation` framework symbol and performs **zero** networking — it
+/// only forwards to the injected backend, so the PLAN W7 grep of this directory
+/// for networking-class symbols stays clean (ADR 0002, repo `CLAUDE.md` hard
+/// rule 2). `Sendable` via a single `Sendable` stored backend.
+struct LocalTranslationService: TranslationService {
+    private let backend: any TranslationService
+
+    init(backend: any TranslationService) {
+        self.backend = backend
+    }
+
+    func availability(
+        translatingFrom source: Locale.Language,
+        into target: Locale.Language
+    ) async -> TranslationLanguageStatus {
+        await backend.availability(translatingFrom: source, into: target)
+    }
+
+    /// Empty or whitespace-only input throws ``TranslationServiceError/emptyInput``
+    /// **without** reaching the backend (the frozen-DocC fail-fast contract).
+    /// Otherwise the original, untrimmed `text` is forwarded verbatim so long
+    /// transcripts are never truncated and the backend's result, typed error and
+    /// `source`/`target` locales propagate unchanged. No second availability
+    /// precheck here — that is the Apple shell's responsibility
+    /// (``AppleTranslationService``), kept out of the pure core.
+    func translate(
+        _ text: String,
+        from source: Locale.Language,
+        into target: Locale.Language
+    ) async throws(TranslationServiceError) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { throw .emptyInput }
+        return try await backend.translate(text, from: source, into: target)
+    }
+}

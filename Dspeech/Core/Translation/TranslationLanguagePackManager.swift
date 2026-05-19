@@ -75,3 +75,34 @@ struct AppleTranslationLanguagePackManager: TranslationLanguagePackPreparer {
         }
     }
 }
+
+/// Deterministically host-testable pure core in front of the OS-gated Apple pack
+/// preparer (``AppleTranslationLanguagePackManager``) — the "functional core,
+/// imperative shell" split, mirroring ``LocalTranslationService``.
+///
+/// ``AppleTranslationLanguagePackManager`` hard-calls `LanguageAvailability.status`
+/// before delegating, so the frozen ``TranslationLanguagePackPreparer`` contract is
+/// only host-verifiable through this forwarding decorator over a faked backend
+/// (`DspeechTests/Fakes/FakeTranslationBackend.swift`). It is the binding
+/// integrator seam the W2 translation tester published (`docs/handoff.md`);
+/// production wiring is `TranslationLanguagePackManager(backend:
+/// AppleTranslationLanguagePackManager(systemDownloadPort: <W5 SwiftUI port>))` (W5).
+///
+/// Invokes the backend **exactly once** (no implicit retry / silent re-download —
+/// ADR 0002) and propagates the typed error and exact `source`/`target` locales
+/// unchanged. Imports no `Translation` framework symbol on this path and performs
+/// zero networking; `Sendable` via a single `Sendable` stored backend.
+struct TranslationLanguagePackManager: TranslationLanguagePackPreparer {
+    private let backend: any TranslationLanguagePackPreparer
+
+    init(backend: any TranslationLanguagePackPreparer) {
+        self.backend = backend
+    }
+
+    func prepareLanguages(
+        from source: Locale.Language,
+        into target: Locale.Language
+    ) async throws(TranslationServiceError) {
+        try await backend.prepareLanguages(from: source, into: target)
+    }
+}
