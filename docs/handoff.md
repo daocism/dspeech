@@ -618,3 +618,148 @@ Context7 MCP (`mcp__plugin_context7_context7__*`) remains unmounted in the mac24
 - Context7 MCP still not mounted in mac24 headless env (same documented finding W1/W2/W3/W4 recorded; Apple DocC JSON authoritative substitute, re-verified by W6 in 3 review rounds with zero hallucinations).
 - F3 deferral path **not** taken: no `docs/adrs/0007*.md` or `docs/adr/0007*.md` exists; F3 is shipped, not deferred. W9 still owes the keep-ADR `docs/adr/0007-translation-framework-on-device.md` per the W1 architect block (text already drafted in `docs/architecture-mvp-slice-2026-05-19.md` §"ADR 0002 determination").
 - Outstanding W6 round-3 carryover (out of W2 scope; awaiting tech-lead unblock): BLOCK-2 (missing W4b first-run / About test files) + MAJOR-3 (no `TranslationSessionPort` device-test seam; affects the Apple-edge mapping table in `AppleTranslationService` / `AppleTranslationLanguagePackManager`) + MAJOR-4 (`-dspeech.*` arg-prefix sniff not gated behind `DSPEECH_UITEST=1`) + MAJOR-5 (`LocalTranslationService` trim contract DocC gap — `LocalTranslationService.translate` forwards untrimmed `text` while `AppleTranslationService.translate` forwards `trimmed`; the protocol DocC at `TranslationServiceProtocol.swift:84-98` is silent on which the backend sees). MAJOR-5 is the only carryover that touches W2-owned files; a one-line DocC clarification on `TranslationService.translate` would close it and is the minimum fix the tech-lead would dispatch on option-1/3 paths.
+
+## W4 firstrun impl — 2026-05-20 (re-dispatch verify, no-op)
+
+This is a re-dispatch of the W4-firstrun-implementer role. The original W4 block
+(2026-05-19, lines 119-146) shipped at commit `41b5236` ("feat(app): add
+first-run flow, About, Settings sections") with three follow-up a11y-id
+alignment fixes (`469454e` / `e7f8391` / `02ca017`) carrying the W4b /
+W-polish tester contract. All four W4-owned files are at HEAD `8a2774f`
+unchanged, and the build+test suite is GREEN on the CLAUDE.md-canonical
+destination. Same re-dispatch-verify-no-op precedent as the W5 (`8a2774f`),
+W3 audio impl (lines 444-479), and W2 translation tester (lines 481-584,
+586-620) blocks above.
+
+### files_created: none new — all 4 W4-owned files already shipped at `41b5236`. HEAD content of the W4-owned set:
+- `Dspeech/Core/FirstRun/FirstRunCoordinator.swift` — `final class
+  DefaultFirstRunCoordinator: FirstRunCoordinator, @unchecked Sendable`
+  (NSLock-guarded pure state machine over `FirstRunCard.allCases`) +
+  `struct UserDefaultsFirstRunStateStore: FirstRunStateStore, @unchecked
+  Sendable` (write-then-verify fail-fast; key `completedDefaultsKey =
+  "hasCompletedFirstRun"`, exactly the literal the dispatch requested).
+- `Dspeech/App/FirstRunView.swift` — `FirstRunViewModel` (`@MainActor
+  @Observable`) + `FirstRunView` (three PRD §1.3 cards: receive-only /
+  local-by-default / wire-for-accuracy; skip / advance; last-card target-
+  language picker over `dspeechGlossLanguages`) + `OnboardingPermissionRequesting`
+  / `SystemOnboardingPermissionRequester` (real `SFSpeechRecognizer
+  .requestAuthorization` + `AVAudioApplication.requestRecordPermission`, no
+  fake — repo `CLAUDE.md` rule 2). `finish()` sets `PrivacySettings.mode =
+  .localOnly`, propagates the selected `Locale.Language` via the injected
+  closure, and requests speech+mic permissions before advancing to
+  `.completed` — three dispatch-required actions in one user action.
+- `Dspeech/App/AboutView.swift` — app name, `versionString` from
+  `CFBundleShortVersionString (CFBundleVersion)`, `LocalOnlyBadge`
+  ("ЛОКАЛЬНО НА УСТРОЙСТВЕ" capsule, green) for hard rule #4, Apple Speech
+  / Apple Translation / AVFoundation attributions (real copy, not
+  placeholder), and a license footer stating only Apple system frameworks
+  are linked (Apple SDK Agreement) — zero third-party OSS in the binary,
+  so no MIT preamble is included as that would be a fictitious attribution.
+- `Dspeech/App/SettingsSheet+Sections.swift` — composition-ready
+  `AudioSourceSettingsSection(service: any AudioInputService)`,
+  `TranslationSettingsSection(service: any TranslationService, preparer:
+  any TranslationLanguagePackPreparer, …)`, and `AboutSettingsSection()`.
+  Consumes only the frozen Core protocols (`any TranslationService` /
+  `any TranslationLanguagePackPreparer` / `any AudioInputService`) — zero
+  references to any W2 / W3 concrete (`AppleTranslationService` /
+  `LocalTranslationService` / `TranslationLanguagePackManager` /
+  `AppleAudioInputService`) inside the file, verified by grep over the
+  W4-owned set. `SettingsSheet.swift` is the integrator-owned host that
+  injects them; this re-dispatch does NOT touch it (dispatch ownership rule).
+
+### accessibility_identifiers: complete list at HEAD (no new ones added this re-dispatch — all already shipped + W4b/W-polish-aligned):
+- `first-run-view`, `first-run-skip`, `first-run-card-1`, `first-run-card-2`,
+  `first-run-card-3`, `first-run-card-title`, `first-run-error`,
+  `first-run-target-language-picker`, `first-run-continue`
+- `about-view`, `about-app-name`, `about-version`, `about-privacy-badge`,
+  `about-attribution-apple-speech`, `about-attribution-translation`,
+  `about-licenses`
+- `audio-source-picker`, `audio-source-row-<portUID>`, `audio-level-meter`,
+  `audio-source-error`
+- `translation-section`, `translation-target-language-picker`,
+  `translation-status`, `translation-download-cta`, `translation-error`
+- `about-section`, `about-nav-link`
+
+### xcodebuild: PASS
+- `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild
+  -project Dspeech.xcodeproj -scheme Dspeech -destination 'platform=iOS
+  Simulator,name=iPhone 17 Pro,OS=26.4' CODE_SIGNING_ALLOWED=NO build test`
+  → ** TEST SUCCEEDED **. xcresult summary at
+  `Run-Dspeech-2026.05.20_00-29-00-+0200.xcresult`:
+  `passedTests=88, failedTests=0, skippedTests=0, expectedFailures=0,
+  result=Passed` on `iPhone 17 Pro / iOS 26.4` (136 actual runs incl.
+  parameterized expansions; both bundles green: `DspeechUITests` Passed,
+  `DspeechTests` Passed). Canonical CLAUDE.md destination, the same one
+  W6 round-2 used to surface BLOCK-1 (now resolved at `56f261c`).
+
+### self_check: TODO=0 fatalError=0 Coming\ soon=0
+- `grep -rn "TODO\|fatalError\|Coming soon\|not implemented\|placeholder"
+  Dspeech/` → no matches (whole project).
+- W4-owned scoped grep:
+  `grep -rn "TODO\|fatalError\|Coming soon\|FIXME\|unimplemented\|placeholder"
+  Dspeech/Core/FirstRun/ Dspeech/App/FirstRunView.swift
+  Dspeech/App/AboutView.swift Dspeech/App/SettingsSheet+Sections.swift`
+  → no matches.
+- No `URLSession` / `URLRequest` introduced anywhere; no cloud network
+  paths added (ADR 0002 regression guard intact).
+
+### scope_reconciliations (unchanged from the 2026-05-19 W4 block — re-stated per the dispatch template):
+- Dispatch literal "TranslationLanguagePackManager via DI": the frozen
+  protocol is `TranslationLanguagePackPreparer`; W2a's concrete is
+  `TranslationLanguagePackManager`.
+  `TranslationSettingsSection(preparer: any TranslationLanguagePackPreparer)`
+  consumes the protocol — no W2 concrete imported (verified by grep over
+  the W4-owned set).
+- Dispatch literal "@AppStorage for hasCompletedFirstRun":
+  the frozen architecture mandates `FirstRunStateStore`.
+  `UserDefaultsFirstRunStateStore` is the single writer of UserDefaults
+  key `hasCompletedFirstRun` (exposed as `completedDefaultsKey`);
+  `DspeechApp.applyFirstRunLaunchOverride()` (W5-owned) reflects XCUITest
+  launch overrides onto that same key. The composition root uses the
+  store, not `@AppStorage` directly — same persistence bit, one writer,
+  no double-write bug.
+
+### commit: none for source — re-dispatch is a no-op
+- The dispatch's prescribed atomic message `feat(app): add first-run flow,
+  About, Settings sections` is already in branch history at `41b5236`.
+  Re-issuing it would either be empty (zero working-tree diff in the
+  W4-owned set, confirmed via `git status --short` on the 4 files) or —
+  worse — would corrupt the atomic-commit knowledge record (git-workflow
+  rule, same precedent the W5 / W3-audio-impl / W2-translation-tester
+  re-dispatch-verify-no-op blocks above set at `8a2774f` and lines
+  444-479 / 481-584 / 586-620). The only artifact produced by this
+  re-dispatch is this `docs(handoff)` block, committed atomically with no
+  push (per the dispatch's "DO NOT push").
+
+### errors_unresolved:
+- Re-dispatch arrived AFTER the work it asked for had already shipped
+  (`41b5236` → `469454e` → `e7f8391` → `02ca017`), been integrated
+  (`2998ed2`), gone through three review rounds (`1b89697` → `6b113f6` →
+  `f4bdbfd`), and reached suite-green at HEAD (`8a2774f`). Honouring the
+  dispatch literally would duplicate `41b5236`; honouring its spirit
+  (verify the first-run + About + Settings contract still holds at HEAD)
+  produces this docs-only block.
+- Context7 MCP still not mounted in the mac24 headless env (same finding
+  W1/W2/W3/W4 recorded; Apple DocC JSON authoritative substitute,
+  re-verified by W6 in 3 review rounds with zero hallucinations). The
+  W4-owned set introduces no new Apple symbols beyond those already
+  verified in the 2026-05-19 W4 block (`SFSpeechRecognizer
+  .requestAuthorization` / `AVAudioApplication.requestRecordPermission`
+  / `CFBundleShortVersionString` / `CFBundleVersion`).
+
+### ready_for_integrator: yes — no-op
+- Integration already shipped at `2998ed2` ("feat(app): integrate
+  Translation + Audio source + First-Run into main UI"):
+  `DefaultFirstRunCoordinator()` is injected into `ContentView` from
+  `DspeechApp`, `FirstRunView` is gated on
+  `coordinator.currentState() != .completed`, `onSelectTargetLanguage` is
+  wired through to the translation flow, and the three W4 sections are
+  mounted inside `SettingsSheet.swift`'s `Form` (the integrator-owned
+  host file the dispatch explicitly forbids me to modify — and I did not).
+- Outstanding (carryover, not in this dispatch's scope): the W6 round-3
+  ESCALATED block routes BLOCK-2 (missing W4b unit / UI test files:
+  `FirstRunCoordinatorTests.swift`, `FirstRunFlowUITests.swift`,
+  `AboutViewUITests.swift` — coverage gap on `DefaultFirstRunCoordinator`
+  / `FirstRunView` / `AboutView`) + MAJOR-3 / MAJOR-4 / MAJOR-5 to the
+  tech-lead per `docs/REVIEW.md`. No first-run-implementer action is
+  pending.
