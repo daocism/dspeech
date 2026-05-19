@@ -345,3 +345,19 @@ fakes; those findings (#2–#5) were dispatched to `role=implementer`, not here.
 ### regression_checks: privacy_badge=visible (PrivacyBadge unchanged in `controlBar`), todo_grep=0 (Dspeech/), urlsession_in_translation=0 (Dspeech/Core/Translation/), adr_0007_translation_deferral=absent (F3 kept per arch §"ADR 0002 determination" — Translation toggle stays visible).
 ### pbxproj_repair: removed dangling refs for `FirstRunCoordinatorTests.swift`, `FirstRunFlowUITests.swift`, `AboutViewUITests.swift` (referenced in HEAD pbxproj but never committed under any branch reachable from HEAD — `git log --all --diff-filter=A -- <path>` empty). Appended `SettingsSheet.swift` (new fileRef `A00000000000000000000130`, build entry `A00000000000000000000131`). `plutil -lint` OK. No existing IDs renumbered (CLAUDE.md project rule).
 ### ready_for_reviewer: yes
+
+## W6 reviewer round 1 — 2026-05-19
+### status: CHANGES_REQUESTED
+### findings: 2 BLOCK, 3 MAJOR, 4 MINOR
+- BLOCK-1: XCUITest regression — 2/3 DspeechUITests fail (`testSettingsButtonOpensSettingsSheet`, `testPrivacyBadgeStartsLocalAndFlipsToCloudOnOptIn`). `Computed hit point {-1, -1}` on `settings-button` after tap synthesis → `.sheet` never presents → `cloud-toggle` / `settings-done-button` not found within 4s. Suspect `Button { … } label: { Image … }` + `.buttonStyle(.plain)` + `.contentShape(Circle())` interaction in `ContentView.swift:229-251`.
+- BLOCK-2: W4b deliverables advertised in handoff (`FirstRunCoordinatorTests.swift` / `FirstRunFlowUITests.swift` / `AboutViewUITests.swift`) are absent from the codebase and from git history on every branch. Zero unit coverage on `DefaultFirstRunCoordinator`, zero UI coverage on `FirstRunView` / `AboutView`.
+- MAJOR-3: `AppleTranslationService` / `AppleTranslationLanguagePackManager` Apple-edge mapping (the entire `TranslationError`→`TranslationServiceError` catch table + `LanguageAvailability.Status`→`TranslationLanguageStatus` map) is host-untested AND device-untested. W2b openly flags this; no W7/W10 device-test slot exists.
+- MAJOR-4: `DspeechApp.applyFirstRunLaunchOverride()` ships an arg-prefix sniff (`-dspeech.*`) into the production composition root — silent first-run skip if any future launcher passes a `-dspeech.*` arg.
+- MAJOR-5: `LocalTranslationService.translate` forwards untrimmed `text` after a `trimmed`-keyed empty-input guard; protocol DocC doesn't specify whether the backend sees trimmed or raw.
+- MINOR-6: 1 `try?` in new code (`AudioInputService.swift:92`, `Task.sleep`) — justified.
+- MINOR-7: route-debounce tests sleep on wall clock instead of using the injected `sleep:` closure — slow-CI brittleness.
+- MINOR-8: `SettingsSheet.packPreparer` re-allocates its preparer chain on every body recomputation.
+- MINOR-9: mutation-test sample of `kind(forPortType:)` is adequately covered by the parameterized adapter test.
+### context7_recheck: TranslationSession.init(installedSource:target:) → convenience init, NO async, NO throws ✓; LanguageAvailability.status(from:to:) → async non-throwing ✓; TranslationSession.translate(String) → async throws ✓; prepareTranslation() → async throws ✓; LanguageAvailability.Status cases ✓; TranslationError cases ✓; AVAudioSession surface ✓. Zero hallucinations. Apple DocC JSON re-fetched independently this session.
+### test_suite: FAIL — 132 unit tests PASS / 1 UI test PASS / 2 UI tests FAIL. `xcodebuild build test` exits with `** TEST FAILED **`.
+### review_path: docs/REVIEW.md
