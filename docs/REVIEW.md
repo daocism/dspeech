@@ -1,5 +1,150 @@
 # W6 — Independent Reviewer Report
 
+## Round 3 — 2026-05-20
+
+- **status:** **ESCALATED** to tech-lead (cycle limit reached: round 3 of max 3)
+- **branch:** `feat/mvp-completion-2026-05-19`
+- **HEAD:** `56f261c` (`fix(app): unbreak settings-button XCUI hit point on iPhone 17 Pro`)
+- **base:** `main`
+- **reviewer:** independent skeptical persona — fresh ctx, did not participate in W1–W5
+- **test command:** `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project Dspeech.xcodeproj -scheme Dspeech -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4' CODE_SIGNING_ALLOWED=NO build test`
+- **test result:** **TEST SUCCEEDED** — 88 tests, 136 actual runs (incl. parameterized expansions), 0 failed, 0 skipped, xcresult `result=Passed`. Both bundles green: `DspeechTests` (all suites incl. `TranslationLanguagePackManagerTests`, `LiveTranscriptionViewModelTests`, `AudioRouteTests`, `TranslationServiceTests`, `PrivacySettingsTests`, `AudioInputServiceTests`, `TranscriptSegmentTests`) and `DspeechUITests` (all 3: `testAppLaunchesToTranscriptSurface`, `testPrivacyBadgeStartsLocalAndFlipsToCloudOnOptIn`, `testSettingsButtonOpensSettingsSheet`). xcresult at `Run-Dspeech-2026.05.20_00-17-23-+0200.xcresult`.
+
+### Delta from round 2
+
+Exactly one commit landed between round 2 (`6b113f6`) and this round-3 review:
+
+```
+56f261c fix(app): unbreak settings-button XCUI hit point on iPhone 17 Pro
+```
+
+Real code delta: `Dspeech/App/ContentView.swift` (+15/-4 production lines) + handoff append. **No echo / no destination-shopping** — fix targets the CLAUDE.md-canonical destination (`iPhone 17 Pro / iOS 26.4`) directly. The cycle-limits "echo / >80% identical" guard does **not** fire: the diff bears no resemblance to the round-1 suggested remediation (which was `.contentShape(Circle())` removal + `Button("…", systemImage:)` refactor). The implementer's root-cause re-diagnosis (control-bar text overflow at 393pt, not the `.buttonStyle(.plain)` × `.contentShape(Circle())` interaction round-1 hypothesized) is engineering-sound and verifiable from the diff alone.
+
+### BLOCK-1 — RESOLVED ✅
+
+Independent re-verification, this session, on iPhone 17 Pro / OS 26.4 (the CLAUDE.md-canonical destination):
+
+```
+[Test Suite] DspeechUITests -> Passed
+  [Test Case] testAppLaunchesToTranscriptSurface() -> Passed
+  [Test Case] testPrivacyBadgeStartsLocalAndFlipsToCloudOnOptIn() -> Passed
+  [Test Case] testSettingsButtonOpensSettingsSheet() -> Passed
+```
+
+No `Computed hit point {-1, -1}` symptom anywhere in the test-run log. The two round-2 BLOCK-1 failures (`testSettingsButtonOpensSettingsSheet`, `testPrivacyBadgeStartsLocalAndFlipsToCloudOnOptIn`) both pass. Fix accepted: closing this finding.
+
+The accepted fix:
+- `controlBar`: title font 28→24pt, `.lineLimit(1)` + `.minimumScaleFactor(0.7)`, HStack spacing 14→12, `Spacer(minLength: 8)`, `.lineLimit(1)` on the toggle label.
+- `settingsButton`: `.contentShape(Circle())` (applied outside the label after `.buttonStyle(.plain)`) → `.contentShape(Rectangle())` (applied inside the label).
+- Two `// why:` comments document the original failure mode, per repo CLAUDE.md exception ("when WHY is non-obvious").
+
+### BLOCK-2 — UNRESOLVED (round 3, same evidence as rounds 1 & 2)
+
+```
+$ ls DspeechTests/ DspeechUITests/
+DspeechTests/:                    DspeechUITests/:
+  AudioInputServiceTests.swift      DspeechUITests.swift
+  AudioRouteTests.swift
+  Fakes/
+  LiveTranscriptionViewModelTests.swift
+  PrivacySettingsTests.swift
+  TranscriptSegmentTests.swift
+  TranslationLanguagePackManagerTests.swift
+  TranslationServiceTests.swift
+
+$ git log --all --diff-filter=A --format='%H %s' -- \
+    DspeechTests/FirstRunCoordinatorTests.swift \
+    DspeechUITests/FirstRunFlowUITests.swift \
+    DspeechUITests/AboutViewUITests.swift
+(empty)
+
+$ grep -r "FirstRunCoordinator\|FirstRunView\|AboutView\|about-privacy-badge\|about-nav-link" \
+    DspeechTests/ DspeechUITests/
+(no files match)
+```
+
+No equivalent coverage in the existing `DspeechTests` / `DspeechUITests` bundles either. `DefaultFirstRunCoordinator` (the first-launch state machine), `FirstRunView` (the user's first interaction with the app), and `AboutView` (the surface that carries hard rule #4 — the `about-privacy-badge` / LOCAL badge into About) all ship with **zero** unit or UI coverage of any kind.
+
+### MAJOR-3 — UNRESOLVED
+
+`grep -r "TranslationSessionPort" Dspeech/` → no matches. `docs/architecture-mvp-slice-2026-05-19.md` → no "Known device-only", "TranslationSessionPort", "device-MT", "W10", or "Apple-edge" sections. `Dspeech/Core/Translation/TranslationService.swift:79-117` (`AppleTranslationService.translate`) and `TranslationLanguagePackManager.swift` (`AppleTranslationLanguagePackManager.prepareLanguages`) still ship the `TranslationError` → `TranslationServiceError` mapping table + `LanguageAvailability.Status` → `TranslationLanguageStatus` map with no host-test, no device-test, and no scheduled W10 device run. Round-2 alternative ("amend arch doc with a 'Known device-only gates' section + W10 schedule") also not taken. Same risk profile: a wrong-mapping bug here silently routes a meaningful error to `.engineFailure(String(describing:))` and loses semantic precision for the UI.
+
+### MAJOR-4 — UNRESOLVED
+
+`Dspeech/App/DspeechApp.swift:33-50` is byte-identical to round 2 — the `else if arguments.contains(where: { $0.hasPrefix("-dspeech.") })` branch is still in the production composition root, not gated behind `DSPEECH_UITEST=1` or `#if DEBUG`. The `// why:` at lines 44-47 still only documents *intent*. Production composition root still silently skips onboarding on any `-dspeech.*` launch arg — including a deep-link / App Clip / MDM-provisioned launch arg accidentally matching the prefix. The `env["DSPEECH_UITEST"]` env var is referenced ten lines higher in the same file (line 23, `isUITesting`), so the one-line gate that closes this finding has zero cost.
+
+### MAJOR-5 — UNRESOLVED
+
+The two layers still pass different values to their delegated backends:
+
+- `LocalTranslationService.translate` (`Dspeech/Core/Translation/TranslationService.swift:158-166`): trims for the empty-input guard, forwards `text` (untrimmed) to the backend.
+- `AppleTranslationService.translate` (lines 79-117, specifically lines 84-85 and 98): trims for the empty-input guard, forwards `trimmed` to `session.translate(trimmed)`.
+
+The protocol DocC at `TranslationServiceProtocol.swift:84-98` still says nothing about whether the backend sees trimmed or raw text. The `LocalTranslationService` DocC (lines 151-157) was extended pre-round-1 to document the untrimmed-forward behaviour, but the protocol contract and the Apple shell still disagree. Pick one: align both layers, or extend the protocol DocC to authorise leading/trailing whitespace pass-through.
+
+### MINOR-6 / MINOR-7 / MINOR-8 — carried from round 2 (non-blocking)
+
+Unchanged. `try?` audit: 1 in new code (`AudioInputService.swift:92`, justified). `AudioRouteTests` debounce specs still use real wall-clock `Task.sleep`. `SettingsSheet.packPreparer` still re-allocates on every body recomputation. None of these block ship; they are listed for the follow-up tracker.
+
+### Anti-AI-failure pattern audit (mechanical, re-run this session)
+
+| Check | Result |
+|---|---|
+| `grep -rn "TODO\|FIXME\|fatalError\|Coming soon\|unimplemented\|URLSession\|URLRequest\|HTTPSURL\|placeholder"` over `Dspeech/` | **0** matches |
+| `grep -rn "try?"` over `Dspeech/` | 1 in new code (`AudioInputService.swift:92` — `Task.sleep`, justified) + 1 pre-existing (`AppleSpeechLiveTranscriptionEngine.swift:156`, out of scope) |
+| `grep -rn "catch\s*\{\s*\}"` over `Dspeech/` | **0** matches |
+| Typed throws on every new error boundary | ✅ (`TranslationServiceError`, `AudioInputServiceError`, `FirstRunCoordinatorError`) |
+| `accessibilityIdentifier(...)` on every new control surfaced by tests | ✅ (missing surface remains the *tests* — BLOCK-2) |
+| DocC on every public type/protocol/symbol in new Core files | ✅ |
+| `@MainActor` only where main-actor isolation is genuinely needed | ✅ |
+| URLSession in Core/Translation | **0** matches (ADR 0002 guard satisfied) |
+
+### Context7 Apple-API re-verification (this session)
+
+Context7 MCP not mounted in env (same finding W1–W6 r1/r2). No new Apple-API call introduced in `56f261c` — the only new symbols are SwiftUI built-ins already shipped with iOS 17+: `.lineLimit(_:)`, `.minimumScaleFactor(_:)`, `Spacer(minLength:)`, `.contentShape(_:)` with `Rectangle()`. The round-1/2 verification table for the Translation / AVAudioSession / Speech surface stands:
+
+- `TranslationSession.init(installedSource:target:)` — convenience init, NO async, NO throws ✓
+- `LanguageAvailability.status(from:to:)` — async, non-throwing ✓
+- `TranslationSession.translate(String)` — async throws ✓
+- `TranslationSession.prepareTranslation()` — async throws ✓
+- `LanguageAvailability.Status` (`.installed/.supported/.unsupported`) ✓
+- `TranslationError` (all 6 cited cases) ✓
+- `AVAudioSession.availableInputs` / `setPreferredInput(_:)` / `currentRoute` / `routeChangeNotification` / `RouteChangeReason` ✓
+
+Zero hallucinated APIs across the branch.
+
+### Mutation-sample sanity check
+
+A representative mutation test: if `ContentView.swift` re-introduced the round-2 layout (revert `.lineLimit(1)` + `.minimumScaleFactor(0.7)` + drop the `.contentShape(Rectangle())` move), `testSettingsButtonOpensSettingsSheet` and `testPrivacyBadgeStartsLocalAndFlipsToCloudOnOptIn` would fail again on iPhone 17 Pro / OS 26.4 — proven by the round-2 capture (`Computed hit point {-1, -1}`) being a known fingerprint of that exact source layout. The XCUITest pair has demonstrable bug-detection power for this finding. (Confirms the test contract is meaningful, not a tautology.)
+
+### Cycle status — ESCALATION
+
+- **Round 3 of (max) 3** — cycle budget exhausted.
+- **Implementer landed real code progress** on BLOCK-1 between round 2 and round 3 (not a zero-fix delta; not an echo of a previously-burned approach; verified-green on the canonical destination). The "zero-code-delta → ESCALATE" trigger from the round-2 cycle warning does **not** apply.
+- **However**: 4 of 5 substantive findings (BLOCK-2, MAJOR-3, MAJOR-4, MAJOR-5) carry forward from round 1 → round 2 → round 3 with zero engagement (no code changed, no DocC amended, no ADR/PLAN amendment scheduling them as accepted deferrals).
+- Per the role spec ("Max 3 review→fix rounds. After 3 → escalate to tech-lead via docs/handoff.md 'BLOCKED' block. Do NOT spin forever."), the correct verdict at this cycle limit is **ESCALATED**, not a fourth `CHANGES_REQUESTED` round.
+
+### Escalation to tech-lead — decision required
+
+The branch is in a **shippable-with-known-gaps** state:
+
+- ✅ Test suite green on canonical destination (88/0/0).
+- ✅ Zero hallucinated Apple APIs.
+- ✅ Anti-AI-failure pattern audit clean (TODO/FIXME/fatalError/URLSession in Core/Translation/Coming soon all 0).
+- ✅ Privacy / ADR 0002 regression guards intact.
+- ❌ BLOCK-2: first-launch and About surfaces have zero test coverage (highest-leverage gap — these are surfaces the user *will* hit on every cold install).
+- ❌ MAJOR-3 / MAJOR-4 / MAJOR-5: untested Apple-edge mapping, unguarded launch-arg sniff in production composition root, asymmetric trim contract.
+
+Tech-lead options:
+
+1. **Accept-and-ship**: merge as-is and dispatch a follow-up branch for BLOCK-2 (highest priority) + MAJOR-3/4/5. Defensible *only* if a dated follow-up entry lands in `docs/PLAN-2026-05-19.md` (or successor) on the same dispatch, naming each finding by ID with a "must-land-before-…" gate. Otherwise the gaps drift.
+2. **Dispatch round-4 remediation**: re-open the cycle for one targeted fix-pass owning BLOCK-2 + MAJOR-4 specifically (those are the cheapest by far — the test files match a frozen contract that W4b already authored against, and MAJOR-4 is a one-line `env["DSPEECH_UITEST"] == "1"` gate around the existing `else if`). MAJOR-3 and MAJOR-5 could be accepted-as-deferred via an ADR amendment instead of code.
+3. **Block-on-BLOCK-2 only**: ship after BLOCK-2 is fixed; defer all three MAJORs to a follow-up by ADR amendment. Aligns with the round-1/2 framing that BLOCK-2 is "the user's first-launch experience plus the about-privacy-badge rendering (hard rule #4) shipping with no test of any kind."
+
+Reviewer recommendation: **option 3**. BLOCK-2 is the only remaining finding whose absence breaks a project hard rule ("no half-implementations" — a shipped first-run/About surface with zero coverage is a half-implementation of the test contract). MAJOR-3/4/5 are real but deferrable with an ADR-amendment trail. Not a reviewer decision — escalating to tech-lead per role spec.
+
+---
+
 ## Round 2 — 2026-05-19
 
 - **status:** CHANGES_REQUESTED
