@@ -15,7 +15,7 @@ struct AboutView: View {
                 HStack {
                     Spacer()
                     LocalOnlyBadge()
-                        .accessibilityIdentifier("about-local-badge")
+                        .accessibilityIdentifier("about-privacy-badge")
                     Spacer()
                 }
                 .listRowBackground(Color.clear)
@@ -28,7 +28,7 @@ struct AboutView: View {
                     title: "Распознавание речи",
                     detail: "Apple Speech (фреймворк Speech, iOS). Распознавание выполняется на устройстве."
                 )
-                .accessibilityIdentifier("about-attribution-speech")
+                .accessibilityIdentifier("about-attribution-apple-speech")
                 attributionRow(
                     title: "Перевод",
                     detail: "Apple Translation (фреймворк Translation, iOS). Перевод выполняется на устройстве; языковые пакеты загружает системный механизм Apple."

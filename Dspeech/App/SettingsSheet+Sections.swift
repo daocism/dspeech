@@ -298,6 +298,7 @@ struct AboutSettingsSection: View {
             } label: {
                 LabeledContent("О приложении", value: AboutView.versionString)
             }
+            .accessibilityElement(children: .combine)
             .accessibilityIdentifier("about-nav-link")
         }
         .accessibilityIdentifier("about-section")
