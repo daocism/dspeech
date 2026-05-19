@@ -763,3 +763,164 @@ W3 audio impl (lines 444-479), and W2 translation tester (lines 481-584,
   / `FirstRunView` / `AboutView`) + MAJOR-3 / MAJOR-4 / MAJOR-5 to the
   tech-lead per `docs/REVIEW.md`. No first-run-implementer action is
   pending.
+
+## W3 audio tester — 2026-05-20 (re-dispatch verify, no-op)
+
+Re-dispatch of the W3-audio-tester role. The original block (2026-05-19, lines
+231-247) recorded `red_initial: FAIL ✓` and `green_after_impl` as device-only /
+suite-blocked because the AVFoundation-hardwired adapter was not host-testable
+and the cross-slice W2 suite block was still open. Both blockers have since
+resolved in branch history (`5a6cf77` shipped the Core DI seam → `118e5ae`
+refactored `AppleAudioInputService` onto it with debounce → `ee5feaa` +
+`b51815c` authored the seam-based specs RED → GREEN), and the W2 suite block
+cleared at `4404511`. This block re-verifies on the CLAUDE.md-canonical
+destination at HEAD `8a2774f` and records the GREEN run the original block
+could not, mirroring the W3-impl, W2-tester, W2-impl, W5-integrator, and
+W4-firstrun re-dispatch-verify-no-op precedents above.
+
+### tests_added: 45 `@Test` total (26 + 19), 3 files — unchanged at HEAD
+- `DspeechTests/AudioInputServiceTests.swift` — 26 `@Test`: 5 `AudioInputLevel
+  .normalized` dBFS-clamp + monotonicity (parameterized PBT — bounded-power
+  stride, zero-at-or-below-floor, one-at-or-above-ceiling, midpoint-to-half,
+  monotonic-in-average-power); 2 `AudioInputDescriptor` (Codable round-trip
+  + UID identity); 1 `AudioInputKind` 4-bucket totality; 2
+  `AudioInputServiceError` Equatable (5-case distinctness + associated-value
+  sensitivity); 6 frozen `AudioInputService` contract via the protocol-fronted
+  `FakeAVAudioSession` (empty → `.noInputsAvailable` not `[]`; nil
+  `currentInput()` pre-config; stale-descriptor selection rejected;
+  available-descriptor selection accepted; `.activationFailed` propagated;
+  `levels()` stream finishes on consumer cancellation); 10 adapter
+  orchestration over the injected `AudioInputSessionPort` seam
+  (`configureForMeasurement` then port→descriptor map; empty ports →
+  `.noInputsAvailable` not `[]`; permission-denied propagated as
+  `.audioSessionUnavailable`; port-type → picker-kind bucket map incl.
+  `.other` 5th case; `activate()` + UID-keyed `setPreferredInput`; stale
+  selection rejection skips `setPreferredInput`; `.activationFailed`
+  propagated and skips preferred; residual session-level preferred-input
+  rejection propagated; `currentInput()` nil pre-configure; `currentInput()`
+  mapped from active port snapshot).
+- `DspeechTests/AudioRouteTests.swift` — 19 `@Test`: 2 `AudioRoute` value
+  logic (case + associated-name Equatable, `displayName` bucket vs device
+  name); 1 `AudioRouteChange` Equatable across reason + activeInput; 1
+  parameterized `AudioRouteChangeReason` rawValue round-trip across all 6
+  cases; 2 frozen `routeChanges()` contract via fake (delivers emitted
+  changes; terminates on consumer cancellation); 7 adapter route-stream
+  orchestration over the seam — every Apple `RouteChangeReason` mapped incl.
+  `wakeFromSleep` / `noSuitableRouteForCategory` → `.unknown`, absent
+  reason-key → `.unknown`, unrepresentable raw → `.unknown`, active-port
+  snapshot mapped, nil-active passes through as nil, **rapid-burst debounce
+  coalesces and latest-wins** (closes original escalation #3), route stream
+  survives `select()`, cancellation propagates to injected raw stream; 1
+  parameterized `AppleAudioInputService.route(from:)` across 8 port-type
+  buckets (builtInMic / usbAudio / headsetMic / **lineIn→wiredHeadset** /
+  bluetoothHFP / **bluetoothLE→bluetooth** / **bluetoothA2DP→bluetooth** /
+  unmapped → `.other(name:)` pinning the W3a 5th-case widening); 4
+  `AudioRouteChangeObserver.routes()` specs (snapshot → `AudioRoute`
+  projection; nil-active **dropped** — the deliberate behavioural contrast
+  with `routeChanges()` which surfaces nil-active with nil `activeInput`;
+  rapid-plug-pull debounce-keeps-latest; cancellation teardown of injected
+  raw stream).
+- `DspeechTests/Fakes/FakeAVAudioSession.swift` — the dispatch-required
+  protocol-fronted fake. Two scriptable conformers in one file (DI seam,
+  the W1-architect remediation `AudioInputSessionPort` makes this finally
+  possible): `FakeAVAudioSession: AudioInputService` for the frozen public
+  contract (`scriptedInputs`, `selectError`, `levelsStreamTerminated`,
+  `routeStreamTerminated`, `emitRouteChange`); `FakeAudioInputSessionPort:
+  AudioInputSessionPort` for the architect-shipped pure-Core DI seam at
+  `Dspeech/Core/Audio/AudioInputServiceProtocol.swift:243`
+  (`scriptedPorts`, `configureError` / `activateError` /
+  `preferredInputError`, call-count + UID recording, `emitRouteEvent`,
+  `routeEventsStreamTerminated`). `portTypeRawValue` constants sourced from
+  `AVAudioSession.Port.{builtInMic,usbAudio,headsetMic,lineIn,bluetoothHFP,
+  bluetoothLE,bluetoothA2DP}` — never a guessed string literal (CLAUDE.md
+  anti-hallucination); `unmappedSnapshot` deliberately uses a non-Apple
+  string to pin the `default → .other` branch.
+
+### red_initial: FAIL ✓ — preserved in git history across 2 separate red→green cycles
+- Cycle 1 (recorded in the 2026-05-19 W3-tester block at line 233): specs
+  authored purely from the frozen `AudioInputServiceProtocol` + the
+  contracted DI-seam DocC (NOT from W3a's `AppleAudioInputService` code —
+  guard #6 echo-chamber). RED reason: `FakeAVAudioSession.swift:47 cannot
+  find type 'AudioInputSessionPort'` — the seam type the specs required did
+  not yet exist in production.
+- Cycle 2 (branch commits `ee5feaa` "test(audio): RED-first seam specs over
+  injected AudioInputSessionPort" → `b51815c` "test(audio): cover
+  AudioRouteChangeObserver + route(from:) over the AudioInputSessionPort
+  seam"): specs authored against the architect's `AudioInputSessionPort`
+  DocC contract, RED until `5a6cf77` ("feat(arch): add AudioInputSessionPort
+  Core DI seam") + `118e5ae` ("feat(audio): debounce route changes via
+  host-testable AudioInputSessionPort orchestration") landed the
+  `init(port:routeDebounce:sleep:)` initializer + the pure-Core debounce +
+  reason mapping. No assertion weakened to force green at any point.
+
+### green_after_impl: PASS ✓ — re-verified this session at HEAD `8a2774f`
+- `xcodebuild -project Dspeech.xcodeproj -scheme Dspeech -destination
+  'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4' CODE_SIGNING_ALLOWED=NO
+  -only-testing:DspeechTests/AudioInputServiceTests
+  -only-testing:DspeechTests/AudioRouteTests test` → ** TEST SUCCEEDED **
+  on the CLAUDE.md-canonical destination. Every `@Test` and every
+  parameterized expansion passed — incl. the 8-case `route(from:)` table,
+  the 8-case Apple-reason mapping, the 6-case `RouteChangeReason.rawValue`
+  round-trip, the 5-case bounded-power stride PBT, and both rapid-burst
+  debounce specs (`contractDebouncesRapidRouteChangesAndKeepsTheLatest`
+  ≈0.40s, `observerRoutesDebouncesARapidPlugPullBurstToTheLatestRoute`
+  ≈0.43s — each confirms "burst not dropped" + "coalesced (count<6)" +
+  "latest wins").
+- Working tree clean across all 3 owned files (`git diff HEAD --
+  DspeechTests/AudioInputServiceTests.swift
+  DspeechTests/AudioRouteTests.swift
+  DspeechTests/Fakes/FakeAVAudioSession.swift` → empty). No new commit
+  produced; re-issuing the dispatch's prescribed RED-first + GREEN commit
+  messages on top of the existing `ee5feaa` + `b51815c` history would
+  corrupt the atomic-commit knowledge record (git-workflow rule, same
+  precedent the W3-impl / W2-tester / W2-impl / W4-firstrun / W5-integrator
+  re-dispatch-verify blocks above set).
+
+### device_gated_cases: unchanged from the 2026-05-19 W3-tester block (lines 235-240)
+USB-C real-route validation is device-only — explicitly noted by the dispatch.
+The `AudioInputSessionPort` seam already lifted everything liftable to host;
+the remaining gates are inherent to the un-fakeable AVFoundation shell
+(`AVAudioSession` has no public initializer):
+- USB-C / wired-external-interface real-route validation through the
+  AVFoundation-backed `AVFoundationAudioInputSessionPort` conformer
+  (`availableInputs` enumeration + `setPreferredInput(_:)` against the live
+  `AVAudioSession`). Fake-port specs cover the orchestration exhaustively;
+  the AVFoundation shell is Andrei-verified on the ADR 0004 wired/cable path.
+- Bluetooth (HFP / LE / A2DP) real-route plug/pull against `AVAudioSession
+  .currentRoute.inputs`.
+- `AppleAudioInputService.routeChanges()` + `AudioRouteChangeObserver
+  .routes()` against real `AVAudioSession.routeChangeNotification` posts.
+  The pure-Core debounce + reason mapping + active-port projection are now
+  host-tested via the fake `AudioInputSessionPort.routeChangeEvents()`; the
+  notification-pump itself stays device-only.
+- `AppleAudioInputService.levels()` real `AVAudioEngine` metering tap incl.
+  record-permission-denied → `.meteringUnavailable` mapping. Host coverage
+  stops at the frozen `levels()` contract via the fake (stream-finish on
+  cancel); the engine-tap shell is device-only.
+
+### ready_for_integrator: yes — no-op
+- W3b deliverables complete and verified-green at HEAD `8a2774f` on the
+  CLAUDE.md-canonical destination. No working-tree changes. Status of the
+  original 5 escalations (W3-tester block lines 241-246):
+  - #1 testability gap (`AppleAudioInputService` hardwired
+    `AVAudioSession.sharedInstance()`) → **RESOLVED** at `5a6cf77` +
+    `118e5ae` (pure-Core `AudioInputSessionPort` seam, adapter refactored
+    onto it).
+  - #2 5-case `AudioRoute` widening → **RATIFIED** by
+    `routeFromSnapshotMapsEveryPortTypeBucketIncludingTheFifthOtherCase`
+    pinning the `.other(name:)` bucket and disallowing silent
+    misclassification.
+  - #3 missing debounce of rapid route changes → **RESOLVED** at `118e5ae`
+    + pinned by `contractDebouncesRapidRouteChangesAndKeepsTheLatest` and
+    `observerRoutesDebouncesARapidPlugPullBurstToTheLatestRoute`.
+  - #4 commit-hygiene defect at `1343876` (broad-`git-add` swept non-owned
+    files) → **HISTORICAL** and superseded by clean atomic commits since
+    (`5a6cf77`, `118e5ae`, `ee5feaa`, `b51815c`, `d94891c`).
+  - #5 cross-slice W2 suite block → **RESOLVED** at `4404511`
+    (`LocalTranslationService` + pack-manager seam shipped); full unit + UI
+    suite is 88/0/0 at HEAD per the W5 re-verify-on-Max block (`8a2774f`).
+- Outstanding work (carryover, not in this dispatch's scope): the W6
+  round-3 ESCALATED block routes BLOCK-2 (missing W4b first-run / About
+  test files) + MAJOR-3 / MAJOR-4 / MAJOR-5 to the tech-lead for an
+  option-1/2/3 decision per `docs/REVIEW.md`. No audio-tester action is
+  pending.
