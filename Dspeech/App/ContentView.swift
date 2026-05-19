@@ -1,10 +1,27 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State private var viewModel = TranscriptDemoViewModel.demo
+    @State private var liveViewModel: LiveTranscriptionViewModel = ContentView.makeDefaultLiveViewModel()
     @State private var privacy = PrivacySettings()
     @State private var showTranslation: Bool = true
     @State private var showSettings: Bool = false
+
+    static func makeDefaultLiveViewModel() -> LiveTranscriptionViewModel {
+        LiveTranscriptionViewModel(engine: AppleSpeechLiveTranscriptionEngine())
+    }
+
+    private var emptyStateText: String {
+        switch liveViewModel.status {
+        case .idle, .stopped:
+            return "Нажмите «Старт» и говорите — расшифровка появится здесь.\nЛокальная обработка, аудио не покидает устройство."
+        case .requestingPermission:
+            return "Запрос доступа к микрофону и распознаванию речи…"
+        case .ready, .listening:
+            return "Слушаю…"
+        case .failed(let message):
+            return "Ошибка: \(message)"
+        }
+    }
 
     var body: some View {
         GeometryReader { geometry in
@@ -20,19 +37,8 @@ struct ContentView: View {
 
                 VStack(spacing: isLandscape ? 8 : 12) {
                     controlBar(isLandscape: isLandscape)
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: isLandscape ? 10 : 12) {
-                            ForEach(viewModel.segments) { segment in
-                                TranscriptSegmentCard(
-                                    segment: segment,
-                                    showTranslation: showTranslation,
-                                    isLandscape: isLandscape
-                                )
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .scrollIndicators(.hidden)
+                    transcriptArea(isLandscape: isLandscape)
+                    bottomBar(isLandscape: isLandscape)
                 }
                 .padding(.horizontal, isLandscape ? 16 : 18)
                 .padding(.top, isLandscape ? 6 : 10)
@@ -43,6 +49,90 @@ struct ContentView: View {
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showSettings) {
             SettingsView(privacy: privacy)
+        }
+    }
+
+    @ViewBuilder
+    private func transcriptArea(isLandscape: Bool) -> some View {
+        if liveViewModel.segments.isEmpty && liveViewModel.partialText.isEmpty {
+            VStack {
+                Spacer()
+                Text(emptyStateText)
+                    .font(.system(size: isLandscape ? 18 : 20, weight: .medium, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.7))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
+                    .accessibilityIdentifier("transcript-empty-state")
+                Spacer()
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: isLandscape ? 10 : 12) {
+                    ForEach(liveViewModel.segments) { segment in
+                        TranscriptSegmentCard(
+                            segment: segment,
+                            showTranslation: showTranslation,
+                            isLandscape: isLandscape
+                        )
+                    }
+                    if !liveViewModel.partialText.isEmpty {
+                        PartialTranscriptCard(text: liveViewModel.partialText, isLandscape: isLandscape)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .scrollIndicators(.hidden)
+        }
+    }
+
+    private func bottomBar(isLandscape: Bool) -> some View {
+        HStack(spacing: 12) {
+            Button {
+                Task { await toggleListening() }
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: liveViewModel.isListening ? "stop.fill" : "mic.fill")
+                    Text(liveViewModel.isListening ? "Стоп" : "Старт")
+                        .font(.headline)
+                }
+                .padding(.horizontal, 18)
+                .padding(.vertical, 10)
+                .frame(minWidth: isLandscape ? 110 : 130)
+                .background(
+                    Capsule().fill(liveViewModel.isListening ? Color.red.opacity(0.85) : Color.cyan.opacity(0.85))
+                )
+                .foregroundStyle(.white)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier(liveViewModel.isListening ? "stop-button" : "start-button")
+
+            if !liveViewModel.segments.isEmpty {
+                Button("Очистить") {
+                    liveViewModel.reset()
+                }
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.white.opacity(0.8))
+                .accessibilityIdentifier("clear-button")
+            }
+
+            Spacer()
+
+            if let error = liveViewModel.lastErrorMessage {
+                Text(error)
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.orange)
+                    .lineLimit(2)
+                    .accessibilityIdentifier("error-banner")
+            }
+        }
+    }
+
+    private func toggleListening() async {
+        if liveViewModel.isListening {
+            liveViewModel.stop()
+        } else {
+            await liveViewModel.start()
         }
     }
 
@@ -178,6 +268,37 @@ struct SettingsView: View {
 private extension Bundle {
     var shortVersion: String {
         (infoDictionary?["CFBundleShortVersionString"] as? String) ?? "—"
+    }
+}
+
+private struct PartialTranscriptCard: View {
+    let text: String
+    let isLandscape: Bool
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "waveform")
+                .font(.system(size: isLandscape ? 16 : 18, weight: .semibold))
+                .foregroundStyle(.cyan.opacity(0.9))
+                .padding(.top, 4)
+            Text(text)
+                .font(.system(size: isLandscape ? 22 : 26, weight: .medium, design: .rounded))
+                .foregroundStyle(.white.opacity(0.85))
+                .italic()
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            Color.cyan.opacity(0.08),
+            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(.cyan.opacity(0.30), lineWidth: 1)
+        }
+        .accessibilityIdentifier("partial-transcript")
     }
 }
 
