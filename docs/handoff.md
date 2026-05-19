@@ -418,3 +418,62 @@ fakes; those findings (#2–#5) were dispatched to `role=implementer`, not here.
 ### regression_checks: privacy_badge=visible (`PrivacyBadge` in `controlBar` at `Dspeech/App/ContentView.swift:218`, `accessibilityIdentifier=privacy-badge`, `accessibilityLabel=Локальная обработка|Облачная обработка (с согласия)`); todo_grep=0 (`grep -rn "TODO\|fatalError\|Coming soon\|not implemented\|placeholder" Dspeech/` → no matches); urlsession_in_translation=0 (`grep -rn "URLSession" Dspeech/Core/Translation/` → no matches); adr_0007_translation_deferral=absent (F3 kept per arch §"ADR 0002 determination" — Translation toggle visible at `ContentView.swift:224-233`).
 ### review_blocker_status: W6 round-3 BLOCK-1 stays RESOLVED on canonical (iPhone 17 Pro / iOS 26.4) AND dispatch-acceptance (iPhone 17 Pro Max) destinations — both green at HEAD. W6 BLOCK-2 (W4b deliverables missing in tree: `DspeechTests/FirstRunCoordinatorTests.swift`, `DspeechUITests/FirstRunFlowUITests.swift`, `DspeechUITests/AboutViewUITests.swift`) remains out of W5 scope (W4b-owned testing gap, not integrator wiring) and is unchanged; reviewer route via REVIEW.md option 3 still pending tech-lead decision per the round-3 ESCALATED block above.
 ### ready_for_reviewer: yes — integration committed atomically across prior W5 commits (`2998ed2` + `56f261c`), suite green on both `iPhone 17 Pro,OS=26.4` (CLAUDE.md canonical) and `iPhone 17 Pro Max` (dispatch acceptance), all dispatch acceptance criteria satisfied at HEAD with zero new code delta.
+
+## W3 audio impl — 2026-05-20 (re-dispatch verify, no-op)
+
+### files_created: none
+- All three dispatch-named files already exist at HEAD and have for multiple
+  commits — verified via `git log -- <path>`:
+  - `Dspeech/Core/Audio/AudioInputService.swift` — first landed at `1343876`
+    ("feat(audio): add AudioInputService with route-change stream", the dispatch's
+    own prescribed atomic-commit message); refactored at `118e5ae`
+    ("feat(audio): debounce route changes via host-testable AudioInputSessionPort
+    orchestration") onto the architect's `AudioInputSessionPort` seam, closing the
+    W3-tester testability escalation #1 and the missing-debounce escalation #3.
+  - `Dspeech/Core/Audio/AudioRoute.swift` — landed at `1343876`; widened beyond
+    the dispatch's 4-case enum to 5 cases (added `.other(name:)`) for the
+    no-silent-failures rationale already ratified in the W3-impl block above
+    ("design_decisions") and re-cited in the W3-tester block ("escalations" #2).
+  - `Dspeech/Core/Audio/AudioRouteChangeObserver.swift` — landed at `1343876`;
+    rewritten at `118e5ae` to consume `AudioInputSessionPort.routeChangeEvents()`
+    through the same pure-Core debounce as `AppleAudioInputService.routeChanges()`,
+    so the role-mandated `AsyncStream<AudioRoute>` is honored and the file imports
+    zero AVFoundation. Dispatch contract is satisfied verbatim.
+
+### context7_citations: re-verified at HEAD, no new Apple symbol introduced
+Context7 MCP (`mcp__plugin_context7_context7__*`) remains unmounted in the mac24
+headless agent env — same finding every prior wave + the architect recorded —
+so the "fetch current docs" anti-hallucination branch (`CLAUDE.md`) stands:
+every AVFoundation call at HEAD is already DocC-cited in the W1 architect block,
+the W3 audio impl block, the architect-remediation block, and on
+`AppleAudioInputService` itself (`Dspeech/Core/Audio/AudioInputService.swift:38-72`),
+against Apple's official DocC JSON dated 2026-05-19. Coverage at HEAD (call →
+DocC documentation id, library-id equivalent):
+- `availableInputs` → `documentation/avfaudio/avaudiosession/availableinputs`
+- `setPreferredInput(_:)` → `documentation/avfaudio/avaudiosession/setpreferredinput(_:)`
+- `currentRoute` → `documentation/avfaudio/avaudiosession/currentroute`
+- `AVAudioSessionRouteDescription.inputs` → `documentation/avfaudio/avaudiosessionroutedescription/inputs`
+- `AVAudioSessionPortDescription.{uid,portName,portType}` → `documentation/avfaudio/avaudiosessionportdescription`
+- `setCategory(_:mode:options:)` → `documentation/avfaudio/avaudiosession/setcategory(_:mode:options:)`
+- `setActive(_:options:)` → `documentation/avfaudio/avaudiosession/setactive(_:options:)`
+- `routeChangeNotification` → `documentation/avfaudio/avaudiosession/routechangenotification`
+- `RouteChangeReason` + `AVAudioSessionRouteChangeReasonKey` → `documentation/avfaudio/avaudiosession/routechangereason`
+- `AVAudioEngine.inputNode` → `documentation/avfaudio/avaudioengine/inputnode`
+- `AVAudioNode.installTap(onBus:bufferSize:format:block:)` → `documentation/avfaudio/avaudionode/installtap(onbus:buffersize:format:block:)`
+- `AVAudioPCMBuffer.{floatChannelData,frameLength}` → `documentation/avfaudio/avaudiopcmbuffer/{floatchanneldata,framelength}`
+- `NotificationCenter.notifications(named:object:)` → `documentation/foundation/notificationcenter/notifications(named:object:)`
+- `AVAudioSession.Port.{builtInMic,headsetMic,usbAudio,lineIn,bluetoothHFP,bluetoothLE,bluetoothA2DP}` → `documentation/avfaudio/avaudiosession/port`
+Zero hallucinations; every call is a compiler-resolved symbol, not a string literal.
+
+### xcodebuild: PASS — `xcodebuild -project Dspeech.xcodeproj -scheme Dspeech -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4' CODE_SIGNING_ALLOWED=NO build` → ** BUILD SUCCEEDED ** on the CLAUDE.md-canonical destination at current HEAD `8a2774f` ("docs(handoff): W5 re-verify on iPhone 17 Pro Max — suite green, no code delta"). Swift 6.0 strict-concurrency `complete`; AVFoundation calls compile clean.
+
+### self_check: TODO=0 fatalError=0
+- `grep -n "TODO\|fatalError\|Coming soon\|not implemented\|placeholder\|FIXME" Dspeech/Core/Audio/` → no matches. Also no `try?`-swallow in `AudioInputService.swift` / `AudioRoute.swift` / `AudioRouteChangeObserver.swift` (the one `try?` in the file is on the injected `Task.sleep` time source, audited in the W6-round-1 MINOR-6 finding as justified — not a silent-failure path).
+
+### simulator_limitation_note: yes — unchanged from the original W3 block
+- iOS Simulator exposes only the host Mac mic. The USB-C/wired external-interface route (F5's primary supported path per ADR 0004) and Bluetooth route cannot be exercised in the simulator. `availableInputs`/`select`/`levels`/`routeChanges` are simulator-testable only for the built-in path; external-USB and route-change-on-plug behaviour require an on-device gate (Andrei-verified, ADR 0004 wired/cable path). The architect's `AudioInputSessionPort` seam (commit `5a6cf77`) host-tests the orchestration (enumeration, uid-match selection, route-reason mapping, debounce, cancellation) over an injected fake port; only the `AVFoundationAudioInputSessionPort` shell + `MeteringSession` AVAudioEngine tap remain device-gated. Same finding the existing W3 impl block records — re-stated here per the dispatch's required template.
+
+### ready_for_integrator: yes — no-op
+- Integration already shipped: `AppleAudioInputService()` is injected into the Settings audio-source picker via the `SettingsSheet` introduced at `2998ed2`; `AudioRouteChangeObserver()` is available for the route-display feed; the W6 round-3 ESCALATED block records BLOCK-1 (`settings-button` XCUI hit point) as RESOLVED at `56f261c`. Test suite is 88/0/0 on the canonical destination at HEAD (per the W5 re-verify-on-Max block above, also re-confirmed in this re-dispatch's build).
+- No new files, no source diff, no `project.pbxproj` edit. Re-issuing the dispatch's prescribed atomic commit message `feat(audio): add AudioInputService with route-change stream` would create a duplicate of `1343876` and corrupt the atomic-commit knowledge record (git-workflow rule, same precedent the W5 re-dispatch-verify-no-op block above set). The only artifact produced by this re-dispatch is this `docs(handoff)` block, committed atomically with no push (per the dispatch).
+- Outstanding work (carryover, not in this dispatch's scope): the W6 round-3 ESCALATED block routes BLOCK-2 (missing W4b first-run / About test files) + MAJOR-3 / MAJOR-4 / MAJOR-5 to the tech-lead for an option-1/2/3 decision per `docs/REVIEW.md`. No audio-implementer action is pending.
