@@ -15,8 +15,9 @@ import Translation
 /// - `LanguageAvailability.status(from:to:)` →
 ///   `…/languageavailability/status(from:to:)` (async, **non-throwing**)
 /// - `TranslationSession.init(installedSource:target:)` →
-///   `…/translationsession/init(installedsource:target:)` (throwing,
-///   **synchronous**, installed-only)
+///   `…/translationsession/init(installedsource:target:)` (**synchronous,
+///   non-throwing**, installed-only — re-verified against the iOS 26.4 SDK
+///   Swift compiler 2026-05-19; the earlier "throwing" note was inaccurate)
 /// - `TranslationSession.translate(_:)` →
 ///   `…/translationsession/translate(_:)` (async, throwing) returning
 ///   `TranslationSession.Response`
@@ -70,8 +71,9 @@ struct AppleTranslationService: TranslationService {
     /// CTA routes through ``TranslationLanguagePackPreparer`` instead).
     ///
     /// On the installed path it constructs a session via
-    /// `TranslationSession.init(installedSource:target:)` (synchronous, throwing;
-    /// Apple DocC `…/translationsession/init(installedsource:target:)`) and reads
+    /// `TranslationSession.init(installedSource:target:)` (synchronous,
+    /// **non-throwing**; Apple DocC
+    /// `…/translationsession/init(installedsource:target:)`) and reads
     /// `Response.targetText`. Apple errors are mapped to ``TranslationServiceError``
     /// at this single boundary; nothing is swallowed.
     func translate(
@@ -92,7 +94,7 @@ struct AppleTranslationService: TranslationService {
         }
 
         do {
-            let session = try TranslationSession(installedSource: source, target: target)
+            let session = TranslationSession(installedSource: source, target: target)
             let response = try await session.translate(trimmed)
             return response.targetText
         } catch TranslationError.nothingToTranslate {
