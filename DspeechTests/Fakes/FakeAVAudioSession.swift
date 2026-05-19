@@ -261,11 +261,35 @@ extension FakeAudioInputSessionPort {
         )
     }
 
+    static func lineInSnapshot(uid: String = "linein-uid", name: String = "Line In") -> AudioPortSnapshot {
+        AudioPortSnapshot(
+            uid: uid,
+            portName: name,
+            portTypeRawValue: AVAudioSession.Port.lineIn.rawValue
+        )
+    }
+
     static func bluetoothSnapshot(uid: String = "bt-uid", name: String = "AirPods Pro") -> AudioPortSnapshot {
         AudioPortSnapshot(
             uid: uid,
             portName: name,
             portTypeRawValue: AVAudioSession.Port.bluetoothHFP.rawValue
+        )
+    }
+
+    static func bluetoothLESnapshot(uid: String = "btle-uid", name: String = "BLE Headset") -> AudioPortSnapshot {
+        AudioPortSnapshot(
+            uid: uid,
+            portName: name,
+            portTypeRawValue: AVAudioSession.Port.bluetoothLE.rawValue
+        )
+    }
+
+    static func bluetoothA2DPSnapshot(uid: String = "bta2dp-uid", name: String = "A2DP Speaker") -> AudioPortSnapshot {
+        AudioPortSnapshot(
+            uid: uid,
+            portName: name,
+            portTypeRawValue: AVAudioSession.Port.bluetoothA2DP.rawValue
         )
     }
 

@@ -21,7 +21,7 @@ struct AudioInputServiceTests {
 
     // MARK: - AudioInputLevel.normalized (pure; architecture-named property test)
 
-    @Test(arguments: [Float(-60), -75, -120, -.infinity])
+    @Test(arguments: [Float(-60), Float(-75), Float(-120), -Float.infinity])
     func normalizedIsZeroAtOrBelowFloor(averagePowerDB: Float) {
         let level = AudioInputLevel(averagePowerDB: averagePowerDB, peakPowerDB: averagePowerDB)
         #expect(level.normalized == 0)

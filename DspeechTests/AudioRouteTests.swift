@@ -295,6 +295,171 @@ struct AudioRouteTests {
         }
         #expect(fake.routeEventsStreamTerminated)
     }
+
+    // MARK: - AppleAudioInputService.route(from:) — pure snapshot→AudioRoute map
+    //
+    // The route-display projection consumed only by AudioRouteChangeObserver. It
+    // is pure (Core in, Core out) so it is asserted directly here — the prior
+    // passes covered kind(forPortType:) but never this mapper, leaving the 5th
+    // .other(name:) case (the W3a widening, journal fp=2ab0bf0bcdc9 / handoff
+    // escalation #2) and the lineIn / bluetoothLE / bluetoothA2DP fold-ins
+    // unpinned. Raw port-type strings are read from the real AVAudioSession.Port
+    // constants (anti-hallucination — never a guessed literal); a silent
+    // regression to a 4-case enum or a mis-bucketed Bluetooth/line-in now fails.
+
+    @Test(arguments: [
+        (FakeAudioInputSessionPort.builtInMicSnapshot(), AudioRoute.builtInMic),
+        (FakeAudioInputSessionPort.usbSnapshot(name: "Cockpit USB-C"), .externalUSB(name: "Cockpit USB-C")),
+        (FakeAudioInputSessionPort.headsetSnapshot(), .wiredHeadset),
+        (FakeAudioInputSessionPort.lineInSnapshot(), .wiredHeadset),
+        (FakeAudioInputSessionPort.bluetoothSnapshot(name: "AirPods Pro"), .bluetooth(name: "AirPods Pro")),
+        (FakeAudioInputSessionPort.bluetoothLESnapshot(name: "BLE Mic"), .bluetooth(name: "BLE Mic")),
+        (FakeAudioInputSessionPort.bluetoothA2DPSnapshot(name: "A2DP Spk"), .bluetooth(name: "A2DP Spk")),
+        (FakeAudioInputSessionPort.unmappedSnapshot(name: "CarPlay"), .other(name: "CarPlay")),
+    ])
+    func routeFromSnapshotMapsEveryPortTypeBucketIncludingTheFifthOtherCase(
+        snapshot: AudioPortSnapshot,
+        expected: AudioRoute
+    ) {
+        #expect(AppleAudioInputService.route(from: snapshot) == expected)
+    }
+
+    // MARK: - AudioRouteChangeObserver.routes() — the debounced route-display feed
+    //
+    // The status-display sibling of routeChanges(): same architect-frozen
+    // AudioInputSessionPort.routeChangeEvents() seam, but it projects each
+    // event's *active port* to a pure AudioRoute and DROPS events with no active
+    // port — there is nothing to display — the deliberate behavioural contrast
+    // with AppleAudioInputService.routeChanges() (which surfaces a nil-active
+    // event as a change whose activeInput is nil). The dispatch names
+    // AudioRouteChangeObserver explicitly and no prior pass exercised it; the
+    // AudioInputSessionPort seam makes its mapping + rapid-burst debounce +
+    // cancellation host-testable for the first time (closes the route-display
+    // half of handoff escalation #1 and escalation #3 on this feed).
+
+    private func firstRoute(
+        from observer: AudioRouteChangeObserver,
+        emitting emit: @escaping () -> Void,
+        timeout: TimeInterval = 3
+    ) async -> AudioRoute? {
+        let collected = TestBox<[AudioRoute]>([])
+        let consumer = Task {
+            for await route in observer.routes() {
+                collected.mutate { $0.append(route) }
+            }
+        }
+        defer { consumer.cancel() }
+        try? await Task.sleep(nanoseconds: 20_000_000)
+        emit()
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline, collected.value.isEmpty {
+            try? await Task.sleep(nanoseconds: 5_000_000)
+        }
+        return collected.value.first
+    }
+
+    @Test func observerRoutesProjectsTheActivePortSnapshotToItsDomainRoute() async {
+        let usb = FakeAudioInputSessionPort.usbSnapshot(uid: "disp-usb", name: "Cockpit USB-C")
+        let fake = FakeAudioInputSessionPort()
+        let observer = AudioRouteChangeObserver(port: fake, debounce: .milliseconds(10))
+
+        let route = await firstRoute(from: observer) {
+            fake.emitRouteEvent(
+                AudioRouteChangeEvent(
+                    reasonRawValue: AVAudioSession.RouteChangeReason.newDeviceAvailable.rawValue,
+                    activePort: usb
+                )
+            )
+        }
+        #expect(route == .externalUSB(name: "Cockpit USB-C"))
+    }
+
+    @Test func observerRoutesDropsEventsWithNoActivePortBecauseThereIsNoRouteToDisplay() async {
+        let usb = FakeAudioInputSessionPort.usbSnapshot(uid: "disp-usb2", name: "USB-C")
+        let fake = FakeAudioInputSessionPort()
+        let observer = AudioRouteChangeObserver(port: fake, debounce: .milliseconds(20))
+
+        let collected = TestBox<[AudioRoute]>([])
+        let consumer = Task {
+            for await route in observer.routes() {
+                collected.mutate { $0.append(route) }
+            }
+        }
+        defer { consumer.cancel() }
+        try? await Task.sleep(nanoseconds: 20_000_000)
+
+        // Device-pull (oldDeviceUnavailable, no active port) → nothing to show.
+        fake.emitRouteEvent(
+            AudioRouteChangeEvent(
+                reasonRawValue: AVAudioSession.RouteChangeReason.oldDeviceUnavailable.rawValue,
+                activePort: nil
+            )
+        )
+        try? await Task.sleep(nanoseconds: 200_000_000)
+        #expect(collected.value.isEmpty)   // nil active port → dropped, not surfaced
+
+        // A subsequent real route still arrives — the drop did not wedge the feed.
+        fake.emitRouteEvent(
+            AudioRouteChangeEvent(
+                reasonRawValue: AVAudioSession.RouteChangeReason.newDeviceAvailable.rawValue,
+                activePort: usb
+            )
+        )
+        let deadline = Date().addingTimeInterval(3)
+        while Date() < deadline, collected.value.isEmpty {
+            try? await Task.sleep(nanoseconds: 5_000_000)
+        }
+        #expect(collected.value == [.externalUSB(name: "USB-C")])
+    }
+
+    @Test func observerRoutesDebouncesARapidPlugPullBurstToTheLatestRoute() async {
+        let usb = FakeAudioInputSessionPort.usbSnapshot(uid: "burst-usb", name: "USB-C")
+        let bt = FakeAudioInputSessionPort.bluetoothSnapshot(uid: "burst-bt", name: "AirPods")
+        let fake = FakeAudioInputSessionPort()
+        let observer = AudioRouteChangeObserver(port: fake, debounce: .milliseconds(120))
+        let newDevice = AVAudioSession.RouteChangeReason.newDeviceAvailable.rawValue
+
+        let collected = TestBox<[AudioRoute]>([])
+        let consumer = Task {
+            for await route in observer.routes() {
+                collected.mutate { $0.append(route) }
+            }
+        }
+        defer { consumer.cancel() }
+        try? await Task.sleep(nanoseconds: 20_000_000)
+
+        for _ in 0..<5 {
+            fake.emitRouteEvent(AudioRouteChangeEvent(reasonRawValue: newDevice, activePort: usb))
+        }
+        fake.emitRouteEvent(AudioRouteChangeEvent(reasonRawValue: newDevice, activePort: bt))
+
+        let deadline = Date().addingTimeInterval(3)
+        while Date() < deadline, collected.value.isEmpty {
+            try? await Task.sleep(nanoseconds: 5_000_000)
+        }
+        try? await Task.sleep(nanoseconds: 250_000_000)
+
+        #expect(collected.value.isEmpty == false)                     // burst not dropped
+        #expect(collected.value.count < 6)                            // coalesced
+        #expect(collected.value.last == .bluetooth(name: "AirPods"))  // latest wins
+    }
+
+    @Test func observerRoutesCancellationTerminatesTheInjectedRawEventStream() async {
+        let fake = FakeAudioInputSessionPort()
+        let observer = AudioRouteChangeObserver(port: fake, debounce: .milliseconds(20))
+        let consumer = Task {
+            for await _ in observer.routes() {}
+        }
+
+        try? await Task.sleep(nanoseconds: 20_000_000)
+        consumer.cancel()
+
+        let deadline = Date().addingTimeInterval(2)
+        while Date() < deadline, !fake.routeEventsStreamTerminated {
+            try? await Task.sleep(nanoseconds: 5_000_000)
+        }
+        #expect(fake.routeEventsStreamTerminated)
+    }
 }
 
 /// Minimal lock-guarded box so a consuming `Task` and the test task can share a
