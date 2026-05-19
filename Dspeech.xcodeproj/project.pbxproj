@@ -24,6 +24,8 @@
 		A00000000000000000000083 /* TranslationServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000080 /* TranslationServiceProtocol.swift */; };
 		A00000000000000000000084 /* AudioInputServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000081 /* AudioInputServiceProtocol.swift */; };
 		A00000000000000000000085 /* FirstRunCoordinatorProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000082 /* FirstRunCoordinatorProtocol.swift */; };
+		A00000000000000000000088 /* TranslationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000086 /* TranslationService.swift */; };
+		A00000000000000000000089 /* TranslationLanguagePackManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000087 /* TranslationLanguagePackManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -52,6 +54,8 @@
 		A00000000000000000000080 /* TranslationServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationServiceProtocol.swift; sourceTree = "<group>"; };
 		A00000000000000000000081 /* AudioInputServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioInputServiceProtocol.swift; sourceTree = "<group>"; };
 		A00000000000000000000082 /* FirstRunCoordinatorProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirstRunCoordinatorProtocol.swift; sourceTree = "<group>"; };
+		A00000000000000000000086 /* TranslationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationService.swift; sourceTree = "<group>"; };
+		A00000000000000000000087 /* TranslationLanguagePackManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationLanguagePackManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -66,7 +70,7 @@
 		A00000000000000000000004 /* Dspeech */ = {isa = PBXGroup; children = ( A00000000000000000000005 /* App */, A00000000000000000000006 /* Core */, ); path = Dspeech; sourceTree = "<group>"; };
 		A00000000000000000000005 /* App */ = {isa = PBXGroup; children = ( A00000000000000000000043 /* DspeechApp.swift */, A00000000000000000000044 /* ContentView.swift */, A00000000000000000000045 /* TranscriptDemoViewModel.swift */, A00000000000000000000072 /* LiveTranscriptionViewModel.swift */, ); path = App; sourceTree = "<group>"; };
 		A00000000000000000000006 /* Core */ = {isa = PBXGroup; children = ( A00000000000000000000007 /* Models */, A00000000000000000000008 /* Audio */, A00000000000000000000009 /* ASR */, A00000000000000000000063 /* Settings */, A00000000000000000000078 /* Translation */, A00000000000000000000079 /* FirstRun */, ); path = Core; sourceTree = "<group>"; };
-		A00000000000000000000078 /* Translation */ = {isa = PBXGroup; children = ( A00000000000000000000080 /* TranslationServiceProtocol.swift */, ); path = Translation; sourceTree = "<group>"; };
+		A00000000000000000000078 /* Translation */ = {isa = PBXGroup; children = ( A00000000000000000000080 /* TranslationServiceProtocol.swift */, A00000000000000000000086 /* TranslationService.swift */, A00000000000000000000087 /* TranslationLanguagePackManager.swift */, ); path = Translation; sourceTree = "<group>"; };
 		A00000000000000000000079 /* FirstRun */ = {isa = PBXGroup; children = ( A00000000000000000000082 /* FirstRunCoordinatorProtocol.swift */, ); path = FirstRun; sourceTree = "<group>"; };
 		A00000000000000000000063 /* Settings */ = {isa = PBXGroup; children = ( A00000000000000000000061 /* PrivacySettings.swift */, ); path = Settings; sourceTree = "<group>"; };
 		A00000000000000000000007 /* Models */ = {isa = PBXGroup; children = ( A00000000000000000000046 /* TranscriptSegment.swift */, ); path = Models; sourceTree = "<group>"; };
@@ -93,7 +97,7 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		A00000000000000000000018 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = ( A00000000000000000000051 /* DspeechApp.swift in Sources */, A00000000000000000000052 /* ContentView.swift in Sources */, A00000000000000000000053 /* TranscriptDemoViewModel.swift in Sources */, A00000000000000000000054 /* TranscriptSegment.swift in Sources */, A00000000000000000000055 /* AudioCaptureService.swift in Sources */, A00000000000000000000056 /* SpeechRecognitionService.swift in Sources */, A00000000000000000000059 /* PrivacySettings.swift in Sources */, A00000000000000000000074 /* LiveTranscriptionEngine.swift in Sources */, A00000000000000000000075 /* AppleSpeechLiveTranscriptionEngine.swift in Sources */, A00000000000000000000076 /* LiveTranscriptionViewModel.swift in Sources */, A00000000000000000000083 /* TranslationServiceProtocol.swift in Sources */, A00000000000000000000084 /* AudioInputServiceProtocol.swift in Sources */, A00000000000000000000085 /* FirstRunCoordinatorProtocol.swift in Sources */, ); runOnlyForDeploymentPostprocessing = 0; };
+		A00000000000000000000018 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = ( A00000000000000000000051 /* DspeechApp.swift in Sources */, A00000000000000000000052 /* ContentView.swift in Sources */, A00000000000000000000053 /* TranscriptDemoViewModel.swift in Sources */, A00000000000000000000054 /* TranscriptSegment.swift in Sources */, A00000000000000000000055 /* AudioCaptureService.swift in Sources */, A00000000000000000000056 /* SpeechRecognitionService.swift in Sources */, A00000000000000000000059 /* PrivacySettings.swift in Sources */, A00000000000000000000074 /* LiveTranscriptionEngine.swift in Sources */, A00000000000000000000075 /* AppleSpeechLiveTranscriptionEngine.swift in Sources */, A00000000000000000000076 /* LiveTranscriptionViewModel.swift in Sources */, A00000000000000000000083 /* TranslationServiceProtocol.swift in Sources */, A00000000000000000000084 /* AudioInputServiceProtocol.swift in Sources */, A00000000000000000000085 /* FirstRunCoordinatorProtocol.swift in Sources */, A00000000000000000000088 /* TranslationService.swift in Sources */, A00000000000000000000089 /* TranslationLanguagePackManager.swift in Sources */, ); runOnlyForDeploymentPostprocessing = 0; };
 		A00000000000000000000021 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = ( A00000000000000000000057 /* TranscriptSegmentTests.swift in Sources */, A00000000000000000000060 /* PrivacySettingsTests.swift in Sources */, A00000000000000000000077 /* LiveTranscriptionViewModelTests.swift in Sources */, ); runOnlyForDeploymentPostprocessing = 0; };
 		A00000000000000000000024 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = ( A00000000000000000000058 /* DspeechUITests.swift in Sources */, ); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXSourcesBuildPhase section */

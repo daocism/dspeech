@@ -43,3 +43,33 @@ Context7 MCP not mounted in mac24 headless env → verified via Apple official D
 - xcodebuild -scheme Dspeech … build → ** BUILD SUCCEEDED ** (iPhone 17 Pro / iOS 26.4 sim, Swift 6.0 strict concurrency complete).
 - W7-equivalent greps: TODO/fatalError/Coming soon over Dspeech/ = CLEAN; URLSession/URLRequest/HTTPSURL over Core/Translation/ = CLEAN.
 - next_steps: W2a/W3a/W4a may start in parallel against the frozen protocols; W2b/W3b/W4b write fakes/tests against the same (not against impl code).
+
+## W2 translation impl — 2026-05-19
+
+### files_created:
+- Dspeech/Core/Translation/TranslationService.swift — `AppleTranslationService: TranslationService` (stateless struct).
+- Dspeech/Core/Translation/TranslationLanguagePackManager.swift — `AppleTranslationLanguagePackManager: TranslationLanguagePackPreparer` + `TranslationPackSystemDownloadPort` (Sendable SwiftUI-seam port).
+- Dspeech.xcodeproj/project.pbxproj — append-only registration (new IDs fileRef …086/087, buildFile …088/089; no existing ID renumbered; plutil -lint OK). Same sanctioned mechanism W1 used (CLAUDE.md permits appending file entries). pbxproj is shared and W3a (audio) appended concurrently; my commit stages only HEAD+W2 pbxproj via the git index, working-tree superset preserved for W3a.
+
+### context7_citations:
+Context7 MCP not mounted in this env (same finding as W1) → "fetch current docs" anti-hallucination branch: Apple official DocC JSON, 2026-05-19.
+- `LanguageAvailability.status(from:to:)` (async, non-throwing) → `documentation/translation/languageavailability/status(from:to:)`
+- `LanguageAvailability.Status{installed,supported,unsupported}` → `documentation/translation/languageavailability`
+- `TranslationSession.init(installedSource:target:)` (throwing, synchronous, installed-only) → `documentation/translation/translationsession/init(installedsource:target:)`
+- `TranslationSession.translate(_:) async throws -> Response` → `documentation/translation/translationsession/translate(_:)`
+- `TranslationSession.Response.targetText: String` → `documentation/translation/translationsession/response/targettext`
+- `TranslationError` (struct; static-let cases + `~=`; Error/LocalizedError/Sendable) cases nothingToTranslate/notInstalled/unsupportedSourceLanguage/unsupportedTargetLanguage/unsupportedLanguagePairing/alreadyCancelled → `documentation/translation/translationerror`
+
+### xcodebuild: PASS — scheme Dspeech, iPhone 17 Pro / iOS 26.4 sim, CODE_SIGNING_ALLOWED=NO, Swift 6.0 strict concurrency complete → ** BUILD SUCCEEDED **.
+
+### self_check: TODO=0 fatalError=0 URLSession=0 (grep over both new files = SELF_CHECK_CLEAN; also FIXME/Coming soon/placeholder/URLRequest/HTTPSURL = 0).
+
+### ready_for_integrator: yes
+- W5 injects `AppleTranslationService()` as the `TranslationService` into the translation VM.
+- W5 must implement a concrete `TranslationPackSystemDownloadPort` at the SwiftUI seam: a `.translationTask(_:action:)`-driven surface that calls `session.prepareTranslation()` and maps user-dismiss/cancel → `.sessionCancelled`. `AppleTranslationLanguagePackManager(systemDownloadPort:)` consumes it. This is the architecture's "W2a model + W5 stitch": iOS gates first asset download behind `.translationTask`, so a pure-Core downloader is impossible (frozen protocol DocC + DocC verification confirm) — not a stub, the OS-mandated boundary.
+- `translate()` pre-checks `availability` so `languagePackNotInstalled` is deterministic regardless of which `TranslationError` the installed-only init surfaces; never downloads; ASR-non-blocking is the caller's `Task` (VM, W5).
+
+### errors_unresolved:
+- Dispatch scope vs PLAN W2a divergence: this dispatch narrowed W2a to ONLY the 2 Core/Translation files and explicitly forbade App/other-Core/tests. PLAN-listed `Dspeech/App/TranslationOverlayViewModel.swift` and `Dspeech/Core/Settings/TranslationSettings.swift` are NOT produced by this wave; F3 target-language source must be wired by W5/settings. Flagged for tech-lead/integrator. No half-implementation within owned scope.
+- Context7 MCP unavailable; Apple DocC JSON substituted (authoritative; same deviation W1 recorded). All symbols verified, none from training memory.
+- `TranslationSession` is a non-Sendable plain class, not @MainActor (DocC). Used only as a non-escaping local inside nonisolated async methods → clean under SWIFT_STRICT_CONCURRENCY=complete (proven by BUILD SUCCEEDED).
