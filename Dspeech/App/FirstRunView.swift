@@ -278,7 +278,7 @@ struct FirstRunView: View {
             }
             .buttonStyle(.plain)
             .disabled(viewModel.isFinishing)
-            .accessibilityIdentifier("first-run-finish")
+            .accessibilityIdentifier("first-run-continue")
         } else {
             Button {
                 viewModel.advance()
@@ -286,7 +286,7 @@ struct FirstRunView: View {
                 buttonLabel("Далее")
             }
             .buttonStyle(.plain)
-            .accessibilityIdentifier("first-run-advance")
+            .accessibilityIdentifier("first-run-continue")
         }
     }
 

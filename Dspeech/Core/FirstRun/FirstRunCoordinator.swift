@@ -13,7 +13,7 @@ import Foundation
 /// reactive hiding, while this store stays the single *writer* of the bit — one
 /// source of truth, two readers.
 struct UserDefaultsFirstRunStateStore: FirstRunStateStore, @unchecked Sendable {
-    static let completedDefaultsKey = "dspeech.hasCompletedFirstRun"
+    static let completedDefaultsKey = "hasCompletedFirstRun"
 
     let defaults: UserDefaults
 

@@ -15,20 +15,20 @@ struct AboutView: View {
                 HStack {
                     Spacer()
                     LocalOnlyBadge()
+                        .accessibilityIdentifier("about-privacy-badge")
                     Spacer()
                 }
                 .listRowBackground(Color.clear)
             } footer: {
                 Text("В режиме LOCAL аудио, транскрипты и метаданные не покидают iPhone. Облако включается только явно и видно по бейджу CLOUD на главном экране (ADR 0002).")
             }
-            .accessibilityIdentifier("about-local-badge")
 
             Section("Распознавание и перевод") {
                 attributionRow(
                     title: "Распознавание речи",
                     detail: "Apple Speech (фреймворк Speech, iOS). Распознавание выполняется на устройстве."
                 )
-                .accessibilityIdentifier("about-attribution-speech")
+                .accessibilityIdentifier("about-attribution-apple-speech")
                 attributionRow(
                     title: "Перевод",
                     detail: "Apple Translation (фреймворк Translation, iOS). Перевод выполняется на устройстве; языковые пакеты загружает системный механизм Apple."
