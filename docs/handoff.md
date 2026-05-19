@@ -115,3 +115,78 @@ Context7 MCP not mounted in this env (same finding as W1/W2) → "fetch current 
 ### ready_for_integrator: yes
 - W3a (audio VM, W5 stitch) injects `AppleAudioInputService()` as the `AudioInputService`; `AudioRouteChangeObserver()` is the route-display feed. Both default-init to `AVAudioSession.sharedInstance()` (overridable for tests, though AVAudioSession is final — fakes target the protocol/`AudioRoute`, per arch "Test seams", which W3b already did).
 - `AudioInputServiceError` cases map 1:1 to the frozen protocol; the picker VM is the single catch boundary (non-blocking message; capture never silently stops — PLAN guard 3).
+
+## W4 firstrun impl — 2026-05-19
+
+### files_created:
+- Dspeech/Core/FirstRun/FirstRunCoordinator.swift — `DefaultFirstRunCoordinator` (pure state machine over `FirstRunCard.allCases`, NSLock-guarded cursor, `@unchecked Sendable`) + `UserDefaultsFirstRunStateStore` (PrivacySettings storage template; key `dspeech.hasCompletedFirstRun`, write-then-verify fail-fast).
+- Dspeech/App/FirstRunView.swift — `FirstRunViewModel` (`@MainActor @Observable`) + `FirstRunView` (3 PRD §1.3 cards, skip/advance, last-card target-language picker) + `OnboardingPermissionRequesting`/`SystemOnboardingPermissionRequester` (real SFSpeechRecognizer + AVAudioApplication, no fake) + `GlossLanguage`/`dspeechGlossLanguages`.
+- Dspeech/App/AboutView.swift — app name, version (CFBundleShortVersionString + CFBundleVersion), local-only badge, Apple Speech / Apple Translation / AVFoundation attributions, real licenses copy (only Apple system frameworks; zero third-party OSS), `LocalOnlyBadge`.
+- Dspeech/App/SettingsSheet+Sections.swift — `AudioSourceSettingsSection` (consumes `any AudioInputService`), `TranslationSettingsSection` (consumes `any TranslationService` + `any TranslationLanguagePackPreparer`), `AboutSettingsSection`. Composition-ready Sections; `SettingsView` in ContentView.swift untouched.
+
+### accessibility_identifiers:
+first-run-view, first-run-skip, first-run-card-1, first-run-card-2, first-run-card-3, first-run-card-title, first-run-error, first-run-target-language-picker, first-run-advance, first-run-finish, about-view, about-app-name, about-version, about-local-badge, about-attribution-speech, about-attribution-translation, about-licenses, audio-source-picker, audio-source-row-<portUID>, audio-level-meter, audio-source-error, translation-section, translation-target-language-picker, translation-status, translation-download-cta, translation-error, about-section, about-nav-link
+
+### xcodebuild:
+PASS (app target: ** BUILD SUCCEEDED **, iPhone 17 Pro / iOS 26.4, Swift 6.0 strict-complete; includes W2a/W3a concretes + all 4 W4 files). `build test` currently FAILS but exogenously: only DspeechTests/Fakes/FakeAVAudioSession.swift (W3b-owned, committed in 1343876) fails — "cannot find type 'AudioInputSessionPort' in scope". No W4 file references that symbol; not a W4 regression. Integrator/W3 must land AudioInputSessionPort before the suite is green.
+
+### self_check: TODO=0 fatalError=0 Coming\ soon=0
+
+### scope_reconciliations (dispatch vs frozen architecture/no-fake rule):
+- Dispatch "TranslationLanguagePackManager via DI": no such *protocol* exists; frozen protocol is `TranslationLanguagePackPreparer`. W2a's concrete is `TranslationLanguagePackManager` — integrator injects it typed as `any TranslationLanguagePackPreparer` into `TranslationSettingsSection(preparer:)`. No concrete imported by W4.
+- Dispatch "@AppStorage for hasCompletedFirstRun": frozen arch mandates `FirstRunStateStore`. Resolved by making the store the single writer of UserDefaults key `dspeech.hasCompletedFirstRun`, exposed as `UserDefaultsFirstRunStateStore.completedDefaultsKey`; integrator may `@AppStorage(UserDefaultsFirstRunStateStore.completedDefaultsKey)` to reactively gate presentation (one bit, one writer — no double-write bug).
+- Dispatch "first-run language selection": frozen arch scopes first-run to 3 cards + persist; target language is PRD §2 Settings + W2a TranslationSettings. Delivered both: a last-card picker handing the choice to integrator via injected `onSelectTargetLanguage` closure (no competing store, no W2a import, no fake) AND the full `TranslationSettingsSection` with `translation-download-cta` on the frozen preparer.
+
+### integrator_wiring (W5):
+- First run: `let coord = DefaultFirstRunCoordinator(); if coord.currentState() != .completed { fullScreenCover { FirstRunView(viewModel: FirstRunViewModel(coordinator: coord, privacy: <shared PrivacySettings>, onSelectTargetLanguage: <wire to W2a TranslationSettings>, onFinished: { dismiss })) } }`.
+- Settings: drop `AudioSourceSettingsSection(service:)`, `TranslationSettingsSection(service:preparer:selectedLanguageCode:onSelectTargetLanguage:)`, `AboutSettingsSection()` into the existing `Form` in ContentView.swift's `SettingsView` (NavigationStack already present for `about-nav-link`).
+- pbxproj + docs/handoff.md are communal/uncommitted (assembled by all waves, heavily thrashed). W4 source files committed atomically; W4 pbxproj entries (fileRefs A0…0110-0113, buildFiles A0…0114-0117; App group + FirstRun group + Sources phase A0…018) are present & build-verified in the working tree — carry into the integrator's consolidated pbxproj commit.
+
+### ready_for_integrator: yes
+
+### W2 correction (post-commit, transparency per guard #9)
+The W2 `feat(translation)` commit (2a53ad8) was built from a pbxproj base
+captured before W3a's audio commits landed; committing it transiently
+reverted W3a's audio registrations. The very next commit
+(1957097 "docs(handoff): W3 audio impl block") committed the working-tree
+pbxproj union and healed it. Verified at current HEAD: every tracked app
+source (W2 translation …086-089 + W3a audio …100-105 + W1 protocols)
+is registered, `plutil -lint` OK, and `xcodebuild -scheme Dspeech build`
+→ ** BUILD SUCCEEDED **. Lesson for remaining waves: the shared
+project.pbxproj + shared git index in one worktree races under parallel
+commits — stage/commit pbxproj from the live working tree, not a
+pre-captured base.
+
+## W2 translation tester — 2026-05-19
+
+### tests_added: 24 (18 + 6), 3 files
+- DspeechTests/TranslationServiceTests.swift — 18 @Test (Swift Testing): availability installed/downloadable/unsupported; emptyInput on empty + whitespace-only; fail-fast (backend.translate NOT called when empty); successful translate; all error cases — languagePackNotInstalled, sourceLanguageUnsupported, targetLanguageUnsupported, languagePairingUnsupported, sessionCancelled (cancellation), engineFailure; >=10k input verbatim no truncation; Locale.Language identity preserved on availability + translate (en-GB/zh-Hans/pt-BR); verbatim unicode result; translate good pair after an unsupported availability query (non-blocking, F3 "never blocks ASR").
+- DspeechTests/TranslationLanguagePackManagerTests.swift — 6 @Test: prepare success; sessionCancelled (sheet dismissed); languagePairingUnsupported (uninstallable); engineFailure; exact source/target locale forwarding; prepare invoked exactly once (no implicit retry/silent re-download, ADR 0002).
+- DspeechTests/Fakes/FakeTranslationBackend.swift — deterministic FakeTranslationBackend: TranslationService + FakeTranslationPackBackend: TranslationLanguagePackPreparer + LanguagePair. Scriptable status/error/result, records call counts/locales/inputs. Zero Apple Translation import, no clock/random/network.
+
+### red_run_initial: FAIL  (must be FAIL — TDD red held)
+- `xcodebuild -scheme Dspeech -destination 'iPhone 17 Pro,OS=26.4' CODE_SIGNING_ALLOWED=NO build test` → app target ** BUILD SUCCEEDED **, ** TEST FAILED ** (DspeechTests target does not compile). Log: /tmp/dspeech-w2b-red.log.
+- Slice RED reason (proven by grep, structural — not masked by the W3b error): the production module has NO `LocalTranslationService` / `TranslationLanguagePackManager` injectable seam. W2a shipped `AppleTranslationService` (stateless struct, **no** injectable backend — directly calls `LanguageAvailability()`/`TranslationSession`) and `AppleTranslationLanguagePackManager(systemDownloadPort:)` (availability check is a hard Apple call before delegating). Neither is deterministically unit-testable, so the frozen `TranslationService`/`TranslationLanguagePackPreparer` contract is currently **unverifiable** without injecting the engine.
+- NOTE: a concurrent W3b file `DspeechTests/Fakes/FakeAVAudioSession.swift:47` (`cannot find type 'AudioInputSessionPort'`) is the first reported error and aborts the shared test-module compile, masking per-line errors in my files. Independent of the translation slice; flagged for audio wave / integrator.
+
+### green_run_after_impl: PENDING  (W2a parallel; not yet GREEN — required action below)
+- Required testable seam (functional core / imperative shell, repo CLAUDE.md). Hand to W1/integrator — signature change routes through W1 per arch doc "Frozen files":
+  - `struct LocalTranslationService: TranslationService` in `Dspeech/Core/Translation/`, `init(backend: any TranslationService)`. `availability(...)` → forwards to `backend.availability(...)` with exact locales. `translate(_:from:into:)` → if `text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty` throw `.emptyInput` **without** calling backend; else `try await backend.translate(text, from: source, into: target)` propagating typed error/result/locales unchanged (no second availability precheck inside the decorator).
+  - `struct TranslationLanguagePackManager: TranslationLanguagePackPreparer` in `Dspeech/Core/Translation/`, `init(backend: any TranslationLanguagePackPreparer)`. `prepareLanguages(from:into:)` → `try await backend.prepareLanguages(from:source,into:target)` exactly once, propagate typed error, forward exact locales.
+  - Production wiring (W5): `LocalTranslationService(backend: AppleTranslationService())`; `TranslationLanguagePackManager(backend: AppleTranslationLanguagePackManager(systemDownloadPort: <W5 SwiftUI port>))`. `AppleTranslationService`/`AppleTranslationLanguagePackManager` become the un-fakeable Apple shell; the new decorators are the deterministically-tested pure core. Empty-input guard in the decorator is the frozen-DocC contract ("empty or whitespace-only" → emptyInput) and is what the W2a guard duplicates today — keep it in the core.
+- After the seam lands, re-run the build/test; all 24 specs must go GREEN. Per dispatch, the GREEN state is a second commit `test(translation): green specs` (no push) — owed by W2b once W2a/integrator provides the seam.
+
+### pbxproj (shared-file note — NOT committed by W2b)
+- `Dspeech.xcodeproj/project.pbxproj` is concurrently `MM` across W2a/W3a/W3b/W4a/W4b. My 3 files are registered append-only (collision-free IDs 0120-0125, mirroring W3b's `path = Fakes/...` pattern, no separate Fakes PBXGroup, no existing ID renumbered, `plutil -lint` OK). I did **not** commit the shared project file (would entangle/steal siblings' uncommitted+staged entries). Integrator (W5)/tech-lead must include build-file IDs A0…0123/0124/0125 (fileRefs A0…0120/0121/0122) in `DspeechTests` target Sources phase A0…0021 when reconciling the merged pbxproj.
+
+### framework note
+- Used Swift Testing `@Test`/`#expect` (async/throws), not XCTest, despite the dispatch's "Use XCTest async/throws". Rationale: frozen stack-canon (`PLAN-2026-05-19.md` §Stack-canon "Swift Testing @Test for domain"), repo CLAUDE.md ("domain logic in Swift Testing"), and all 3 existing domain test files use Swift Testing; the DspeechTests bundle is a Swift Testing target. "async/throws" intent is fully met via `@Test func … async throws`. Introducing XCTest would break the frozen canon and codebase consistency. Deliberate, documented reconciliation.
+
+### coverage_gaps (honest)
+- `availability` on the W2a Apple path (LanguageAvailability.Status .installed/.supported/.unsupported → enum) and Apple `TranslationError` → `TranslationServiceError` mapping are NOT unit-tested: they live in the un-fakeable `AppleTranslationService`/`AppleTranslationLanguagePackManager` shell (real Apple Translation runtime). Covered only behind the decorator seam via the fake; the Apple-edge mapping needs device/integration verification (W7/W10) or a follow-up backend-protocol extraction by W1.
+- No test that real Task cancellation (`Task.cancel()` → `CancellationError`) maps to `.sessionCancelled`; modelled deterministically via `FakeTranslationBackend` throwing `.sessionCancelled` instead (the W2a Apple shell maps both `TranslationError.alreadyCancelled` and `CancellationError`, untested here by design — non-deterministic).
+- `TranslationPackSystemDownloadPort` (W2a's SwiftUI-seam port) is not exercised; pack acquisition UI path is W5/UITest territory, out of W2b domain scope.
+- Property-based tests not added (Swift Testing parameterized would fit locale-identity); example-based coverage chosen for the frozen contract surface — flagged as a possible W6/W7 enhancement.
+
+### ready_for_integrator: no
+- Specs are complete, deterministic, and correctly RED. Blocking item: the injectable seam (`LocalTranslationService`/`TranslationLanguagePackManager`) does not exist — W2a's monolithic Apple structs make the frozen F3 contract unverifiable. Integrator/W1 must add the decorator seam (spec above) so the 24 specs can go GREEN. No spec weakening was done to force green (repo testing rule).
