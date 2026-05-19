@@ -2,44 +2,23 @@ import Foundation
 import Testing
 @testable import Dspeech
 
-/// `AudioRoute` enum + `AudioRouteChangeObserver` + the frozen
-/// `AudioInputService.routeChanges()` mapping (PRD F5 live picker refresh).
+/// `AudioRoute` domain enum + the frozen `AudioInputService.routeChanges()`
+/// contract.
 ///
-/// Everything below `AudioRoute` is RED until the W3 audio implementer lands
-/// `AudioRoute.swift` / `AudioRouteChangeObserver.swift` / `AudioInputService.swift`
-/// against the contract documented in `FakeAVAudioSession.swift`.
+/// `AudioRoute` and its `displayName` are pure value logic in W3's
+/// `AudioRoute.swift` — genuinely host-testable and tested here directly.
 ///
-/// Real USB-C / Bluetooth route plug-and-pull is **device-only** — the iOS
-/// Simulator fabricates routes (PLAN-2026-05-19 residual risk; W1 handoff).
-/// These tests pin the *debounce / lifecycle / mapping* behaviour, which is
-/// device-independent; physical-route validation stays Andrei-gated.
+/// `AudioRouteChangeObserver` / `AppleAudioInputService.routeChanges()` wrap
+/// `AVAudioSession.routeChangeNotification` + `session.currentRoute.inputs` with
+/// no fakeable seam, so their notification→route mapping, the
+/// dispatch-required **debounce of rapid route changes**, and observer
+/// cancellation are **device-only** and additionally blocked on a testability
+/// fix — both escalated in `docs/handoff.md` (W3 audio tester block). They are
+/// deliberately not faked here: faking a stand-in would assert nothing about the
+/// shipped code.
 struct AudioRouteTests {
 
-    private actor RouteCollector {
-        private(set) var routes: [AudioRoute] = []
-        func append(_ route: AudioRoute) { routes.append(route) }
-        var count: Int { routes.count }
-        var last: AudioRoute? { routes.last }
-    }
-
-    private actor ChangeCollector {
-        private(set) var changes: [AudioRouteChange] = []
-        func append(_ change: AudioRouteChange) { changes.append(change) }
-        var last: AudioRouteChange? { changes.last }
-    }
-
-    private func waitUntil(
-        _ predicate: @Sendable () async -> Bool,
-        timeoutNs: UInt64 = 3_000_000_000
-    ) async {
-        let deadline = Date().addingTimeInterval(Double(timeoutNs) / 1_000_000_000)
-        while Date() < deadline {
-            if await predicate() { return }
-            try? await Task.sleep(nanoseconds: 5_000_000)
-        }
-    }
-
-    // MARK: - AudioRoute enum (RED until AudioRoute.swift)
+    // MARK: - AudioRoute (pure; W3 impl widened the dispatch's 4 cases to 5)
 
     @Test func routeEquatableDistinguishesCasesAndAssociatedNames() {
         #expect(AudioRoute.builtInMic == AudioRoute.builtInMic)
@@ -47,125 +26,102 @@ struct AudioRouteTests {
         #expect(AudioRoute.externalUSB(name: "A") == AudioRoute.externalUSB(name: "A"))
         #expect(AudioRoute.externalUSB(name: "A") != AudioRoute.externalUSB(name: "B"))
         #expect(AudioRoute.bluetooth(name: "AirPods") != AudioRoute.externalUSB(name: "AirPods"))
+        #expect(AudioRoute.other(name: "CarPlay") != AudioRoute.other(name: "AirPlay"))
+        #expect(AudioRoute.other(name: "CarPlay") != AudioRoute.bluetooth(name: "CarPlay"))
     }
 
-    // MARK: - AudioRouteChangeObserver (RED until AudioRouteChangeObserver.swift)
-
-    @Test func observerCoalescesRapidRouteBurstToFinalRoute() async {
-        let fake = FakeAVAudioSession()
-        let observer = AudioRouteChangeObserver(session: fake)
-        let collector = RouteCollector()
-
-        let consumer = Task {
-            for await route in observer.routes() {
-                await collector.append(route)
-            }
-        }
-        defer { consumer.cancel() }
-
-        let burst: [AudioRoute] = [
-            .externalUSB(name: "Iface-1"),
-            .bluetooth(name: "AirPods"),
-            .wiredHeadset,
-            .externalUSB(name: "Iface-2"),
-        ]
-        for route in burst { fake.pushRoute(route) }
-
-        await waitUntil { await collector.last == .externalUSB(name: "Iface-2") }
-
-        let observed = await collector.count
-        #expect(await collector.last == .externalUSB(name: "Iface-2"))
-        #expect(observed >= 1)
-        #expect(observed < burst.count, "rapid burst must be debounced, not replayed 1:1")
+    @Test func routeDisplayNameUsesDeviceNameWhenPresentBucketLabelOtherwise() {
+        #expect(AudioRoute.externalUSB(name: "Behringer UMC202HD").displayName == "Behringer UMC202HD")
+        #expect(AudioRoute.bluetooth(name: "AirPods Pro").displayName == "AirPods Pro")
+        #expect(AudioRoute.other(name: "CarPlay").displayName == "CarPlay")
+        #expect(AudioRoute.builtInMic.displayName.isEmpty == false)
+        #expect(AudioRoute.wiredHeadset.displayName.isEmpty == false)
+        #expect(AudioRoute.builtInMic.displayName != AudioRoute.wiredHeadset.displayName)
     }
 
-    @Test func observerKeepsUpstreamLiveAcrossRouteChangeDuringActiveCapture() async {
-        let fake = FakeAVAudioSession()
-        let observer = AudioRouteChangeObserver(session: fake)
-        let collector = RouteCollector()
+    // MARK: - AudioRouteChange / AudioRouteChangeReason (frozen value types)
 
-        let consumer = Task {
-            for await route in observer.routes() {
-                await collector.append(route)
-            }
-        }
-        defer { consumer.cancel() }
+    @Test func routeChangeEquatableConsidersReasonAndActiveInput() {
+        let usb = FakeAVAudioSession.usbDescriptor()
+        let a = AudioRouteChange(reason: .newDeviceAvailable, activeInput: usb)
+        let b = AudioRouteChange(reason: .newDeviceAvailable, activeInput: usb)
+        let differentReason = AudioRouteChange(reason: .oldDeviceUnavailable, activeInput: usb)
+        let differentInput = AudioRouteChange(reason: .newDeviceAvailable, activeInput: nil)
 
-        fake.pushRoute(.externalUSB(name: "Cockpit-USB"))
-        await waitUntil { await collector.last == .externalUSB(name: "Cockpit-USB") }
-
-        fake.pushRoute(.wiredHeadset)
-        await waitUntil { await collector.last == .wiredHeadset }
-
-        #expect(await collector.last == .wiredHeadset)
-        #expect(
-            fake.routeChangesContinuationFinished == false,
-            "a route change must not tear down the live capture route stream"
-        )
+        #expect(a == b)
+        #expect(a != differentReason)
+        #expect(a != differentInput)
     }
 
-    @Test func observerStopsUpstreamObservationWhenConsumerCancelled() async {
-        let fake = FakeAVAudioSession()
-        let observer = AudioRouteChangeObserver(session: fake)
-        let collector = RouteCollector()
-
-        let consumer = Task {
-            for await route in observer.routes() {
-                await collector.append(route)
-            }
-        }
-
-        fake.pushRoute(.externalUSB(name: "USB"))
-        await waitUntil { await collector.count >= 1 }
-
-        consumer.cancel()
-
-        await waitUntil { fake.routeChangesContinuationFinished }
-        #expect(
-            fake.routeChangesContinuationFinished,
-            "cancelling the consumer must remove the AVAudioSession route observer (no leak)"
-        )
+    @Test(arguments: [
+        AudioRouteChangeReason.newDeviceAvailable,
+        .oldDeviceUnavailable,
+        .categoryChange,
+        .override,
+        .configurationChange,
+        .unknown,
+    ])
+    func routeChangeReasonRoundTripsThroughRawValue(reason: AudioRouteChangeReason) {
+        #expect(AudioRouteChangeReason(rawValue: reason.rawValue) == reason)
     }
 
-    // MARK: - AudioInputService.routeChanges() mapping (RED until AudioInputService.swift)
+    // MARK: - Frozen routeChanges() contract (via the sanctioned fake seam)
 
-    @Test func serviceRouteChangesMapsRouteBucketToActiveInputKind() async throws {
+    @Test func contractRouteChangeStreamDeliversEmittedChanges() async {
         let usb = FakeAVAudioSession.usbDescriptor(name: "Cockpit-USB")
         let fake = FakeAVAudioSession(scriptedInputs: [usb])
-        let service = AppleAudioInputService(session: fake)
-        let collector = ChangeCollector()
 
+        let collected = TestBox<[AudioRouteChange]>([])
         let consumer = Task {
-            for await change in service.routeChanges() {
-                await collector.append(change)
+            for await change in fake.routeChanges() {
+                collected.mutate { $0.append(change) }
             }
         }
         defer { consumer.cancel() }
 
-        fake.pushRoute(.externalUSB(name: "Cockpit-USB"))
+        try? await Task.sleep(nanoseconds: 20_000_000)
+        fake.emitRouteChange(AudioRouteChange(reason: .newDeviceAvailable, activeInput: usb))
 
-        await waitUntil { await collector.last?.activeInput?.kind == .wired }
-        let last = try #require(await collector.last)
-        #expect(last.activeInput?.kind == .wired)
-        #expect(last.reason == .newDeviceAvailable)
+        let deadline = Date().addingTimeInterval(2)
+        while Date() < deadline, collected.value.isEmpty {
+            try? await Task.sleep(nanoseconds: 5_000_000)
+        }
+        #expect(collected.value.last?.activeInput == usb)
+        #expect(collected.value.last?.reason == .newDeviceAvailable)
     }
 
-    @Test func serviceRouteChangesFallsBackToBuiltInWhenNoInputAvailable() async throws {
-        let fake = FakeAVAudioSession(scriptedInputs: [])
-        let service = AppleAudioInputService(session: fake)
-        let collector = ChangeCollector()
-
+    @Test func contractRouteChangeStreamTerminatesOnConsumerCancellation() async {
+        let fake = FakeAVAudioSession()
         let consumer = Task {
-            for await change in service.routeChanges() {
-                await collector.append(change)
-            }
+            for await _ in fake.routeChanges() {}
         }
-        defer { consumer.cancel() }
 
-        fake.pushRoute(.builtInMic)
+        try? await Task.sleep(nanoseconds: 20_000_000)
+        consumer.cancel()
 
-        await waitUntil { await collector.last?.activeInput?.kind == .builtInMicrophone }
-        let last = try #require(await collector.last)
-        #expect(last.activeInput?.kind == .builtInMicrophone)
+        let deadline = Date().addingTimeInterval(2)
+        while Date() < deadline, !fake.routeStreamTerminated {
+            try? await Task.sleep(nanoseconds: 5_000_000)
+        }
+        #expect(fake.routeStreamTerminated)
+    }
+}
+
+/// Minimal lock-guarded box so a consuming `Task` and the test task can share a
+/// collection without data races (Swift 6 `complete` concurrency).
+final class TestBox<Value>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage: Value
+
+    init(_ value: Value) { storage = value }
+
+    var value: Value {
+        lock.lock(); defer { lock.unlock() }
+        return storage
+    }
+
+    func mutate(_ transform: (inout Value) -> Void) {
+        lock.lock(); defer { lock.unlock() }
+        transform(&storage)
     }
 }

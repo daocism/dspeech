@@ -1,63 +1,42 @@
 import Foundation
-import Testing
 @testable import Dspeech
 
-/// Test double for the AVAudioSession-fronting DI seam the W3 audio
-/// implementer (`Dspeech/Core/Audio/`) must expose so `AppleAudioInputService`
-/// and `AudioRouteChangeObserver` are testable without a device or AVFAudio.
+/// Scriptable fake conforming to the **frozen `AudioInputService` protocol** —
+/// the test seam the architecture mandates
+/// (`docs/architecture-mvp-slice-2026-05-19.md` "Test seams": *"All three
+/// protocols are trivially fakeable (no Apple import in Core): … fake
+/// `AudioInputService` yielding scripted `availableInputs`,
+/// `AsyncThrowingStream` levels, and `routeChanges`"*).
 ///
-/// CONTRACT REQUESTED OF W3 IMPL (documented in `docs/handoff.md` "W3 audio
-/// tester" block — these symbols are RED until the impl lands):
+/// ## Why this is not a fake of `AVAudioSession`
+/// The W3 tester dispatch asked for a *"protocol-fronted fake, injected via
+/// DI"*. The W3 implementer instead hardwired `AVAudioSession.sharedInstance()`
+/// into `AppleAudioInputService` / `AudioRouteChangeObserver`
+/// (`init(session: AVAudioSession = .sharedInstance())`) and reads
+/// `session.currentRoute.inputs` + `NotificationCenter` directly. `AVAudioSession`
+/// has no public initializer and is not designed for subclass override, so the
+/// concrete adapter's enumeration / selection / route-mapping / debounce /
+/// cancellation paths are **not host-unit-testable as built** — they are
+/// device-only, and the missing fakeable Core seam is escalated to the
+/// tech-lead in `docs/handoff.md` (W3 audio tester block).
 ///
-/// ```swift
-/// // Dspeech/Core/Audio/AudioRoute.swift
-/// enum AudioRoute: Equatable, Sendable {
-///     case builtInMic
-///     case wiredHeadset
-///     case externalUSB(name: String)
-///     case bluetooth(name: String)
-/// }
-///
-/// // Dspeech/Core/Audio/AudioInputService.swift (or AudioRouteChangeObserver.swift)
-/// // — pure Core seam, no AVFAudio leak; the real adapter and this fake both conform.
-/// protocol AudioInputSessionPort: Sendable {
-///     func availableInputs() throws(AudioInputServiceError) -> [AudioInputDescriptor]
-///     func currentInput() -> AudioInputDescriptor?
-///     func setPreferredInput(_ input: AudioInputDescriptor) throws(AudioInputServiceError)
-///     func routeChanges() -> AsyncStream<AudioRoute>
-/// }
-///
-/// final class AppleAudioInputService: AudioInputService {
-///     init(session: AudioInputSessionPort)
-/// }
-///
-/// final class AudioRouteChangeObserver: Sendable {
-///     init(session: AudioInputSessionPort)
-///     func routes() -> AsyncStream<AudioRoute>   // debounced; .builtInMic fallback when no input
-/// }
-/// ```
-///
-/// Policy split (so policy is testable, the seam stays thin):
-/// - `availableInputs()` on the seam returns the raw list (may be empty) and only
-///   throws ``AudioInputServiceError/audioSessionUnavailable(_:)`` when the
-///   session itself is unusable (e.g. record permission denied). The empty →
-///   ``AudioInputServiceError/noInputsAvailable`` and "descriptor not present" →
-///   ``AudioInputServiceError/inputNotSelectable(_:)`` decisions belong to
-///   `AppleAudioInputService` and are asserted in `AudioInputServiceTests`.
-final class FakeAVAudioSession: AudioInputSessionPort, @unchecked Sendable {
+/// What *is* host-testable and worth pinning is the **frozen contract** every
+/// conformer (including `AppleAudioInputService` on device) must honour. This
+/// fake scripts that contract so `AudioInputServiceTests` can assert the
+/// semantics the protocol DocC promises (error vs empty, `nil`-as-state, stream
+/// cancellation) without pretending to exercise AVFoundation internals.
+final class FakeAVAudioSession: AudioInputService, @unchecked Sendable {
     var scriptedInputs: [AudioInputDescriptor]
     var scriptedCurrentInput: AudioInputDescriptor?
-
-    /// When set, `availableInputs()` rethrows this (record-permission-denied path).
     var availableInputsError: AudioInputServiceError?
-    /// When set, `setPreferredInput(_:)` rethrows this (activation/route-apply failure).
-    var setPreferredError: AudioInputServiceError?
+    var selectError: AudioInputServiceError?
 
-    private(set) var availableInputsCallCount = 0
-    private(set) var lastPreferredInput: AudioInputDescriptor?
-    private(set) var routeChangesContinuationFinished = false
+    private(set) var selectedInput: AudioInputDescriptor?
 
-    private var routeContinuation: AsyncStream<AudioRoute>.Continuation?
+    private var levelsContinuation: AsyncThrowingStream<AudioInputLevel, Error>.Continuation?
+    private var routeContinuation: AsyncStream<AudioRouteChange>.Continuation?
+    private(set) var levelsStreamTerminated = false
+    private(set) var routeStreamTerminated = false
 
     init(
         scriptedInputs: [AudioInputDescriptor] = [],
@@ -68,9 +47,11 @@ final class FakeAVAudioSession: AudioInputSessionPort, @unchecked Sendable {
     }
 
     func availableInputs() throws(AudioInputServiceError) -> [AudioInputDescriptor] {
-        availableInputsCallCount += 1
         if let availableInputsError {
             throw availableInputsError
+        }
+        guard !scriptedInputs.isEmpty else {
+            throw AudioInputServiceError.noInputsAvailable
         }
         return scriptedInputs
     }
@@ -79,29 +60,43 @@ final class FakeAVAudioSession: AudioInputSessionPort, @unchecked Sendable {
         scriptedCurrentInput
     }
 
-    func setPreferredInput(_ input: AudioInputDescriptor) throws(AudioInputServiceError) {
-        if let setPreferredError {
-            throw setPreferredError
+    func select(_ input: AudioInputDescriptor) throws(AudioInputServiceError) {
+        if let selectError {
+            throw selectError
         }
-        lastPreferredInput = input
+        guard scriptedInputs.contains(input) else {
+            throw AudioInputServiceError.inputNotSelectable(input)
+        }
+        selectedInput = input
         scriptedCurrentInput = input
     }
 
-    func routeChanges() -> AsyncStream<AudioRoute> {
-        AsyncStream<AudioRoute> { continuation in
-            self.routeContinuation = continuation
+    func levels() -> AsyncThrowingStream<AudioInputLevel, Error> {
+        AsyncThrowingStream<AudioInputLevel, Error> { continuation in
+            self.levelsContinuation = continuation
             continuation.onTermination = { @Sendable _ in
-                self.routeChangesContinuationFinished = true
+                self.levelsStreamTerminated = true
             }
         }
     }
 
-    /// Simulate one `AVAudioSession.routeChangeNotification` delivering `route`.
-    func pushRoute(_ route: AudioRoute) {
-        routeContinuation?.yield(route)
+    func routeChanges() -> AsyncStream<AudioRouteChange> {
+        AsyncStream<AudioRouteChange> { continuation in
+            self.routeContinuation = continuation
+            continuation.onTermination = { @Sendable _ in
+                self.routeStreamTerminated = true
+            }
+        }
     }
 
-    /// Simulate the device going away (session ends the raw route stream).
+    func emitLevel(_ level: AudioInputLevel) {
+        levelsContinuation?.yield(level)
+    }
+
+    func emitRouteChange(_ change: AudioRouteChange) {
+        routeContinuation?.yield(change)
+    }
+
     func finishRouteChanges() {
         routeContinuation?.finish()
     }
@@ -114,15 +109,6 @@ extension FakeAVAudioSession {
             kind: .builtInMicrophone,
             displayName: "iPhone Microphone",
             portType: "MicrophoneBuiltIn"
-        )
-    }
-
-    static func wiredHeadsetDescriptor() -> AudioInputDescriptor {
-        AudioInputDescriptor(
-            id: "wired-headset-uid",
-            kind: .wired,
-            displayName: "Headset Microphone",
-            portType: "HeadsetMicrophone"
         )
     }
 

@@ -2,17 +2,24 @@ import Foundation
 import Testing
 @testable import Dspeech
 
-/// Audio-input slice (PRD F5) behavioural spec.
+/// Audio-input slice (PRD F5) spec.
 ///
-/// Two layers:
-/// 1. Frozen-contract value types (`AudioInputServiceProtocol.swift`) — green
-///    from the first commit, regression cover for the architect-frozen surface.
-/// 2. `AppleAudioInputService` over `FakeAVAudioSession` — RED until the W3
-///    audio implementer lands the concrete + the `AudioInputSessionPort` seam,
-///    then green with no test edits (TDD red → green).
+/// Scope is **what is genuinely host-testable**:
+/// 1. Pure domain logic of the architect-frozen value types
+///    (`AudioInputServiceProtocol.swift`).
+/// 2. The frozen `AudioInputService` *contract* every conformer must honour,
+///    exercised through `FakeAVAudioSession` (the architecture-sanctioned fake
+///    seam — `docs/architecture-mvp-slice-2026-05-19.md` "Test seams").
+///
+/// NOT in scope (escalated, see `docs/handoff.md` W3 audio tester block):
+/// `AppleAudioInputService` / `AudioRouteChangeObserver` hardwire
+/// `AVAudioSession.sharedInstance()` with no fakeable seam, so their AVFoundation
+/// enumeration / selection / route-mapping / debounce / cancellation paths are
+/// **device-only** — they cannot be unit-tested on the host without an impl
+/// change introducing a fakeable Core seam.
 struct AudioInputServiceTests {
 
-    // MARK: - AudioInputLevel.normalized (pure domain logic — green from start)
+    // MARK: - AudioInputLevel.normalized (pure; architecture-named property test)
 
     @Test(arguments: [Float(-60), -75, -120, -.infinity])
     func normalizedIsZeroAtOrBelowFloor(averagePowerDB: Float) {
@@ -105,87 +112,73 @@ struct AudioInputServiceTests {
         #expect(AudioInputServiceError.inputNotSelectable(usb) != .inputNotSelectable(bt))
     }
 
-    // MARK: - AppleAudioInputService over FakeAVAudioSession (RED until W3 impl)
+    // MARK: - Frozen AudioInputService contract (via the sanctioned fake seam)
 
-    @Test func availableInputsReturnsSessionEnumeratedDescriptors() throws {
-        let usb = FakeAVAudioSession.usbDescriptor()
-        let builtIn = FakeAVAudioSession.builtInMicDescriptor()
-        let fake = FakeAVAudioSession(scriptedInputs: [usb, builtIn])
-        let service = AppleAudioInputService(session: fake)
-
-        let inputs = try service.availableInputs()
-
-        #expect(inputs == [usb, builtIn])
-    }
-
-    @Test func availableInputsThrowsNoInputsAvailableWhenSessionEmpty() {
-        let fake = FakeAVAudioSession(scriptedInputs: [])
-        let service = AppleAudioInputService(session: fake)
-
+    @Test func contractSurfacesNoInputsAvailableAsErrorNotEmptyCollection() {
+        let service: any AudioInputService = FakeAVAudioSession(scriptedInputs: [])
         do {
             _ = try service.availableInputs()
-            Issue.record("expected AudioInputServiceError.noInputsAvailable")
+            Issue.record("availableInputs() must throw .noInputsAvailable, never return []")
         } catch {
             #expect(error == .noInputsAvailable)
         }
     }
 
-    @Test func availableInputsRethrowsAudioSessionUnavailableWhenPermissionDenied() {
-        let fake = FakeAVAudioSession(scriptedInputs: [])
-        fake.availableInputsError = .audioSessionUnavailable("record-permission-denied")
-        let service = AppleAudioInputService(session: fake)
-
-        do {
-            _ = try service.availableInputs()
-            Issue.record("expected AudioInputServiceError.audioSessionUnavailable")
-        } catch {
-            #expect(error == .audioSessionUnavailable("record-permission-denied"))
-        }
-    }
-
-    @Test func currentInputIsNilBeforeSessionConfigured() {
-        let fake = FakeAVAudioSession(scriptedInputs: [], scriptedCurrentInput: nil)
-        let service = AppleAudioInputService(session: fake)
+    @Test func contractTreatsNilCurrentInputAsLegalPreConfigurationState() {
+        let service: any AudioInputService = FakeAVAudioSession(scriptedInputs: [])
         #expect(service.currentInput() == nil)
     }
 
-    @Test func selectForwardsPresentDescriptorToSession() throws {
-        let usb = FakeAVAudioSession.usbDescriptor()
-        let fake = FakeAVAudioSession(scriptedInputs: [usb])
-        let service = AppleAudioInputService(session: fake)
-
-        try service.select(usb)
-
-        #expect(fake.lastPreferredInput == usb)
-        #expect(service.currentInput() == usb)
-    }
-
-    @Test func selectThrowsInputNotSelectableWhenDescriptorAbsent() {
+    @Test func contractRejectsSelectionOfAnUnavailableDescriptor() {
         let present = FakeAVAudioSession.builtInMicDescriptor()
         let stale = FakeAVAudioSession.usbDescriptor(name: "unplugged")
         let fake = FakeAVAudioSession(scriptedInputs: [present])
-        let service = AppleAudioInputService(session: fake)
 
         do {
-            try service.select(stale)
-            Issue.record("expected AudioInputServiceError.inputNotSelectable")
+            try fake.select(stale)
+            Issue.record("select() must reject a descriptor absent from availableInputs")
         } catch {
             #expect(error == .inputNotSelectable(stale))
         }
-        #expect(fake.lastPreferredInput == nil)
+        #expect(fake.selectedInput == nil)
     }
 
-    @Test func selectRethrowsActivationFailedFromSession() {
+    @Test func contractAcceptsSelectionOfAnAvailableDescriptor() throws {
         let usb = FakeAVAudioSession.usbDescriptor()
         let fake = FakeAVAudioSession(scriptedInputs: [usb])
-        fake.setPreferredError = .activationFailed("session-could-not-activate")
-        let service = AppleAudioInputService(session: fake)
+
+        try fake.select(usb)
+
+        #expect(fake.selectedInput == usb)
+        #expect(fake.currentInput() == usb)
+    }
+
+    @Test func contractPropagatesActivationFailureFromTheSession() {
+        let usb = FakeAVAudioSession.usbDescriptor()
+        let fake = FakeAVAudioSession(scriptedInputs: [usb])
+        fake.selectError = .activationFailed("session-could-not-activate")
 
         do {
-            try service.select(usb)
-            Issue.record("expected AudioInputServiceError.activationFailed")
+            try fake.select(usb)
+            Issue.record("select() must propagate .activationFailed unchanged")
         } catch {
             #expect(error == .activationFailed("session-could-not-activate"))
         }
+    }
+
+    @Test func contractLevelsStreamFinishesOnConsumerCancellation() async {
+        let fake = FakeAVAudioSession()
+        let consumer = Task {
+            for try await _ in fake.levels() {}
+        }
+        // Give the stream builder a turn so onTermination is registered.
+        try? await Task.sleep(nanoseconds: 20_000_000)
+        consumer.cancel()
+
+        let deadline = Date().addingTimeInterval(2)
+        while Date() < deadline, !fake.levelsStreamTerminated {
+            try? await Task.sleep(nanoseconds: 5_000_000)
+        }
+        #expect(fake.levelsStreamTerminated)
     }
 }
