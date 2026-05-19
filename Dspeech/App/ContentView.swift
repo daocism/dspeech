@@ -202,15 +202,22 @@ struct ContentView: View {
     }
 
     private func controlBar(isLandscape: Bool) -> some View {
-        HStack(spacing: 14) {
+        // why: at 28pt the title wrapped to two lines on iPhone 17 Pro
+        // (393pt wide), which collapsed the settings button into a sub-line
+        // and produced XCUI `Computed hit point {-1, -1}`. lineLimit(1) +
+        // minimumScaleFactor keeps the title on a single line and lets it
+        // shrink before the trailing controls get squeezed off-screen.
+        HStack(spacing: 12) {
             Text("Dspeech")
-                .font(.system(size: isLandscape ? 22 : 28, weight: .bold, design: .rounded))
+                .font(.system(size: isLandscape ? 22 : 24, weight: .bold, design: .rounded))
                 .foregroundStyle(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
                 .accessibilityIdentifier("app-title")
 
             PrivacyBadge(mode: privacy.mode, isLandscape: isLandscape)
 
-            Spacer()
+            Spacer(minLength: 8)
 
             settingsButton(isLandscape: isLandscape)
 
@@ -218,6 +225,7 @@ struct ContentView: View {
                 Text("Перевод")
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(.white.opacity(0.85))
+                    .lineLimit(1)
             }
             .toggleStyle(.switch)
             .tint(.cyan)
@@ -228,6 +236,11 @@ struct ContentView: View {
 
     private func settingsButton(isLandscape: Bool) -> some View {
         let diameter: CGFloat = isLandscape ? 32 : 36
+        // why: `.contentShape(Circle())` after `.buttonStyle(.plain)` broke
+        // XCUI's accessibility hit-point calculation on iPhone 17 Pro
+        // (`Computed hit point {-1, -1}`); the visible circle background
+        // already bounds the visual hit area, so the default rectangular
+        // content shape is what the test needs to tap.
         return Button {
             showSettings = true
         } label: {
@@ -243,9 +256,9 @@ struct ContentView: View {
                     Circle()
                         .stroke(.white.opacity(0.18), lineWidth: 1)
                 )
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .contentShape(Circle())
         .accessibilityIdentifier("settings-button")
         .accessibilityLabel("Настройки")
     }
