@@ -5,12 +5,19 @@ import Translation
 /// port so the Core layer stays SwiftUI-free.
 ///
 /// Apple exposes **no** programmatic downloader for an absent language pair:
-/// `TranslationSession.init(installedSource:target:)` is installed-only and
-/// throws otherwise, and `prepareTranslation()` requires a `TranslationSession`
-/// that only the SwiftUI `.translationTask(_:action:)` modifier can mint for a
-/// not-yet-installed pair (verified against Apple DocC
-/// `documentation/translation/translationsession{,/preparetranslation()}` and
-/// `…/translationsession/configuration`, 2026-05-19; restated in the frozen
+/// `TranslationSession.init(installedSource:target:)` is **synchronous and
+/// non-throwing** and installed-only — it neither acquires nor signals an absent
+/// pair, so absence is detected up front via `LanguageAvailability.status(from:to:)`
+/// (the precheck in ``AppleTranslationLanguagePackManager/prepareLanguages(from:into:)``).
+/// The sole acquisition route for a not-yet-installed pair is
+/// `prepareTranslation()`, which requires a `TranslationSession` that only the
+/// SwiftUI `.translationTask(_:action:)` modifier (via
+/// `TranslationSession.Configuration`) can mint (verified against Apple DocC
+/// `documentation/translation/translationsession{,/init(installedsource:target:),`
+/// `/preparetranslation()}` and `…/translationsession/configuration`,
+/// independently re-fetched 2026-05-19 — the `init(installedSource:target:)`
+/// declaration fragment carries no `throws`/`async`, corroborated by the iOS 26.4
+/// SDK Swift compiler at `f6fb939`; restated in the frozen
 /// ``TranslationLanguagePackPreparer`` DocC).
 ///
 /// The conforming type therefore lives at the SwiftUI integration seam and is
