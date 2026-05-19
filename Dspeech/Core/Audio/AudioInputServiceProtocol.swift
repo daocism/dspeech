@@ -160,3 +160,120 @@ protocol AudioInputService: Sendable {
     /// is plugged or pulled. Route changes are events, not failures — non-throwing.
     func routeChanges() -> AsyncStream<AudioRouteChange>
 }
+
+/// An AVFoundation-free snapshot of one input port.
+///
+/// The pure-Core projection of the three `AVAudioSessionPortDescription`
+/// fields the audio adapter's mapping logic consumes — `uid`, `portName`,
+/// `portType.rawValue` (verified against Apple DocC
+/// `documentation/avfaudio/avaudiosessionportdescription`; no new Apple symbol
+/// is introduced by this seam — it carries those values as plain `String`).
+/// It exists so ``AudioInputDescriptor`` / ``AudioRouteChangeReason``
+/// derivation can be exercised on the host without `AVAudioSession`, which has
+/// no public initializer and is not designed for subclass override.
+struct AudioPortSnapshot: Equatable, Sendable {
+    let uid: String
+    let portName: String
+    let portTypeRawValue: String
+
+    init(uid: String, portName: String, portTypeRawValue: String) {
+        self.uid = uid
+        self.portName = portName
+        self.portTypeRawValue = portTypeRawValue
+    }
+}
+
+/// One raw route-change event, before Core maps it onto ``AudioRouteChange``.
+///
+/// `reasonRawValue` is the unmapped `AVAudioSession.RouteChangeReason` raw
+/// value taken from the notification `userInfo` key
+/// `AVAudioSessionRouteChangeReasonKey` (verified against Apple DocC
+/// `documentation/avfaudio/avaudiosession/routechangenotification`), or `nil`
+/// when the key is absent. Mapping it onto ``AudioRouteChangeReason`` and
+/// coalescing rapid changes are pure-Core, host-testable steps the adapter
+/// performs — deliberately not this seam's responsibility.
+struct AudioRouteChangeEvent: Equatable, Sendable {
+    let reasonRawValue: UInt?
+    let activePort: AudioPortSnapshot?
+
+    init(reasonRawValue: UInt?, activePort: AudioPortSnapshot?) {
+        self.reasonRawValue = reasonRawValue
+        self.activePort = activePort
+    }
+}
+
+/// Pure-Core dependency seam beneath ``AudioInputService``'s AVFoundation
+/// adapter.
+///
+/// ## Why this exists
+/// `AppleAudioInputService` / `AudioRouteChangeObserver` were built reading
+/// `AVAudioSession.sharedInstance()` directly. `AVAudioSession` has no public
+/// initializer and is not override-designed, so the adapter's enumeration,
+/// uid-match selection, route-reason mapping, debounce, and stream-cancellation
+/// paths are **not host-unit-testable as built** — they are device-only. The
+/// W3 audio tester escalated this as a CRITICAL testability defect
+/// (`docs/handoff.md` "W3 audio tester block" escalation #1; root cause: the
+/// frozen audio protocol never exposed a fakeable seam — an architect defect,
+/// remediated here additively, the existing ``AudioInputService`` unchanged).
+///
+/// This protocol is that seam. The real `AVAudioSession`-backed conformer
+/// (W3a, imports AVFoundation, itself device-only) and a host fake both
+/// conform, so the adapter becomes a pure orchestrator whose decisions are
+/// unit-testable. It deliberately exposes **only Core value types** — no
+/// `AVFoundation` import in Core, per
+/// `docs/architecture-mvp-slice-2026-05-19.md` "Test seams".
+///
+/// ## Adapter contract (W3a adoption guidance — orchestration stays host-testable)
+/// - `availableInputs()` → ``configureForMeasurement()`` then
+///   ``availablePorts()``, mapping each snapshot to ``AudioInputDescriptor``;
+///   throw ``AudioInputServiceError/noInputsAvailable`` on an empty result —
+///   the empty-vs-error decision is the host-tested step.
+/// - `select(_:)` → ``configureForMeasurement()``, ``activate()``, verify the
+///   descriptor's `id` is present in ``availablePorts()`` and throw
+///   ``AudioInputServiceError/inputNotSelectable(_:)`` from the adapter when it
+///   is not (the descriptor-bearing error stays adapter-owned and host-tested),
+///   then delegate to ``setPreferredInput(portUID:)``.
+/// - `routeChanges()` → map each ``routeChangeEvents()`` element onto
+///   ``AudioRouteChange`` (reason-code mapping plus rapid-change debounce live
+///   here, in pure Core, host-tested — closes handoff escalation #3).
+///
+/// `Sendable` with an explicit `async` stream so isolation stays correct under
+/// Swift 6.0 nonisolated-default and a future Swift 6.2
+/// `defaultIsolation(MainActor.self)` migration alike.
+protocol AudioInputSessionPort: Sendable {
+    /// Puts the shared session into `.record` / `.measurement` for faithful
+    /// receive-only capture (system AGC/EQ off, as the ASR engine uses).
+    ///
+    /// - Throws: ``AudioInputServiceError/audioSessionUnavailable(_:)`` — never
+    ///   a silent no-op.
+    func configureForMeasurement() throws(AudioInputServiceError)
+
+    /// Activates the session so a preferred-input change takes effect.
+    ///
+    /// - Throws: ``AudioInputServiceError/activationFailed(_:)``.
+    func activate() throws(AudioInputServiceError)
+
+    /// Currently available input ports as AVFoundation-free snapshots. Returns
+    /// `[]` (never `nil`) when none are available — the adapter decides whether
+    /// `[]` is ``AudioInputServiceError/noInputsAvailable``.
+    func availablePorts() -> [AudioPortSnapshot]
+
+    /// The port currently feeding capture, or `nil` before the session is
+    /// configured (a legitimate pre-configuration state, not a failure).
+    func currentInputPort() -> AudioPortSnapshot?
+
+    /// Makes the port identified by `portUID` the preferred capture route.
+    ///
+    /// The adapter performs the host-testable membership pre-check against
+    /// ``availablePorts()`` and owns ``AudioInputServiceError/inputNotSelectable(_:)``;
+    /// this call covers the residual session-level rejection.
+    ///
+    /// - Throws: ``AudioInputServiceError/activationFailed(_:)`` if the session
+    ///   rejects the preferred-input change.
+    func setPreferredInput(portUID: String) throws(AudioInputServiceError)
+
+    /// Raw route-change events. Reason-code mapping and rapid-change debounce
+    /// are performed by the adapter in pure Core, not here. Route changes are
+    /// events, not failures — non-throwing.
+    func routeChangeEvents() -> AsyncStream<AudioRouteChangeEvent>
+}

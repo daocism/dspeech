@@ -190,3 +190,150 @@ pre-captured base.
 
 ### ready_for_integrator: no
 - Specs are complete, deterministic, and correctly RED. Blocking item: the injectable seam (`LocalTranslationService`/`TranslationLanguagePackManager`) does not exist — W2a's monolithic Apple structs make the frozen F3 contract unverifiable. Integrator/W1 must add the decorator seam (spec above) so the 24 specs can go GREEN. No spec weakening was done to force green (repo testing rule).
+
+## W4b firstrun tester — 2026-05-19
+
+### files_created:
+- DspeechTests/FirstRunCoordinatorTests.swift (Swift Testing; 9 @Test, pure state-machine)
+- DspeechUITests/FirstRunFlowUITests.swift (XCUITest; 3 tests)
+- DspeechUITests/AboutViewUITests.swift (XCUITest; 2 tests)
+
+### pbxproj_registration (append-only, no existing ID renumbered; plutil -lint OK):
+- FirstRunCoordinatorTests.swift  → DspeechTests target  (fileRef A…126 / buildFile A…127; group A…010, sources A…021)
+- FirstRunFlowUITests.swift       → DspeechUITests target (fileRef A…128 / buildFile A…129; group A…011, sources A…024)
+- AboutViewUITests.swift          → DspeechUITests target (fileRef A…12A / buildFile A…12B; group A…011, sources A…024)
+- Method: idempotent collision-safe insert before each section-End marker; IDs recomputed from live file (sibling waves had pushed IDs past my first plan 086–091 → reallocated 126–12B). Re-registration is trivially reproducible by the same insert if a concurrent writer ever clobbers these entries; no scratch tooling left in tree.
+- Rationale for editing a non-owned shared file: a test file absent from its target can never go red→green (no-half-implementation rule); same sanctioned-append precedent as W1 architect. Flagged here per guard #4/#8.
+
+### contract_published (spec-first — W4a/W5 MUST satisfy these; tests were authored purely from the frozen FirstRunCoordinatorProtocol, NOT from W4a code):
+- Concrete type: `DefaultFirstRunCoordinator: FirstRunCoordinator` with `init(store: any FirstRunStateStore)`.
+  VERIFIED ALIGNED: W4a shipped exactly `final class DefaultFirstRunCoordinator: FirstRunCoordinator` / `init(store: any FirstRunStateStore = UserDefaultsFirstRunStateStore())` — independent convergence, zero ping-pong, no name negotiation needed.
+- First-run accessibilityIdentifiers required by FirstRunFlowUITests: `first-run-card-1`, `first-run-card-2`, `first-run-card-3`, `first-run-skip` (all arch-frozen), plus `first-run-continue` (tester-defined: the primary advance control, present on every card; tapping it on card 3 completes and dismisses onboarding).
+- Post-first-run transcript surface must show existing `app-title` (= "Dspeech") and `privacy-badge` whose accessibilityLabel == "Локальная обработка" (LOCAL — ADR 0002). These already exist in ContentView; W5 must route to it after `.completed`.
+- About accessibilityIdentifiers required by AboutViewUITests (tester-defined spec): entry `about-nav-link` (NavigationLink row inside Settings), container `about-view`, and `about-app-name`, `about-version`, `about-privacy-badge`, `about-attribution-apple-speech`, `about-attribution-translation`, `about-licenses`.
+
+### tests_authored:
+- Unit (pure, no I/O): card order == [receiveOnly,localByDefault,wireForAccuracy]; fresh→`.showing(.receiveOnly)`; advance×3 walks cards then `.completed` (persists exactly once); terminal idempotency; skip from card1 / mid-card → `.completed`; pre-completed store → `.completed`; persistence-failure on final-advance AND on skip → typed `FirstRunCoordinatorError.persistenceUnavailable` rethrown, store stays incomplete, `currentState() != .completed` (fail-safe re-show). No silent-failure path accepted; no assertion weakened to force green.
+- UI: 3-card walk → transcript + LOCAL badge; skip → transcript + LOCAL badge; completed-state gate on relaunch; Settings→About surfaces all required IDs; About privacy statement stays visible (hard rule #4 carried into About).
+- @AppStorage reset: launchEnvironment `DSPEECH_UITEST`/`DSPEECH_FORCE_FIRST_RUN` carries the explicit reset intent (role spec); `-hasCompletedFirstRun NO|YES` launch arg is the UserDefaults argument-domain override that actually flips `@AppStorage("hasCompletedFirstRun")` with zero composition-root coupling (same mechanism as `-dspeech.privacy.mode.v1` in DspeechUITests). Documented with a single `// why:`.
+
+### xcodebuild: FAIL (mid-wave) — failure is NOT in W4b scope
+- Sole compile error in the whole DspeechTests module: `DspeechTests/Fakes/FakeAVAudioSession.swift:47 cannot find type 'AudioInputSessionPort' in scope` (W3b fake depending on a W3a type not yet shipped). My 3 files produced ZERO diagnostics; W4a's `DefaultFirstRunCoordinator` declaration matches my test's references.
+- Consequence: the shared DspeechTests target cannot link/run until W3a ships `AudioInputSessionPort`, so FirstRunCoordinatorTests cannot execute green YET (red-first authored; green is W7-gated after sibling convergence — the designed flow).
+
+### errors / next_steps:
+1. BLOCKING (sibling, not W4b): W3a must ship `AudioInputSessionPort` so the DspeechTests module compiles; only then do the 9 first-run unit specs run.
+2. INTEGRATION HAZARD for W5 (not my file): once first-run gating lands, the existing `DspeechUITests.swift` helper `launchAppWithCleanPrivacyDefaults()` does NOT bypass onboarding → its 3 tests will regress (fresh launch shows first-run, hiding `settings-button`/`translation-toggle`). W5 must add `-hasCompletedFirstRun YES` to that shared helper.
+3. No git commit performed: shared uncommitted worktree with intermingled in-flight sibling changes (pbxproj/handoff/FakeAVAudioSession) → a per-wave commit cannot be atomic and would entangle siblings' work (guard #8 "no auto-merge"). Integrator/W7 commits the converged state.
+
+### ready_for_integrator: yes (W4b deliverables complete; specs correct & red-first; contract aligned with W4a; only blockers are sibling-wave (W3a) + a W5 integration fix, both documented above)
+
+## W3 audio tester — 2026-05-19
+### tests_added: 22, DspeechTests/AudioInputServiceTests.swift (15) + DspeechTests/AudioRouteTests.swift (7) + DspeechTests/Fakes/FakeAVAudioSession.swift (fixture, frozen-AudioInputService fake)
+### red_initial: FAIL ✓ — commit 8965814: spec authored purely from the frozen AudioInputServiceProtocol + a documented DI-seam contract (NOT from W3a code, echo-chamber guard #6). Build RED: `FakeAVAudioSession.swift:47 cannot find type 'AudioInputSessionPort'`.
+### green_after_impl: my 3 files compile clean (ZERO diagnostics) at commit d94891c; app target ** BUILD SUCCEEDED **. Full green test EXECUTION is W7-gated — blocked ONLY by a sibling slice (W2 `TranslationLanguagePackManagerTests.swift`), not by W3b. No assertion was weakened to force green.
+### device_gated_cases:
+- USB-C / Bluetooth real-route plug & pull (Simulator fabricates routes — PLAN residual risk).
+- AppleAudioInputService.availableInputs/select/currentInput against real AVAudioSession.availableInputs + setPreferredInput.
+- AudioRouteChangeObserver + AppleAudioInputService.routeChanges notification→route mapping, reason mapping, and observer cancellation/teardown.
+- AppleAudioInputService.levels() real AVAudioEngine metering tap (record-permission-denied path).
+- These are device-gated NOT only by Simulator limits but because W3a left no fakeable seam (see escalation #1) — on-device is currently the ONLY way to exercise them.
+### escalations (route to tech-lead / W6 reviewer / W7 verifier — cross-wave, NOT fixable within W3b ownership):
+1. CRITICAL (testability): W3a `AppleAudioInputService` & `AudioRouteChangeObserver` take `init(session: AVAudioSession = .sharedInstance())` and read `session.currentRoute.inputs` + `NotificationCenter` directly. `AVAudioSession` has no public init and is not override-designed → the concrete adapter is NOT host-unit-testable. This contradicts arch doc "Test seams" ("all three protocols trivially fakeable, no Apple import in Core") and the W3b dispatch ("protocol-fronted fake, injected via DI"). Root cause: W1 never froze a DI seam; W3a chose concrete-AVAudioSession injection. Remediation (W1/W3a, NOT W3b): introduce a pure Core seam (e.g. `protocol AudioInputSessionPort: Sendable` exposing availableInputs/currentInput/setPreferredInput/raw route stream) that the real adapter and a fake both conform to; or split pure mappers to take Core types not `AVAudioSessionPortDescription`. Until then the slice's behaviour is device-only.
+2. SPEC DIVERGENCE: W3a `AudioRoute` ships 5 cases (added `.other(name:)`) vs the W3-impl dispatch's specified 4 (builtInMic/externalUSB/bluetooth/wiredHeadset). W3a documented a defensible no-silent-failure rationale (CarPlay/AirPlay). Tests assert the actual 5-case enum. Tech-lead: ratify the widening or send back to W3a.
+3. REQUIREMENT GAP: W3b dispatch + arch require **debounce of rapid route changes**. W3a `AudioRouteChangeObserver.routes()` yields on EVERY notification with NO coalescing/debounce. The debounce spec is currently unmet AND un-host-testable (see #1). Tech-lead: W3a must implement debounce; then it needs the seam from #1 to be verifiable off-device.
+4. COMMIT HYGIENE: W3a commit 1343876 "feat(audio): add AudioInputService…" used a broad `git add` and swept in NON-owned files — my 3 W3b test files + W2a `TranslationService.swift`/`TranslationLanguagePackManager.swift` + docs/handoff.md — violating atomic-commit / file-ownership (guard #4/#8). Content is intact (verified: committed test files == authored spec, empty diff); history is conflated. Shared-index race across parallel `claude -p` waves on one worktree is systemic — recommend per-wave git worktrees or an index lock in run-pipeline.sh.
+5. CROSS-SLICE BLOCK (FYI, owned by W2): `DspeechTests` is one module; W2 `TranslationLanguagePackManagerTests.swift` is RED (`cannot find type 'TranslationLanguagePackManager'` though `Dspeech/Core/Translation/TranslationLanguagePackManager.swift` exists — likely target/visibility), which blocks green test execution for ALL slices incl. W3b. W7 gate must converge W2 first.
+### ready_for_integrator: yes — W3b deliverables complete, specs correct, red-first honoured, no assertion weakened. Blockers are sibling-wave (W2) + the W3a/W1 testability defect (escalation #1), both documented; integrator/W7 own convergence.
+
+## W1 architect — 2026-05-19 (remediation round 1, fp=9ea645285fe6)
+
+This is a re-dispatch. The canned W1 prompt ("Create ONLY … freeze MVP-slice
+protocols") is generic; the operative instruction is the autopilot journal's
+`NEW-FINDING fp=9ea645285fe6 role=architect` — the W3 audio tester's CRITICAL
+testability escalation (#1 above) routed back to the architect. The original
+freeze already shipped at `95aa790` with 4 downstream waves built against it;
+re-creating the protocols would be destructive, so the fix is **additive**.
+
+### files_created: none new — additive edits only
+- `Dspeech/Core/Audio/AudioInputServiceProtocol.swift` — appended pure-Core seam
+  `AudioInputSessionPort` + value types `AudioPortSnapshot`,
+  `AudioRouteChangeEvent`. Existing `AudioInputService`/`AudioInputKind`/
+  `AudioInputDescriptor`/`AudioInputLevel`/`AudioRouteChangeReason`/
+  `AudioRouteChange`/`AudioInputServiceError` are **byte-identical** (purely
+  additive — every current conformer keeps compiling, W2/W3/W4 undisturbed).
+- `docs/architecture-mvp-slice-2026-05-19.md` — amended "Test seams" (the prior
+  "all three trivially fakeable" claim masked the adapter gap), added the
+  "Audio adapter DI seam — W3-tester remediation" section, updated "Frozen
+  files" + W3a adoption guidance. 245 lines (≤300).
+- `docs/handoff.md` — this block.
+- **No `project.pbxproj` edit**: the seam lives inside the already-registered
+  `AudioInputServiceProtocol.swift`, so it deliberately sidesteps the shared-
+  pbxproj race that W2/W3/W4 hit.
+
+### context7_citations:
+Context7 MCP (`mcp__plugin_context7_context7__*`) is not mounted in this env —
+ToolSearch returned none; the only MCP surface is Google Drive (same finding as
+the original W1/W2/W3). Decisive mitigation: **the seam introduces zero Apple
+API by design** — its entire purpose is no-AVFoundation-in-Core, so there is no
+new Apple symbol to verify (the strongest anti-hallucination posture: nothing to
+hallucinate). The Apple calls the real conformer will make
+(`AVAudioSession.availableInputs` / `setPreferredInput(_:)` / `currentRoute` /
+`routeChangeNotification` / `AVAudioSessionRouteChangeReasonKey`) were already
+DocC-verified in the original W1 block + arch doc and proven green at `d94891c`
+(`AppleAudioInputService` compiles clean under Swift 6 strict-complete).
+
+### deferrals: F3 deferred? NO — unchanged. ADR-0007 not in scope of this
+remediation (Translation-kept already determined at the original W1; not
+re-litigated). Translation/FirstRun protocols need no architect change — W2b's
+24 specs and W4b's 9 specs are deterministic against the frozen protocols via
+fakes; those findings (#2–#5) were dispatched to `role=implementer`, not here.
+
+### interfaces (added this round):
+- `AudioPortSnapshot{uid,portName,portTypeRawValue}` — AVFoundation-free
+  projection of `AVAudioSessionPortDescription`.
+- `AudioRouteChangeEvent{reasonRawValue:UInt?, activePort:AudioPortSnapshot?}` —
+  raw event; reason-mapping + debounce are adapter-side pure Core.
+- `protocol AudioInputSessionPort: Sendable`:
+  `configureForMeasurement() throws(AudioInputServiceError)`,
+  `activate() throws(AudioInputServiceError)`,
+  `availablePorts() -> [AudioPortSnapshot]`,
+  `currentInputPort() -> AudioPortSnapshot?`,
+  `setPreferredInput(portUID:) throws(AudioInputServiceError)`,
+  `routeChangeEvents() -> AsyncStream<AudioRouteChangeEvent>`.
+  Adapter-contract DocC tells W3a how to keep the orchestration host-testable
+  and where to add the missing debounce (closes escalations #1 and #3).
+
+### errors_unresolved (honest):
+- **xcodebuild app target = BUILD FAILED, but exogenous and pre-existing.** All
+  6 `error:` lines are in `ContentView.swift` / `DspeechApp.swift` (W5-exclusive,
+  I am forbidden to touch; both `M` dirty at session start) — `cannot find`
+  `OnboardingPermissionRequesting` / `LocalTranslationService` /
+  `DefaultFirstRunCoordinator` / `SystemOnboardingPermissionRequester` /
+  `UserDefaultsFirstRunStateStore`: W5 integration-in-flight + untracked
+  `Dspeech/Core/Translation/LocalTranslationService.swift` absent from the
+  Sources phase (W5/pbxproj-race, integrator-owned, predates this edit).
+  `AudioInputServiceProtocol.swift` produced **zero diagnostics** — proven by
+  the full `error:` enumeration containing none of my file/symbols; Swift
+  type-checks the whole module together, so a fault in the additive types would
+  have surfaced against my file. The additive seam is sound; the red is W5's,
+  not mine, and not fixable within architect scope.
+- Dispatch-vs-reality reconciliations (transparency, per the precedent every
+  prior wave set): (a) commit message is the honest conventional-commit for the
+  actual change, not the canned `feat(arch): freeze MVP-slice protocols` —
+  that exact message already exists at `95aa790` for the *original* freeze;
+  reusing it for a different (remediation) change would corrupt the atomic-
+  commit knowledge record (git-workflow rule). (b) Co-author footer uses
+  `Claude Opus 4.6 (1M context)` per the dispatch + repo CLAUDE.md + all 9
+  prior branch commits (branch-history consistency).
+- Did NOT push (per dispatch).
+
+### ready_for_implementers: yes
+- The `AudioInputSessionPort` seam exists and compiles clean. W3a implementer
+  remediation (separate dispatch) can now refactor `AppleAudioInputService`
+  onto it and add debounce, host-testable for the first time; W3b can then
+  inject a fake `AudioInputSessionPort` and lift the device-only gate on the
+  mapping/selection/route/debounce specs.
+- Whole-tree green remains W5-integrator / W7-verifier owned (converge the
+  untracked `LocalTranslationService.swift` + ContentView/DspeechApp/pbxproj),
+  exactly as the PLAN DAG and prior wave handoffs intend.

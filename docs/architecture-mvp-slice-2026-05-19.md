@@ -158,10 +158,13 @@ VM's actor. View models follow the `PrivacySettings` template: `@MainActor
 
 ## Test seams (for W2b/W3b/W4b)
 
-- All three protocols are trivially fakeable (no Apple import in Core): fake
-  `TranslationService` returning each `TranslationLanguageStatus`/error;
-  fake `AudioInputService` yielding scripted `availableInputs`,
-  `AsyncThrowingStream` levels, and `routeChanges`; in-memory `FirstRunStateStore`.
+- All three service protocols are trivially fakeable at the **contract** level
+  (no Apple import in Core): fake `TranslationService` returning each
+  `TranslationLanguageStatus`/error; fake `AudioInputService` yielding scripted
+  `availableInputs`, `AsyncThrowingStream` levels, and `routeChanges`; in-memory
+  `FirstRunStateStore`. **Adapter-level** audio logic (port→descriptor mapping,
+  uid-match selection, route-reason mapping, debounce) is host-testable only
+  through the `AudioInputSessionPort` seam below — see next section.
 - New persistent settings get a UserDefaults round-trip test, like
   `PrivacySettingsTests.userDefaultsRoundTrip` (`CLAUDE.md` rule).
 - `FirstRunCoordinator` is a pure state machine over `FirstRunCard.allCases` —
@@ -173,14 +176,50 @@ VM's actor. View models follow the `PrivacySettings` template: `@MainActor
   XCUITest IDs `translation-download-cta`, `audio-source-picker`,
   `audio-level-meter`, `first-run-card-{1,2,3}`, `first-run-skip`.
 
+## Audio adapter DI seam — W3-tester remediation (2026-05-19)
+
+The W3 audio tester escalated a **CRITICAL testability defect**
+(`docs/handoff.md` "W3 audio tester block" escalation #1): `AppleAudioInputService`
+/ `AudioRouteChangeObserver` read `AVAudioSession.sharedInstance()` directly;
+`AVAudioSession` has no public initializer and is not override-designed, so the
+adapter's enumeration / uid-match selection / route-reason mapping / debounce /
+cancellation logic is device-only. Root cause is an **architect omission** — the
+frozen audio protocol exposed no fakeable seam — so it is remediated here.
+
+Remediation (additive, non-breaking): a pure-Core `AudioInputSessionPort`
+protocol plus value types `AudioPortSnapshot` / `AudioRouteChangeEvent`, appended
+to `Dspeech/Core/Audio/AudioInputServiceProtocol.swift`. It exposes
+`configureForMeasurement()` / `activate()` / `availablePorts()` /
+`currentInputPort()` / `setPreferredInput(portUID:)` /
+`routeChangeEvents()` in Core types only — **zero AVFoundation, zero new Apple
+symbol** (the strongest anti-hallucination posture: nothing to verify because
+nothing Apple is introduced; the underlying `availableInputs` /
+`setPreferredInput` / `currentRoute` / `routeChangeNotification` calls the real
+conformer makes were already DocC-verified above and proven green at `d94891c`).
+
+The existing `AudioInputService` and every current conformer
+(`AppleAudioInputService`, `FakeAVAudioSession`) are byte-identical — the seam is
+purely additive, so W2/W3/W4 are not disturbed and the suite stays green. W3a
+(separate implementer dispatch) refactors `AppleAudioInputService` into a pure
+orchestrator over an injected `AudioInputSessionPort` (real `AVAudioSession`
+conformer = the un-fakeable shell; host fake = the tested core), per the
+"Adapter contract" DocC on the protocol. This also gives W3a a pure-Core place
+to add the missing rapid-change **debounce** (handoff escalation #3),
+host-testable for the first time.
+
 ## Frozen files (this commit)
 
 `Dspeech/Core/Translation/TranslationServiceProtocol.swift`,
 `Dspeech/Core/Audio/AudioInputServiceProtocol.swift`,
-`Dspeech/Core/FirstRun/FirstRunCoordinatorProtocol.swift`, plus append-only
-`project.pbxproj` registration (CLAUDE.md-sanctioned; no existing ID renumbered;
-`plutil -lint` OK; `xcodebuild … build` SUCCEEDED). Implementers must not edit
-these signatures; signature changes route back through W1.
+`Dspeech/Core/FirstRun/FirstRunCoordinatorProtocol.swift`. Originally registered
+append-only in `project.pbxproj` (CLAUDE.md-sanctioned; no existing ID
+renumbered; `plutil -lint` OK; `xcodebuild … build` SUCCEEDED at `95aa790`).
+The 2026-05-19 W3-tester remediation **adds** `AudioInputSessionPort` /
+`AudioPortSnapshot` / `AudioRouteChangeEvent` *inside the already-registered*
+`AudioInputServiceProtocol.swift` — no new file, **no `project.pbxproj` edit**
+(it sidesteps the shared-pbxproj race the W2/W3 waves hit). Existing protocol
+signatures are unchanged; the additive seam is the only delta. Implementers must
+not edit these signatures; signature changes route back through W1.
 
 ## Implementer guidance / open items
 
@@ -193,8 +232,14 @@ these signatures; signature changes route back through W1.
   installed path; `TranslationLanguagePackPreparer` is the only type allowed to
   drive `.translationTask`/`prepareTranslation()` and lives at the SwiftUI seam
   (W2a model + W5 stitch), still zero Dspeech `URLSession`.
-- W3a: resolve `AudioInputDescriptor.portType` back to a live
-  `AVAudioSessionPortDescription` via `availableInputs` `uid` match before
-  `setPreferredInput`; share the one `AVAudioSession` with the ASR engine.
+- W3a: refactor `AppleAudioInputService` onto an injected
+  `AudioInputSessionPort` (default = a new `AVAudioSession`-backed conformer;
+  inject a fake in tests) so the orchestration is host-testable; resolve a
+  snapshot back to a live `AVAudioSessionPortDescription` via `uid` match inside
+  that conformer before `setPreferredInput`; share the one `AVAudioSession` with
+  the ASR engine; add the rapid-change debounce in the pure-Core mapping step
+  (handoff escalations #1, #3). The descriptor-bearing
+  `AudioInputServiceError.inputNotSelectable` stays adapter-owned via the
+  `availablePorts()` membership pre-check.
 - W9: write `docs/adr/0007-translation-framework-on-device.md` from the
   "ADR 0002 determination" section above.
