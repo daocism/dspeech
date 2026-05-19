@@ -181,4 +181,159 @@ struct AudioInputServiceTests {
         }
         #expect(fake.levelsStreamTerminated)
     }
+
+    // MARK: - Adapter orchestration over the injected AudioInputSessionPort seam
+    //
+    // These pin the host-testable orchestration the architect's "Adapter
+    // contract" DocC promises (`AudioInputServiceProtocol.swift:226`), now that
+    // commit 5a6cf77 shipped the pure-Core `AudioInputSessionPort` seam. They
+    // construct `AppleAudioInputService` over an injected
+    // `FakeAudioInputSessionPort` instead of `AVAudioSession.sharedInstance()`.
+    // Seam contract these specs require of the W3a implementer remediation
+    // (fp=9d12d5f9513b) — see docs/handoff.md "W3 audio tester" block:
+    //   init(port: AudioInputSessionPort,
+    //        routeDebounce: Duration = .milliseconds(300),
+    //        sleep: @Sendable (Duration) async -> Void = <real Task.sleep>)
+    // Until that initializer exists the DspeechTests module is RED (intended).
+
+    @Test func adapterAvailableInputsConfiguresThenMapsEachPortToDescriptor() throws {
+        let usb = FakeAudioInputSessionPort.usbSnapshot(uid: "u1", name: "Cockpit USB-C")
+        let mic = FakeAudioInputSessionPort.builtInMicSnapshot(uid: "m1")
+        let fake = FakeAudioInputSessionPort(scriptedPorts: [usb, mic])
+
+        let inputs = try AppleAudioInputService(port: fake).availableInputs()
+
+        #expect(fake.configureCallCount >= 1)
+        #expect(inputs.map(\.id) == ["u1", "m1"])
+        #expect(inputs[0].kind == .wired)
+        #expect(inputs[0].displayName == "Cockpit USB-C")
+        #expect(inputs[0].portType == usb.portTypeRawValue)
+        #expect(inputs[1].kind == .builtInMicrophone)
+    }
+
+    @Test func adapterSurfacesEmptyPortsAsNoInputsAvailableNotAnEmptyArray() {
+        let fake = FakeAudioInputSessionPort(scriptedPorts: [])
+        do {
+            _ = try AppleAudioInputService(port: fake).availableInputs()
+            Issue.record("availableInputs() must throw .noInputsAvailable, never return []")
+        } catch {
+            #expect(error == .noInputsAvailable)
+        }
+    }
+
+    @Test func adapterPropagatesPermissionDeniedAsAudioSessionUnavailable() {
+        // AVAudioSession microphone-permission denial surfaces from
+        // configureForMeasurement(); the adapter must propagate, not fall back.
+        let fake = FakeAudioInputSessionPort(scriptedPorts: [FakeAudioInputSessionPort.usbSnapshot()])
+        fake.configureError = .audioSessionUnavailable("microphone-permission-denied")
+        do {
+            _ = try AppleAudioInputService(port: fake).availableInputs()
+            Issue.record("availableInputs() must propagate the configure failure")
+        } catch {
+            #expect(error == .audioSessionUnavailable("microphone-permission-denied"))
+        }
+    }
+
+    @Test func adapterMapsPortTypeRawValueToTheCorrectPickerKind() throws {
+        let cases: [(AudioPortSnapshot, AudioInputKind)] = [
+            (FakeAudioInputSessionPort.builtInMicSnapshot(), .builtInMicrophone),
+            (FakeAudioInputSessionPort.usbSnapshot(), .wired),
+            (FakeAudioInputSessionPort.headsetSnapshot(), .wired),
+            (FakeAudioInputSessionPort.bluetoothSnapshot(), .bluetooth),
+            (FakeAudioInputSessionPort.unmappedSnapshot(), .other),
+        ]
+        for (snapshot, expectedKind) in cases {
+            let fake = FakeAudioInputSessionPort(scriptedPorts: [snapshot])
+            let input = try AppleAudioInputService(port: fake).availableInputs().first
+            #expect(input?.kind == expectedKind)
+            #expect(input?.id == snapshot.uid)
+            #expect(input?.displayName == snapshot.portName)
+        }
+    }
+
+    @Test func adapterSelectActivatesAndDelegatesPreferredInputByPortUID() throws {
+        let usb = FakeAudioInputSessionPort.usbSnapshot(uid: "usb-uid-1")
+        let fake = FakeAudioInputSessionPort(scriptedPorts: [usb])
+        let descriptor = AudioInputDescriptor(
+            id: "usb-uid-1",
+            kind: .wired,
+            displayName: "USB-C Audio",
+            portType: usb.portTypeRawValue
+        )
+
+        try AppleAudioInputService(port: fake).select(descriptor)
+
+        #expect(fake.configureCallCount >= 1)
+        #expect(fake.activateCallCount >= 1)
+        #expect(fake.preferredInputCallCount == 1)
+        #expect(fake.preferredInputUID == "usb-uid-1")
+    }
+
+    @Test func adapterRejectsSelectionAbsentFromPortsWithoutCallingSetPreferred() {
+        let present = FakeAudioInputSessionPort.builtInMicSnapshot(uid: "present-uid")
+        let fake = FakeAudioInputSessionPort(scriptedPorts: [present])
+        let stale = AudioInputDescriptor(
+            id: "unplugged-uid",
+            kind: .wired,
+            displayName: "USB-C (unplugged)",
+            portType: "USBAudio"
+        )
+
+        do {
+            try AppleAudioInputService(port: fake).select(stale)
+            Issue.record("select() must reject a descriptor absent from availablePorts()")
+        } catch {
+            #expect(error == .inputNotSelectable(stale))
+        }
+        #expect(fake.preferredInputCallCount == 0)
+    }
+
+    @Test func adapterPropagatesActivationFailureAndSkipsPreferredInput() {
+        let usb = FakeAudioInputSessionPort.usbSnapshot(uid: "u1")
+        let fake = FakeAudioInputSessionPort(scriptedPorts: [usb])
+        fake.activateError = .activationFailed("session-busy")
+        let descriptor = AudioInputDescriptor(
+            id: "u1", kind: .wired, displayName: "USB", portType: usb.portTypeRawValue
+        )
+
+        do {
+            try AppleAudioInputService(port: fake).select(descriptor)
+            Issue.record("select() must propagate .activationFailed")
+        } catch {
+            #expect(error == .activationFailed("session-busy"))
+        }
+        #expect(fake.preferredInputCallCount == 0)
+    }
+
+    @Test func adapterPropagatesSessionLevelPreferredInputRejection() {
+        let usb = FakeAudioInputSessionPort.usbSnapshot(uid: "u1")
+        let fake = FakeAudioInputSessionPort(scriptedPorts: [usb])
+        fake.preferredInputError = .activationFailed("session-rejected-preferred-input")
+        let descriptor = AudioInputDescriptor(
+            id: "u1", kind: .wired, displayName: "USB", portType: usb.portTypeRawValue
+        )
+
+        do {
+            try AppleAudioInputService(port: fake).select(descriptor)
+            Issue.record("select() must propagate the residual session-level rejection")
+        } catch {
+            #expect(error == .activationFailed("session-rejected-preferred-input"))
+        }
+    }
+
+    @Test func adapterCurrentInputIsNilBeforeTheSessionIsConfigured() {
+        let fake = FakeAudioInputSessionPort(scriptedPorts: [], scriptedCurrentPort: nil)
+        #expect(AppleAudioInputService(port: fake).currentInput() == nil)
+    }
+
+    @Test func adapterCurrentInputMapsTheActivePortSnapshot() {
+        let usb = FakeAudioInputSessionPort.usbSnapshot(uid: "live-uid", name: "Live USB")
+        let fake = FakeAudioInputSessionPort(scriptedPorts: [usb], scriptedCurrentPort: usb)
+
+        let current = AppleAudioInputService(port: fake).currentInput()
+
+        #expect(current?.id == "live-uid")
+        #expect(current?.kind == .wired)
+        #expect(current?.displayName == "Live USB")
+    }
 }
