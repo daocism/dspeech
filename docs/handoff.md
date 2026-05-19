@@ -337,3 +337,11 @@ fakes; those findings (#2–#5) were dispatched to `role=implementer`, not here.
 - Whole-tree green remains W5-integrator / W7-verifier owned (converge the
   untracked `LocalTranslationService.swift` + ContentView/DspeechApp/pbxproj),
   exactly as the PLAN DAG and prior wave handoffs intend.
+
+## W5 integrator — 2026-05-19
+### files_modified: Dspeech/App/DspeechApp.swift, Dspeech/App/ContentView.swift, Dspeech/App/SettingsSheet.swift (new), Dspeech.xcodeproj/project.pbxproj
+### accessibilityIdentifiers_added: translation-toggle (carried), settings-button (carried), settings-sheet (via SettingsSheet), cloud-toggle (via SettingsSheet), settings-done-button (via SettingsSheet); W4 leaves consumed verbatim (`audio-source-row-<id>`, `audio-level-meter`, `audio-source-error`, `translation-target-language-picker`, `translation-download-cta`, `translation-error`, `translation-status`, `about-nav-link`, `about-view`, `about-*`, `first-run-card-title`, `first-run-skip`, `first-run-continue`, `first-run-target-language-picker`, `first-run-error`).
+### xcodebuild_test: PASS, tests_count_before=N/A (HEAD pbxproj referenced 3 never-committed test files — FirstRunCoordinatorTests, FirstRunFlowUITests, AboutViewUITests — causing `Build input files cannot be found`; **build at HEAD did not even reach the test phase**), tests_count_after=88 PASSED / 0 FAILED / 0 SKIPPED on `iPhone 17 Pro Max`.
+### regression_checks: privacy_badge=visible (PrivacyBadge unchanged in `controlBar`), todo_grep=0 (Dspeech/), urlsession_in_translation=0 (Dspeech/Core/Translation/), adr_0007_translation_deferral=absent (F3 kept per arch §"ADR 0002 determination" — Translation toggle stays visible).
+### pbxproj_repair: removed dangling refs for `FirstRunCoordinatorTests.swift`, `FirstRunFlowUITests.swift`, `AboutViewUITests.swift` (referenced in HEAD pbxproj but never committed under any branch reachable from HEAD — `git log --all --diff-filter=A -- <path>` empty). Appended `SettingsSheet.swift` (new fileRef `A00000000000000000000130`, build entry `A00000000000000000000131`). `plutil -lint` OK. No existing IDs renumbered (CLAUDE.md project rule).
+### ready_for_reviewer: yes

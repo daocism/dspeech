@@ -1,10 +1,40 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State private var liveViewModel: LiveTranscriptionViewModel = ContentView.makeDefaultLiveViewModel()
-    @State private var privacy = PrivacySettings()
+    @State private var liveViewModel: LiveTranscriptionViewModel
+    @State private var privacy: PrivacySettings
     @State private var showTranslation: Bool = true
     @State private var showSettings: Bool = false
+    @State private var showFirstRun: Bool
+    @State private var firstRunViewModel: FirstRunViewModel?
+    @AppStorage("dspeech.translation.targetLanguageCode") private var targetLanguageCode = "ru"
+
+    private let audioService: any AudioInputService
+    private let translationService: any TranslationService
+    private let firstRunCoordinator: any FirstRunCoordinator
+    private let permissionRequester: any OnboardingPermissionRequesting
+
+    init(
+        liveViewModel: LiveTranscriptionViewModel = ContentView.makeDefaultLiveViewModel(),
+        privacy: PrivacySettings = PrivacySettings(),
+        audioService: any AudioInputService = AppleAudioInputService(),
+        translationService: any TranslationService = LocalTranslationService(backend: AppleTranslationService()),
+        firstRunCoordinator: any FirstRunCoordinator = DefaultFirstRunCoordinator(),
+        permissionRequester: any OnboardingPermissionRequesting = SystemOnboardingPermissionRequester()
+    ) {
+        _liveViewModel = State(initialValue: liveViewModel)
+        _privacy = State(initialValue: privacy)
+        self.audioService = audioService
+        self.translationService = translationService
+        self.firstRunCoordinator = firstRunCoordinator
+        self.permissionRequester = permissionRequester
+        // why: deciding first-run in .onAppear races SwiftUI's first
+        // presentation transaction and the cover is silently dropped at
+        // launch (XCUITest sees the transcript surface directly). Arming
+        // the cover from synchronously-resolved init state makes
+        // presentation deterministic.
+        _showFirstRun = State(initialValue: firstRunCoordinator.currentState() != .completed)
+    }
 
     static func makeDefaultLiveViewModel() -> LiveTranscriptionViewModel {
         LiveTranscriptionViewModel(engine: AppleSpeechLiveTranscriptionEngine())
@@ -48,8 +78,43 @@ struct ContentView: View {
         .statusBarHidden(true)
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showSettings) {
-            SettingsView(privacy: privacy)
+            SettingsSheet(
+                privacy: privacy,
+                audioService: audioService,
+                translationService: translationService,
+                targetLanguageCode: $targetLanguageCode,
+                onSelectTargetLanguage: { language in applySelectedTargetLanguage(language) }
+            )
         }
+        .fullScreenCover(isPresented: $showFirstRun) {
+            Group {
+                if let firstRunViewModel {
+                    FirstRunView(viewModel: firstRunViewModel)
+                } else {
+                    Color.black.ignoresSafeArea()
+                }
+            }
+            .task { ensureFirstRunViewModel() }
+        }
+    }
+
+    private func ensureFirstRunViewModel() {
+        guard firstRunViewModel == nil else { return }
+        firstRunViewModel = FirstRunViewModel(
+            coordinator: firstRunCoordinator,
+            privacy: privacy,
+            permissionRequester: permissionRequester,
+            initialTargetLanguageCode: targetLanguageCode,
+            onSelectTargetLanguage: { language in applySelectedTargetLanguage(language) },
+            onFinished: { showFirstRun = false }
+        )
+    }
+
+    private func applySelectedTargetLanguage(_ language: Locale.Language) {
+        guard let match = dspeechGlossLanguages.first(where: {
+            Locale.Language(identifier: $0.code).languageCode == language.languageCode
+        }) else { return }
+        targetLanguageCode = match.code
     }
 
     @ViewBuilder
@@ -204,70 +269,6 @@ struct PrivacyBadge: View {
             )
             .accessibilityIdentifier("privacy-badge")
             .accessibilityLabel(isLocal ? "Локальная обработка" : "Облачная обработка (с согласия)")
-    }
-}
-
-struct SettingsView: View {
-    @Bindable var privacy: PrivacySettings
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    Toggle(isOn: $privacy.allowCloud) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Разрешить облачную обработку")
-                                .font(.body.weight(.medium))
-                            Text(privacy.allowCloud
-                                 ? "Аудио и расшифровки могут уходить с устройства."
-                                 : "Аудио остаётся на устройстве. Облако выключено.")
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .accessibilityIdentifier("cloud-toggle")
-                } header: {
-                    Text("Приватность")
-                } footer: {
-                    Text("По умолчанию Dspeech обрабатывает звук только локально. Облако включается явно и видно по бейджу LOCAL/CLOUD на главном экране.")
-                }
-
-                Section("Распознавание") {
-                    LabeledContent("Язык по умолчанию", value: "Авто")
-                    LabeledContent("Модель ASR", value: "Apple Speech")
-                    LabeledContent("Режим", value: privacy.mode.displayName)
-                }
-                Section("Перевод") {
-                    LabeledContent("Целевой язык", value: "Русский")
-                    LabeledContent(
-                        "Провайдер",
-                        value: privacy.allowCloud ? "Облако (по согласию)" : "Локальный"
-                    )
-                }
-                Section("О приложении") {
-                    LabeledContent("Версия", value: Bundle.main.shortVersion)
-                }
-            }
-            .navigationTitle("Настройки")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Готово") {
-                        dismiss()
-                    }
-                    .accessibilityIdentifier("settings-done-button")
-                }
-            }
-        }
-        .accessibilityIdentifier("settings-sheet")
-        .preferredColorScheme(.dark)
-    }
-}
-
-private extension Bundle {
-    var shortVersion: String {
-        (infoDictionary?["CFBundleShortVersionString"] as? String) ?? "—"
     }
 }
 
