@@ -9,3 +9,19 @@ build/
 *.m4a
 *.wav
 *.caf
+
+# autopilot runtime artifacts (not source-of-truth, transient per-session)
+.agent-logs/
+.agent-state/
+.agent-prompts/W1-*.md
+.agent-prompts/W2-*.md
+.agent-prompts/W3-*.md
+.agent-prompts/W4-*.md
+.agent-prompts/W4b-*.md
+.agent-prompts/W5-*.md
+.agent-prompts/W6-*.md
+.agent-prompts/W7-*.md
+.agent-prompts/W8-*.md
+.agent-prompts/W9-*.md
+.agent-prompts/watchdog-*.sh
+.agent-prompts/workday-pilot.sh
