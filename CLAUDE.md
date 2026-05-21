@@ -61,6 +61,17 @@ ssh mac24 'cd /Users/andre/projects/dspeech-ios && \
 - `docs/adr/` — Architecture Decision Records, numbered, append-only.
 - `docs/product/` — product PRD and adjacent product docs.
 
+## Project Workspace memory
+
+This repo is the canonical Dspeech project memory for AI agents. Before non-trivial Dspeech work, read:
+
+- `docs/ai-kb/README.md`
+- `docs/ai-kb/current-context.md`
+- `.ai/project-state.md`
+- relevant ADRs under `docs/adr/`
+
+Do not store Dspeech-scoped knowledge in global Mr.Dao/Claude memory. If work changes durable project truth, update `docs/ai-kb/current-context.md` and/or an ADR in the same branch. Notion is a read model only.
+
 ## Workflow
 
 1. Read `docs/PLAN-<date>.md` (most recent) and the relevant ADRs first.
