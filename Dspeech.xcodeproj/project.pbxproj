@@ -21,6 +21,15 @@
 		A00000000000000000000075 /* AppleSpeechLiveTranscriptionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000071 /* AppleSpeechLiveTranscriptionEngine.swift */; };
 		A00000000000000000000076 /* LiveTranscriptionViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000072 /* LiveTranscriptionViewModel.swift */; };
 		A00000000000000000000077 /* LiveTranscriptionViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000073 /* LiveTranscriptionViewModelTests.swift */; };
+		A00000000000000000000087 /* CallSign.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000078 /* CallSign.swift */; };
+		A00000000000000000000088 /* PilotVoiceProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000079 /* PilotVoiceProfile.swift */; };
+		A00000000000000000000089 /* SpeakerMatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000080 /* SpeakerMatcher.swift */; };
+		A00000000000000000000090 /* LocalSpeakerIdentifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000081 /* LocalSpeakerIdentifier.swift */; };
+		A00000000000000000000091 /* ATCTranscriptGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000082 /* ATCTranscriptGate.swift */; };
+		A00000000000000000000092 /* VoiceFilterStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000083 /* VoiceFilterStorage.swift */; };
+		A00000000000000000000093 /* VoiceFilterPipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000084 /* VoiceFilterPipeline.swift */; };
+		A00000000000000000000094 /* CallSignTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000085 /* CallSignTests.swift */; };
+		A00000000000000000000095 /* VoiceFilterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000086 /* VoiceFilterTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -46,6 +55,15 @@
 		A00000000000000000000071 /* AppleSpeechLiveTranscriptionEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSpeechLiveTranscriptionEngine.swift; sourceTree = "<group>"; };
 		A00000000000000000000072 /* LiveTranscriptionViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTranscriptionViewModel.swift; sourceTree = "<group>"; };
 		A00000000000000000000073 /* LiveTranscriptionViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTranscriptionViewModelTests.swift; sourceTree = "<group>"; };
+		A00000000000000000000078 /* CallSign.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallSign.swift; sourceTree = "<group>"; };
+		A00000000000000000000079 /* PilotVoiceProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PilotVoiceProfile.swift; sourceTree = "<group>"; };
+		A00000000000000000000080 /* SpeakerMatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeakerMatcher.swift; sourceTree = "<group>"; };
+		A00000000000000000000081 /* LocalSpeakerIdentifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalSpeakerIdentifier.swift; sourceTree = "<group>"; };
+		A00000000000000000000082 /* ATCTranscriptGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ATCTranscriptGate.swift; sourceTree = "<group>"; };
+		A00000000000000000000083 /* VoiceFilterStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceFilterStorage.swift; sourceTree = "<group>"; };
+		A00000000000000000000084 /* VoiceFilterPipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceFilterPipeline.swift; sourceTree = "<group>"; };
+		A00000000000000000000085 /* CallSignTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallSignTests.swift; sourceTree = "<group>"; };
+		A00000000000000000000086 /* VoiceFilterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceFilterTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -59,12 +77,13 @@
 		A00000000000000000000003 /* Products */ = {isa = PBXGroup; children = ( A00000000000000000000015 /* Dspeech.app */, A00000000000000000000016 /* DspeechTests.xctest */, A00000000000000000000017 /* DspeechUITests.xctest */, ); name = Products; sourceTree = "<group>"; };
 		A00000000000000000000004 /* Dspeech */ = {isa = PBXGroup; children = ( A00000000000000000000005 /* App */, A00000000000000000000006 /* Core */, ); path = Dspeech; sourceTree = "<group>"; };
 		A00000000000000000000005 /* App */ = {isa = PBXGroup; children = ( A00000000000000000000043 /* DspeechApp.swift */, A00000000000000000000044 /* ContentView.swift */, A00000000000000000000045 /* TranscriptDemoViewModel.swift */, A00000000000000000000072 /* LiveTranscriptionViewModel.swift */, ); path = App; sourceTree = "<group>"; };
-		A00000000000000000000006 /* Core */ = {isa = PBXGroup; children = ( A00000000000000000000007 /* Models */, A00000000000000000000008 /* Audio */, A00000000000000000000009 /* ASR */, A00000000000000000000063 /* Settings */, ); path = Core; sourceTree = "<group>"; };
+		A00000000000000000000006 /* Core */ = {isa = PBXGroup; children = ( A00000000000000000000007 /* Models */, A00000000000000000000008 /* Audio */, A00000000000000000000009 /* ASR */, A00000000000000000000063 /* Settings */, A00000000000000000000096 /* VoiceFilter */, ); path = Core; sourceTree = "<group>"; };
+		A00000000000000000000096 /* VoiceFilter */ = {isa = PBXGroup; children = ( A00000000000000000000078 /* CallSign.swift */, A00000000000000000000079 /* PilotVoiceProfile.swift */, A00000000000000000000080 /* SpeakerMatcher.swift */, A00000000000000000000081 /* LocalSpeakerIdentifier.swift */, A00000000000000000000082 /* ATCTranscriptGate.swift */, A00000000000000000000083 /* VoiceFilterStorage.swift */, A00000000000000000000084 /* VoiceFilterPipeline.swift */, ); path = VoiceFilter; sourceTree = "<group>"; };
 		A00000000000000000000063 /* Settings */ = {isa = PBXGroup; children = ( A00000000000000000000061 /* PrivacySettings.swift */, ); path = Settings; sourceTree = "<group>"; };
 		A00000000000000000000007 /* Models */ = {isa = PBXGroup; children = ( A00000000000000000000046 /* TranscriptSegment.swift */, ); path = Models; sourceTree = "<group>"; };
 		A00000000000000000000008 /* Audio */ = {isa = PBXGroup; children = ( A00000000000000000000047 /* AudioCaptureService.swift */, ); path = Audio; sourceTree = "<group>"; };
 		A00000000000000000000009 /* ASR */ = {isa = PBXGroup; children = ( A00000000000000000000048 /* SpeechRecognitionService.swift */, A00000000000000000000070 /* LiveTranscriptionEngine.swift */, A00000000000000000000071 /* AppleSpeechLiveTranscriptionEngine.swift */, ); path = ASR; sourceTree = "<group>"; };
-		A00000000000000000000010 /* DspeechTests */ = {isa = PBXGroup; children = ( A00000000000000000000049 /* TranscriptSegmentTests.swift */, A00000000000000000000062 /* PrivacySettingsTests.swift */, A00000000000000000000073 /* LiveTranscriptionViewModelTests.swift */, ); path = DspeechTests; sourceTree = "<group>"; };
+		A00000000000000000000010 /* DspeechTests */ = {isa = PBXGroup; children = ( A00000000000000000000049 /* TranscriptSegmentTests.swift */, A00000000000000000000062 /* PrivacySettingsTests.swift */, A00000000000000000000073 /* LiveTranscriptionViewModelTests.swift */, A00000000000000000000085 /* CallSignTests.swift */, A00000000000000000000086 /* VoiceFilterTests.swift */, ); path = DspeechTests; sourceTree = "<group>"; };
 		A00000000000000000000011 /* DspeechUITests */ = {isa = PBXGroup; children = ( A00000000000000000000050 /* DspeechUITests.swift */, ); path = DspeechUITests; sourceTree = "<group>"; };
 /* End PBXGroup section */
 
@@ -85,8 +104,8 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		A00000000000000000000018 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = ( A00000000000000000000051 /* DspeechApp.swift in Sources */, A00000000000000000000052 /* ContentView.swift in Sources */, A00000000000000000000053 /* TranscriptDemoViewModel.swift in Sources */, A00000000000000000000054 /* TranscriptSegment.swift in Sources */, A00000000000000000000055 /* AudioCaptureService.swift in Sources */, A00000000000000000000056 /* SpeechRecognitionService.swift in Sources */, A00000000000000000000059 /* PrivacySettings.swift in Sources */, A00000000000000000000074 /* LiveTranscriptionEngine.swift in Sources */, A00000000000000000000075 /* AppleSpeechLiveTranscriptionEngine.swift in Sources */, A00000000000000000000076 /* LiveTranscriptionViewModel.swift in Sources */, ); runOnlyForDeploymentPostprocessing = 0; };
-		A00000000000000000000021 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = ( A00000000000000000000057 /* TranscriptSegmentTests.swift in Sources */, A00000000000000000000060 /* PrivacySettingsTests.swift in Sources */, A00000000000000000000077 /* LiveTranscriptionViewModelTests.swift in Sources */, ); runOnlyForDeploymentPostprocessing = 0; };
+		A00000000000000000000018 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = ( A00000000000000000000051 /* DspeechApp.swift in Sources */, A00000000000000000000052 /* ContentView.swift in Sources */, A00000000000000000000053 /* TranscriptDemoViewModel.swift in Sources */, A00000000000000000000054 /* TranscriptSegment.swift in Sources */, A00000000000000000000055 /* AudioCaptureService.swift in Sources */, A00000000000000000000056 /* SpeechRecognitionService.swift in Sources */, A00000000000000000000059 /* PrivacySettings.swift in Sources */, A00000000000000000000074 /* LiveTranscriptionEngine.swift in Sources */, A00000000000000000000075 /* AppleSpeechLiveTranscriptionEngine.swift in Sources */, A00000000000000000000076 /* LiveTranscriptionViewModel.swift in Sources */, A00000000000000000000087 /* CallSign.swift in Sources */, A00000000000000000000088 /* PilotVoiceProfile.swift in Sources */, A00000000000000000000089 /* SpeakerMatcher.swift in Sources */, A00000000000000000000090 /* LocalSpeakerIdentifier.swift in Sources */, A00000000000000000000091 /* ATCTranscriptGate.swift in Sources */, A00000000000000000000092 /* VoiceFilterStorage.swift in Sources */, A00000000000000000000093 /* VoiceFilterPipeline.swift in Sources */, ); runOnlyForDeploymentPostprocessing = 0; };
+		A00000000000000000000021 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = ( A00000000000000000000057 /* TranscriptSegmentTests.swift in Sources */, A00000000000000000000060 /* PrivacySettingsTests.swift in Sources */, A00000000000000000000077 /* LiveTranscriptionViewModelTests.swift in Sources */, A00000000000000000000094 /* CallSignTests.swift in Sources */, A00000000000000000000095 /* VoiceFilterTests.swift in Sources */, ); runOnlyForDeploymentPostprocessing = 0; };
 		A00000000000000000000024 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = ( A00000000000000000000058 /* DspeechUITests.swift in Sources */, ); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXSourcesBuildPhase section */
 

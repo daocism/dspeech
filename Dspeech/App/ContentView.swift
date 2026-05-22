@@ -1,10 +1,20 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State private var liveViewModel: LiveTranscriptionViewModel = ContentView.makeDefaultLiveViewModel()
+    @State private var liveViewModel: LiveTranscriptionViewModel
+    @State private var voiceFilter: VoiceFilterPipeline
     @State private var privacy = PrivacySettings()
     @State private var showTranslation: Bool = true
     @State private var showSettings: Bool = false
+
+    init() {
+        let filter = VoiceFilterPipeline(identifier: UnavailableLocalSpeakerIdentifier())
+        _voiceFilter = State(initialValue: filter)
+        _liveViewModel = State(initialValue: LiveTranscriptionViewModel(
+            engine: AppleSpeechLiveTranscriptionEngine(),
+            voiceFilter: filter
+        ))
+    }
 
     static func makeDefaultLiveViewModel() -> LiveTranscriptionViewModel {
         LiveTranscriptionViewModel(engine: AppleSpeechLiveTranscriptionEngine())
@@ -48,13 +58,14 @@ struct ContentView: View {
         .statusBarHidden(true)
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showSettings) {
-            SettingsView(privacy: privacy)
+            SettingsView(privacy: privacy, voiceFilter: voiceFilter)
         }
     }
 
     @ViewBuilder
     private func transcriptArea(isLandscape: Bool) -> some View {
-        if liveViewModel.segments.isEmpty && liveViewModel.partialText.isEmpty {
+        let displayedSegments = liveViewModel.visibleSegments
+        if displayedSegments.isEmpty && liveViewModel.partialText.isEmpty {
             VStack {
                 Spacer()
                 Text(emptyStateText)
@@ -69,7 +80,7 @@ struct ContentView: View {
         } else {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: isLandscape ? 10 : 12) {
-                    ForEach(liveViewModel.segments) { segment in
+                    ForEach(displayedSegments) { segment in
                         TranscriptSegmentCard(
                             segment: segment,
                             showTranslation: showTranslation,
@@ -209,7 +220,13 @@ struct PrivacyBadge: View {
 
 struct SettingsView: View {
     @Bindable var privacy: PrivacySettings
+    var voiceFilter: VoiceFilterPipeline?
     @Environment(\.dismiss) private var dismiss
+
+    init(privacy: PrivacySettings, voiceFilter: VoiceFilterPipeline? = nil) {
+        self.privacy = privacy
+        self.voiceFilter = voiceFilter
+    }
 
     var body: some View {
         NavigationStack {
@@ -231,6 +248,10 @@ struct SettingsView: View {
                     Text("Приватность")
                 } footer: {
                     Text("По умолчанию Dspeech обрабатывает звук только локально. Облако включается явно и видно по бейджу LOCAL/CLOUD на главном экране.")
+                }
+
+                if let voiceFilter {
+                    VoiceFilterSettingsSection(pipeline: voiceFilter)
                 }
 
                 Section("Распознавание") {
@@ -262,6 +283,98 @@ struct SettingsView: View {
         }
         .accessibilityIdentifier("settings-sheet")
         .preferredColorScheme(.dark)
+    }
+}
+
+struct VoiceFilterSettingsSection: View {
+    let pipeline: VoiceFilterPipeline
+
+    @State private var enabled: Bool
+    @State private var callsignDraft: String
+
+    init(pipeline: VoiceFilterPipeline) {
+        self.pipeline = pipeline
+        _enabled = State(initialValue: pipeline.enabled)
+        _callsignDraft = State(initialValue: pipeline.callSign?.raw ?? "")
+    }
+
+    private var capabilityReason: String? {
+        if case let .unavailable(reason) = pipeline.capability { return reason }
+        return nil
+    }
+
+    var body: some View {
+        Section {
+            Toggle(isOn: $enabled) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Фильтр диспетчер/пилот")
+                        .font(.body.weight(.medium))
+                    Text(enabled
+                         ? "Скрывать переговоры пилотов и нерелевантные обращения диспетчера."
+                         : "Все сегменты ATC отображаются.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .accessibilityIdentifier("voicefilter-enabled-toggle")
+            .onChange(of: enabled) { _, newValue in
+                pipeline.setEnabled(newValue)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Позывной воздушного судна")
+                    .font(.body.weight(.medium))
+                TextField("N123AB / RA-89077 / SBI247", text: $callsignDraft)
+                    .textInputAutocapitalization(.characters)
+                    .autocorrectionDisabled(true)
+                    .accessibilityIdentifier("voicefilter-callsign-field")
+                Text(callsignDraft.isEmpty
+                     ? "Без позывного фильтр пропускает все сегменты не-пилотов."
+                     : "Сегменты без совпадения по позывному будут скрываться, пока окно продолжения активно.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            .onChange(of: callsignDraft) { _, newValue in
+                pipeline.setCallSign(newValue.isEmpty ? nil : newValue)
+            }
+
+            if let capabilityReason {
+                VStack(alignment: .leading, spacing: 6) {
+                    Label("Слот пилота недоступен", systemImage: "exclamationmark.triangle.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.orange)
+                    Text(capabilityReason)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                .accessibilityIdentifier("voicefilter-capability-banner")
+
+                ForEach(PilotVoiceProfile.Slot.allCases, id: \.rawValue) { slot in
+                    HStack(alignment: .firstTextBaseline) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(slot == .primary ? "Pilot 1 (Captain)" : "Pilot 2 (First Officer)")
+                                .font(.body.weight(.medium))
+                            Text("Запись голоса появится после установки модели.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button("Записать голос") {}
+                            .disabled(true)
+                            .buttonStyle(.bordered)
+                            .accessibilityIdentifier(
+                                slot == .primary
+                                ? "voicefilter-enroll-pilot1"
+                                : "voicefilter-enroll-pilot2"
+                            )
+                    }
+                }
+            }
+        } header: {
+            Text("Голосовой фильтр ATC")
+        } footer: {
+            Text("Распознавание выполняется только на устройстве. Аудио и образцы голоса не покидают iPhone. Подробности — ADR 0007.")
+        }
     }
 }
 
