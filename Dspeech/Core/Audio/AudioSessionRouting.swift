@@ -12,7 +12,7 @@ final class FakeAudioSessionRouting: AudioSessionRouting, @unchecked Sendable {
     private let lock = NSLock()
     private var _currentRoute: RouteSnapshot
     private var _availableInputs: [PortSnapshot]
-    private var _permissionGranted: Bool
+    private let _permissionGranted: Bool
     private var _preferredInputUIDs: [String] = []
     private var continuation: AsyncStream<RouteChangeEvent>.Continuation?
     let routeChanges: AsyncStream<RouteChangeEvent>
@@ -45,8 +45,7 @@ final class FakeAudioSessionRouting: AudioSessionRouting, @unchecked Sendable {
     }
 
     func requestRecordPermission() async -> Bool {
-        lock.lock(); defer { lock.unlock() }
-        return _permissionGranted
+        _permissionGranted
     }
 
     func setPreferredInput(uid: String) throws {
