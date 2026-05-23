@@ -9,29 +9,57 @@ PR: [#2 — feat: wire local ATC voice-filter phase one](https://github.com/daoc
 
 ## Supervisor verdict
 
-**BLOCKED — run produced no audit, implementation, or verification artifact for dspeech.**
+**PARTIAL — uncommitted Swift implementation present in working tree,
+no tests, no xcodebuild, no audit/implementation/verification
+artifact written to `.ai/runs/`.**
 
-The supervisor was told to gate on
-`.ai/runs/dspeech-supervisor-20260523T132443Z-1c576edf-{audit,implementation,verification}.md`.
-None of these files exist in the canonical dspeech repo. The branch
-HEAD on `origin/feat/local-pilot-voice-filter` is unchanged at
-`fd0d4b2` (the pre-dispatch tip), so no new dspeech code or tests
-landed in this cycle.
+The supervisor's required upstream artifacts
+(`.ai/runs/dspeech-supervisor-20260523T132443Z-1c576edf-{audit,
+implementation,verification}.md`) do **not** exist. The branch HEAD
+on `origin/feat/local-pilot-voice-filter` is unchanged at `fd0d4b2`
+(the pre-dispatch tip), so no new dspeech code landed in `git` this
+cycle.
 
-Two structural workflow bugs (see next section) made the failure
-inevitable: the dispatched workers were composed for the wrong
-project (web frontend roles for an iOS Swift app) **and** their
-worktrees were materialised against the wrong git repo (MyInfra,
-not dspeech). No worker could have written a dspeech artifact even
-if it ran to completion.
+However, mid-run inspection of the working tree turned up **four
+new, well-formed Swift files** in the canonical repo at
+`Dspeech/Core/Audio/`, written at 15:34–15:35 UTC and matching §1–§4
+of the prior research handoff's "Exact recommendations for the
+engineer":
 
-Per the brief's instruction — "If neither appears, create a final
-report that says the run is blocked by missing upstream artifacts" —
-this report is that final.
+- `RouteHealthTypes.swift` (3.5 KB) — domain types
+  (`AudioPortType`, `PortSnapshot`, `RouteSnapshot`, `RouteHealth`,
+  `RouteHealthAssessment`, `RouteChangeEvent`, `RouteChangeNotice`).
+- `RouteHealthClassifier.swift` (1.9 KB) — pure
+  `enum RouteHealthClassifier.classify(route:availableInputs:)`,
+  five-state output matching the research doc.
+- `AudioSessionRouting.swift` (2.4 KB) — `protocol
+  AudioSessionRouting: Sendable` + `FakeAudioSessionRouting` (test
+  fake with manual `emit` / `updateRoute`).
+- `LiveAudioSessionRouting.swift` (production adapter) — sole
+  `AVFAudio` importer, behind `#if canImport(AVFAudio)`, observing
+  `AVAudioSession.routeChangeNotification` and mapping `RouteChange
+  Reason` raw values to the domain enum.
+
+These files are **untracked**, never compiled, never tested, and not
+added to the Xcode project (`Dspeech.xcodeproj/project.pbxproj` not
+modified). The supervisor reporter intentionally **does not commit
+them** — they cannot ship without (a) Xcode project membership,
+(b) at least the test matrix the research handoff §7 prescribed,
+(c) one `xcodebuild ... iPhone 17 Pro` green run on mac24. All three
+are outside this reporter's role authority and require either a
+swiftui-implementer + tester(XCTest) pair, or mac24 returning to
+service.
+
+So: real, useful work was done by some worker; it is parked in the
+working tree; the supervisor cycle did not close. Per the brief's
+"If neither artifact appears, create a final report that says the
+run is blocked by missing upstream artifacts" — this report is that
+final, and it captures the in-flight state so the next cycle can
+pick up exactly where this one stopped without re-doing it.
 
 ## Workflow bugs found/fixed
 
-### B1. Wrong worktree repo (CRITICAL — primary cause of empty run)
+### B1. Wrong worktree repo (CRITICAL — worker output bypassed git isolation)
 
 All three worker worktrees under
 `/tmp/ai-office-runs/dspeech-supervisor-20260523T132443Z-1c576edf/`
@@ -45,17 +73,26 @@ $ git status --short --branch
 ## HEAD (no branch)
 ```
 
-`894d876` is a MyInfra commit. dspeech HEAD is `fd0d4b2`. Workers
-writing into these worktrees cannot reach dspeech sources, cannot
-commit to `feat/local-pilot-voice-filter`, and cannot produce any
-artifact under dspeech `.ai/runs/`.
+`894d876` is a MyInfra commit. dspeech HEAD is `fd0d4b2`. The
+intent of `git worktree`-per-role isolation is that each worker
+edits only inside its worktree, then the orchestrator merges. With
+the worktrees pointing at MyInfra, **at least one worker reached
+outside its worktree** and wrote directly into the canonical
+`/home/user/projects/dspeech/Dspeech/Core/Audio/` path (see
+"Supervisor verdict" — four uncommitted Swift files at 15:34–15:35
+UTC). This is the worst-of-both-worlds outcome: the worker did real
+work, but it landed in a location that bypasses the run's git
+isolation contract. No commit was made; no branch was updated;
+no review was triggered.
 
 Fix (not applied this run — out of scope for qa-manual reporter
-authority): the team-dispatch worktree provisioner must read the
-project's canonical repo from the registry
+authority): the team-dispatch worktree provisioner must
+(a) read the project's canonical repo from the registry
 (`MyInfra/config/project-workspaces/projects.yaml` for `dspeech`)
 and `git worktree add` from `/home/user/projects/dspeech`, not from
-the orchestrator's current cwd. Filed as a real workflow bug to
+the orchestrator's current cwd; and (b) constrain each role's
+allowed Write/Edit paths to its own worktree to prevent
+out-of-worktree side effects. Filed as a real workflow bug to
 escalate.
 
 ### B2. Role composition mismatched to project (CRITICAL)
@@ -114,11 +151,12 @@ re-enable mac24 dispatch.
 
 ## Product risks
 
-P1. **Open PR #2 is still phase-1 only.** It correctly ships the
-post-ASR callsign relevance gate and the local-only Pilot 1 / Pilot
-2 enrollment UI (disabled with explicit "local model unavailable"
-banner per ADR 0007). What it does NOT ship — and what the product
-north star needs:
+P1. **Open PR #2 is still phase-1 only on the branch — but four
+uncommitted Swift files in the working tree push it closer.**
+PR #2 (on origin) correctly ships the post-ASR callsign relevance
+gate and the local-only Pilot 1 / Pilot 2 enrollment UI (disabled
+with explicit "local model unavailable" banner per ADR 0007). What
+the branch still does NOT ship:
 
    - Pre-ASR pilot suppression actually wired to a real local
      speaker identifier (FluidAudio / CoreML pack). Today's `Core/
@@ -126,10 +164,14 @@ north star needs:
      identifier is stubbed.
    - Audio route health classifier from the research handoff
      (`docs/research/2026-05-23-audio-route-health.md`, sections
-     §3-§5). The research is committed; the Swift implementation is
-     not.
+     §3-§5). **The Swift implementation is written but
+     uncommitted, not in the Xcode project, and untested** (see
+     §Evidence "Untracked Swift implementation"). It is the first
+     thing the next cycle must verify and land.
    - XCTest coverage on the simulator for the route-health
-     classifier and `FakeAudioSessionRouting`.
+     classifier and `FakeAudioSessionRouting` — no `RouteHealth*`
+     tests in `DspeechTests/`, no JSON fixtures in
+     `tests/Fixtures/AudioRoute/`.
 
 P2. **ATC-only transcript reliability not yet measured.** Phase-1
 gate filters by callsign continuation, but there is no eval harness
@@ -159,16 +201,23 @@ unchanged. The risk is opportunity cost, not breakage.
 
 In order, product-north-star first:
 
-1. **Land the route-health classifier and `AudioSessionRouting`
-   protocol in Swift** per the research doc's "Exact recommendations
-   for the engineer" §1–§7. Pure-function classifier +
-   `LiveAudioSessionRouting` (sole `AVFAudio` importer) +
-   `FakeAudioSessionRouting`. Tests: classifier unit tests over
-   JSON fixtures in `tests/Fixtures/AudioRoute/*.json`, one VM
-   integration test per `RouteHealth` value, one banner test for
-   `.oldDeviceUnavailable`. This is the gate for "reliable ATC-only
-   transcript" — once route-health is enforced pre-ASR, the
-   transcript stops ingesting clearly-bad audio.
+1. **Verify, test, and commit the in-flight route-health work
+   already on disk.** Four Swift files at `Dspeech/Core/Audio/`
+   (`RouteHealthTypes.swift`, `RouteHealthClassifier.swift`,
+   `AudioSessionRouting.swift`, `LiveAudioSessionRouting.swift`)
+   implement §1–§4 of the research doc and are untracked in the
+   working tree. Next cycle must (a) add them to
+   `Dspeech.xcodeproj/project.pbxproj`, (b) write the §7 test
+   matrix — classifier unit tests over JSON fixtures in
+   `tests/Fixtures/AudioRoute/*.json`, one VM integration test per
+   `RouteHealth` value, one banner test for `.oldDeviceUnavailable`
+   driven by `FakeAudioSessionRouting`, (c) run
+   `xcodebuild ... iPhone 17 Pro` on mac24 once, (d) commit + push.
+   Only then proceed to §2 (capture-screen chip + route-change
+   banner UI from research §2.1/§2.2) and §6 (transcript metadata
+   markers). This is the gate for "reliable ATC-only transcript" —
+   once route-health is enforced pre-ASR, the transcript stops
+   ingesting clearly-bad audio.
 
 2. **Wire pre-ASR pilot suppression to a real local speaker
    identifier.** Replace the stubbed `LocalSpeakerIdentifier` with
@@ -251,13 +300,35 @@ bb8013f feat(asr): wire on-device live transcription MVP (Apple Speech)
 b48875a chore: add mac24 Dspeech agent orchestrator wrapper
 
 $ git status --short --branch
-## feat/local-pilot-voice-filter...origin/feat/local-pilot-voice-filter
-(no local changes)
+## feat/local-pilot-voice-filter
+?? Dspeech/Core/Audio/AudioSessionRouting.swift
+?? Dspeech/Core/Audio/LiveAudioSessionRouting.swift
+?? Dspeech/Core/Audio/RouteHealthClassifier.swift
+?? Dspeech/Core/Audio/RouteHealthTypes.swift
 ```
 
-`HEAD == origin/feat/local-pilot-voice-filter == fd0d4b2`. Branch is
-already pushed and synchronized with remote. No new dspeech commits
-this run.
+Branch tip pushed: `fd0d4b2` + this report commit. Working tree is
+**not clean** — four untracked Swift files left by a worker that
+escaped its worktree (see B1). Reporter intentionally did not stage
+or commit them (see "Supervisor verdict" rationale).
+
+### Untracked Swift implementation (proof of B1 escape + P1 progress)
+
+```
+$ ls -la Dspeech/Core/Audio/
+-rw-rw-r-- AudioCaptureService.swift           (282 B, 2026-05-17 20:53)
+-rw-rw-r-- AudioSessionRouting.swift          (2.4 KB, 2026-05-23 15:35)  NEW
+-rw-rw-r-- LiveAudioSessionRouting.swift            (-, 2026-05-23 15:35)  NEW
+-rw-rw-r-- RouteHealthClassifier.swift        (1.9 KB, 2026-05-23 15:34)  NEW
+-rw-rw-r-- RouteHealthTypes.swift             (3.5 KB, 2026-05-23 15:34)  NEW
+```
+
+All four files compile cleanly to a reader (no obvious syntax
+errors; `Sendable` annotations consistent; `LiveAudioSessionRouting`
+correctly behind `#if canImport(AVFAudio)`) but have not been built.
+`DspeechTests/` contains no `RouteHealth*.swift`. `tests/Fixtures/
+AudioRoute/` does not exist. `Dspeech.xcodeproj/project.pbxproj`
+has not been modified. Next cycle: §"Next cycle priority" step 1.
 
 ### Worker worktree git state (proves B1)
 
@@ -328,7 +399,13 @@ outcome to record.
 
 ---
 
-End of report. No source code changed. No PR #2 update made by this
-reporter (PR body already accurately describes the phase-1 scope;
-updating it would invent supervisor-cycle status that the workflow
-bugs above prevented us from earning).
+End of report. The reporter committed only this document. Four
+untracked Swift files left in the working tree by an out-of-worktree
+worker (B1) are intentionally **not** committed by this reporter —
+they require Swift engineer + XCTest author + xcodebuild verification
+on mac24 before merge, which is the explicit work item for the next
+cycle (§"Next cycle priority" #1). PR #2 body not updated: it still
+accurately describes what is on the branch (the phase-1 callsign
+gate + research handoff). Posting supervisor-cycle status into the
+PR body would invent progress that the workflow bugs above prevented
+us from earning.
