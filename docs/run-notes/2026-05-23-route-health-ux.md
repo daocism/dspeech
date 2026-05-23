@@ -82,3 +82,67 @@ green on mac24).
 
 Until that slice lands, do not market this as a user-visible route-health
 feature.
+
+---
+
+## tester-unit deterministic Xcode evidence (2026-05-23)
+
+Run: `dspeech-builder-20260523T190026Z-8ff9dfb0` · Role: `tester-unit` · Host: `ubuntu-vm` → mac24
+
+### Commit under test
+
+- Branch `feat/local-pilot-voice-filter` @ **`bdef438`** (origin == mac24 HEAD after `git pull --ff-only`).
+- **Caveat — not a clean tree:** mac24 working tree carried uncommitted local
+  modifications NOT in `bdef438`: `Dspeech/Core/ASR/AppleSpeechLiveTranscriptionEngine.swift`
+  (Swift-6 `@Sendable` tap/recognition refactor) and `DspeechUITests/DspeechUITests.swift`
+  (added `testStartButtonDoesNotCrashAppWithPermissionsPreGranted`). These were left in
+  place (in-flight work, not mine to discard). The unit run therefore reflects
+  `bdef438` **plus those local mods**. The route-health unit targets are pure and
+  independent of the ASR engine change, so the route-health verdict is unaffected; flagged for honesty.
+
+### Static scope checks (vs `origin/main...HEAD`, route-health + capture files)
+
+- Forbidden deps: **none** — `URLSession`/`Network.framework`/`NWPathMonitor`/`CoreML`/`.mlmodel`/`http(s)://`/telemetry/`dataTask` all absent. Route-health is pure `AVAudioSession` introspection behind the `AudioSessionRouting` protocol.
+- Banned copy: **none** — no `certified`/`guaranteed`/`radio link`/`flight-safe`/`safety-critical` in `Dspeech/`.
+
+### Commands run (deterministic shell on mac24)
+
+```bash
+ssh mac24 'cd /Users/andre/projects/dspeech-ios && git fetch origin feat/local-pilot-voice-filter \
+  && git checkout feat/local-pilot-voice-filter && git pull --ff-only'   # → bdef438
+
+# DEVELOPER_DIR required: default xcode-select points at CommandLineTools, not full Xcode.
+export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+
+# Targeted first:
+xcodebuild test -scheme Dspeech -destination "platform=iOS Simulator,name=iPhone 17" \
+  -only-testing:DspeechTests/RouteHealthClassifierTests \
+  -only-testing:DspeechTests/RouteHealthMonitorTests \
+  -only-testing:DspeechTests/LiveTranscriptionViewModelTests
+
+# Full unit suite:
+xcodebuild test -scheme Dspeech -destination "platform=iOS Simulator,name=iPhone 17" \
+  -only-testing:DspeechTests
+```
+
+Exact destination: `platform=iOS Simulator, name=iPhone 17, OS:26.4, arch:arm64, id:E072E456-F0C4-490A-800A-54EBB813237C` (iPhone 17 was installed; no fallback needed).
+
+### Pass/fail
+
+| Run | Result | Cases |
+|-----|--------|-------|
+| Targeted (classifier + monitor + view-model) | **TEST SUCCEEDED** | 59 passed, 0 failed |
+| Full `DspeechTests` unit bundle | **TEST SUCCEEDED** | 105 passed, 0 failed |
+
+Per-suite: RouteHealthClassifierTests 26 · RouteHealthMonitorTests 24 · LiveTranscriptionViewModelTests 9 · SpeakerMatcherTests 12 · CallSignTests 8 · VoiceFilterPipelineTests 7 · ATCTranscriptGateTests 7 · PrivacySettingsTests 6 · VoiceFilterStorageTests 3 · TranscriptSegmentTests 2.
+
+Component-level start-gate logic is **green and correct**: `blocksStartOnlyForNoInput()` and `blocksStartWhenNoInput()` pass; copy guards `displayCopyAvoidsCertifiedLanguage()` / `bannerCopyAvoidsCertifiedLanguage()` pass.
+
+### Limitations / not covered
+
+- **UI/integration gap stands (confirms reviewer findings #1–#2).** `grep -rn RouteHealthMonitor Dspeech/` → 1 production definition, **0 production call sites**. No chip/banner in `ContentView`, no Start-button gate, no `.lost`→`engine.stop()` wiring. Unit tests exercise the monitor/classifier in isolation only; they cannot and do not prove the user-visible increment, because it is not wired. No view-model test covers route-health start-gating or external-loss→stop (nothing to test yet).
+- `DspeechUITests` bundle **not run** — it drives the live mic/Start button and depends on simulator permission state; out of scope for a deterministic unit run, and the relevant route-health UI does not exist to assert against.
+
+### Residual manual device smoke (after the wiring slice lands)
+
+On a physical iPhone with an external ATC input source: (1) verify the route-health chip renders and updates on plug/unplug; (2) verify Start is disabled with a reason when no input is present; (3) verify that unplugging the external source mid-capture actually pauses ASR and surfaces the banner (today the copy claims «Запись приостановлена» but nothing pauses — must be true before that string ships).
