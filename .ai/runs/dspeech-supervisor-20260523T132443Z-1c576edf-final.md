@@ -399,13 +399,72 @@ outcome to record.
 
 ---
 
-End of report. The reporter committed only this document. Four
-untracked Swift files left in the working tree by an out-of-worktree
-worker (B1) are intentionally **not** committed by this reporter —
-they require Swift engineer + XCTest author + xcodebuild verification
-on mac24 before merge, which is the explicit work item for the next
-cycle (§"Next cycle priority" #1). PR #2 body not updated: it still
-accurately describes what is on the branch (the phase-1 callsign
-gate + research handoff). Posting supervisor-cycle status into the
-PR body would invent progress that the workflow bugs above prevented
-us from earning.
+---
+
+## Addendum (post-report-write, ~15:36 UTC)
+
+After this report's first commit (`3fd78f1`) was pushed, two things
+changed in the working tree:
+
+1. **A `verification.md` artifact appeared**, authored by the
+   `tester-unit` worker and committed alongside this report's
+   correction commit (`3e9c327`). It is now at
+   `.ai/runs/dspeech-supervisor-20260523T132443Z-1c576edf-verification.md`.
+   Independently authored, it reaches the same B1/B2 root-cause
+   verdict from the worker's own perspective — confirming the
+   workflow bugs are observable from inside the broken dispatch,
+   not just from the supervisor's vantage. Its verdict at write
+   time was `BLOCKED: implementation artifact missing` because at
+   *its* observation moment the Swift implementation had not yet
+   landed in the canonical tree.
+
+2. **Three more Swift files appeared in the working tree** after
+   this reporter's initial inspection — pushing the in-flight
+   implementation closer to the research handoff's §1–§7 scope:
+
+   - `Dspeech/App/RouteHealthMonitor.swift` (174 lines) —
+     `@MainActor @Observable` view-model wrapping
+     `RouteHealthClassifier` + `AudioSessionRouting`, exposing
+     `assessment`, `lastNotice`, `lastEvent` for SwiftUI surfaces.
+   - `DspeechTests/RouteHealthClassifierTests.swift` (113 lines) —
+     Swift Testing framework (`@Test`, `#expect`) — covers all
+     five `RouteHealth` cases (`noInput`, `cautionBuiltIn`,
+     `suitableExternal` via USB/headset/etc., `unsuitableOutputOnly`,
+     `unknownExternal`).
+   - `DspeechTests/RouteHealthMonitorTests.swift` (103 lines) —
+     drives `RouteHealthMonitor` via `FakeAudioSessionRouting`.
+
+   Total in-flight uncommitted state on disk: **7 Swift files**
+   (4 production + 1 monitor + 2 tests). This matches research
+   handoff §1–§7 quite well, missing only the capture-screen UI
+   chip / banner from §2 and the transcript metadata markers from
+   §6, plus Xcode project membership (`.pbxproj` not modified).
+
+   These files were still untracked when this addendum was
+   written. Reporter continues to intentionally **not** commit
+   them — the rationale in the "Supervisor verdict" section
+   stands: no xcodebuild has compiled them, no Xcode project lists
+   them, and the qa-manual role does not own Swift authorship or
+   XCTest validation.
+
+**Implication for the next cycle:** the very first action of the
+next dispatched swiftui-implementer is roughly 80% of step 1 in
+"Next cycle priority" already on disk; the work item is verification
++ Xcode project membership + commit, not greenfield Swift. The
+next cycle's tester is similarly handed a working test suite to
+validate.
+
+---
+
+End of report. The reporter committed only the two `*.md` artifacts
+(`-final.md`, swept-in `-verification.md`). Seven untracked Swift
+files left in the working tree by out-of-worktree workers (B1) are
+intentionally **not** committed by this reporter — they require
+swiftui-implementer review + Xcode project membership + xcodebuild
+verification on mac24 before merge, which is the explicit work item
+for the next cycle (§"Next cycle priority" #1). PR #2 body not
+updated: it still accurately describes what is on the branch (the
+phase-1 callsign gate + research handoff + this run's metadata
+commits). Posting supervisor-cycle status into the PR body would
+invent merge-readiness that the workflow bugs above prevented us
+from earning.
