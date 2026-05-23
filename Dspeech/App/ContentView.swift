@@ -1,24 +1,29 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State private var liveViewModel: LiveTranscriptionViewModel
+    @State private var coordinator: CaptureCoordinator
     @State private var voiceFilter: VoiceFilterPipeline
     @State private var privacy = PrivacySettings()
     @State private var showTranslation: Bool = true
     @State private var showSettings: Bool = false
 
-    init() {
-        let filter = VoiceFilterPipeline(identifier: UnavailableLocalSpeakerIdentifier())
+    init(
+        engine: any LiveTranscriptionEngine = AppleSpeechLiveTranscriptionEngine(),
+        voiceFilter: VoiceFilterPipeline? = nil,
+        routing: AudioSessionRouting = LiveAudioSessionRouting()
+    ) {
+        let filter = voiceFilter ?? VoiceFilterPipeline(identifier: UnavailableLocalSpeakerIdentifier())
+        let live = LiveTranscriptionViewModel(engine: engine, voiceFilter: filter)
+        let monitor = RouteHealthMonitor(routing: routing)
         _voiceFilter = State(initialValue: filter)
-        _liveViewModel = State(initialValue: LiveTranscriptionViewModel(
-            engine: AppleSpeechLiveTranscriptionEngine(),
-            voiceFilter: filter
+        _coordinator = State(initialValue: CaptureCoordinator(
+            live: live,
+            routeMonitor: monitor,
+            routeChanges: routing.routeChanges
         ))
     }
 
-    static func makeDefaultLiveViewModel() -> LiveTranscriptionViewModel {
-        LiveTranscriptionViewModel(engine: AppleSpeechLiveTranscriptionEngine())
-    }
+    private var liveViewModel: LiveTranscriptionViewModel { coordinator.live }
 
     private var emptyStateText: String {
         switch liveViewModel.status {
@@ -47,6 +52,7 @@ struct ContentView: View {
 
                 VStack(spacing: isLandscape ? 8 : 12) {
                     controlBar(isLandscape: isLandscape)
+                    routeBanner(isLandscape: isLandscape)
                     transcriptArea(isLandscape: isLandscape)
                     bottomBar(isLandscape: isLandscape)
                 }
@@ -59,6 +65,35 @@ struct ContentView: View {
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showSettings) {
             SettingsView(privacy: privacy, voiceFilter: voiceFilter)
+        }
+        .onAppear { coordinator.beginObservingRouteChanges() }
+        .onDisappear { coordinator.endObservingRouteChanges() }
+    }
+
+    @ViewBuilder
+    private func routeBanner(isLandscape: Bool) -> some View {
+        if let message = coordinator.routeBanner ?? coordinator.startBlockedMessage {
+            HStack(spacing: 8) {
+                Image(systemName: coordinator.canStart ? "exclamationmark.triangle.fill" : "mic.slash.fill")
+                    .font(.system(size: isLandscape ? 13 : 14, weight: .semibold))
+                Text(message)
+                    .font(.system(size: isLandscape ? 13 : 14, weight: .medium))
+                    .lineLimit(2)
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(coordinator.canStart ? Color.orange : Color.red)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                (coordinator.canStart ? Color.orange : Color.red).opacity(0.14),
+                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke((coordinator.canStart ? Color.orange : Color.red).opacity(0.4), lineWidth: 1)
+            }
+            .accessibilityIdentifier("route-banner")
         }
     }
 
@@ -99,6 +134,7 @@ struct ContentView: View {
 
     private func bottomBar(isLandscape: Bool) -> some View {
         HStack(spacing: 12) {
+            let startDisabled = !liveViewModel.isListening && !coordinator.canStart
             Button {
                 Task { await toggleListening() }
             } label: {
@@ -114,8 +150,10 @@ struct ContentView: View {
                     Capsule().fill(liveViewModel.isListening ? Color.red.opacity(0.85) : Color.cyan.opacity(0.85))
                 )
                 .foregroundStyle(.white)
+                .opacity(startDisabled ? 0.4 : 1)
             }
             .buttonStyle(.plain)
+            .disabled(startDisabled)
             .accessibilityIdentifier(liveViewModel.isListening ? "stop-button" : "start-button")
 
             if !liveViewModel.segments.isEmpty {
@@ -140,11 +178,7 @@ struct ContentView: View {
     }
 
     private func toggleListening() async {
-        if liveViewModel.isListening {
-            liveViewModel.stop()
-        } else {
-            await liveViewModel.start()
-        }
+        await coordinator.toggle()
     }
 
     private func controlBar(isLandscape: Bool) -> some View {
@@ -155,6 +189,8 @@ struct ContentView: View {
                 .accessibilityIdentifier("app-title")
 
             PrivacyBadge(mode: privacy.mode, isLandscape: isLandscape)
+
+            RouteHealthChip(health: coordinator.routeMonitor.health, isLandscape: isLandscape)
 
             Spacer()
 
@@ -215,6 +251,48 @@ struct PrivacyBadge: View {
             )
             .accessibilityIdentifier("privacy-badge")
             .accessibilityLabel(isLocal ? "Локальная обработка" : "Облачная обработка (с согласия)")
+    }
+}
+
+struct RouteHealthChip: View {
+    let health: RouteHealth
+    let isLandscape: Bool
+
+    private var tint: Color {
+        switch health {
+        case .suitableExternal: return .green
+        case .cautionBuiltIn: return .orange
+        case .unknownExternal, .unsuitableOutputOnly: return .yellow
+        case .noInput: return .red
+        }
+    }
+
+    private var icon: String {
+        switch health {
+        case .suitableExternal: return "cable.connector"
+        case .cautionBuiltIn: return "iphone"
+        case .unknownExternal: return "questionmark.circle"
+        case .unsuitableOutputOnly: return "speaker.wave.2"
+        case .noInput: return "mic.slash"
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.system(size: isLandscape ? 9 : 10, weight: .bold))
+            Text(health.shortLabel)
+                .font(.system(size: isLandscape ? 10 : 11, weight: .bold, design: .monospaced))
+        }
+        .foregroundStyle(tint)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 3)
+        .background(tint.opacity(0.16), in: Capsule())
+        .overlay(
+            Capsule().stroke(tint.opacity(0.45), lineWidth: 1)
+        )
+        .accessibilityIdentifier("route-health-chip")
+        .accessibilityLabel("Источник захвата: \(health.displayLabel)")
     }
 }
 
