@@ -17,24 +17,29 @@ struct VoiceFilterDecision: Equatable, Sendable {
 final class VoiceFilterPipeline {
     private let identifier: any LocalSpeakerIdentifier
     private let storage: VoiceFilterStorage
+    private let modelPackStorage: ModelPackStateStorage
     private let matchConfig: SpeakerMatchConfig
     private var gate: ATCTranscriptGate
 
     private(set) var profiles: [PilotVoiceProfile]
     private(set) var callSign: CallSign?
     private(set) var enabled: Bool
+    private(set) var modelPackState: ModelPackState
 
     init(
         identifier: any LocalSpeakerIdentifier,
         storage: VoiceFilterStorage = UserDefaultsVoiceFilterStorage(),
+        modelPackStorage: ModelPackStateStorage = UserDefaultsModelPackStateStorage(),
         matchConfig: SpeakerMatchConfig = .default
     ) {
         self.identifier = identifier
         self.storage = storage
+        self.modelPackStorage = modelPackStorage
         self.matchConfig = matchConfig
         self.profiles = storage.loadProfiles()
         self.callSign = storage.loadCallSign()
         self.enabled = storage.loadEnabled()
+        self.modelPackState = modelPackStorage.loadState()
         self.gate = ATCTranscriptGate(
             config: storage.loadGateConfig(),
             configuredCallSign: storage.loadCallSign()
@@ -43,9 +48,18 @@ final class VoiceFilterPipeline {
 
     var capability: VoiceFilterCapability {
         switch identifier.availability {
-        case .available: return .ready
-        case .unavailable(let reason): return .unavailable(reason: reason)
+        case .unavailable(let reason):
+            return .unavailable(reason: reason)
+        case .available:
+            return modelPackState.isInstalled
+                ? .ready
+                : .unavailable(reason: modelPackState.capabilityReason)
         }
+    }
+
+    func setModelPackState(_ state: ModelPackState) {
+        modelPackState = state
+        modelPackStorage.saveState(state)
     }
 
     var enrolledSlots: Set<PilotVoiceProfile.Slot> {
