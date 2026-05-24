@@ -23,6 +23,19 @@ replay/route validation kit and App Store readiness.
 
 ## Last successful run
 
+2026-05-24: Model-pack **execution gate** landed on `feat/local-pilot-voice-filter`
+via `3dfc246 fix(voice-filter): gate speaker model execution`. `VoiceFilterPipeline`
+now calls a private `requireInstalledModelPack()` before `identifier.enroll` and
+`identifier.classify`, throwing `LocalSpeakerIdentifierError.modelUnavailable` unless
+`modelPackState.isInstalled` — so an *available* identifier can no longer enroll/classify
+while the pack is `.absent`/`.acquiring`/`.failed`/`.disabled` (ADR 0008 installed-only
+contract). `decide(...)` and the callsign text gate are unchanged. Adds
+`ModelPackStateStorageTests` (7: round-trip absent/installed/failed/disabled, acquiring→absent
+cold-start recovery, missing/corrupt→absent) and 7 new `VoiceFilterPipelineTests` gate cases.
+Verified on mac24 (iPhone 17 Pro / iOS 26.4): `-only-testing:DspeechTests` → `** TEST SUCCEEDED **`;
+full DspeechTests suite green. mac24's unrelated dirty files were preserved (ff-merge only).
+`DspeechUITests` not run this slice.
+
 2026-05-24: Route-health **capture UX** landed on `feat/local-pilot-voice-filter`
 via `b671f74 feat(audio): surface route health in capture UI`. A new
 `@Observable CaptureCoordinator` seam wires `RouteHealthMonitor` into

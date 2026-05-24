@@ -68,11 +68,11 @@ No lane in this matrix requires Andrei to buy hardware. The wired and in-aircraf
 Simulator / CI lane (must be green before the feature ships behind its toggle):
 
 - [ ] Network-deny integration test green (§1) on iPhone 17 Pro / iOS 26.4 sim.
-- [ ] Missing-pack-throws test green (no silent auto-download).
+- [x] Missing-pack-throws test green (no silent auto-download). — `VoiceFilterPipelineTests.absentPackEnrollThrowsModelUnavailable` / `absentPackClassifyThrowsModelUnavailable` (commit `3dfc246`, mac24 iPhone 17 Pro / iOS 26.4). An *available* identifier behind an `.absent`/`.disabled` pack throws `modelUnavailable`; no acquisition/download code exists to auto-fetch.
 - [ ] Download-phase boundary test green (egress only during `downloading`, one-directional).
 - [ ] Source-override (`baseURL`) test green.
 - [ ] Privacy-badge invariance test green across all five states.
-- [ ] Model-pack state-machine round-trip persistence test green (storage-protocol injected).
+- [x] Model-pack state-machine round-trip persistence test green (storage-protocol injected). — `ModelPackStateStorageTests` (round-trip absent/installed/failed/disabled, `.acquiring`→`.absent` cold-start recovery, missing/corrupt→`.absent`); `UserDefaultsModelPackStateStorage` via the injected `ModelPackStateStorage` protocol (commit `3dfc246`, mac24 iPhone 17 Pro / iOS 26.4).
 - [ ] Embedding dimension asserted (256) against the live backend.
 - [ ] All replay fixtures (§2) produce their expected decision/routing labels.
 - [ ] Threshold calibration values measured on the corpus and written back into §3.
