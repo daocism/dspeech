@@ -155,7 +155,7 @@ final class VoiceFilterPipeline {
         case .mixed:
             return .transcribe(reason: .mixedOrLowConfidence)
         case .insufficientSpeech:
-            return .discard(reason: .insufficientSpeech)
+            return .transcribe(reason: .insufficientSpeech)
         }
     }
 

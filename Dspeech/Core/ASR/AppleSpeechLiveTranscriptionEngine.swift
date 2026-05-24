@@ -9,14 +9,16 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     }
 
     private let localeIdentifier: String
+    private let bufferGate: (any SpeechAudioBufferGate)?
     private var recognizer: SFSpeechRecognizer?
     private var request: SFSpeechAudioBufferRecognitionRequest?
     private var task: SFSpeechRecognitionTask?
     private let audioEngine = AVAudioEngine()
     private var continuation: AsyncStream<LiveTranscriptionEvent>.Continuation?
 
-    init(localeIdentifier: String = "en-US") {
+    init(localeIdentifier: String = "en-US", bufferGate: (any SpeechAudioBufferGate)? = nil) {
         self.localeIdentifier = localeIdentifier
+        self.bufferGate = bufferGate
     }
 
     func events() -> AsyncStream<LiveTranscriptionEvent> {
@@ -94,7 +96,7 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
         inputNode.removeTap(onBus: 0)
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
             Task { @MainActor [weak self] in
-                self?.request?.append(buffer)
+                await self?.appendThroughGate(buffer)
             }
         }
 
@@ -120,6 +122,59 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
                 }
             }
         }
+    }
+
+    private func appendThroughGate(_ buffer: AVAudioPCMBuffer) async {
+        guard let request else { return }
+        guard let bufferGate else {
+            request.append(buffer)
+            return
+        }
+        guard let samples = Self.monoFloatSamples(from: buffer) else {
+            request.append(buffer)
+            return
+        }
+        do {
+            let decision = try await bufferGate.route(
+                samples: samples,
+                sampleRate: buffer.format.sampleRate
+            )
+            switch decision {
+            case .discard:
+                return
+            case .transcribe:
+                request.append(buffer)
+            }
+        } catch {
+            request.append(buffer)
+        }
+    }
+
+    nonisolated static func monoFloatSamples(from buffer: AVAudioPCMBuffer) -> [Float]? {
+        guard buffer.format.commonFormat == .pcmFormatFloat32,
+              let channelData = buffer.floatChannelData else {
+            return nil
+        }
+        let frameLength = Int(buffer.frameLength)
+        let channelCount = Int(buffer.format.channelCount)
+        guard frameLength > 0, channelCount > 0 else { return nil }
+
+        if channelCount == 1 {
+            return Array(UnsafeBufferPointer(start: channelData[0], count: frameLength))
+        }
+
+        var mono = [Float](repeating: 0, count: frameLength)
+        for channel in 0..<channelCount {
+            let pointer = channelData[channel]
+            for frame in 0..<frameLength {
+                mono[frame] += pointer[frame]
+            }
+        }
+        let scale = 1.0 / Float(channelCount)
+        for frame in 0..<frameLength {
+            mono[frame] *= scale
+        }
+        return mono
     }
 
     private func emitFinalSegment(text: String, transcription: SFTranscription) {

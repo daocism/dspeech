@@ -66,6 +66,7 @@ enum PreTranscriptionRoutingDecision: Equatable, Sendable {
         case nonPilotVoice
         case mixedOrLowConfidence
         case insufficientSpeech
+        case classifierUnavailable
     }
 
     case transcribe(reason: Reason)

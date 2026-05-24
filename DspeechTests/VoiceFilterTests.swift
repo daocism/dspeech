@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import Testing
 @testable import Dspeech
@@ -650,5 +651,255 @@ struct ModelPackStateStorageTests {
         defaults.set(Data([0x00, 0x01, 0x02, 0x03]), forKey: UserDefaultsModelPackStateStorage.stateKey)
         let store = UserDefaultsModelPackStateStorage(defaults: defaults)
         #expect(store.loadState() == .absent)
+    }
+}
+
+@MainActor
+struct SpeechAudioBufferGateTests {
+    final class InMemoryStorage: VoiceFilterStorage, @unchecked Sendable {
+        var profiles: [PilotVoiceProfile] = []
+        var callSign: CallSign?
+        var config: ATCTranscriptGateConfig = .default
+        var enabled: Bool = false
+
+        func loadProfiles() -> [PilotVoiceProfile] { profiles }
+        func saveProfiles(_ profiles: [PilotVoiceProfile]) { self.profiles = profiles }
+        func loadCallSign() -> CallSign? { callSign }
+        func saveCallSign(_ cs: CallSign?) { callSign = cs }
+        func loadGateConfig() -> ATCTranscriptGateConfig { config }
+        func saveGateConfig(_ c: ATCTranscriptGateConfig) { config = c }
+        func loadEnabled() -> Bool { enabled }
+        func saveEnabled(_ flag: Bool) { enabled = flag }
+    }
+
+    final class InMemoryModelPackStorage: ModelPackStateStorage, @unchecked Sendable {
+        var state: ModelPackState
+        init(_ state: ModelPackState = .absent) { self.state = state }
+        func loadState() -> ModelPackState { state }
+        func saveState(_ state: ModelPackState) { self.state = state }
+    }
+
+    struct ScriptedIdentifier: LocalSpeakerIdentifier {
+        let decision: SpeakerMatchDecision
+        var thrownError: LocalSpeakerIdentifierError?
+        var availability: LocalSpeakerIdentifierAvailability = .available
+
+        var embeddingDimension: Int { 4 }
+
+        func enroll(samples: [Float], sampleRate: Double) async throws -> VoicePrintVector {
+            if let thrownError { throw thrownError }
+            return VoicePrintVector(values: [1, 0, 0, 0], quality: 0.9)
+        }
+
+        func classify(
+            samples: [Float],
+            sampleRate: Double,
+            profiles: [PilotVoiceProfile]
+        ) async throws -> SpeakerMatchDecision {
+            if let thrownError { throw thrownError }
+            return decision
+        }
+    }
+
+    static func installedPack() -> InstalledModelPack {
+        InstalledModelPack(
+            identifier: "fluidaudio-speaker-256",
+            version: "1.0.0",
+            embeddingDimension: 256,
+            checksumSHA256: String(repeating: "a", count: 64),
+            source: "https://mirror.invalid/voice-filter",
+            sizeBytes: 12_345_678,
+            installedAt: Date(timeIntervalSince1970: 748_137_600)
+        )
+    }
+
+    private static func captainProfile() -> PilotVoiceProfile {
+        PilotVoiceProfile(
+            slot: .primary,
+            label: "Captain",
+            voicePrint: VoicePrintVector(values: [1, 0, 0, 0], quality: 0.9)
+        )
+    }
+
+    private static func enabledPipeline(
+        identifier: any LocalSpeakerIdentifier,
+        pack: ModelPackState = .installed(installedPack())
+    ) -> VoiceFilterPipeline {
+        let store = InMemoryStorage()
+        store.enabled = true
+        store.profiles = [captainProfile()]
+        return VoiceFilterPipeline(
+            identifier: identifier,
+            storage: store,
+            modelPackStorage: InMemoryModelPackStorage(pack)
+        )
+    }
+
+    @Test func confidentPilotIsDiscardedBeforeASR() async throws {
+        let gate = VoiceFilterSpeechAudioBufferGate(
+            pipeline: Self.enabledPipeline(
+                identifier: ScriptedIdentifier(decision: .pilot(slot: .primary, score: 0.94))
+            )
+        )
+        let route = try await gate.route(samples: [0.1, 0.2, 0.1, 0.2], sampleRate: 16_000)
+        #expect(route == .discard(reason: .pilotVoice))
+    }
+
+    @Test func nonPilotTranscribes() async throws {
+        let gate = VoiceFilterSpeechAudioBufferGate(
+            pipeline: Self.enabledPipeline(
+                identifier: ScriptedIdentifier(decision: .nonPilot(bestPilotScore: 0.1))
+            )
+        )
+        let route = try await gate.route(samples: [0.1, 0.2, 0.1, 0.2], sampleRate: 16_000)
+        #expect(route == .transcribe(reason: .nonPilotVoice))
+    }
+
+    @Test func mixedTranscribes() async throws {
+        let gate = VoiceFilterSpeechAudioBufferGate(
+            pipeline: Self.enabledPipeline(
+                identifier: ScriptedIdentifier(decision: .mixed(bestPilotScore: 0.62))
+            )
+        )
+        let route = try await gate.route(samples: [0.1, 0.2, 0.1, 0.2], sampleRate: 16_000)
+        #expect(route == .transcribe(reason: .mixedOrLowConfidence))
+    }
+
+    @Test func insufficientSpeechFailsOpenToASR() async throws {
+        let gate = VoiceFilterSpeechAudioBufferGate(
+            pipeline: Self.enabledPipeline(
+                identifier: ScriptedIdentifier(decision: .insufficientSpeech)
+            )
+        )
+        let route = try await gate.route(samples: [0.0, 0.0, 0.0, 0.0], sampleRate: 16_000)
+        #expect(route == .transcribe(reason: .insufficientSpeech))
+    }
+
+    @Test func disabledFilterTranscribes() async throws {
+        let store = InMemoryStorage()
+        store.enabled = false
+        store.profiles = [Self.captainProfile()]
+        let pipeline = VoiceFilterPipeline(
+            identifier: ScriptedIdentifier(decision: .pilot(slot: .primary, score: 0.99)),
+            storage: store,
+            modelPackStorage: InMemoryModelPackStorage(.installed(Self.installedPack()))
+        )
+        let gate = VoiceFilterSpeechAudioBufferGate(pipeline: pipeline)
+        let route = try await gate.route(samples: [0.1, 0.2, 0.1, 0.2], sampleRate: 16_000)
+        #expect(route == .transcribe(reason: .filterDisabled))
+    }
+
+    @Test func noProfileTranscribes() async throws {
+        let store = InMemoryStorage()
+        store.enabled = true
+        store.profiles = []
+        let pipeline = VoiceFilterPipeline(
+            identifier: ScriptedIdentifier(decision: .pilot(slot: .primary, score: 0.99)),
+            storage: store,
+            modelPackStorage: InMemoryModelPackStorage(.installed(Self.installedPack()))
+        )
+        let gate = VoiceFilterSpeechAudioBufferGate(pipeline: pipeline)
+        let route = try await gate.route(samples: [0.1, 0.2, 0.1, 0.2], sampleRate: 16_000)
+        #expect(route == .transcribe(reason: .noPilotProfile))
+    }
+
+    @Test func absentPackFailsOpenToASR() async throws {
+        let gate = VoiceFilterSpeechAudioBufferGate(
+            pipeline: Self.enabledPipeline(
+                identifier: ScriptedIdentifier(decision: .pilot(slot: .primary, score: 0.99)),
+                pack: .absent
+            )
+        )
+        let route = try await gate.route(samples: [0.1, 0.2, 0.1, 0.2], sampleRate: 16_000)
+        #expect(route == .transcribe(reason: .classifierUnavailable))
+    }
+
+    @Test func disabledPackFailsOpenToASR() async throws {
+        let gate = VoiceFilterSpeechAudioBufferGate(
+            pipeline: Self.enabledPipeline(
+                identifier: ScriptedIdentifier(decision: .pilot(slot: .primary, score: 0.99)),
+                pack: .disabled(Self.installedPack())
+            )
+        )
+        let route = try await gate.route(samples: [0.1, 0.2, 0.1, 0.2], sampleRate: 16_000)
+        #expect(route == .transcribe(reason: .classifierUnavailable))
+    }
+
+    @Test func unavailableIdentifierFailsOpenToASR() async throws {
+        let gate = VoiceFilterSpeechAudioBufferGate(
+            pipeline: Self.enabledPipeline(identifier: UnavailableLocalSpeakerIdentifier())
+        )
+        let route = try await gate.route(samples: [0.1, 0.2, 0.1, 0.2], sampleRate: 16_000)
+        #expect(route == .transcribe(reason: .classifierUnavailable))
+    }
+
+    @Test func thrownClassifierErrorFailsOpenToASR() async throws {
+        let gate = VoiceFilterSpeechAudioBufferGate(
+            pipeline: Self.enabledPipeline(
+                identifier: ScriptedIdentifier(
+                    decision: .pilot(slot: .primary, score: 0.99),
+                    thrownError: .captureFailed(reason: "boom")
+                )
+            )
+        )
+        let route = try await gate.route(samples: [0.1, 0.2, 0.1, 0.2], sampleRate: 16_000)
+        #expect(route == .transcribe(reason: .classifierUnavailable))
+    }
+
+    @Test func alwaysTranscribeGateNeverDiscards() async throws {
+        let gate = AlwaysTranscribeSpeechAudioBufferGate()
+        let route = try await gate.route(samples: [0.1, 0.2], sampleRate: 16_000)
+        if case .transcribe = route { } else {
+            Issue.record("always-transcribe gate must never discard, got \(route)")
+        }
+    }
+
+    @Test func routeBeforeTranscriptionFailsOpenForInsufficientSpeech() {
+        let store = InMemoryStorage()
+        store.enabled = true
+        store.profiles = [Self.captainProfile()]
+        let pipeline = VoiceFilterPipeline(
+            identifier: UnavailableLocalSpeakerIdentifier(),
+            storage: store
+        )
+        let route = pipeline.routeBeforeTranscription(speaker: .insufficientSpeech)
+        #expect(route == .transcribe(reason: .insufficientSpeech))
+    }
+
+    @Test func monoFloatSamplesExtractsMonoFloat32() {
+        let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16_000, channels: 1, interleaved: false)!
+        let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 4)!
+        buffer.frameLength = 4
+        let channel = buffer.floatChannelData![0]
+        let input: [Float] = [0.1, -0.2, 0.3, -0.4]
+        for (i, value) in input.enumerated() { channel[i] = value }
+        let samples = AppleSpeechLiveTranscriptionEngine.monoFloatSamples(from: buffer)
+        #expect(samples == input)
+    }
+
+    @Test func monoFloatSamplesAveragesStereoChannels() {
+        let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16_000, channels: 2, interleaved: false)!
+        let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 2)!
+        buffer.frameLength = 2
+        let left = buffer.floatChannelData![0]
+        let right = buffer.floatChannelData![1]
+        left[0] = 1.0; left[1] = 0.0
+        right[0] = 0.0; right[1] = 1.0
+        let samples = AppleSpeechLiveTranscriptionEngine.monoFloatSamples(from: buffer)
+        #expect(samples == [0.5, 0.5])
+    }
+
+    @Test func monoFloatSamplesNilForNonFloatFormat() {
+        let format = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: 16_000, channels: 1, interleaved: false)!
+        let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 4)!
+        buffer.frameLength = 4
+        #expect(AppleSpeechLiveTranscriptionEngine.monoFloatSamples(from: buffer) == nil)
+    }
+
+    @Test func monoFloatSamplesNilForEmptyBuffer() {
+        let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16_000, channels: 1, interleaved: false)!
+        let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 4)!
+        buffer.frameLength = 0
+        #expect(AppleSpeechLiveTranscriptionEngine.monoFloatSamples(from: buffer) == nil)
     }
 }

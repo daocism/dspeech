@@ -8,12 +8,15 @@ struct ContentView: View {
     @State private var showSettings: Bool = false
 
     init(
-        engine: any LiveTranscriptionEngine = AppleSpeechLiveTranscriptionEngine(),
+        engine: (any LiveTranscriptionEngine)? = nil,
         voiceFilter: VoiceFilterPipeline? = nil,
         routing: AudioSessionRouting = LiveAudioSessionRouting()
     ) {
         let filter = voiceFilter ?? VoiceFilterPipeline(identifier: UnavailableLocalSpeakerIdentifier())
-        let live = LiveTranscriptionViewModel(engine: engine, voiceFilter: filter)
+        let resolvedEngine = engine ?? AppleSpeechLiveTranscriptionEngine(
+            bufferGate: VoiceFilterSpeechAudioBufferGate(pipeline: filter)
+        )
+        let live = LiveTranscriptionViewModel(engine: resolvedEngine, voiceFilter: filter)
         let monitor = RouteHealthMonitor(routing: routing)
         _voiceFilter = State(initialValue: filter)
         _coordinator = State(initialValue: CaptureCoordinator(
