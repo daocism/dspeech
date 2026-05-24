@@ -85,6 +85,35 @@ Active task `https://www.notion.so/369dfa2b7893814cbe7ee7cea26486a6` still retur
 `NOT_FOUND` through the connector (same as CEO observation 2026-05-24). Update not
 applied; recorded here instead.
 
+## Supervisor recovery verification
+
+Run `dspeech-supervisor-20260524T203001Z-b9f6965f` supplied the independent
+tester + reviewer evidence the original builder run never gathered (that run
+finalized `Blocked` because `engineer-backend` exited `rc=1`, dependency-blocking
+its tester/reviewer — even though `24dfbdf` + `75d1be9` had landed healthy on
+`origin/feat/local-pilot-voice-filter`).
+
+- **tester-unit** — `.ai/runs/dspeech-supervisor-20260524T203001Z-b9f6965f-tester-unit.md`.
+  Verdict **PASS**. Ran the full `DspeechTests` suite on mac24 (iPhone 17 Pro /
+  iOS 26.4) in a throwaway detached worktree at the pushed head `75d1be9` (the
+  shared mac24 checkout had unrelated dirty work in the same ASR file, so an
+  `--ff-only` merge would have been destructive) → `** TEST SUCCEEDED **`. All 13
+  suites green including the new `SpeechAudioBufferGateTests`. Static checks: no new
+  network/model-download surface, no certification/flight-safety copy.
+- **reviewer** — `.ai/runs/dspeech-supervisor-20260524T203001Z-b9f6965f-review.md`.
+  Verdict **APPROVE**. Confirmed single shared `VoiceFilterPipeline`, every error
+  path fail-opens to ASR, only `.pilot` is discarded, no FluidAudio/WhisperKit/SPM/
+  network added, privacy/local-only preserved. Non-blocking forward-looking asks
+  for the next builder cycle: W1 (move classification off `@MainActor` + guarantee
+  FIFO append order before a real classifier lands), W2 (utterance-aware discard
+  granularity), T1 (extract a testable append-vs-skip helper). Workflow findings
+  F1 (finalizer marked `Blocked` while work landed healthy) and F2 (`feat()` commit
+  authored under `tester-unit` identity) recorded for governance.
+
+State reconciled in `.ai/project-state.md` ("Last successful run") and
+`docs/ai-kb/current-context.md` (next priority) in commit
+`docs(ai): reconcile pre-asr routing gate recovery`.
+
 ## Next highest-leverage slice
 
 Wire the real FluidAudio-backed `LocalSpeakerIdentifier` behind the ADR 0008

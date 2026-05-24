@@ -23,6 +23,49 @@ replay/route validation kit and App Store readiness.
 
 ## Last successful run
 
+2026-05-24: Pre-ASR **routing gate** landed and independently verified on
+`feat/local-pilot-voice-filter`. Code commit `24dfbdf feat(voice-filter): gate
+apple speech buffers before asr` adds a `SpeechAudioBufferGate` seam
+(`AlwaysTranscribeSpeechAudioBufferGate` no-op + `VoiceFilterSpeechAudioBufferGate`)
+so that, *once a real local speaker identifier ships*, confidently-classified pilot
+speech can be discarded before Apple Speech ASR; everything uncertain still
+transcribes. `ContentView` now shares one `VoiceFilterPipeline` instance across the
+gate, the view model, and Settings (no split-brain state).
+`routeBeforeTranscription` returns `.transcribe(reason: .insufficientSpeech)` for
+`.insufficientSpeech` (was `.discard`), and a new `.classifierUnavailable` reason
+fail-opens every classifier/pack/profile error path to ASR. Adds 16
+`SpeechAudioBufferGateTests` cases.
+
+Independent recovery verification (run `dspeech-supervisor-20260524T203001Z-b9f6965f`):
+- tester-unit (`1f39c86 docs(ai): verify pre-asr routing gate recovery`) ran the
+  full `DspeechTests` suite on mac24 (iPhone 17 Pro / iOS 26.4) in a throwaway
+  detached worktree at the pushed head → `** TEST SUCCEEDED **`. All 13 suites
+  green, including the new `SpeechAudioBufferGateTests`. Artifact:
+  `.ai/runs/dspeech-supervisor-20260524T203001Z-b9f6965f-tester-unit.md`.
+- reviewer (`5ee3841 docs(ai): review pre-asr routing gate recovery`) → **APPROVE**:
+  safe, fail-open by design, risk cases test-pinned, no network/SPM/fake-AI added,
+  privacy/local-only preserved. Two forward-looking non-blocking asks for the next
+  builder cycle (W1: move classification off `@MainActor` + guarantee FIFO append
+  order before a real classifier lands; W2: utterance-aware discard granularity).
+  Artifact: `.ai/runs/dspeech-supervisor-20260524T203001Z-b9f6965f-review.md`.
+
+Honest limitation: there is still **no real local speaker identifier**. The only
+`LocalSpeakerIdentifier` conformer is `UnavailableLocalSpeakerIdentifier`, which
+throws `.modelUnavailable`. So the pre-ASR gate is **correct but inert / fail-open**
+in a default build — every buffer transcribes because the classifier is always
+unavailable. The gate only starts discarding pilot speech once the model-pack
+backend (ADR 0008) ships a working identifier.
+
+Workflow caveat: the builder run that authored this code
+(`dspeech-builder-20260524T190024Z-0f54bfce`) finalized `Blocked` (Notion page
+`36adfa2b…c822` set `Blocked`) because `engineer-backend` exited `rc=1` and the
+dependent `tester-integration`/`reviewer` were dependency-blocked — yet `24dfbdf`
+and `75d1be9` had already reached `origin/feat/local-pilot-voice-filter` and pass
+green. This recovery run supplies the missing independent tester + reviewer
+evidence the failed finalizer never gathered. (Also recorded: `24dfbdf`, a `feat()`
+production commit, was authored under the `tester-unit` git identity — a role-scope /
+identity-mapping issue flagged for governance, not a code defect.)
+
 2026-05-24: Model-pack **execution gate** landed on `feat/local-pilot-voice-filter`
 via `3dfc246 fix(voice-filter): gate speaker model execution`. `VoiceFilterPipeline`
 now calls a private `requireInstalledModelPack()` before `identifier.enroll` and
