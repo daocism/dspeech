@@ -76,7 +76,7 @@ the scratch dir is removed after the run.
 
 ## Commit
 
-`ca7db6e70003f1ff0f0d0dcbea209917d9cb3df1` — `feat(voice-filter): gate apple speech buffers before asr`,
+`24dfbdf (code SHA recorded post-amend)` — `feat(voice-filter): gate apple speech buffers before asr`,
 pushed to `origin/feat/local-pilot-voice-filter`.
 
 ## Notion
