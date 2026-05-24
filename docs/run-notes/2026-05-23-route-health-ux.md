@@ -146,3 +146,101 @@ Component-level start-gate logic is **green and correct**: `blocksStartOnlyForNo
 ### Residual manual device smoke (after the wiring slice lands)
 
 On a physical iPhone with an external ATC input source: (1) verify the route-health chip renders and updates on plug/unplug; (2) verify Start is disabled with a reason when no input is present; (3) verify that unplugging the external source mid-capture actually pauses ASR and surfaces the banner (today the copy claims «Запись приостановлена» but nothing pauses — must be true before that string ships).
+
+---
+
+## Post-review fix: UX wiring landed (2026-05-24)
+
+Run: `dspeech-supervisor-20260524T002321Z-edbbae4a` · Role: `docs-writer` · Host: `ubuntu-vm`
+
+**State-repair note.** The previous builder's finalizer marked run
+`dspeech-builder-20260523T190026Z-8ff9dfb0` BLOCKED *after* the engineer had
+already landed the wiring. The REQUEST_CHANGES verdict above is **historical** —
+preserved as the reviewer's record at the time, no longer the latest truth. The
+two HIGH findings (#1 no UX surface, #2 `.lost` banner over-claim) were resolved
+by `b671f74 feat(audio): surface route health in capture UI`.
+
+### What `b671f74` changed (the UX slice the reviewer asked for)
+
+`+384 / −18` across 4 files — no new network/audio egress, route-health stays
+pure `AVAudioSession` introspection behind `AudioSessionRouting`:
+
+| File | Change |
+|------|--------|
+| `Dspeech/App/CaptureCoordinator.swift` (new, +88) | `@MainActor @Observable` seam between `LiveTranscriptionViewModel` and `RouteHealthMonitor`. Exposes `canStart`, `captureSourceLabel`/`captureSourceShortLabel`, `routeBanner`, and `start()/stop()/toggle()`. |
+| `Dspeech/App/ContentView.swift` (+106/−18) | Renders the **route-health chip** (`accessibilityIdentifier("route-health-chip")`) and the **route-change banner** (`route-banner`). Start button now bound through the coordinator. |
+| `Dspeech.xcodeproj/project.pbxproj` (+12) | Adds `CaptureCoordinator` + its tests to the build/test targets. |
+| `DspeechTests/CaptureCoordinatorTests.swift` (new, +196) | 8 tests covering the seam (see below). |
+
+Resolutions, finding by finding:
+
+1. **Finding #1 (no route-health surface) — resolved.** `RouteHealthMonitor`
+   now has a production consumer: `CaptureCoordinator`, rendered by
+   `ContentView` as the `route-health-chip` and `route-banner`. It is no longer
+   test-only.
+2. **Start gate on `.noInput` — wired.** `CaptureCoordinator.canStart` is
+   `!routeMonitor.blocksStart`; `start()` early-returns and sets
+   `startBlockedMessage` instead of calling `live.start()` when
+   `routeMonitor.blocksStart` is true. The already-correct `.noInput`-only
+   gating logic is now actually read by the Start path.
+3. **Finding #2 (external-input-loss over-claim) — resolved.**
+   `handleRouteEvent` calls `live.stop()` when `lastNotice.kind == .lost` while
+   `live.isListening`. Capture now genuinely stops on external→built-in loss, so
+   the «Запись приостановлена» banner copy is true rather than a §4 silent-lie.
+
+The MEDIUM findings are unchanged by this slice and remain open as product
+questions: #3 AirPlay-as-suitable-external (`airPlayIsSuitableExternal_pinningCurrentBehavior`,
+intentional pin — confirm for ATC) and #4 commit-hygiene (a process note, not a
+code defect).
+
+### `CaptureCoordinatorTests` (added in `b671f74`)
+
+Swift Testing `@Test`s in `DspeechTests/CaptureCoordinatorTests.swift`, driving a
+`FakeEngine`:
+
+- `startBlockedWhenNoInput` — Start refused, `startBlockedMessage` set, engine not started.
+- `startAllowedForCautionBuiltIn` — built-in mic permitted.
+- `startAllowedForSuitableExternal` — external source permitted.
+- `oldDeviceUnavailableExternalToBuiltInStopsAndShowsNotice` — `.lost` while listening stops capture and surfaces the notice.
+- `oldDeviceUnavailableWhenIdleDoesNotCallStop` — no spurious stop when idle.
+- `routeBannerNilForSilentNotice` — non-user-visible notices produce no banner.
+- `toggleStopsWhenListening` — toggle stops an active capture.
+- `blockedMessageAvoidsForbiddenPhrases` — blocked-start copy stays free of certified/guaranteed/flight-safety language.
+
+### Tester evidence for this run — honest status
+
+The dependency `tester-unit` for run `dspeech-supervisor-20260524T002321Z-edbbae4a`
+**did not emit** a `…-20260524T002321Z-edbbae4a-verification.md` artifact; there
+is no fresh recorded test run for this run.
+
+mac24 **was reachable** (macOS 26.4.1), but its `dspeech-ios` checkout is pinned
+at `bdef438` (pre-wiring) and carries **uncommitted in-flight work**
+(`AppleSpeechLiveTranscriptionEngine.swift`, `DspeechUITests.swift` — the same
+mods the prior tester-unit flagged). `CaptureCoordinator.swift` and
+`CaptureCoordinatorTests.swift` exist only at `b671f74`, not in that tree.
+Advancing the checkout to `b671f74` would require stashing/discarding another
+worker's in-flight changes, so it was **not done** — these 8
+`CaptureCoordinatorTests` are therefore **not yet independently verified green in
+a recorded run**. Flagged honestly rather than asserted.
+
+**Prior engineer evidence (separate, pre-wiring baseline at `bdef438`)** — cited
+from the tester-unit section above, not from this run: full `DspeechTests` bundle
+**105 passed / 0 failed**; targeted classifier + monitor + view-model **59
+passed / 0 failed**; Release simulator build green
+(`.ai/runs/2026-05-23-route-health/mrdao-autopilot-fix.md`, iPhone 17 Pro /
+iOS 26.4). That baseline covers the route-health model/monitor layer; it predates
+and does **not** cover `CaptureCoordinator` or its tests.
+
+**To close the gap:** on a clean `b671f74` checkout run
+`xcodebuild test -only-testing:DspeechTests/CaptureCoordinatorTests` plus the full
+`DspeechTests` bundle, and the residual physical-device smoke above (chip render,
+Start gate, external-loss→actual pause).
+
+### Notion / PR status
+
+- **Notion** `369dfa2b-7893-814c-be7e-e7cea26486a6` still returns **NOT_FOUND** in
+  this environment (no accessible Notion tool / integration mismatch) — status is
+  recorded here, as it was for the reviewer handoff. The AI Office finalizer
+  updates its own run page; this run note is the canonical record.
+- **PR [#2](https://github.com/daocism/dspeech/pull/2)** (OPEN, draft) — `gh`
+  reachable; PR body's route-health section appended with this post-fix status.
