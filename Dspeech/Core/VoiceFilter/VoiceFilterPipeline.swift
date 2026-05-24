@@ -62,6 +62,12 @@ final class VoiceFilterPipeline {
         modelPackStorage.saveState(state)
     }
 
+    private func requireInstalledModelPack() throws {
+        guard modelPackState.isInstalled else {
+            throw LocalSpeakerIdentifierError.modelUnavailable(reason: modelPackState.capabilityReason)
+        }
+    }
+
     var enrolledSlots: Set<PilotVoiceProfile.Slot> {
         Set(profiles.map(\.slot))
     }
@@ -88,6 +94,7 @@ final class VoiceFilterPipeline {
         sampleRate: Double,
         spokenCallSign rawCallSign: String? = nil
     ) async throws -> PilotVoiceProfile {
+        try requireInstalledModelPack()
         let vector = try await identifier.enroll(samples: samples, sampleRate: sampleRate)
         let spokenCallSign = rawCallSign.flatMap(CallSign.init(raw:))
         let profile = PilotVoiceProfile(
@@ -187,6 +194,7 @@ final class VoiceFilterPipeline {
         guard enabled, !profiles.isEmpty else {
             return .nonPilot(bestPilotScore: 0)
         }
+        try requireInstalledModelPack()
         return try await identifier.classify(
             samples: samples,
             sampleRate: sampleRate,

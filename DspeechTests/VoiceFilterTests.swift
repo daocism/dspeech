@@ -266,6 +266,25 @@ struct VoiceFilterPipelineTests {
         func saveEnabled(_ flag: Bool) { enabled = flag }
     }
 
+    final class InMemoryModelPackStorage: ModelPackStateStorage, @unchecked Sendable {
+        var state: ModelPackState
+        init(_ state: ModelPackState = .absent) { self.state = state }
+        func loadState() -> ModelPackState { state }
+        func saveState(_ state: ModelPackState) { self.state = state }
+    }
+
+    static func installedPack() -> InstalledModelPack {
+        InstalledModelPack(
+            identifier: "fluidaudio-speaker-256",
+            version: "1.0.0",
+            embeddingDimension: 256,
+            checksumSHA256: String(repeating: "a", count: 64),
+            source: "https://mirror.invalid/voice-filter",
+            sizeBytes: 12_345_678,
+            installedAt: Date(timeIntervalSince1970: 748_137_600)
+        )
+    }
+
     struct FakeIdentifier: LocalSpeakerIdentifier {
         let vector: VoicePrintVector
         var availability: LocalSpeakerIdentifierAvailability { .available }
@@ -402,7 +421,8 @@ struct VoiceFilterPipelineTests {
         let store = InMemoryStorage()
         let pipeline = VoiceFilterPipeline(
             identifier: FakeIdentifier(vector: VoicePrintVector(values: [1, 0, 0, 0], quality: 0.92)),
-            storage: store
+            storage: store,
+            modelPackStorage: InMemoryModelPackStorage(.installed(Self.installedPack()))
         )
         let profile = try await pipeline.enrollPilot(
             slot: .primary,
@@ -414,5 +434,221 @@ struct VoiceFilterPipelineTests {
         #expect(profile.spokenCallSign?.normalized == "N123AB")
         #expect(store.profiles.first?.spokenCallSign?.normalized == "N123AB")
         #expect(store.callSign?.normalized == "N123AB")
+    }
+
+    @Test func absentPackMakesAvailableIdentifierUnavailable() {
+        let pipeline = VoiceFilterPipeline(
+            identifier: FakeIdentifier(vector: VoicePrintVector(values: [1, 0, 0, 0], quality: 0.92)),
+            storage: InMemoryStorage(),
+            modelPackStorage: InMemoryModelPackStorage(.absent)
+        )
+        if case .unavailable = pipeline.capability { } else {
+            Issue.record("expected unavailable capability when pack absent, got \(pipeline.capability)")
+        }
+    }
+
+    @Test func absentPackEnrollThrowsModelUnavailable() async {
+        let pipeline = VoiceFilterPipeline(
+            identifier: FakeIdentifier(vector: VoicePrintVector(values: [1, 0, 0, 0], quality: 0.92)),
+            storage: InMemoryStorage(),
+            modelPackStorage: InMemoryModelPackStorage(.absent)
+        )
+        do {
+            _ = try await pipeline.enrollPilot(
+                slot: .primary,
+                label: "Captain",
+                samples: [0, 1, 0, 1],
+                sampleRate: 16_000
+            )
+            Issue.record("expected enroll to throw with absent pack")
+        } catch let err as LocalSpeakerIdentifierError {
+            if case .modelUnavailable = err { } else {
+                Issue.record("expected modelUnavailable, got \(err)")
+            }
+        } catch {
+            Issue.record("unexpected error \(error)")
+        }
+    }
+
+    @Test func absentPackClassifyThrowsModelUnavailable() async {
+        let store = InMemoryStorage()
+        store.enabled = true
+        store.profiles = [PilotVoiceProfile(
+            slot: .primary,
+            label: "Captain",
+            voicePrint: VoicePrintVector(values: [1, 0, 0, 0], quality: 0.9)
+        )]
+        let pipeline = VoiceFilterPipeline(
+            identifier: FakeIdentifier(vector: VoicePrintVector(values: [1, 0, 0, 0], quality: 0.92)),
+            storage: store,
+            modelPackStorage: InMemoryModelPackStorage(.absent)
+        )
+        do {
+            _ = try await pipeline.classify(samples: [0, 1, 0, 1], sampleRate: 16_000)
+            Issue.record("expected classify to throw with absent pack")
+        } catch let err as LocalSpeakerIdentifierError {
+            if case .modelUnavailable = err { } else {
+                Issue.record("expected modelUnavailable, got \(err)")
+            }
+        } catch {
+            Issue.record("unexpected error \(error)")
+        }
+    }
+
+    @Test func installedPackMakesCapabilityReady() {
+        let pipeline = VoiceFilterPipeline(
+            identifier: FakeIdentifier(vector: VoicePrintVector(values: [1, 0, 0, 0], quality: 0.92)),
+            storage: InMemoryStorage(),
+            modelPackStorage: InMemoryModelPackStorage(.installed(Self.installedPack()))
+        )
+        #expect(pipeline.capability == .ready)
+    }
+
+    @Test func installedPackClassifyDelegatesToIdentifier() async throws {
+        let store = InMemoryStorage()
+        store.enabled = true
+        store.profiles = [PilotVoiceProfile(
+            slot: .primary,
+            label: "Captain",
+            voicePrint: VoicePrintVector(values: [1, 0, 0, 0], quality: 0.9)
+        )]
+        let pipeline = VoiceFilterPipeline(
+            identifier: FakeIdentifier(vector: VoicePrintVector(values: [1, 0, 0, 0], quality: 0.92)),
+            storage: store,
+            modelPackStorage: InMemoryModelPackStorage(.installed(Self.installedPack()))
+        )
+        let decision = try await pipeline.classify(samples: [0, 1, 0, 1], sampleRate: 16_000)
+        if case let .pilot(slot, _) = decision {
+            #expect(slot == .primary)
+        } else {
+            Issue.record("expected delegated pilot decision, got \(decision)")
+        }
+    }
+
+    @Test func disabledPackEnrollThrowsDespitePackMetadata() async {
+        let pipeline = VoiceFilterPipeline(
+            identifier: FakeIdentifier(vector: VoicePrintVector(values: [1, 0, 0, 0], quality: 0.92)),
+            storage: InMemoryStorage(),
+            modelPackStorage: InMemoryModelPackStorage(.disabled(Self.installedPack()))
+        )
+        if case .unavailable = pipeline.capability { } else {
+            Issue.record("disabled pack must report unavailable, got \(pipeline.capability)")
+        }
+        do {
+            _ = try await pipeline.enrollPilot(
+                slot: .primary,
+                label: "Captain",
+                samples: [0, 1, 0, 1],
+                sampleRate: 16_000
+            )
+            Issue.record("expected enroll to throw with disabled pack")
+        } catch let err as LocalSpeakerIdentifierError {
+            if case .modelUnavailable = err { } else {
+                Issue.record("expected modelUnavailable, got \(err)")
+            }
+        } catch {
+            Issue.record("unexpected error \(error)")
+        }
+    }
+
+    @Test func disabledPackClassifyThrowsDespitePackMetadata() async {
+        let store = InMemoryStorage()
+        store.enabled = true
+        store.profiles = [PilotVoiceProfile(
+            slot: .primary,
+            label: "Captain",
+            voicePrint: VoicePrintVector(values: [1, 0, 0, 0], quality: 0.9)
+        )]
+        let pipeline = VoiceFilterPipeline(
+            identifier: FakeIdentifier(vector: VoicePrintVector(values: [1, 0, 0, 0], quality: 0.92)),
+            storage: store,
+            modelPackStorage: InMemoryModelPackStorage(.disabled(Self.installedPack()))
+        )
+        do {
+            _ = try await pipeline.classify(samples: [0, 1, 0, 1], sampleRate: 16_000)
+            Issue.record("expected classify to throw with disabled pack")
+        } catch let err as LocalSpeakerIdentifierError {
+            if case .modelUnavailable = err { } else {
+                Issue.record("expected modelUnavailable, got \(err)")
+            }
+        } catch {
+            Issue.record("unexpected error \(error)")
+        }
+    }
+}
+
+struct ModelPackStateStorageTests {
+    private func makeStore() -> (UserDefaultsModelPackStateStorage, () -> Void) {
+        let suiteName = "dspeech.tests.modelpack.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        let cleanup = { defaults.removePersistentDomain(forName: suiteName) }
+        return (UserDefaultsModelPackStateStorage(defaults: defaults), cleanup)
+    }
+
+    private static func pack() -> InstalledModelPack {
+        InstalledModelPack(
+            identifier: "fluidaudio-speaker-256",
+            version: "1.0.0",
+            embeddingDimension: 256,
+            checksumSHA256: String(repeating: "a", count: 64),
+            source: "https://mirror.invalid/voice-filter",
+            sizeBytes: 12_345_678,
+            installedAt: Date(timeIntervalSince1970: 748_137_600)
+        )
+    }
+
+    @Test func roundTripAbsent() {
+        let (store, cleanup) = makeStore()
+        defer { cleanup() }
+        store.saveState(.absent)
+        #expect(store.loadState() == .absent)
+    }
+
+    @Test func roundTripInstalled() {
+        let (store, cleanup) = makeStore()
+        defer { cleanup() }
+        store.saveState(.installed(Self.pack()))
+        #expect(store.loadState() == .installed(Self.pack()))
+    }
+
+    @Test func roundTripFailed() {
+        let (store, cleanup) = makeStore()
+        defer { cleanup() }
+        let failure = ModelPackFailure(
+            kind: .checksum,
+            userSafeReason: "Проверка контрольной суммы не прошла.",
+            isRetryable: true
+        )
+        store.saveState(.failed(failure))
+        #expect(store.loadState() == .failed(failure))
+    }
+
+    @Test func roundTripDisabled() {
+        let (store, cleanup) = makeStore()
+        defer { cleanup() }
+        store.saveState(.disabled(Self.pack()))
+        #expect(store.loadState() == .disabled(Self.pack()))
+    }
+
+    @Test func acquiringRecoversToAbsentOnColdStart() {
+        let (store, cleanup) = makeStore()
+        defer { cleanup() }
+        store.saveState(.acquiring(ModelPackAcquisition(phase: .downloading, fractionComplete: 0.4)))
+        #expect(store.loadState() == .absent)
+    }
+
+    @Test func missingDataLoadsAbsent() {
+        let (store, cleanup) = makeStore()
+        defer { cleanup() }
+        #expect(store.loadState() == .absent)
+    }
+
+    @Test func corruptDataLoadsAbsent() {
+        let suiteName = "dspeech.tests.modelpack.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(Data([0x00, 0x01, 0x02, 0x03]), forKey: UserDefaultsModelPackStateStorage.stateKey)
+        let store = UserDefaultsModelPackStateStorage(defaults: defaults)
+        #expect(store.loadState() == .absent)
     }
 }
