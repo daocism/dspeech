@@ -18,7 +18,10 @@ struct ContentView: View {
         } else {
             let modelPackStorage = UserDefaultsModelPackStateStorage()
             filter = VoiceFilterPipeline(
-                identifier: LocalSpeakerIdentifierFactory.make(state: modelPackStorage.loadState()),
+                identifier: LocalSpeakerIdentifierFactory.make(
+                    state: modelPackStorage.loadState(),
+                    backendBuilder: FluidAudioBackendBuilder()
+                ),
                 modelPackStorage: modelPackStorage
             )
         }

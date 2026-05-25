@@ -1119,3 +1119,170 @@ struct SpeechAudioBufferGateTests {
         #expect(AppleSpeechLiveTranscriptionEngine.monoFloatSamples(from: buffer) == nil)
     }
 }
+
+@MainActor
+struct FluidAudioBackendBuilderTests {
+    static func pack(dimension: Int = 256, localModelPath: String? = nil) -> InstalledModelPack {
+        InstalledModelPack(
+            identifier: "fluidaudio-speaker-\(dimension)",
+            version: "1.0.0",
+            embeddingDimension: dimension,
+            checksumSHA256: String(repeating: "a", count: 64),
+            source: "https://mirror.invalid/voice-filter",
+            sizeBytes: 12_345_678,
+            installedAt: Date(timeIntervalSince1970: 748_137_600),
+            localModelPath: localModelPath
+        )
+    }
+
+    private static let allFilesPresent: @Sendable (String) -> Bool = { _ in true }
+    private static let noFilesPresent: @Sendable (String) -> Bool = { _ in false }
+
+    private func isUnavailable(_ identifier: any LocalSpeakerIdentifier) -> Bool {
+        if case .unavailable = identifier.availability { return true }
+        return false
+    }
+
+    private func expectModelUnavailable(_ body: () throws -> any LocalSpeakerIdentifier) {
+        do {
+            _ = try body()
+            Issue.record("expected makeIdentifier to throw")
+        } catch let error as LocalSpeakerIdentifierError {
+            if case .modelUnavailable = error { } else {
+                Issue.record("expected modelUnavailable, got \(error)")
+            }
+        } catch {
+            Issue.record("unexpected error \(error)")
+        }
+    }
+
+    @Test func nilLocalModelPathThrowsModelUnavailable() {
+        let builder = FluidAudioBackendBuilder(fileExists: Self.allFilesPresent)
+        expectModelUnavailable { try builder.makeIdentifier(for: Self.pack(localModelPath: nil)) }
+    }
+
+    @Test func emptyLocalModelPathThrowsModelUnavailable() {
+        let builder = FluidAudioBackendBuilder(fileExists: Self.allFilesPresent)
+        expectModelUnavailable { try builder.makeIdentifier(for: Self.pack(localModelPath: "")) }
+    }
+
+    @Test func missingModelFilesThrowsModelUnavailable() {
+        let builder = FluidAudioBackendBuilder(fileExists: Self.noFilesPresent)
+        expectModelUnavailable {
+            try builder.makeIdentifier(for: Self.pack(localModelPath: "/var/mobile/voice-filter"))
+        }
+    }
+
+    @Test func bothBundleFilesRequired() {
+        let onlySegmentation: @Sendable (String) -> Bool = {
+            $0.hasSuffix(FluidAudioBackendBuilder.segmentationModelFileName)
+        }
+        let builder = FluidAudioBackendBuilder(fileExists: onlySegmentation)
+        expectModelUnavailable {
+            try builder.makeIdentifier(for: Self.pack(localModelPath: "/var/mobile/voice-filter"))
+        }
+    }
+
+    @Test func presentBundleFilesProduceAvailableBackendAtDimension256() throws {
+        let builder = FluidAudioBackendBuilder(fileExists: Self.allFilesPresent)
+        let identifier = try builder.makeIdentifier(
+            for: Self.pack(dimension: 256, localModelPath: "/var/mobile/voice-filter")
+        )
+        #expect(!isUnavailable(identifier))
+        #expect(identifier.embeddingDimension == 256)
+    }
+
+    @Test func factoryWithFluidBuilderAbsentStaysUnavailable() {
+        let identifier = LocalSpeakerIdentifierFactory.make(
+            state: .absent,
+            backendBuilder: FluidAudioBackendBuilder(fileExists: Self.allFilesPresent)
+        )
+        #expect(isUnavailable(identifier))
+    }
+
+    @Test func factoryWithFluidBuilderNilPathStaysUnavailable() {
+        let identifier = LocalSpeakerIdentifierFactory.make(
+            state: .installed(Self.pack(localModelPath: nil)),
+            backendBuilder: FluidAudioBackendBuilder(fileExists: Self.allFilesPresent)
+        )
+        #expect(isUnavailable(identifier))
+        #expect(identifier.embeddingDimension == 256)
+    }
+
+    @Test func factoryWithFluidBuilderMissingFilesStaysUnavailable() {
+        let identifier = LocalSpeakerIdentifierFactory.make(
+            state: .installed(Self.pack(localModelPath: "/var/mobile/voice-filter")),
+            backendBuilder: FluidAudioBackendBuilder(fileExists: Self.noFilesPresent)
+        )
+        #expect(isUnavailable(identifier))
+    }
+
+    @Test func factoryWithFluidBuilderDimensionMismatchStaysUnavailable() {
+        let identifier = LocalSpeakerIdentifierFactory.make(
+            state: .installed(Self.pack(dimension: 128, localModelPath: "/var/mobile/voice-filter")),
+            backendBuilder: FluidAudioBackendBuilder(fileExists: Self.allFilesPresent)
+        )
+        #expect(isUnavailable(identifier))
+    }
+
+    @Test func disabledPackWithFluidBuilderStaysUnavailable() {
+        let identifier = LocalSpeakerIdentifierFactory.make(
+            state: .disabled(Self.pack(dimension: 256, localModelPath: "/var/mobile/voice-filter")),
+            backendBuilder: FluidAudioBackendBuilder(fileExists: Self.allFilesPresent)
+        )
+        #expect(isUnavailable(identifier))
+    }
+}
+
+struct SpeakerAudioPreprocessingTests {
+    @Test func resampleIsIdentityAtTargetRate() {
+        let samples: [Float] = [0.1, -0.2, 0.3, -0.4]
+        #expect(SpeakerAudioPreprocessing.resample(samples, from: 16_000, to: 16_000) == samples)
+    }
+
+    @Test func resampleUpsamplesEightToSixteenK() {
+        let samples: [Float] = (0..<100).map { Float($0) }
+        let out = SpeakerAudioPreprocessing.resample(samples, from: 8_000, to: 16_000)
+        #expect(out.count == 200)
+        #expect(out.first == 0)
+    }
+
+    @Test func resampleDownsamplesFortyEightToSixteenK() {
+        let samples: [Float] = Array(repeating: 0.5, count: 480)
+        let out = SpeakerAudioPreprocessing.resample(samples, from: 48_000, to: 16_000)
+        #expect(out.count == 160)
+        #expect(out.allSatisfy { abs($0 - 0.5) < 1e-5 })
+    }
+
+    @Test func resamplePassesThroughDegenerateInput() {
+        #expect(SpeakerAudioPreprocessing.resample([], from: 48_000, to: 16_000) == [])
+        #expect(SpeakerAudioPreprocessing.resample([0.7], from: 48_000, to: 16_000) == [0.7])
+        #expect(SpeakerAudioPreprocessing.resample([0.1, 0.2], from: 0, to: 16_000) == [0.1, 0.2])
+    }
+
+    @Test func voicedQualityIsZeroForSilence() {
+        #expect(SpeakerAudioPreprocessing.voicedQuality([0, 0, 0, 0]) == 0)
+        #expect(SpeakerAudioPreprocessing.voicedQuality([]) == 0)
+    }
+
+    @Test func voicedQualityRisesWithEnergyAndClampsAtOne() {
+        let quiet = SpeakerAudioPreprocessing.voicedQuality([0.02, -0.02, 0.02, -0.02])
+        let loud = SpeakerAudioPreprocessing.voicedQuality([0.3, -0.3, 0.3, -0.3])
+        #expect(quiet < loud)
+        #expect(SpeakerAudioPreprocessing.voicedQuality([1, -1, 1, -1]) == 1.0)
+    }
+
+    @Test func prepareSilenceFallsBelowQualityFloor() {
+        let prepared = SpeakerAudioPreprocessing.prepare(samples: [0, 0, 0, 0], sampleRate: 16_000)
+        #expect(prepared.quality < SpeakerAudioPreprocessing.minVoicedQuality)
+    }
+
+    @Test func prepareLoudSpeechMeetsQualityFloor() {
+        let prepared = SpeakerAudioPreprocessing.prepare(
+            samples: Array(repeating: 0.25, count: 32),
+            sampleRate: 16_000
+        )
+        #expect(prepared.quality >= SpeakerAudioPreprocessing.minVoicedQuality)
+        #expect(prepared.samples.count == 32)
+    }
+}
