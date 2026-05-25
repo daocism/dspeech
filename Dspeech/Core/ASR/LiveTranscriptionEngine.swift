@@ -55,3 +55,42 @@ final class VoiceFilterSpeechAudioBufferGate: SpeechAudioBufferGate {
         return pipeline.routeBeforeTranscription(speaker: speaker)
     }
 }
+
+enum AudioBufferRouting: Equatable, Sendable {
+    case transcribe
+    case discard
+}
+
+@MainActor
+final class SerialAudioRoutingQueue<Element: Sendable> {
+    private nonisolated let continuation: AsyncStream<Element>.Continuation
+    private var consumer: Task<Void, Never>?
+
+    init(
+        route: @escaping @Sendable @MainActor (Element) async -> AudioBufferRouting,
+        append: @escaping @Sendable @MainActor (Element) -> Void
+    ) {
+        let (stream, continuation) = AsyncStream<Element>.makeStream()
+        self.continuation = continuation
+        // why: a single sequential consumer is the serialization boundary — buffer N+1 is
+        // not routed until buffer N's transcribe/discard decision and any append have
+        // completed, so capture order is preserved even when classification latency varies.
+        self.consumer = Task { @MainActor in
+            for await element in stream {
+                if case .transcribe = await route(element) {
+                    append(element)
+                }
+            }
+        }
+    }
+
+    nonisolated func submit(_ element: Element) {
+        continuation.yield(element)
+    }
+
+    func finish() {
+        continuation.finish()
+        consumer?.cancel()
+        consumer = nil
+    }
+}

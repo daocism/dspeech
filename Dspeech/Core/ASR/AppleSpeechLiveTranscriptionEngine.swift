@@ -15,6 +15,7 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     private var task: SFSpeechRecognitionTask?
     private let audioEngine = AVAudioEngine()
     private var continuation: AsyncStream<LiveTranscriptionEvent>.Continuation?
+    private var routingQueue: SerialAudioRoutingQueue<SendableAudioBuffer>?
 
     init(localeIdentifier: String = "en-US", bufferGate: (any SpeechAudioBufferGate)? = nil) {
         self.localeIdentifier = localeIdentifier
@@ -91,13 +92,27 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
         }
         self.request = request
 
+        let queue = SerialAudioRoutingQueue<SendableAudioBuffer>(
+            route: { [weak self] box in
+                // why: nil self (engine torn down) fails open rather than dropping audio.
+                await self?.routeBuffer(box.buffer) ?? .transcribe
+            },
+            append: { [weak self] box in
+                // why: request is nil once cleanup() runs, so a late in-flight buffer
+                // cannot append to a stale recognition request.
+                self?.request?.append(box.buffer)
+            }
+        )
+        self.routingQueue = queue
+
         let inputNode = audioEngine.inputNode
         let recordingFormat = inputNode.outputFormat(forBus: 0)
         inputNode.removeTap(onBus: 0)
-        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
-            Task { @MainActor [weak self] in
-                await self?.appendThroughGate(buffer)
-            }
+        // why: yield directly into the serial queue from the capture thread — no per-buffer
+        // Task, whose start order is not guaranteed and would let buffers append out of
+        // capture order once classification latency is non-trivial.
+        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, _ in
+            queue.submit(SendableAudioBuffer(buffer))
         }
 
         audioEngine.prepare()
@@ -149,29 +164,19 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
         }
     }
 
-    private func appendThroughGate(_ buffer: AVAudioPCMBuffer) async {
-        guard let request else { return }
-        guard let bufferGate else {
-            request.append(buffer)
-            return
-        }
-        guard let samples = Self.monoFloatSamples(from: buffer) else {
-            request.append(buffer)
-            return
-        }
+    func routeBuffer(_ buffer: AVAudioPCMBuffer) async -> AudioBufferRouting {
+        guard let bufferGate else { return .transcribe }
+        guard let samples = Self.monoFloatSamples(from: buffer) else { return .transcribe }
         do {
-            let decision = try await bufferGate.route(
-                samples: samples,
-                sampleRate: buffer.format.sampleRate
-            )
-            switch decision {
+            switch try await bufferGate.route(samples: samples, sampleRate: buffer.format.sampleRate) {
             case .discard:
-                return
+                return .discard
             case .transcribe:
-                request.append(buffer)
+                return .transcribe
             }
         } catch {
-            request.append(buffer)
+            // why: fail open — a thrown classifier must never silently drop ATC audio.
+            return .transcribe
         }
     }
 
@@ -229,6 +234,10 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
             audioEngine.stop()
         }
         audioEngine.inputNode.removeTap(onBus: 0)
+        // why: stop the serial consumer and drop the request before niling it, so no
+        // queued or in-flight buffer can append to a stale recognition request.
+        routingQueue?.finish()
+        routingQueue = nil
         request?.endAudio()
         task?.cancel()
         task = nil
@@ -258,5 +267,17 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
                 }
             }
         }
+    }
+}
+
+// why: an AVAudioPCMBuffer is produced on the realtime capture thread and consumed once,
+// in order, by the serial routing queue's main-actor consumer. It is never mutated
+// concurrently across that single hand-off, so the unchecked-Sendable box is the honest,
+// narrow escape hatch that lets it cross into the AsyncStream without a per-buffer Task.
+struct SendableAudioBuffer: @unchecked Sendable {
+    let buffer: AVAudioPCMBuffer
+
+    init(_ buffer: AVAudioPCMBuffer) {
+        self.buffer = buffer
     }
 }

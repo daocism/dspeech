@@ -1286,3 +1286,156 @@ struct SpeakerAudioPreprocessingTests {
         #expect(prepared.samples.count == 32)
     }
 }
+
+@MainActor
+struct SerialAudioRoutingQueueTests {
+    @MainActor
+    final class Recorder {
+        private(set) var values: [Int] = []
+        func append(_ value: Int) { values.append(value) }
+    }
+
+    private static func drain(until condition: @escaping () -> Bool) async {
+        var spins = 0
+        while !condition() && spins < 100_000 {
+            await Task.yield()
+            spins += 1
+        }
+    }
+
+    @Test func preservesCaptureOrderWhenEarlierElementRoutesSlower() async {
+        let recorder = Recorder()
+        let queue = SerialAudioRoutingQueue<Int>(
+            route: { value in
+                // Earlier values yield more times; under concurrent (per-buffer Task)
+                // routing they would be overtaken. A serial consumer must still append
+                // strictly in submission order.
+                for _ in 0..<((4 - value) * 8) { await Task.yield() }
+                return .transcribe
+            },
+            append: { value in recorder.append(value) }
+        )
+        for value in 0..<4 { queue.submit(value) }
+        await Self.drain(until: { recorder.values.count == 4 })
+        #expect(recorder.values == [0, 1, 2, 3])
+    }
+
+    @Test func discardedElementsDoNotAppend() async {
+        let recorder = Recorder()
+        let queue = SerialAudioRoutingQueue<Int>(
+            route: { value in value % 2 == 0 ? .transcribe : .discard },
+            append: { value in recorder.append(value) }
+        )
+        for value in 0..<5 { queue.submit(value) }
+        await Self.drain(until: { recorder.values.count == 3 })
+        #expect(recorder.values == [0, 2, 4])
+    }
+
+    @Test func failOpenRoutingStillAppendsInOrder() async {
+        let recorder = Recorder()
+        // route mirrors the engine fail-open contract: a simulated classifier failure
+        // still yields .transcribe so the buffer reaches ASR.
+        let queue = SerialAudioRoutingQueue<Int>(
+            route: { _ in .transcribe },
+            append: { value in recorder.append(value) }
+        )
+        for value in 0..<3 { queue.submit(value) }
+        await Self.drain(until: { recorder.values.count == 3 })
+        #expect(recorder.values == [0, 1, 2])
+    }
+
+    @Test func submitAfterFinishIsIgnored() async {
+        let recorder = Recorder()
+        let queue = SerialAudioRoutingQueue<Int>(
+            route: { _ in .transcribe },
+            append: { value in recorder.append(value) }
+        )
+        queue.submit(1)
+        await Self.drain(until: { recorder.values.count == 1 })
+        queue.finish()
+        queue.submit(2)
+        for _ in 0..<1_000 { await Task.yield() }
+        #expect(recorder.values == [1])
+    }
+}
+
+@MainActor
+struct AppleSpeechRoutingTests {
+    private static func floatBuffer(_ samples: [Float], sampleRate: Double = 16_000) -> AVAudioPCMBuffer {
+        let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: sampleRate, channels: 1, interleaved: false)!
+        let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(samples.count))!
+        buffer.frameLength = AVAudioFrameCount(samples.count)
+        let channel = buffer.floatChannelData![0]
+        for (i, value) in samples.enumerated() { channel[i] = value }
+        return buffer
+    }
+
+    private static func int16Buffer(count: Int) -> AVAudioPCMBuffer {
+        let format = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: 16_000, channels: 1, interleaved: false)!
+        let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(count))!
+        buffer.frameLength = AVAudioFrameCount(count)
+        return buffer
+    }
+
+    private static func enabledPipeline(_ identifier: any LocalSpeakerIdentifier) -> VoiceFilterPipeline {
+        let store = SpeechAudioBufferGateTests.InMemoryStorage()
+        store.enabled = true
+        store.profiles = [PilotVoiceProfile(
+            slot: .primary,
+            label: "Captain",
+            voicePrint: VoicePrintVector(values: [1, 0, 0, 0], quality: 0.9)
+        )]
+        return VoiceFilterPipeline(
+            identifier: identifier,
+            storage: store,
+            modelPackStorage: SpeechAudioBufferGateTests.InMemoryModelPackStorage(
+                .installed(SpeechAudioBufferGateTests.installedPack())
+            )
+        )
+    }
+
+    @Test func noGateRoutesTranscribe() async {
+        let engine = AppleSpeechLiveTranscriptionEngine(bufferGate: nil)
+        let routing = await engine.routeBuffer(Self.floatBuffer([0.1, 0.2, 0.1, 0.2]))
+        #expect(routing == .transcribe)
+    }
+
+    @Test func unsupportedSampleFormatRoutesTranscribe() async {
+        let gate = VoiceFilterSpeechAudioBufferGate(pipeline: Self.enabledPipeline(
+            SpeechAudioBufferGateTests.ScriptedIdentifier(decision: .pilot(slot: .primary, score: 0.99))
+        ))
+        let engine = AppleSpeechLiveTranscriptionEngine(bufferGate: gate)
+        let routing = await engine.routeBuffer(Self.int16Buffer(count: 4))
+        #expect(routing == .transcribe)
+    }
+
+    @Test func confidentPilotRoutesDiscard() async {
+        let gate = VoiceFilterSpeechAudioBufferGate(pipeline: Self.enabledPipeline(
+            SpeechAudioBufferGateTests.ScriptedIdentifier(decision: .pilot(slot: .primary, score: 0.94))
+        ))
+        let engine = AppleSpeechLiveTranscriptionEngine(bufferGate: gate)
+        let routing = await engine.routeBuffer(Self.floatBuffer([0.1, 0.2, 0.1, 0.2]))
+        #expect(routing == .discard)
+    }
+
+    @Test func thrownClassifierErrorRoutesTranscribe() async {
+        let gate = VoiceFilterSpeechAudioBufferGate(pipeline: Self.enabledPipeline(
+            SpeechAudioBufferGateTests.ScriptedIdentifier(
+                decision: .pilot(slot: .primary, score: 0.99),
+                thrownError: .captureFailed(reason: "boom")
+            )
+        ))
+        let engine = AppleSpeechLiveTranscriptionEngine(bufferGate: gate)
+        let routing = await engine.routeBuffer(Self.floatBuffer([0.1, 0.2, 0.1, 0.2]))
+        #expect(routing == .transcribe)
+    }
+
+    @Test func nonPilotRoutesTranscribe() async {
+        let gate = VoiceFilterSpeechAudioBufferGate(pipeline: Self.enabledPipeline(
+            SpeechAudioBufferGateTests.ScriptedIdentifier(decision: .nonPilot(bestPilotScore: 0.1))
+        ))
+        let engine = AppleSpeechLiveTranscriptionEngine(bufferGate: gate)
+        let routing = await engine.routeBuffer(Self.floatBuffer([0.1, 0.2, 0.1, 0.2]))
+        #expect(routing == .transcribe)
+    }
+}
