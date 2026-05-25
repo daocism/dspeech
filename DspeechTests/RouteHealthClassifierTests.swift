@@ -191,24 +191,45 @@ struct RouteHealthClassifierTests {
         #expect(result.primaryInputTypeRaw == "AirPlay")
     }
 
-    @Test func emptyRouteWithSuitableAvailableInputIsNoInput() {
+    @Test func emptyRouteWithSuitableAvailableInputUsesAvailableInput() {
         let usb = PortSnapshot(portType: .usbAudio, portName: "USB Tap")
         let result = RouteHealthClassifier.classify(
             route: RouteSnapshot(inputs: [], outputs: []),
             availableInputs: [usb]
         )
-        #expect(result.health == .noInput)
-        #expect(result.primaryInputName == nil)
+        #expect(result.health == .suitableExternal)
+        #expect(result.primaryInputName == "USB Tap")
     }
 
-    @Test func emptyRouteWithMixedAvailableInputsIsNoInput() {
+    @Test func emptyRouteWithBuiltInMicAvailableIsCaution() {
+        let mic = PortSnapshot(portType: .builtInMic, portName: "iPhone Microphone")
+        let result = RouteHealthClassifier.classify(
+            route: RouteSnapshot(inputs: [], outputs: []),
+            availableInputs: [mic]
+        )
+        #expect(result.health == .cautionBuiltIn)
+        #expect(result.primaryInputName == "iPhone Microphone")
+    }
+
+    @Test func emptyRouteWithMixedAvailableInputsPrefersCapturableInput() {
         let usb = PortSnapshot(portType: .usbAudio, portName: "USB Tap")
         let a2dp = PortSnapshot(portType: .bluetoothA2DP, portName: "AirPods")
         let result = RouteHealthClassifier.classify(
             route: RouteSnapshot(inputs: [], outputs: [a2dp]),
-            availableInputs: [usb, a2dp]
+            availableInputs: [a2dp, usb]
         )
-        #expect(result.health == .noInput)
+        #expect(result.health == .suitableExternal)
+        #expect(result.primaryInputName == "USB Tap")
+    }
+
+    @Test func emptyRouteWithOnlyOutputAvailableIsUnsuitable() {
+        let a2dp = PortSnapshot(portType: .bluetoothA2DP, portName: "AirPods")
+        let result = RouteHealthClassifier.classify(
+            route: RouteSnapshot(inputs: [], outputs: [a2dp]),
+            availableInputs: [a2dp]
+        )
+        #expect(result.health == .unsuitableOutputOnly)
+        #expect(result.primaryInputName == "AirPods")
     }
 
     @Test func unknownRawValuePreservedThroughAssessment() {

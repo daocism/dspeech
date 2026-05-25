@@ -12,6 +12,16 @@ final class LiveAudioSessionRouting: AudioSessionRouting, @unchecked Sendable {
 
     init(session: AVAudioSession = .sharedInstance()) {
         self.session = session
+        // why: until a record-capable category is set, `currentRoute` and
+        // `availableInputs` enumerate no microphone, which makes route health read
+        // .noInput and disables Start before the engine ever activates capture.
+        // Priming the category (without activating — the engine owns activation)
+        // lets the OS surface the real input so Start reflects an available mic.
+        try? session.setCategory(
+            .playAndRecord,
+            mode: .measurement,
+            options: [.allowBluetooth, .allowBluetoothA2DP, .defaultToSpeaker]
+        )
         var localContinuation: AsyncStream<RouteChangeEvent>.Continuation!
         self.routeChanges = AsyncStream<RouteChangeEvent>(
             bufferingPolicy: .unbounded

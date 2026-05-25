@@ -5,25 +5,31 @@ enum RouteHealthClassifier {
         route: RouteSnapshot,
         availableInputs: [PortSnapshot]
     ) -> RouteHealthAssessment {
-        guard let primary = route.inputs.first else {
-            if availableInputs.isEmpty {
-                return RouteHealthAssessment(health: .noInput)
-            }
-            if availableInputs.allSatisfy({ $0.portType.isOutputOnly }) {
-                let outputName = availableInputs.first?.portName
-                return RouteHealthAssessment(
-                    health: .unsuitableOutputOnly,
-                    primaryInputName: outputName,
-                    primaryInputTypeRaw: availableInputs.first?.portType.rawValue
-                )
-            }
-            return RouteHealthAssessment(health: .noInput)
+        if let primary = route.inputs.first {
+            return assess(port: primary)
         }
 
-        let name = primary.portName
-        let typeRaw = primary.portType.rawValue
+        // why: pre-activation the active route reports no input even though a usable
+        // mic exists in availableInputs; classifying from it keeps Start enabled
+        // instead of falsely reporting .noInput before the engine activates capture.
+        if let capturable = availableInputs.first(where: { !$0.portType.isOutputOnly }) {
+            return assess(port: capturable)
+        }
+        if let outputOnly = availableInputs.first {
+            return RouteHealthAssessment(
+                health: .unsuitableOutputOnly,
+                primaryInputName: outputOnly.portName,
+                primaryInputTypeRaw: outputOnly.portType.rawValue
+            )
+        }
+        return RouteHealthAssessment(health: .noInput)
+    }
 
-        switch primary.portType {
+    private static func assess(port: PortSnapshot) -> RouteHealthAssessment {
+        let name = port.portName
+        let typeRaw = port.portType.rawValue
+
+        switch port.portType {
         case .lineIn, .usbAudio, .headsetMic, .carAudio, .bluetoothHFP, .bluetoothLE, .airPlay:
             return RouteHealthAssessment(
                 health: .suitableExternal,
