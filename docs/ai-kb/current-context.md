@@ -16,6 +16,7 @@ The voice-filter routing path is now landed and verified end-to-end as a *seam*:
 - `docs/PLAN-2026-05-18.md` remains the current iteration plan until superseded by a newer dated plan.
 - MyInfra Project Workspaces registers this project as `project_id=dspeech` and task prefix `[Dspeech]`.
 - Notion is a read model only; this repo + `docs/ai-kb/` + `.ai/project-state.md` is canonical for AI project memory.
+- Notion connector returned **NOT_FOUND** for active task `369dfa2b-7893-814c-be7e-e7cea26486a6` (no connector reachable from the run environment); repo run-notes + commit SHAs are the canonical handoff. See `docs/run-notes/2026-05-25-speaker-identifier-slice.md`.
 
 ## Current next priority
 

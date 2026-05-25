@@ -96,3 +96,60 @@ Result: **`** TEST SUCCEEDED **`** (full `DspeechTests` suite, incl. new
    project file.
 2. Build the explicit `absent → downloading → installed` acquisition flow + the
    network-deny integration test from `docs/eval/local-speaker-model-pack-validation.md` §1.
+
+---
+
+## Closeout (docs-writer, run `dspeech-builder-20260525T070045Z-aac9d282`)
+
+**Status:** DONE — merge-ready, no source changes outstanding. The speaker-identifier
+factory/gate landed on `origin/feat/local-pilot-voice-filter` and is verified green at the
+pushed tip. Shipping build is **inert/fail-open** (no registered backend → every path
+transcribes); a confident pilot is discarded only behind an installed pack **and** an
+available, dimension-matching backend — proven via a fake builder, no real model yet.
+
+**Artifacts (canonical handoff):**
+- Tester-unit verification: `docs/run-notes/2026-05-25-speaker-identifier-test.md` — full
+  `DspeechTests` `** TEST SUCCEEDED **`, 44 slice tests green, deterministic (re-run ×2),
+  fail-open contract table, no-network/privacy confirmation. Verdict: safe for supervisor.
+- FluidAudio upstream contract: `docs/research/2026-05-25-fluid-audio-speaker-identifier-contract.md`.
+- Eval contract: `docs/eval/local-speaker-model-pack-validation.md`.
+- Prior pre-ASR routing-gate slice: `docs/run-notes/2026-05-24-pre-asr-routing-gate.md`
+  (+ recovery artifacts under `.ai/runs/dspeech-supervisor-20260524T203001Z-b9f6965f-*.md`).
+
+**Commits (on `origin/feat/local-pilot-voice-filter`, draft PR
+[#2](https://github.com/daocism/dspeech/pull/2)):**
+- `fd10aa0 feat(voice-filter): gate concrete speaker identifier behind installed model pack` — the slice code.
+- `0fda374 docs(research): verify FluidAudio speaker-identifier upstream contract`.
+- `49acd3a docs(run-notes): record speaker-identifier factory/gate slice`.
+- `c81f97a docs(run-notes): tester-unit verification of speaker-identifier gate 49acd3a`.
+- `35a69ae docs(ai): reconcile pre-asr routing gate recovery`.
+
+**Blockers:** none for this slice. Forward-looking, before the FluidAudio backend can enable
+discard in production (must clear, not optional):
+- **W1 (MEDIUM):** `SpeechAudioBufferGate.route` is `@MainActor` — move classification
+  off-main with guaranteed FIFO `request.append` ordering before a real (suspending) classifier.
+- **W2 (MEDIUM):** discard is per-buffer — make it utterance/segment-aware so dropping pilot
+  buffers can't fragment following non-pilot recognition.
+- **T1 (LOW):** extract the `appendThroughGate` append-vs-skip branch into a pure helper
+  testable without AVFoundation; the engine-level seam is currently unit-untested.
+- **Host hygiene:** the canonical mac24 checkout `dspeech-ios` carries stale uncommitted WIP
+  (HEAD `e024f20`) that *removes* the buffer-gate seam. Verification ran against the pushed
+  tip in a throwaway worktree; the mac24 checkout must be reconciled to `origin` before any
+  future build runs against it directly.
+
+**What the supervisor should inspect:**
+1. `docs/run-notes/2026-05-25-speaker-identifier-test.md` — the fail-open contract table and
+   the single guarded discard path.
+2. `git show fd10aa0` — `LocalSpeakerIdentifierFactory.make` returns `Unavailable` for every
+   case except installed-pack + available, dimension-matching backend.
+3. `DspeechTests/VoiceFilterTests.swift::LocalSpeakerIdentifierFactoryTests` (+ the existing
+   `SpeechAudioBufferGateTests`) — the behavior pins guarding against silent ATC discard.
+4. Confirm the next ADR-0008/FluidAudio builder clears W1/W2/T1 and runs on a mac24 checkout
+   matching `origin` before enabling production discard.
+
+**Notion:** active task `369dfa2b-7893-814c-be7e-e7cea26486a6`
+(`https://www.notion.so/369dfa2b7893814cbe7ee7cea26486a6`): **Notion connector returned
+NOT_FOUND for the active task** (matches the CEO preflight; no Notion connector is reachable
+from this run environment), so the status update was **not applied**. Per `CLAUDE.md`, Notion
+is a read-model only — this does not gate code. The repo artifacts and commit SHAs above are
+the canonical handoff.
