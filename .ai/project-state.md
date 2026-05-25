@@ -23,6 +23,26 @@ replay/route validation kit and App Store readiness.
 
 ## Last successful run
 
+2026-05-25: **Voice-filter feature made functional end-to-end** on
+`feat/local-pilot-voice-filter` (commits `1d8ce83`..`1375e09`). Fixes a launch
+bug where Start was permanently disabled (route health read `.noInput` before any
+record category was set — `RouteHealthClassifier` now falls back to a usable
+available input and `LiveAudioSessionRouting` primes `.playAndRecord`); reflows
+the control bar so the "Dspeech" title no longer wraps; adds on-device voice
+dictation of the aircraft callsign (`CallsignDictationService` +
+`PhoneticCallsignParser`, ICAO/aviation digit mapping). Completes the deferred
+ADR 0007/0008 FluidAudio path: corrects the adapter to the real
+`extractSpeakerEmbedding`/offline `DiarizerModels.load` API (it never compiled
+against the resolved package), adds `SpeakerModelPackInstaller`
+(`DiarizerModels.downloadIfNeeded` → real `.absent→downloading→installed` with
+the ~13 MB pyannote+wespeaker_v2 pack, recursive model-dir locate), wires the
+previously hard-disabled download CTA, lets `VoiceFilterPipeline` hot-swap its
+identifier on install, and enrolls real pilot voiceprints via
+`VoiceEnrollmentRecorder`. Verified on iPhone 17 Pro / iOS 26.4: cold download
+installs and reaches the installed state; DspeechTests + Start/download UI tests
+green. Still open per ADR 0008: a dedicated network-deny integration test and
+replay-fixture eval lane before TestFlight.
+
 2026-05-24: Pre-ASR **routing gate** landed and independently verified on
 `feat/local-pilot-voice-filter`. Code commit `24dfbdf feat(voice-filter): gate
 apple speech buffers before asr` adds a `SpeechAudioBufferGate` seam
