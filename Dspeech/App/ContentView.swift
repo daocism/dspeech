@@ -197,29 +197,36 @@ struct ContentView: View {
     }
 
     private func controlBar(isLandscape: Bool) -> some View {
-        HStack(spacing: 14) {
-            Text("Dspeech")
-                .font(.system(size: isLandscape ? 22 : 28, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-                .accessibilityIdentifier("app-title")
+        VStack(spacing: isLandscape ? 6 : 10) {
+            HStack(spacing: 10) {
+                Text("Dspeech")
+                    .font(.system(size: isLandscape ? 22 : 28, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .accessibilityIdentifier("app-title")
 
-            PrivacyBadge(mode: privacy.mode, isLandscape: isLandscape)
+                Spacer(minLength: 8)
 
-            RouteHealthChip(health: coordinator.routeMonitor.health, isLandscape: isLandscape)
-
-            Spacer()
-
-            settingsButton(isLandscape: isLandscape)
-
-            Toggle(isOn: $showTranslation) {
-                Text("Перевод")
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(.white.opacity(0.85))
+                settingsButton(isLandscape: isLandscape)
             }
-            .toggleStyle(.switch)
-            .tint(.cyan)
-            .fixedSize()
-            .accessibilityIdentifier("translation-toggle")
+
+            HStack(spacing: 8) {
+                PrivacyBadge(mode: privacy.mode, isLandscape: isLandscape)
+                RouteHealthChip(health: coordinator.routeMonitor.health, isLandscape: isLandscape)
+
+                Spacer(minLength: 8)
+
+                Toggle(isOn: $showTranslation) {
+                    Text("Перевод")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.white.opacity(0.85))
+                }
+                .toggleStyle(.switch)
+                .tint(.cyan)
+                .fixedSize()
+                .accessibilityIdentifier("translation-toggle")
+            }
         }
     }
 
@@ -385,6 +392,7 @@ struct VoiceFilterSettingsSection: View {
     @State private var enabled: Bool
     @State private var callsignDraft: String
     @State private var modelPackState: ModelPackState
+    @State private var dictation = CallsignDictationService()
 
     init(pipeline: VoiceFilterPipeline) {
         self.pipeline = pipeline
@@ -419,18 +427,24 @@ struct VoiceFilterSettingsSection: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Позывной воздушного судна")
                     .font(.body.weight(.medium))
-                TextField("N123AB / RA-89077 / SBI247", text: $callsignDraft)
-                    .textInputAutocapitalization(.characters)
-                    .autocorrectionDisabled(true)
-                    .accessibilityIdentifier("voicefilter-callsign-field")
-                Text(callsignDraft.isEmpty
-                     ? "Без позывного фильтр пропускает все сегменты не-пилотов."
-                     : "Сегменты без совпадения по позывному будут скрываться, пока окно продолжения активно.")
+                HStack(spacing: 8) {
+                    TextField("N123AB / RA-89077 / SBI247", text: $callsignDraft)
+                        .textInputAutocapitalization(.characters)
+                        .autocorrectionDisabled(true)
+                        .accessibilityIdentifier("voicefilter-callsign-field")
+                    dictationButton
+                }
+                Text(dictationHint)
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(dictation.unavailableReason == nil ? Color.secondary : Color.orange)
             }
             .onChange(of: callsignDraft) { _, newValue in
                 pipeline.setCallSign(newValue.isEmpty ? nil : newValue)
+            }
+            .onChange(of: dictation.liveTranscript) { _, transcript in
+                guard dictation.isListening else { return }
+                let parsed = PhoneticCallsignParser.parse(transcript)
+                if !parsed.isEmpty { callsignDraft = parsed }
             }
 
             modelPackContent
@@ -439,6 +453,32 @@ struct VoiceFilterSettingsSection: View {
         } footer: {
             Text("Распознавание выполняется только на устройстве. Аудио и образцы голоса не покидают iPhone. Подробности — ADR 0007 и ADR 0008.")
         }
+    }
+
+    private var dictationButton: some View {
+        Button {
+            Task { await dictation.toggle() }
+        } label: {
+            Image(systemName: dictation.isListening ? "stop.circle.fill" : "mic.circle.fill")
+                .font(.system(size: 26))
+                .foregroundStyle(dictation.isListening ? Color.red : Color.cyan)
+                .symbolEffect(.pulse, isActive: dictation.isListening)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("voicefilter-callsign-dictate")
+        .accessibilityLabel(dictation.isListening ? "Остановить голосовой ввод" : "Задать позывной голосом")
+    }
+
+    private var dictationHint: String {
+        if let reason = dictation.unavailableReason {
+            return reason
+        }
+        if dictation.isListening {
+            return "Слушаю — продиктуйте позывной по буквам (например: «november one two three alpha bravo»)."
+        }
+        return callsignDraft.isEmpty
+            ? "Без позывного фильтр пропускает все сегменты не-пилотов. Нажмите микрофон, чтобы задать голосом."
+            : "Сегменты без совпадения по позывному будут скрываться, пока окно продолжения активно."
     }
 
     @ViewBuilder
