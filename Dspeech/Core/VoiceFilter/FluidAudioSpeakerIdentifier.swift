@@ -55,14 +55,14 @@ actor FluidAudioDiarizerHandle {
 
     func extractEmbedding(from samples: [Float]) async throws -> [Float] {
         let manager = try await loadedDiarizer()
-        return try manager.extractEmbedding(samples)
+        return try manager.extractSpeakerEmbedding(from: samples)
     }
 
     private func loadedDiarizer() async throws -> DiarizerManager {
         if let diarizer {
             return diarizer
         }
-        let models = try await DiarizerModels.load(
+        let models = try DiarizerModels.load(
             localSegmentationModel: segmentationModelURL,
             localEmbeddingModel: embeddingModelURL
         )
