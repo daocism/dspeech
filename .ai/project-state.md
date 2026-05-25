@@ -23,6 +23,19 @@ replay/route validation kit and App Store readiness.
 
 ## Last successful run
 
+2026-05-25 (workflow audit, run `dspeech-supervisor-20260525T203100Z-a08f1596`):
+**Builder run `dspeech-builder-20260525T190042Z-c2188fe3`'s `Blocked` finalizer is a
+workflow false-negative, not a product/test failure.** `qa-manual` confirmed a pristine
+canonical checkout (clean tree, on-branch, 0/0 divergence), then hit a transient Claude
+API `500 Internal server error` before writing its QA artifact — so it exited `rc=1` and
+the finalizer flagged `Blocked`. The slice it covered (offline FluidAudio speaker
+identifier behind the installed model-pack gate) is landed at `2d2da3e`, independently
+verified green by tester-unit (full `DspeechTests`, 184/184, iPhone 17 Pro / iOS 26.4),
+and pushed at `89495cc`. Branch is clean, 0/0 divergence from origin. Notion `NOT_FOUND`
+for task `369dfa2b…26486a6` is a read-model/connector reachability issue, not lost state
+(repo is canonical). Doc-only; no code change warranted. Evidence:
+`.ai/runs/dspeech-supervisor-20260525T203100Z-a08f1596-workflow-audit.md`.
+
 2026-05-25 (reconciliation, run `dspeech-builder-20260525T190042Z-c2188fe3`):
 **Branch confirmed coherent around the landed offline FluidAudio speaker-identifier
 slice** — no surgery needed. The engineer-backend worktree started at `a8a643d`, a
