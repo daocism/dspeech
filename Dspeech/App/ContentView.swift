@@ -17,11 +17,13 @@ struct ContentView: View {
             filter = voiceFilter
         } else {
             let modelPackStorage = UserDefaultsModelPackStateStorage()
+            let backendBuilder = FluidAudioBackendBuilder()
             filter = VoiceFilterPipeline(
                 identifier: LocalSpeakerIdentifierFactory.make(
                     state: modelPackStorage.loadState(),
-                    backendBuilder: FluidAudioBackendBuilder()
+                    backendBuilder: backendBuilder
                 ),
+                backendBuilder: backendBuilder,
                 modelPackStorage: modelPackStorage
             )
         }
@@ -393,6 +395,11 @@ struct VoiceFilterSettingsSection: View {
     @State private var callsignDraft: String
     @State private var modelPackState: ModelPackState
     @State private var dictation = CallsignDictationService()
+    @State private var downloadTask: Task<Void, Never>?
+    @State private var recorder = VoiceEnrollmentRecorder()
+    @State private var recordingSlot: PilotVoiceProfile.Slot?
+    @State private var enrollMessage: String?
+    private let installer = SpeakerModelPackInstaller()
 
     init(pipeline: VoiceFilterPipeline) {
         self.pipeline = pipeline
@@ -502,6 +509,86 @@ struct VoiceFilterSettingsSection: View {
         modelPackState = state
     }
 
+    private func startDownload() {
+        downloadTask?.cancel()
+        transition(to: .acquiring(ModelPackAcquisition(phase: .downloading, fractionComplete: 0)))
+        downloadTask = Task {
+            do {
+                let pack = try await installer.install { acquisition in
+                    Task { @MainActor in
+                        if case .acquiring = modelPackState {
+                            modelPackState = .acquiring(acquisition)
+                        }
+                    }
+                }
+                if Task.isCancelled { return }
+                transition(to: .installed(pack))
+            } catch is CancellationError {
+                return
+            } catch {
+                if Task.isCancelled { return }
+                transition(to: .failed(ModelPackFailure(
+                    kind: .network,
+                    userSafeReason: "Не удалось скачать пакет модели. Проверьте подключение к сети и попробуйте снова.",
+                    isRetryable: true
+                )))
+            }
+            downloadTask = nil
+        }
+    }
+
+    private func cancelDownload() {
+        downloadTask?.cancel()
+        downloadTask = nil
+        transition(to: .absent)
+    }
+
+    private func enrollSubtitle(for slot: PilotVoiceProfile.Slot) -> String {
+        if recordingSlot == slot {
+            return "Идёт запись — говорите несколько секунд, затем «Остановить»."
+        }
+        if !identifierAvailable {
+            return "Запись станет доступна, когда распознаватель будет подключён."
+        }
+        if pipeline.enrolledSlots.contains(slot) {
+            return "Образец голоса записан. Запишите заново, чтобы обновить."
+        }
+        return "Запишите образец голоса для распознавания."
+    }
+
+    private func toggleEnrollment(slot: PilotVoiceProfile.Slot) async {
+        if recordingSlot == slot {
+            let result = recorder.stop()
+            recordingSlot = nil
+            guard let result else {
+                enrollMessage = "Запись не получилась — попробуйте снова."
+                return
+            }
+            do {
+                _ = try await pipeline.enrollPilot(
+                    slot: slot,
+                    label: slot == .primary ? "Pilot 1" : "Pilot 2",
+                    samples: result.samples,
+                    sampleRate: result.sampleRate
+                )
+                enrollMessage = "Голос сохранён для \(slot == .primary ? "Pilot 1" : "Pilot 2")."
+            } catch LocalSpeakerIdentifierError.insufficientSpeech {
+                enrollMessage = "Слишком тихо или коротко — запишите образец чётче."
+            } catch {
+                enrollMessage = "Не удалось сохранить образец голоса. Попробуйте снова."
+            }
+            return
+        }
+
+        enrollMessage = nil
+        recordingSlot = slot
+        await recorder.start()
+        if !recorder.isRecording {
+            recordingSlot = nil
+            enrollMessage = recorder.unavailableReason ?? "Не удалось начать запись."
+        }
+    }
+
     private var absentContent: some View {
         VStack(alignment: .leading, spacing: 8) {
             Label("Модель не установлена", systemImage: "arrow.down.circle")
@@ -510,15 +597,17 @@ struct VoiceFilterSettingsSection: View {
             Text("Голосовой фильтр пилотов работает только после установки локального пакета модели. Загрузка — разовая, явная, по вашему запросу; аудио при этом не покидает устройство.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
-            Button("Скачать пакет голосового фильтра (≈ размер уточняется)") {}
-                .buttonStyle(.bordered)
-                .disabled(true)
-                .accessibilityIdentifier("voicefilter-modelpack-download-cta")
-            Text("Источник модели и точный размер появятся, когда канал загрузки будет подключён. Пока загрузчик недоступен в этой сборке.")
+            Button("Скачать пакет голосового фильтра (≈ 15 МБ)") {
+                startDownload()
+            }
+            .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier("voicefilter-modelpack-download-cta")
+            Text("Модель FluidAudio (\(SpeakerModelPackInstaller.source)) загружается один раз по этому запросу. С устройства уходит только запрос на скачивание модели — аудио, расшифровки и образцы голоса не передаются.")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("voicefilter-modelpack-absent")
     }
 
@@ -534,12 +623,13 @@ struct VoiceFilterSettingsSection: View {
                     .foregroundStyle(.secondary)
             }
             Button("Отменить") {
-                transition(to: .absent)
+                cancelDownload()
             }
             .buttonStyle(.bordered)
             .accessibilityIdentifier("voicefilter-modelpack-cancel")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("voicefilter-modelpack-acquiring")
     }
 
@@ -569,22 +659,30 @@ struct VoiceFilterSettingsSection: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(slot == .primary ? "Pilot 1 (Captain)" : "Pilot 2 (First Officer)")
                             .font(.body.weight(.medium))
-                        Text(identifierAvailable
-                             ? "Запишите образец голоса для распознавания."
-                             : "Запись станет доступна, когда распознаватель будет подключён.")
+                        Text(enrollSubtitle(for: slot))
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Button("Записать голос") {}
-                        .disabled(!identifierAvailable)
-                        .buttonStyle(.bordered)
-                        .accessibilityIdentifier(
-                            slot == .primary
-                            ? "voicefilter-enroll-pilot1"
-                            : "voicefilter-enroll-pilot2"
-                        )
+                    Button(recordingSlot == slot ? "Остановить" : "Записать голос") {
+                        Task { await toggleEnrollment(slot: slot) }
+                    }
+                    .disabled(!identifierAvailable || (recordingSlot != nil && recordingSlot != slot))
+                    .buttonStyle(.bordered)
+                    .tint(recordingSlot == slot ? .red : nil)
+                    .accessibilityIdentifier(
+                        slot == .primary
+                        ? "voicefilter-enroll-pilot1"
+                        : "voicefilter-enroll-pilot2"
+                    )
                 }
+            }
+
+            if let enrollMessage {
+                Text(enrollMessage)
+                    .font(.footnote)
+                    .foregroundStyle(.cyan)
+                    .accessibilityIdentifier("voicefilter-enroll-message")
             }
 
             Button("Удалить пакет") {
@@ -595,6 +693,7 @@ struct VoiceFilterSettingsSection: View {
             .accessibilityIdentifier("voicefilter-modelpack-delete")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("voicefilter-modelpack-installed")
     }
 
@@ -619,6 +718,7 @@ struct VoiceFilterSettingsSection: View {
             .accessibilityIdentifier("voicefilter-modelpack-continue-without")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("voicefilter-modelpack-failed")
     }
 
@@ -643,6 +743,7 @@ struct VoiceFilterSettingsSection: View {
             .accessibilityIdentifier("voicefilter-modelpack-delete")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("voicefilter-modelpack-disabled")
     }
 

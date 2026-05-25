@@ -82,6 +82,51 @@ final class DspeechUITests: XCTestCase {
     }
 
     @MainActor
+    func testVoiceFilterModelPackDownloadCTAIsEnabledAndStartsAcquisition() throws {
+        let app = XCUIApplication()
+        app.launchArguments += [
+            "-dspeech.privacy.mode.v1", "localOnly",
+            "-dspeech.voicefilter.modelpack.v1", "absent"
+        ]
+        app.launch()
+
+        app.buttons["settings-button"].tap()
+
+        let enabledToggle = app.switches["voicefilter-enabled-toggle"]
+        XCTAssertTrue(enabledToggle.waitForExistence(timeout: 6),
+                      "voice-filter section must render")
+
+        let downloadCTA = app.buttons["voicefilter-modelpack-download-cta"]
+        var attempts = 0
+        while !downloadCTA.exists && attempts < 8 {
+            app.swipeUp()
+            attempts += 1
+        }
+        XCTAssertTrue(downloadCTA.waitForExistence(timeout: 4),
+                      "download CTA must be present in the voice-filter section")
+        XCTAssertTrue(downloadCTA.isEnabled,
+                      "download CTA must be enabled (no longer a disabled placeholder)")
+
+        downloadCTA.tap()
+
+        // why: with model files already cached, install can complete almost
+        // instantly, so accept either the acquiring state or the installed result
+        // as proof the download path is wired and ran.
+        let cancel = app.buttons["voicefilter-modelpack-cancel"]
+        let progress = app.progressIndicators["voicefilter-modelpack-progress"]
+        let installed = app.staticTexts["Модель установлена и проверена"]
+        let movedOff = NSPredicate(format: "exists == false")
+        expectation(for: movedOff, evaluatedWith: downloadCTA, handler: nil)
+        waitForExpectations(timeout: 8)
+        XCTAssertTrue(cancel.exists || progress.exists || installed.exists,
+                      "tapping download must transition to acquiring or installed")
+
+        if cancel.exists {
+            cancel.tap()
+        }
+    }
+
+    @MainActor
     private func launchAppWithCleanPrivacyDefaults() -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += [

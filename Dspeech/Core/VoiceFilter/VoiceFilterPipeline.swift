@@ -15,7 +15,8 @@ struct VoiceFilterDecision: Equatable, Sendable {
 
 @MainActor
 final class VoiceFilterPipeline {
-    private let identifier: any LocalSpeakerIdentifier
+    private var identifier: any LocalSpeakerIdentifier
+    private let backendBuilder: (any LocalSpeakerBackendBuilder)?
     private let storage: VoiceFilterStorage
     private let modelPackStorage: ModelPackStateStorage
     private let matchConfig: SpeakerMatchConfig
@@ -28,11 +29,13 @@ final class VoiceFilterPipeline {
 
     init(
         identifier: any LocalSpeakerIdentifier,
+        backendBuilder: (any LocalSpeakerBackendBuilder)? = nil,
         storage: VoiceFilterStorage = UserDefaultsVoiceFilterStorage(),
         modelPackStorage: ModelPackStateStorage = UserDefaultsModelPackStateStorage(),
         matchConfig: SpeakerMatchConfig = .default
     ) {
         self.identifier = identifier
+        self.backendBuilder = backendBuilder
         self.storage = storage
         self.modelPackStorage = modelPackStorage
         self.matchConfig = matchConfig
@@ -60,6 +63,15 @@ final class VoiceFilterPipeline {
     func setModelPackState(_ state: ModelPackState) {
         modelPackState = state
         modelPackStorage.saveState(state)
+        // why: identifier is built from the pack state at init; when the state
+        // changes at runtime (install/delete/enable) rebuild it via the backend
+        // builder so enrollment becomes usable without an app relaunch.
+        if let backendBuilder {
+            identifier = LocalSpeakerIdentifierFactory.make(
+                state: state,
+                backendBuilder: backendBuilder
+            )
+        }
     }
 
     private func requireInstalledModelPack() throws {
