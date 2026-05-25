@@ -23,6 +23,25 @@ replay/route validation kit and App Store readiness.
 
 ## Last successful run
 
+2026-05-25 (reconciliation, run `dspeech-builder-20260525T190042Z-c2188fe3`):
+**Branch confirmed coherent around the landed offline FluidAudio speaker-identifier
+slice** — no surgery needed. The engineer-backend worktree started at `a8a643d`, a
+strict ancestor of `origin/feat/local-pilot-voice-filter` (`4fe4a44`) with zero
+local commits ahead and a clean tree; origin is a clean fast-forward superset
+(no `git reset --hard`, no dirty/staged state to recover — the two researcher input
+artifacts named in the brief did not exist). Source at `4fe4a44` verified to satisfy
+the accepted slice contract: default build fails open to
+`UnavailableLocalSpeakerIdentifier`; `FluidAudioBackendBuilder` fails closed on
+missing model path / missing `pyannote_segmentation.mlmodelc` / `wespeaker_v2.mlmodelc`
+/ dimension mismatch / load error; `FluidAudioSpeakerIdentifier` uses the real offline
+`DiarizerModels.load` + `extractSpeakerEmbedding` API; `VoiceFilterPipeline`
+classifies before ASR and discards only confident `.pilot` speech; flight-safety
+disclaimer intact (ADR 0008). Doc-only commit: corrected the stale
+`UnavailableLocalSpeakerIdentifier`-is-the-only-conformer claim in
+`docs/ai-kb/current-context.md`. Evidence + handoff:
+`docs/run-notes/2026-05-25-fluid-audio-reconciliation.md`;
+recovery decision: `.ai/runs/dspeech-builder-20260525T190042Z-c2188fe3-canonical-recovery.md`.
+
 2026-05-25: **Voice-filter feature made functional end-to-end** on
 `feat/local-pilot-voice-filter` (commits `1d8ce83`..`1375e09`). Fixes a launch
 bug where Start was permanently disabled (route health read `.noInput` before any

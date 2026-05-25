@@ -7,7 +7,7 @@
 
 Dspeech is a native iOS 26+ SwiftUI app for receive-only aviation cockpit / ATC transcription, with optional translation later. The active product direction is local-first and privacy-first: no audio, transcript, or metadata leaves the device while cloud privacy is disabled. Current implementation already has the Apple Speech live transcription MVP wired in the app; future work should build on the existing service/protocol boundaries in `Dspeech/Core/ASR/`, `Dspeech/Core/Audio/`, and `Dspeech/Core/Settings/`.
 
-The voice-filter routing path is now landed and verified end-to-end as a *seam*: route-health capture UX, the model-pack execution gate (ADR 0008 installed-only contract), and the **pre-ASR `SpeechAudioBufferGate`** are all wired on `feat/local-pilot-voice-filter`. The pre-ASR gate routes every captured buffer through `VoiceFilterPipeline` before Apple Speech ASR and discards only confidently-classified pilot speech. It is **inert / fail-open in a default build** because the only `LocalSpeakerIdentifier` conformer is `UnavailableLocalSpeakerIdentifier` (throws `.modelUnavailable`): basic routing *is live*, but it never discards until a real on-device speaker model ships.
+The voice-filter routing path is now landed and verified end-to-end as a *seam*: route-health capture UX, the model-pack execution gate (ADR 0008 installed-only contract), the **pre-ASR `SpeechAudioBufferGate`**, and a real **offline FluidAudio speaker identifier** (`FluidAudioSpeakerIdentifier` + `FluidAudioBackendBuilder`, behind the installed model-pack gate) are all wired on `feat/local-pilot-voice-filter`. The pre-ASR gate routes every captured buffer through `VoiceFilterPipeline` before Apple Speech ASR and discards only confidently-classified pilot speech. A **default build still fails open**: `LocalSpeakerIdentifierFactory.make` returns `UnavailableLocalSpeakerIdentifier` unless an `InstalledModelPack` *and* an injected `LocalSpeakerBackendBuilder` are both present, and `FluidAudioBackendBuilder` itself fails closed to `UnavailableLocalSpeakerIdentifier` on a missing model path, missing `pyannote_segmentation.mlmodelc`/`wespeaker_v2.mlmodelc` files, an embedding-dimension mismatch, or any load error. Discard of pilot speech only becomes live once a user has installed and verified a local pack on-device — and this is explicitly **not a flight-safety guarantee** (ADR 0008).
 
 ## Binding decisions
 
@@ -24,16 +24,17 @@ The voice-filter routing scaffold (route-health UX → model-pack execution gate
 pre-ASR buffer gate) is complete and verified. The next highest-leverage work, in
 order:
 
-1. **Real local/offline speaker identifier + explicit model-pack acquisition UX** —
-   replace `UnavailableLocalSpeakerIdentifier` with an on-device embedding-backed
-   `LocalSpeakerIdentifier` (FluidAudio is the named Phase-2 candidate), gated
-   behind a model-pack the user downloads/imports/verifies on-device with **zero
-   audio egress** and an explicit acquisition UX (replacing the disabled enrollment
-   buttons). Only when a verified pack is present does the pre-ASR gate stop
-   fail-opening and actually discard confident pilot speech. The next builder MUST
-   first move classification off `@MainActor` with FIFO append ordering (reviewer
-   W1) and make discard utterance-aware, not raw-buffer-level (reviewer W2), before
-   enabling discard in production.
+1. **Harden the landed FluidAudio speaker identifier for production discard** — the
+   on-device embedding-backed `LocalSpeakerIdentifier` (`FluidAudioSpeakerIdentifier`
+   + `FluidAudioBackendBuilder`) has landed behind the installed model-pack gate with
+   **zero audio egress** and real `extractSpeakerEmbedding`/offline `DiarizerModels.load`
+   wiring; a default build still fails open to `UnavailableLocalSpeakerIdentifier`.
+   Before enabling discard in production the next builder MUST first move classification
+   off `@MainActor` with FIFO append ordering (reviewer W1) and make discard
+   utterance-aware, not raw-buffer-level (reviewer W2), and add the ADR 0008
+   network-deny integration test + replay-fixture eval lane. The model-pack
+   acquisition UX still needs hardening past the current download CTA / enrollment
+   surface.
 2. **Replay / source-audio validation kit** — a fixture harness that feeds recorded
    ATC source audio through the ASR + filter pipeline so transcription/filter
    quality is regression-testable without aircraft hardware.
