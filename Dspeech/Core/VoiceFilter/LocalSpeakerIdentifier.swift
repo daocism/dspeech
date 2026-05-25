@@ -57,3 +57,46 @@ struct UnavailableLocalSpeakerIdentifier: LocalSpeakerIdentifier {
         throw LocalSpeakerIdentifierError.modelUnavailable(reason: reason)
     }
 }
+
+protocol LocalSpeakerBackendBuilder: Sendable {
+    func makeIdentifier(for pack: InstalledModelPack) throws -> any LocalSpeakerIdentifier
+}
+
+enum LocalSpeakerIdentifierFactory {
+    static func make(
+        state: ModelPackState,
+        backendBuilder: (any LocalSpeakerBackendBuilder)? = nil
+    ) -> any LocalSpeakerIdentifier {
+        guard case let .installed(pack) = state else {
+            return UnavailableLocalSpeakerIdentifier(reason: state.capabilityReason)
+        }
+        guard let backendBuilder else {
+            return UnavailableLocalSpeakerIdentifier(
+                reason: state.capabilityReason,
+                embeddingDimension: pack.embeddingDimension
+            )
+        }
+        let identifier: any LocalSpeakerIdentifier
+        do {
+            identifier = try backendBuilder.makeIdentifier(for: pack)
+        } catch {
+            return UnavailableLocalSpeakerIdentifier(
+                reason: "Не удалось инициализировать локальный распознаватель из установленного пакета.",
+                embeddingDimension: pack.embeddingDimension
+            )
+        }
+        guard case .available = identifier.availability else {
+            return UnavailableLocalSpeakerIdentifier(
+                reason: "Локальный распознаватель сообщил о недоступности после установки пакета.",
+                embeddingDimension: pack.embeddingDimension
+            )
+        }
+        guard identifier.embeddingDimension == pack.embeddingDimension else {
+            return UnavailableLocalSpeakerIdentifier(
+                reason: "Размерность эмбеддингов распознавателя (\(identifier.embeddingDimension)) не совпадает с пакетом (\(pack.embeddingDimension)).",
+                embeddingDimension: pack.embeddingDimension
+            )
+        }
+        return identifier
+    }
+}

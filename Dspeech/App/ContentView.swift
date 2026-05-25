@@ -12,7 +12,16 @@ struct ContentView: View {
         voiceFilter: VoiceFilterPipeline? = nil,
         routing: AudioSessionRouting = LiveAudioSessionRouting()
     ) {
-        let filter = voiceFilter ?? VoiceFilterPipeline(identifier: UnavailableLocalSpeakerIdentifier())
+        let filter: VoiceFilterPipeline
+        if let voiceFilter {
+            filter = voiceFilter
+        } else {
+            let modelPackStorage = UserDefaultsModelPackStateStorage()
+            filter = VoiceFilterPipeline(
+                identifier: LocalSpeakerIdentifierFactory.make(state: modelPackStorage.loadState()),
+                modelPackStorage: modelPackStorage
+            )
+        }
         let resolvedEngine = engine ?? AppleSpeechLiveTranscriptionEngine(
             bufferGate: VoiceFilterSpeechAudioBufferGate(pipeline: filter)
         )

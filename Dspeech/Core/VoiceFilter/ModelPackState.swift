@@ -32,6 +32,27 @@ struct InstalledModelPack: Equatable, Sendable, Codable {
     let source: String
     let sizeBytes: Int64
     let installedAt: Date
+    let localModelPath: String?
+
+    init(
+        identifier: String,
+        version: String,
+        embeddingDimension: Int,
+        checksumSHA256: String,
+        source: String,
+        sizeBytes: Int64,
+        installedAt: Date,
+        localModelPath: String? = nil
+    ) {
+        self.identifier = identifier
+        self.version = version
+        self.embeddingDimension = embeddingDimension
+        self.checksumSHA256 = checksumSHA256
+        self.source = source
+        self.sizeBytes = sizeBytes
+        self.installedAt = installedAt
+        self.localModelPath = localModelPath
+    }
 }
 
 struct ModelPackFailure: Equatable, Sendable, Codable {

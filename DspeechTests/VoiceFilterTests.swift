@@ -655,6 +655,222 @@ struct ModelPackStateStorageTests {
 }
 
 @MainActor
+struct LocalSpeakerIdentifierFactoryTests {
+    static func pack(dimension: Int = 256, localModelPath: String? = nil) -> InstalledModelPack {
+        InstalledModelPack(
+            identifier: "fluidaudio-speaker-\(dimension)",
+            version: "1.0.0",
+            embeddingDimension: dimension,
+            checksumSHA256: String(repeating: "a", count: 64),
+            source: "https://mirror.invalid/voice-filter",
+            sizeBytes: 12_345_678,
+            installedAt: Date(timeIntervalSince1970: 748_137_600),
+            localModelPath: localModelPath
+        )
+    }
+
+    struct StubIdentifier: LocalSpeakerIdentifier {
+        let vector: VoicePrintVector
+        var availability: LocalSpeakerIdentifierAvailability = .available
+        var embeddingDimension: Int { vector.dimension }
+
+        func enroll(samples: [Float], sampleRate: Double) async throws -> VoicePrintVector { vector }
+        func classify(
+            samples: [Float],
+            sampleRate: Double,
+            profiles: [PilotVoiceProfile]
+        ) async throws -> SpeakerMatchDecision {
+            SpeakerMatcher.match(candidate: vector, profiles: profiles)
+        }
+    }
+
+    struct StubBackendBuilder: LocalSpeakerBackendBuilder {
+        enum Outcome: Sendable {
+            case identifier(any LocalSpeakerIdentifier)
+            case failsToLoad
+        }
+
+        let outcome: Outcome
+
+        func makeIdentifier(for pack: InstalledModelPack) throws -> any LocalSpeakerIdentifier {
+            switch outcome {
+            case .identifier(let identifier):
+                return identifier
+            case .failsToLoad:
+                throw LocalSpeakerIdentifierError.modelUnavailable(reason: "stub-load-failed")
+            }
+        }
+    }
+
+    private func isUnavailable(_ identifier: any LocalSpeakerIdentifier) -> Bool {
+        if case .unavailable = identifier.availability { return true }
+        return false
+    }
+
+    @Test func absentStateProducesUnavailable() {
+        #expect(isUnavailable(LocalSpeakerIdentifierFactory.make(state: .absent)))
+    }
+
+    @Test func acquiringStateProducesUnavailable() {
+        let identifier = LocalSpeakerIdentifierFactory.make(
+            state: .acquiring(ModelPackAcquisition(phase: .downloading, fractionComplete: 0.3))
+        )
+        #expect(isUnavailable(identifier))
+    }
+
+    @Test func failedStateProducesUnavailable() {
+        let identifier = LocalSpeakerIdentifierFactory.make(
+            state: .failed(ModelPackFailure(kind: .network, userSafeReason: "сеть недоступна", isRetryable: true))
+        )
+        #expect(isUnavailable(identifier))
+    }
+
+    @Test func disabledStateProducesUnavailable() {
+        #expect(isUnavailable(LocalSpeakerIdentifierFactory.make(state: .disabled(Self.pack()))))
+    }
+
+    @Test func installedWithoutBackendStaysUnavailable() {
+        let identifier = LocalSpeakerIdentifierFactory.make(
+            state: .installed(Self.pack()),
+            backendBuilder: nil
+        )
+        #expect(isUnavailable(identifier))
+        #expect(identifier.embeddingDimension == 256)
+    }
+
+    @Test func installedWithoutBackendKeepsPipelineNotReady() {
+        let pack = Self.pack()
+        let identifier = LocalSpeakerIdentifierFactory.make(state: .installed(pack), backendBuilder: nil)
+        let pipeline = VoiceFilterPipeline(
+            identifier: identifier,
+            storage: VoiceFilterPipelineTests.InMemoryStorage(),
+            modelPackStorage: VoiceFilterPipelineTests.InMemoryModelPackStorage(.installed(pack))
+        )
+        if case .ready = pipeline.capability {
+            Issue.record("installed pack without a real backend must not report ready")
+        }
+    }
+
+    @Test func installedWithThrowingBackendFailsOpenToUnavailable() {
+        let identifier = LocalSpeakerIdentifierFactory.make(
+            state: .installed(Self.pack()),
+            backendBuilder: StubBackendBuilder(outcome: .failsToLoad)
+        )
+        #expect(isUnavailable(identifier))
+    }
+
+    @Test func installedWithUnavailableBackendStaysUnavailable() {
+        let stub = StubIdentifier(
+            vector: VoicePrintVector(values: Array(repeating: 0.1, count: 256), quality: 0.9),
+            availability: .unavailable(reason: "backend-down")
+        )
+        let identifier = LocalSpeakerIdentifierFactory.make(
+            state: .installed(Self.pack(dimension: 256)),
+            backendBuilder: StubBackendBuilder(outcome: .identifier(stub))
+        )
+        #expect(isUnavailable(identifier))
+    }
+
+    @Test func installedWithDimensionMismatchStaysUnavailable() {
+        let stub = StubIdentifier(vector: VoicePrintVector(values: [1, 0, 0, 0], quality: 0.9))
+        let identifier = LocalSpeakerIdentifierFactory.make(
+            state: .installed(Self.pack(dimension: 256)),
+            backendBuilder: StubBackendBuilder(outcome: .identifier(stub))
+        )
+        #expect(isUnavailable(identifier))
+    }
+
+    @Test func installedWithMatchingBackendBecomesAvailable() {
+        let stub = StubIdentifier(vector: VoicePrintVector(values: [1, 0, 0, 0], quality: 0.92))
+        let identifier = LocalSpeakerIdentifierFactory.make(
+            state: .installed(Self.pack(dimension: 4)),
+            backendBuilder: StubBackendBuilder(outcome: .identifier(stub))
+        )
+        #expect(!isUnavailable(identifier))
+        #expect(identifier.embeddingDimension == 4)
+    }
+
+    @Test func factoryBackedPipelineDiscardsConfidentPilotBeforeASR() async throws {
+        let stub = StubIdentifier(vector: VoicePrintVector(values: [1, 0, 0, 0], quality: 0.92))
+        let pack = Self.pack(dimension: 4, localModelPath: "/var/mobile/Containers/Data/voice-filter/speaker-4.mlmodelc")
+        let identifier = LocalSpeakerIdentifierFactory.make(
+            state: .installed(pack),
+            backendBuilder: StubBackendBuilder(outcome: .identifier(stub))
+        )
+        let store = VoiceFilterPipelineTests.InMemoryStorage()
+        store.enabled = true
+        store.profiles = [PilotVoiceProfile(
+            slot: .primary,
+            label: "Captain",
+            voicePrint: VoicePrintVector(values: [1, 0, 0, 0], quality: 0.9)
+        )]
+        let pipeline = VoiceFilterPipeline(
+            identifier: identifier,
+            storage: store,
+            modelPackStorage: VoiceFilterPipelineTests.InMemoryModelPackStorage(.installed(pack))
+        )
+        #expect(pipeline.capability == .ready)
+        let decision = try await pipeline.classify(samples: [0.1, 0.2, 0.1, 0.2], sampleRate: 16_000)
+        guard case .pilot = decision else {
+            Issue.record("expected pilot decision through factory-backed pipeline, got \(decision)")
+            return
+        }
+        #expect(pipeline.routeBeforeTranscription(speaker: decision) == .discard(reason: .pilotVoice))
+    }
+
+    @Test func factoryBackedPipelineKeepsMixedSpeechTranscribed() async throws {
+        let stub = StubIdentifier(vector: VoicePrintVector(values: [0.71, 0.71, 0, 0], quality: 0.92))
+        let pack = Self.pack(dimension: 4)
+        let identifier = LocalSpeakerIdentifierFactory.make(
+            state: .installed(pack),
+            backendBuilder: StubBackendBuilder(outcome: .identifier(stub))
+        )
+        let store = VoiceFilterPipelineTests.InMemoryStorage()
+        store.enabled = true
+        store.profiles = [
+            PilotVoiceProfile(slot: .primary, label: "Captain", voicePrint: VoicePrintVector(values: [1, 0, 0, 0], quality: 0.9)),
+            PilotVoiceProfile(slot: .secondary, label: "FO", voicePrint: VoicePrintVector(values: [0, 1, 0, 0], quality: 0.9))
+        ]
+        let pipeline = VoiceFilterPipeline(
+            identifier: identifier,
+            storage: store,
+            modelPackStorage: VoiceFilterPipelineTests.InMemoryModelPackStorage(.installed(pack))
+        )
+        let decision = try await pipeline.classify(samples: [0.1, 0.2, 0.1, 0.2], sampleRate: 16_000)
+        guard case .mixed = decision else {
+            Issue.record("expected mixed decision, got \(decision)")
+            return
+        }
+        #expect(pipeline.routeBeforeTranscription(speaker: decision) == .transcribe(reason: .mixedOrLowConfidence))
+    }
+
+    @Test func manualModelPathRoundTripsThroughStorage() {
+        let suiteName = "dspeech.tests.modelpack.path.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = UserDefaultsModelPackStateStorage(defaults: defaults)
+        let pack = Self.pack(
+            dimension: 256,
+            localModelPath: "/var/mobile/Containers/Data/voice-filter/speaker-256.mlmodelc"
+        )
+        store.saveState(.installed(pack))
+        #expect(store.loadState() == .installed(pack))
+        #expect(store.loadState().installedPack?.localModelPath == pack.localModelPath)
+    }
+
+    @Test func legacyPackJSONWithoutLocalModelPathDecodesToNil() throws {
+        let legacy = """
+        {"identifier":"fluidaudio-speaker-256","version":"1.0.0","embeddingDimension":256,\
+        "checksumSHA256":"\(String(repeating: "a", count: 64))","source":"https://mirror.invalid/voice-filter",\
+        "sizeBytes":12345678,"installedAt":0}
+        """.data(using: .utf8)!
+        let pack = try JSONDecoder().decode(InstalledModelPack.self, from: legacy)
+        #expect(pack.localModelPath == nil)
+        #expect(pack.embeddingDimension == 256)
+    }
+}
+
+@MainActor
 struct SpeechAudioBufferGateTests {
     final class InMemoryStorage: VoiceFilterStorage, @unchecked Sendable {
         var profiles: [PilotVoiceProfile] = []
