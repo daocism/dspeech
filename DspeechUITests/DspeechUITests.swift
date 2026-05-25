@@ -56,6 +56,32 @@ final class DspeechUITests: XCTestCase {
     }
 
     @MainActor
+    func testStartButtonDoesNotCrashAppWithPermissionsPreGranted() throws {
+        let app = launchAppWithCleanPrivacyDefaults()
+
+        let startButton = app.buttons["start-button"]
+        XCTAssertTrue(startButton.waitForExistence(timeout: 8),
+                      "main start-button must be reachable on launch")
+        startButton.tap()
+
+        let permissionAlertButton = app.alerts.element.buttons.matching(
+            NSPredicate(format: "label CONTAINS[c] %@ OR label CONTAINS[c] %@",
+                        "Разреш", "Allow")
+        ).firstMatch
+        if permissionAlertButton.waitForExistence(timeout: 3) {
+            permissionAlertButton.tap()
+        }
+
+        let stopButton = app.buttons["stop-button"]
+        let stopAppeared = stopButton.waitForExistence(timeout: 8)
+
+        XCTAssertTrue(app.state == .runningForeground,
+                      "app must still be running (not crashed) after tapping start")
+        XCTAssertTrue(stopAppeared || startButton.exists,
+                      "either listening started (stop-button) or engine reported failure (start-button stayed) — app must not crash")
+    }
+
+    @MainActor
     private func launchAppWithCleanPrivacyDefaults() -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += [

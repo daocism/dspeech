@@ -103,18 +103,43 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
         audioEngine.prepare()
         try audioEngine.start()
 
-        task = recognizer.recognitionTask(with: request) { [weak self] result, error in
+        let localePrefix = String(localeIdentifier.prefix(2))
+        task = recognizer.recognitionTask(with: request) { @Sendable [weak self] result, error in
+            let event: LiveTranscriptionEvent?
+            let isFinal: Bool
+            if let result {
+                let raw = result.bestTranscription.formattedString
+                if result.isFinal {
+                    let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if trimmed.isEmpty {
+                        event = nil
+                    } else {
+                        let confidence = Self.averageConfidence(for: result.bestTranscription)
+                        let segment = TranscriptSegment(
+                            text: trimmed,
+                            translatedText: nil,
+                            confidence: confidence,
+                            sourceLanguageCode: localePrefix,
+                            source: .liveATC
+                        )
+                        event = .segment(segment)
+                    }
+                    isFinal = true
+                } else {
+                    event = .partial(raw)
+                    isFinal = false
+                }
+            } else {
+                event = nil
+                isFinal = false
+            }
+            let terminal = isFinal || error != nil
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                if let result {
-                    let text = result.bestTranscription.formattedString
-                    if result.isFinal {
-                        self.emitFinalSegment(text: text, transcription: result.bestTranscription)
-                    } else {
-                        self.emit(.partial(text))
-                    }
+                if let event {
+                    self.emit(event)
                 }
-                if error != nil || (result?.isFinal == true) {
+                if terminal {
                     self.cleanup()
                     if self.status == .listening {
                         self.status = .stopped
@@ -215,7 +240,7 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
         continuation?.yield(event)
     }
 
-    private static func requestSpeechAuthorization() async -> Bool {
+    private nonisolated static func requestSpeechAuthorization() async -> Bool {
         await withCheckedContinuation { continuation in
             SFSpeechRecognizer.requestAuthorization { status in
                 continuation.resume(returning: status == .authorized)
@@ -223,7 +248,7 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
         }
     }
 
-    private static func requestMicrophonePermission() async -> Bool {
+    private nonisolated static func requestMicrophonePermission() async -> Bool {
         if #available(iOS 17.0, *) {
             return await AVAudioApplication.requestRecordPermission()
         } else {
