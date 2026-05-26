@@ -13,6 +13,7 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     private var recognizer: SFSpeechRecognizer?
     private var request: SFSpeechAudioBufferRecognitionRequest?
     private var task: SFSpeechRecognitionTask?
+    private var router: SerialBufferRouter<AVAudioPCMBuffer>?
     private let audioEngine = AVAudioEngine()
     private var continuation: AsyncStream<LiveTranscriptionEvent>.Continuation?
 
@@ -91,12 +92,30 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
         }
         self.request = request
 
+        if bufferGate != nil {
+            // why: the gate routes through the nonisolated identifier, so the heavy
+            // classifier work runs off @MainActor; the router serializes append/discard
+            // in capture order so a slow first classifier can't let a later buffer
+            // overtake it into Apple Speech.
+            router = SerialBufferRouter<AVAudioPCMBuffer>(
+                classify: { [weak self] samples, sampleRate in
+                    guard let self else { return .transcribe(reason: .classifierUnavailable) }
+                    return try await self.routeSamples(samples, sampleRate: sampleRate)
+                },
+                append: { [weak self] buffer in self?.request?.append(buffer) }
+            )
+        } else {
+            router = nil
+        }
+
         let inputNode = audioEngine.inputNode
         let recordingFormat = inputNode.outputFormat(forBus: 0)
         inputNode.removeTap(onBus: 0)
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
+            let samples = Self.monoFloatSamples(from: buffer)
+            let sampleRate = buffer.format.sampleRate
             Task { @MainActor [weak self] in
-                await self?.appendThroughGate(buffer)
+                self?.routeBuffer(buffer, samples: samples, sampleRate: sampleRate)
             }
         }
 
@@ -149,30 +168,20 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
         }
     }
 
-    private func appendThroughGate(_ buffer: AVAudioPCMBuffer) async {
-        guard let request else { return }
-        guard let bufferGate else {
-            request.append(buffer)
+    private func routeSamples(_ samples: [Float], sampleRate: Double) async throws -> PreTranscriptionRoutingDecision {
+        guard let bufferGate else { return .transcribe(reason: .classifierUnavailable) }
+        return try await bufferGate.route(samples: samples, sampleRate: sampleRate)
+    }
+
+    private func routeBuffer(_ buffer: AVAudioPCMBuffer, samples: [Float]?, sampleRate: Double) {
+        guard let router else {
+            request?.append(buffer)
             return
         }
-        guard let samples = Self.monoFloatSamples(from: buffer) else {
-            request.append(buffer)
-            return
-        }
-        do {
-            let decision = try await bufferGate.route(
-                samples: samples,
-                sampleRate: buffer.format.sampleRate
-            )
-            switch decision {
-            case .discard:
-                return
-            case .transcribe:
-                request.append(buffer)
-            }
-        } catch {
-            request.append(buffer)
-        }
+        // why: a non-float / empty buffer can't be classified; route it through the
+        // serial router with empty samples so it fails open to ASR while keeping FIFO
+        // order with classified buffers ahead of and behind it.
+        router.submit(buffer, samples: samples ?? [], sampleRate: sampleRate)
     }
 
     nonisolated static func monoFloatSamples(from buffer: AVAudioPCMBuffer) -> [Float]? {
@@ -229,6 +238,10 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
             audioEngine.stop()
         }
         audioEngine.inputNode.removeTap(onBus: 0)
+        // why: finish() before nil-ing the request so any buffer still classifying
+        // off-main can't append into an ended/released recognition request.
+        router?.finish()
+        router = nil
         request?.endAudio()
         task?.cancel()
         task = nil
