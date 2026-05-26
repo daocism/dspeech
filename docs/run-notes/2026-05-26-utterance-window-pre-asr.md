@@ -50,7 +50,28 @@ layer by the existing `SpeechAudioBufferGateTests` in `VoiceFilterTests.swift`.
 
 ## Tests run and result
 
-<!-- filled in after mac24 run; see below -->
+Ran on mac24 (the only Xcode host; ubuntu-vm has no Xcode):
+
+```bash
+ssh mac24 'cd /Users/andre/projects/dspeech-ios && git fetch origin && \
+  git checkout feat/local-pilot-voice-filter && \
+  git pull --ff-only origin feat/local-pilot-voice-filter && \
+  DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+  xcodebuild -project Dspeech.xcodeproj -scheme Dspeech \
+    -destination "platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4" \
+    -only-testing:DspeechTests CODE_SIGNING_ALLOWED=NO test'
+```
+
+Result: **`** TEST SUCCEEDED **`** at branch tip `aee9c8c`.
+
+- All 8 `UtteranceWindowRouterTests` passed:
+  `subThresholdWindowIsNeverDiscarded`, `coherentPilotWindowIsDiscardedAsUnit`,
+  `transcribeWindowAppendsAllBuffersInOrder`, `classifierErrorAppendsWindowAsUnit`,
+  `chunksAppliedInSubmitOrder`, `finishFlushesPendingTailInOrder`,
+  `finishPreventsFutureAppends`, `inFlightChunkDoesNotAppendAfterFinish`.
+- The W1 regression guard `SerialBufferRouterTests` (5 cases) stayed green.
+- The rest of the `DspeechTests` domain suite (VoiceFilter, RouteHealth,
+  CaptureCoordinator, LiveTranscriptionViewModel, etc.) stayed green.
 
 ## Residual risk
 
