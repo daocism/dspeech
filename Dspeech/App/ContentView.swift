@@ -1,14 +1,46 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State private var liveViewModel: LiveTranscriptionViewModel = ContentView.makeDefaultLiveViewModel()
+    @State private var coordinator: CaptureCoordinator
+    @State private var voiceFilter: VoiceFilterPipeline
     @State private var privacy = PrivacySettings()
     @State private var showTranslation: Bool = true
     @State private var showSettings: Bool = false
 
-    static func makeDefaultLiveViewModel() -> LiveTranscriptionViewModel {
-        LiveTranscriptionViewModel(engine: AppleSpeechLiveTranscriptionEngine())
+    init(
+        engine: (any LiveTranscriptionEngine)? = nil,
+        voiceFilter: VoiceFilterPipeline? = nil,
+        routing: AudioSessionRouting = LiveAudioSessionRouting()
+    ) {
+        let filter: VoiceFilterPipeline
+        if let voiceFilter {
+            filter = voiceFilter
+        } else {
+            let modelPackStorage = UserDefaultsModelPackStateStorage()
+            let backendBuilder = FluidAudioBackendBuilder()
+            filter = VoiceFilterPipeline(
+                identifier: LocalSpeakerIdentifierFactory.make(
+                    state: modelPackStorage.loadState(),
+                    backendBuilder: backendBuilder
+                ),
+                backendBuilder: backendBuilder,
+                modelPackStorage: modelPackStorage
+            )
+        }
+        let resolvedEngine = engine ?? AppleSpeechLiveTranscriptionEngine(
+            bufferGate: VoiceFilterSpeechAudioBufferGate(pipeline: filter)
+        )
+        let live = LiveTranscriptionViewModel(engine: resolvedEngine, voiceFilter: filter)
+        let monitor = RouteHealthMonitor(routing: routing)
+        _voiceFilter = State(initialValue: filter)
+        _coordinator = State(initialValue: CaptureCoordinator(
+            live: live,
+            routeMonitor: monitor,
+            routeChanges: routing.routeChanges
+        ))
     }
+
+    private var liveViewModel: LiveTranscriptionViewModel { coordinator.live }
 
     private var emptyStateText: String {
         switch liveViewModel.status {
@@ -37,6 +69,7 @@ struct ContentView: View {
 
                 VStack(spacing: isLandscape ? 8 : 12) {
                     controlBar(isLandscape: isLandscape)
+                    routeBanner(isLandscape: isLandscape)
                     transcriptArea(isLandscape: isLandscape)
                     bottomBar(isLandscape: isLandscape)
                 }
@@ -48,13 +81,43 @@ struct ContentView: View {
         .statusBarHidden(true)
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showSettings) {
-            SettingsView(privacy: privacy)
+            SettingsView(privacy: privacy, voiceFilter: voiceFilter)
+        }
+        .onAppear { coordinator.beginObservingRouteChanges() }
+        .onDisappear { coordinator.endObservingRouteChanges() }
+    }
+
+    @ViewBuilder
+    private func routeBanner(isLandscape: Bool) -> some View {
+        if let message = coordinator.routeBanner ?? coordinator.startBlockedMessage {
+            HStack(spacing: 8) {
+                Image(systemName: coordinator.canStart ? "exclamationmark.triangle.fill" : "mic.slash.fill")
+                    .font(.system(size: isLandscape ? 13 : 14, weight: .semibold))
+                Text(message)
+                    .font(.system(size: isLandscape ? 13 : 14, weight: .medium))
+                    .lineLimit(2)
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(coordinator.canStart ? Color.orange : Color.red)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                (coordinator.canStart ? Color.orange : Color.red).opacity(0.14),
+                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke((coordinator.canStart ? Color.orange : Color.red).opacity(0.4), lineWidth: 1)
+            }
+            .accessibilityIdentifier("route-banner")
         }
     }
 
     @ViewBuilder
     private func transcriptArea(isLandscape: Bool) -> some View {
-        if liveViewModel.segments.isEmpty && liveViewModel.partialText.isEmpty {
+        let displayedSegments = liveViewModel.visibleSegments
+        if displayedSegments.isEmpty && liveViewModel.partialText.isEmpty {
             VStack {
                 Spacer()
                 Text(emptyStateText)
@@ -69,7 +132,7 @@ struct ContentView: View {
         } else {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: isLandscape ? 10 : 12) {
-                    ForEach(liveViewModel.segments) { segment in
+                    ForEach(displayedSegments) { segment in
                         TranscriptSegmentCard(
                             segment: segment,
                             showTranslation: showTranslation,
@@ -88,6 +151,7 @@ struct ContentView: View {
 
     private func bottomBar(isLandscape: Bool) -> some View {
         HStack(spacing: 12) {
+            let startDisabled = !liveViewModel.isListening && !coordinator.canStart
             Button {
                 Task { await toggleListening() }
             } label: {
@@ -103,8 +167,10 @@ struct ContentView: View {
                     Capsule().fill(liveViewModel.isListening ? Color.red.opacity(0.85) : Color.cyan.opacity(0.85))
                 )
                 .foregroundStyle(.white)
+                .opacity(startDisabled ? 0.4 : 1)
             }
             .buttonStyle(.plain)
+            .disabled(startDisabled)
             .accessibilityIdentifier(liveViewModel.isListening ? "stop-button" : "start-button")
 
             if !liveViewModel.segments.isEmpty {
@@ -129,35 +195,40 @@ struct ContentView: View {
     }
 
     private func toggleListening() async {
-        if liveViewModel.isListening {
-            liveViewModel.stop()
-        } else {
-            await liveViewModel.start()
-        }
+        await coordinator.toggle()
     }
 
     private func controlBar(isLandscape: Bool) -> some View {
-        HStack(spacing: 14) {
-            Text("Dspeech")
-                .font(.system(size: isLandscape ? 22 : 28, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-                .accessibilityIdentifier("app-title")
+        VStack(spacing: isLandscape ? 6 : 10) {
+            HStack(spacing: 10) {
+                Text("Dspeech")
+                    .font(.system(size: isLandscape ? 22 : 28, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .accessibilityIdentifier("app-title")
 
-            PrivacyBadge(mode: privacy.mode, isLandscape: isLandscape)
+                Spacer(minLength: 8)
 
-            Spacer()
-
-            settingsButton(isLandscape: isLandscape)
-
-            Toggle(isOn: $showTranslation) {
-                Text("Перевод")
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(.white.opacity(0.85))
+                settingsButton(isLandscape: isLandscape)
             }
-            .toggleStyle(.switch)
-            .tint(.cyan)
-            .fixedSize()
-            .accessibilityIdentifier("translation-toggle")
+
+            HStack(spacing: 8) {
+                PrivacyBadge(mode: privacy.mode, isLandscape: isLandscape)
+                RouteHealthChip(health: coordinator.routeMonitor.health, isLandscape: isLandscape)
+
+                Spacer(minLength: 8)
+
+                Toggle(isOn: $showTranslation) {
+                    Text("Перевод")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.white.opacity(0.85))
+                }
+                .toggleStyle(.switch)
+                .tint(.cyan)
+                .fixedSize()
+                .accessibilityIdentifier("translation-toggle")
+            }
         }
     }
 
@@ -207,9 +278,57 @@ struct PrivacyBadge: View {
     }
 }
 
+struct RouteHealthChip: View {
+    let health: RouteHealth
+    let isLandscape: Bool
+
+    private var tint: Color {
+        switch health {
+        case .suitableExternal: return .green
+        case .cautionBuiltIn: return .orange
+        case .unknownExternal, .unsuitableOutputOnly: return .yellow
+        case .noInput: return .red
+        }
+    }
+
+    private var icon: String {
+        switch health {
+        case .suitableExternal: return "cable.connector"
+        case .cautionBuiltIn: return "iphone"
+        case .unknownExternal: return "questionmark.circle"
+        case .unsuitableOutputOnly: return "speaker.wave.2"
+        case .noInput: return "mic.slash"
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.system(size: isLandscape ? 9 : 10, weight: .bold))
+            Text(health.shortLabel)
+                .font(.system(size: isLandscape ? 10 : 11, weight: .bold, design: .monospaced))
+        }
+        .foregroundStyle(tint)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 3)
+        .background(tint.opacity(0.16), in: Capsule())
+        .overlay(
+            Capsule().stroke(tint.opacity(0.45), lineWidth: 1)
+        )
+        .accessibilityIdentifier("route-health-chip")
+        .accessibilityLabel("Источник захвата: \(health.displayLabel)")
+    }
+}
+
 struct SettingsView: View {
     @Bindable var privacy: PrivacySettings
+    var voiceFilter: VoiceFilterPipeline?
     @Environment(\.dismiss) private var dismiss
+
+    init(privacy: PrivacySettings, voiceFilter: VoiceFilterPipeline? = nil) {
+        self.privacy = privacy
+        self.voiceFilter = voiceFilter
+    }
 
     var body: some View {
         NavigationStack {
@@ -231,6 +350,10 @@ struct SettingsView: View {
                     Text("Приватность")
                 } footer: {
                     Text("По умолчанию Dspeech обрабатывает звук только локально. Облако включается явно и видно по бейджу LOCAL/CLOUD на главном экране.")
+                }
+
+                if let voiceFilter {
+                    VoiceFilterSettingsSection(pipeline: voiceFilter)
                 }
 
                 Section("Распознавание") {
@@ -262,6 +385,370 @@ struct SettingsView: View {
         }
         .accessibilityIdentifier("settings-sheet")
         .preferredColorScheme(.dark)
+    }
+}
+
+struct VoiceFilterSettingsSection: View {
+    let pipeline: VoiceFilterPipeline
+
+    @State private var enabled: Bool
+    @State private var callsignDraft: String
+    @State private var modelPackState: ModelPackState
+    @State private var dictation = CallsignDictationService()
+    @State private var downloadTask: Task<Void, Never>?
+    @State private var recorder = VoiceEnrollmentRecorder()
+    @State private var recordingSlot: PilotVoiceProfile.Slot?
+    @State private var enrollMessage: String?
+    private let installer = SpeakerModelPackInstaller()
+
+    init(pipeline: VoiceFilterPipeline) {
+        self.pipeline = pipeline
+        _enabled = State(initialValue: pipeline.enabled)
+        _callsignDraft = State(initialValue: pipeline.callSign?.raw ?? "")
+        _modelPackState = State(initialValue: pipeline.modelPackState)
+    }
+
+    private var identifierAvailable: Bool {
+        if case .ready = pipeline.capability { return true }
+        return false
+    }
+
+    var body: some View {
+        Section {
+            Toggle(isOn: $enabled) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Фильтр диспетчер/пилот")
+                        .font(.body.weight(.medium))
+                    Text(enabled
+                         ? "Скрывать переговоры пилотов и нерелевантные обращения диспетчера."
+                         : "Все сегменты ATC отображаются.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .accessibilityIdentifier("voicefilter-enabled-toggle")
+            .onChange(of: enabled) { _, newValue in
+                pipeline.setEnabled(newValue)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Позывной воздушного судна")
+                    .font(.body.weight(.medium))
+                HStack(spacing: 8) {
+                    TextField("N123AB / RA-89077 / SBI247", text: $callsignDraft)
+                        .textInputAutocapitalization(.characters)
+                        .autocorrectionDisabled(true)
+                        .accessibilityIdentifier("voicefilter-callsign-field")
+                    dictationButton
+                }
+                Text(dictationHint)
+                    .font(.footnote)
+                    .foregroundStyle(dictation.unavailableReason == nil ? Color.secondary : Color.orange)
+            }
+            .onChange(of: callsignDraft) { _, newValue in
+                pipeline.setCallSign(newValue.isEmpty ? nil : newValue)
+            }
+            .onChange(of: dictation.liveTranscript) { _, transcript in
+                guard dictation.isListening else { return }
+                let parsed = PhoneticCallsignParser.parse(transcript)
+                if !parsed.isEmpty { callsignDraft = parsed }
+            }
+
+            modelPackContent
+        } header: {
+            Text("Голосовой фильтр ATC")
+        } footer: {
+            Text("Распознавание выполняется только на устройстве. Аудио и образцы голоса не покидают iPhone. Подробности — ADR 0007 и ADR 0008.")
+        }
+    }
+
+    private var dictationButton: some View {
+        Button {
+            Task { await dictation.toggle() }
+        } label: {
+            Image(systemName: dictation.isListening ? "stop.circle.fill" : "mic.circle.fill")
+                .font(.system(size: 26))
+                .foregroundStyle(dictation.isListening ? Color.red : Color.cyan)
+                .symbolEffect(.pulse, isActive: dictation.isListening)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("voicefilter-callsign-dictate")
+        .accessibilityLabel(dictation.isListening ? "Остановить голосовой ввод" : "Задать позывной голосом")
+    }
+
+    private var dictationHint: String {
+        if let reason = dictation.unavailableReason {
+            return reason
+        }
+        if dictation.isListening {
+            return "Слушаю — продиктуйте позывной по буквам (например: «november one two three alpha bravo»)."
+        }
+        return callsignDraft.isEmpty
+            ? "Без позывного фильтр пропускает все сегменты не-пилотов. Нажмите микрофон, чтобы задать голосом."
+            : "Сегменты без совпадения по позывному будут скрываться, пока окно продолжения активно."
+    }
+
+    @ViewBuilder
+    private var modelPackContent: some View {
+        switch modelPackState {
+        case .absent:
+            absentContent
+        case .acquiring(let acquisition):
+            acquiringContent(acquisition)
+        case .installed(let pack):
+            installedContent(pack)
+        case .failed(let failure):
+            failedContent(failure)
+        case .disabled(let pack):
+            disabledContent(pack)
+        }
+    }
+
+    private func transition(to state: ModelPackState) {
+        pipeline.setModelPackState(state)
+        modelPackState = state
+    }
+
+    private func startDownload() {
+        downloadTask?.cancel()
+        transition(to: .acquiring(ModelPackAcquisition(phase: .downloading, fractionComplete: 0)))
+        downloadTask = Task {
+            do {
+                let pack = try await installer.install { acquisition in
+                    Task { @MainActor in
+                        if case .acquiring = modelPackState {
+                            modelPackState = .acquiring(acquisition)
+                        }
+                    }
+                }
+                if Task.isCancelled { return }
+                transition(to: .installed(pack))
+            } catch is CancellationError {
+                return
+            } catch {
+                if Task.isCancelled { return }
+                transition(to: .failed(ModelPackFailure(
+                    kind: .network,
+                    userSafeReason: "Не удалось скачать пакет модели. Проверьте подключение к сети и попробуйте снова.",
+                    isRetryable: true
+                )))
+            }
+            downloadTask = nil
+        }
+    }
+
+    private func cancelDownload() {
+        downloadTask?.cancel()
+        downloadTask = nil
+        transition(to: .absent)
+    }
+
+    private func enrollSubtitle(for slot: PilotVoiceProfile.Slot) -> String {
+        if recordingSlot == slot {
+            return "Идёт запись — говорите несколько секунд, затем «Остановить»."
+        }
+        if !identifierAvailable {
+            return "Запись станет доступна, когда распознаватель будет подключён."
+        }
+        if pipeline.enrolledSlots.contains(slot) {
+            return "Образец голоса записан. Запишите заново, чтобы обновить."
+        }
+        return "Запишите образец голоса для распознавания."
+    }
+
+    private func toggleEnrollment(slot: PilotVoiceProfile.Slot) async {
+        if recordingSlot == slot {
+            let result = recorder.stop()
+            recordingSlot = nil
+            guard let result else {
+                enrollMessage = "Запись не получилась — попробуйте снова."
+                return
+            }
+            do {
+                _ = try await pipeline.enrollPilot(
+                    slot: slot,
+                    label: slot == .primary ? "Pilot 1" : "Pilot 2",
+                    samples: result.samples,
+                    sampleRate: result.sampleRate
+                )
+                enrollMessage = "Голос сохранён для \(slot == .primary ? "Pilot 1" : "Pilot 2")."
+            } catch LocalSpeakerIdentifierError.insufficientSpeech {
+                enrollMessage = "Слишком тихо или коротко — запишите образец чётче."
+            } catch {
+                enrollMessage = "Не удалось сохранить образец голоса. Попробуйте снова."
+            }
+            return
+        }
+
+        enrollMessage = nil
+        recordingSlot = slot
+        await recorder.start()
+        if !recorder.isRecording {
+            recordingSlot = nil
+            enrollMessage = recorder.unavailableReason ?? "Не удалось начать запись."
+        }
+    }
+
+    private var absentContent: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Модель не установлена", systemImage: "arrow.down.circle")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+            Text("Голосовой фильтр пилотов работает только после установки локального пакета модели. Загрузка — разовая, явная, по вашему запросу; аудио при этом не покидает устройство.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            Button("Скачать пакет голосового фильтра (≈ 15 МБ)") {
+                startDownload()
+            }
+            .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier("voicefilter-modelpack-download-cta")
+            Text("Модель FluidAudio (\(SpeakerModelPackInstaller.source)) загружается один раз по этому запросу. С устройства уходит только запрос на скачивание модели — аудио, расшифровки и образцы голоса не передаются.")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("voicefilter-modelpack-absent")
+    }
+
+    private func acquiringContent(_ acquisition: ModelPackAcquisition) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(acquisition.phase == .downloading ? "Загрузка модели…" : "Установка модели…")
+                .font(.subheadline.weight(.semibold))
+            ProgressView(value: acquisition.fractionComplete)
+                .accessibilityIdentifier("voicefilter-modelpack-progress")
+            if let received = acquisition.bytesReceived, let total = acquisition.totalBytes {
+                Text("\(byteString(received)) из \(byteString(total))")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+            Button("Отменить") {
+                cancelDownload()
+            }
+            .buttonStyle(.bordered)
+            .accessibilityIdentifier("voicefilter-modelpack-cancel")
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("voicefilter-modelpack-acquiring")
+    }
+
+    private func installedContent(_ pack: InstalledModelPack) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Модель установлена и проверена", systemImage: "checkmark.seal.fill")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.green)
+            Text("Пакет «\(pack.identifier)» · \(pack.embeddingDimension)-мерные эмбеддинги · \(byteString(pack.sizeBytes)). Распознавание выполняется офлайн.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
+            if !identifierAvailable {
+                VStack(alignment: .leading, spacing: 6) {
+                    Label("Слот пилота недоступен", systemImage: "exclamationmark.triangle.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.orange)
+                    Text("Пакет установлен, но локальный распознаватель не подключён в этой сборке, поэтому запись голоса отключена.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                .accessibilityIdentifier("voicefilter-capability-banner")
+            }
+
+            ForEach(PilotVoiceProfile.Slot.allCases, id: \.rawValue) { slot in
+                HStack(alignment: .firstTextBaseline) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(slot == .primary ? "Pilot 1 (Captain)" : "Pilot 2 (First Officer)")
+                            .font(.body.weight(.medium))
+                        Text(enrollSubtitle(for: slot))
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button(recordingSlot == slot ? "Остановить" : "Записать голос") {
+                        Task { await toggleEnrollment(slot: slot) }
+                    }
+                    .disabled(!identifierAvailable || (recordingSlot != nil && recordingSlot != slot))
+                    .buttonStyle(.bordered)
+                    .tint(recordingSlot == slot ? .red : nil)
+                    .accessibilityIdentifier(
+                        slot == .primary
+                        ? "voicefilter-enroll-pilot1"
+                        : "voicefilter-enroll-pilot2"
+                    )
+                }
+            }
+
+            if let enrollMessage {
+                Text(enrollMessage)
+                    .font(.footnote)
+                    .foregroundStyle(.cyan)
+                    .accessibilityIdentifier("voicefilter-enroll-message")
+            }
+
+            Button("Удалить пакет") {
+                transition(to: .absent)
+            }
+            .buttonStyle(.bordered)
+            .tint(.red)
+            .accessibilityIdentifier("voicefilter-modelpack-delete")
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("voicefilter-modelpack-installed")
+    }
+
+    private func failedContent(_ failure: ModelPackFailure) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Не удалось установить модель", systemImage: "xmark.octagon.fill")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.red)
+            Text(failure.userSafeReason)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            if failure.isRetryable {
+                Button("Повторить загрузку") {}
+                    .buttonStyle(.bordered)
+                    .disabled(true)
+                    .accessibilityIdentifier("voicefilter-modelpack-retry")
+            }
+            Button("Продолжить без голосового фильтра") {
+                transition(to: .absent)
+            }
+            .buttonStyle(.bordered)
+            .accessibilityIdentifier("voicefilter-modelpack-continue-without")
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("voicefilter-modelpack-failed")
+    }
+
+    private func disabledContent(_ pack: InstalledModelPack) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Пакет установлен, фильтр выключен", systemImage: "pause.circle")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+            Text("Модель «\(pack.identifier)» остаётся на устройстве. Включите фильтр выше или удалите пакет, чтобы освободить место.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            Button("Включить голосовой фильтр") {
+                transition(to: .installed(pack))
+            }
+            .buttonStyle(.bordered)
+            .accessibilityIdentifier("voicefilter-modelpack-enable")
+            Button("Удалить пакет (\(byteString(pack.sizeBytes)))") {
+                transition(to: .absent)
+            }
+            .buttonStyle(.bordered)
+            .tint(.red)
+            .accessibilityIdentifier("voicefilter-modelpack-delete")
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("voicefilter-modelpack-disabled")
+    }
+
+    private func byteString(_ bytes: Int64) -> String {
+        ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
     }
 }
 

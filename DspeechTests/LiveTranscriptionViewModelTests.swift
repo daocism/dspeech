@@ -46,6 +46,22 @@ struct LiveTranscriptionViewModelTests {
         )
     }
 
+    final class VoiceFilterMemoryStorage: VoiceFilterStorage, @unchecked Sendable {
+        var profiles: [PilotVoiceProfile] = []
+        var callSign: CallSign?
+        var config: ATCTranscriptGateConfig = .default
+        var enabled: Bool = false
+
+        func loadProfiles() -> [PilotVoiceProfile] { profiles }
+        func saveProfiles(_ profiles: [PilotVoiceProfile]) { self.profiles = profiles }
+        func loadCallSign() -> CallSign? { callSign }
+        func saveCallSign(_ callSign: CallSign?) { self.callSign = callSign }
+        func loadGateConfig() -> ATCTranscriptGateConfig { config }
+        func saveGateConfig(_ config: ATCTranscriptGateConfig) { self.config = config }
+        func loadEnabled() -> Bool { enabled }
+        func saveEnabled(_ enabled: Bool) { self.enabled = enabled }
+    }
+
     private func wait(for predicate: @MainActor () -> Bool, timeoutNs: UInt64 = 1_000_000_000) async {
         let deadline = Date().addingTimeInterval(Double(timeoutNs) / 1_000_000_000.0)
         while Date() < deadline {
@@ -92,6 +108,55 @@ struct LiveTranscriptionViewModelTests {
         await wait(for: { vm.segments.count == 1 })
         #expect(vm.segments.first?.text == "Descend and maintain three thousand.")
         #expect(vm.segments.first?.source == .liveATC)
+        #expect(vm.partialText.isEmpty)
+    }
+
+    @Test func voiceFilterSuppressesNonMatchingCallSignSegments() async {
+        let engine = FakeEngine()
+        let storage = VoiceFilterMemoryStorage()
+        storage.enabled = true
+        storage.callSign = CallSign(raw: "N123AB")
+        let pipeline = VoiceFilterPipeline(
+            identifier: UnavailableLocalSpeakerIdentifier(),
+            storage: storage
+        )
+        let vm = LiveTranscriptionViewModel(engine: engine, voiceFilter: pipeline)
+        await vm.start()
+
+        engine.push(.segment(makeSegment("United 247 contact ground point niner")))
+        await wait(for: { vm.segments.count == 1 && vm.visibleSegments.isEmpty })
+
+        #expect(vm.segments.count == 1)
+        #expect(vm.visibleSegments.isEmpty)
+        if let stored = vm.segments.first {
+            #expect(vm.indicator(for: stored) == .otherTrafficSuppressed)
+        } else {
+            Issue.record("expected stored suppressed segment")
+        }
+        #expect(vm.partialText.isEmpty)
+    }
+
+    @Test func voiceFilterDisplaysOwnCallSignSegments() async {
+        let engine = FakeEngine()
+        let storage = VoiceFilterMemoryStorage()
+        storage.enabled = true
+        storage.callSign = CallSign(raw: "N123AB")
+        let pipeline = VoiceFilterPipeline(
+            identifier: UnavailableLocalSpeakerIdentifier(),
+            storage: storage
+        )
+        let vm = LiveTranscriptionViewModel(engine: engine, voiceFilter: pipeline)
+        await vm.start()
+
+        engine.push(.segment(makeSegment("N123AB descend and maintain three thousand")))
+        await wait(for: { vm.visibleSegments.count == 1 })
+
+        #expect(vm.visibleSegments.first?.text == "N123AB descend and maintain three thousand")
+        if let stored = vm.visibleSegments.first {
+            #expect(vm.indicator(for: stored) == .dispatcherAddressedOwnCallSign)
+        } else {
+            Issue.record("expected visible segment")
+        }
         #expect(vm.partialText.isEmpty)
     }
 

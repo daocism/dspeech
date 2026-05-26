@@ -9,14 +9,17 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     }
 
     private let localeIdentifier: String
+    private let bufferGate: (any SpeechAudioBufferGate)?
     private var recognizer: SFSpeechRecognizer?
     private var request: SFSpeechAudioBufferRecognitionRequest?
     private var task: SFSpeechRecognitionTask?
+    private var router: SerialBufferRouter<AVAudioPCMBuffer>?
     private let audioEngine = AVAudioEngine()
     private var continuation: AsyncStream<LiveTranscriptionEvent>.Continuation?
 
-    init(localeIdentifier: String = "en-US") {
+    init(localeIdentifier: String = "en-US", bufferGate: (any SpeechAudioBufferGate)? = nil) {
         self.localeIdentifier = localeIdentifier
+        self.bufferGate = bufferGate
     }
 
     func events() -> AsyncStream<LiveTranscriptionEvent> {
@@ -89,30 +92,73 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
         }
         self.request = request
 
+        if bufferGate != nil {
+            // why: the gate routes through the nonisolated identifier, so the heavy
+            // classifier work runs off @MainActor; the router serializes append/discard
+            // in capture order so a slow first classifier can't let a later buffer
+            // overtake it into Apple Speech.
+            router = SerialBufferRouter<AVAudioPCMBuffer>(
+                classify: { [weak self] samples, sampleRate in
+                    guard let self else { return .transcribe(reason: .classifierUnavailable) }
+                    return try await self.routeSamples(samples, sampleRate: sampleRate)
+                },
+                append: { [weak self] buffer in self?.request?.append(buffer) }
+            )
+        } else {
+            router = nil
+        }
+
         let inputNode = audioEngine.inputNode
         let recordingFormat = inputNode.outputFormat(forBus: 0)
         inputNode.removeTap(onBus: 0)
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
+            let samples = Self.monoFloatSamples(from: buffer)
+            let sampleRate = buffer.format.sampleRate
             Task { @MainActor [weak self] in
-                self?.request?.append(buffer)
+                self?.routeBuffer(buffer, samples: samples, sampleRate: sampleRate)
             }
         }
 
         audioEngine.prepare()
         try audioEngine.start()
 
-        task = recognizer.recognitionTask(with: request) { [weak self] result, error in
+        let localePrefix = String(localeIdentifier.prefix(2))
+        task = recognizer.recognitionTask(with: request) { @Sendable [weak self] result, error in
+            let event: LiveTranscriptionEvent?
+            let isFinal: Bool
+            if let result {
+                let raw = result.bestTranscription.formattedString
+                if result.isFinal {
+                    let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if trimmed.isEmpty {
+                        event = nil
+                    } else {
+                        let confidence = Self.averageConfidence(for: result.bestTranscription)
+                        let segment = TranscriptSegment(
+                            text: trimmed,
+                            translatedText: nil,
+                            confidence: confidence,
+                            sourceLanguageCode: localePrefix,
+                            source: .liveATC
+                        )
+                        event = .segment(segment)
+                    }
+                    isFinal = true
+                } else {
+                    event = .partial(raw)
+                    isFinal = false
+                }
+            } else {
+                event = nil
+                isFinal = false
+            }
+            let terminal = isFinal || error != nil
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                if let result {
-                    let text = result.bestTranscription.formattedString
-                    if result.isFinal {
-                        self.emitFinalSegment(text: text, transcription: result.bestTranscription)
-                    } else {
-                        self.emit(.partial(text))
-                    }
+                if let event {
+                    self.emit(event)
                 }
-                if error != nil || (result?.isFinal == true) {
+                if terminal {
                     self.cleanup()
                     if self.status == .listening {
                         self.status = .stopped
@@ -120,6 +166,49 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
                 }
             }
         }
+    }
+
+    private func routeSamples(_ samples: [Float], sampleRate: Double) async throws -> PreTranscriptionRoutingDecision {
+        guard let bufferGate else { return .transcribe(reason: .classifierUnavailable) }
+        return try await bufferGate.route(samples: samples, sampleRate: sampleRate)
+    }
+
+    private func routeBuffer(_ buffer: AVAudioPCMBuffer, samples: [Float]?, sampleRate: Double) {
+        guard let router else {
+            request?.append(buffer)
+            return
+        }
+        // why: a non-float / empty buffer can't be classified; route it through the
+        // serial router with empty samples so it fails open to ASR while keeping FIFO
+        // order with classified buffers ahead of and behind it.
+        router.submit(buffer, samples: samples ?? [], sampleRate: sampleRate)
+    }
+
+    nonisolated static func monoFloatSamples(from buffer: AVAudioPCMBuffer) -> [Float]? {
+        guard buffer.format.commonFormat == .pcmFormatFloat32,
+              let channelData = buffer.floatChannelData else {
+            return nil
+        }
+        let frameLength = Int(buffer.frameLength)
+        let channelCount = Int(buffer.format.channelCount)
+        guard frameLength > 0, channelCount > 0 else { return nil }
+
+        if channelCount == 1 {
+            return Array(UnsafeBufferPointer(start: channelData[0], count: frameLength))
+        }
+
+        var mono = [Float](repeating: 0, count: frameLength)
+        for channel in 0..<channelCount {
+            let pointer = channelData[channel]
+            for frame in 0..<frameLength {
+                mono[frame] += pointer[frame]
+            }
+        }
+        let scale = 1.0 / Float(channelCount)
+        for frame in 0..<frameLength {
+            mono[frame] *= scale
+        }
+        return mono
     }
 
     private func emitFinalSegment(text: String, transcription: SFTranscription) {
@@ -149,6 +238,10 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
             audioEngine.stop()
         }
         audioEngine.inputNode.removeTap(onBus: 0)
+        // why: finish() before nil-ing the request so any buffer still classifying
+        // off-main can't append into an ended/released recognition request.
+        router?.finish()
+        router = nil
         request?.endAudio()
         task?.cancel()
         task = nil
@@ -160,7 +253,7 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
         continuation?.yield(event)
     }
 
-    private static func requestSpeechAuthorization() async -> Bool {
+    private nonisolated static func requestSpeechAuthorization() async -> Bool {
         await withCheckedContinuation { continuation in
             SFSpeechRecognizer.requestAuthorization { status in
                 continuation.resume(returning: status == .authorized)
@@ -168,7 +261,7 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
         }
     }
 
-    private static func requestMicrophonePermission() async -> Bool {
+    private nonisolated static func requestMicrophonePermission() async -> Bool {
         if #available(iOS 17.0, *) {
             return await AVAudioApplication.requestRecordPermission()
         } else {
