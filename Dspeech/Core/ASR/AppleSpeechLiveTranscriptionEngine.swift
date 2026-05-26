@@ -13,8 +13,13 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     private var recognizer: SFSpeechRecognizer?
     private var request: SFSpeechAudioBufferRecognitionRequest?
     private var task: SFSpeechRecognitionTask?
-    private var router: SerialBufferRouter<AVAudioPCMBuffer>?
+    private var router: UtteranceWindowRouter<AVAudioPCMBuffer>?
     private let audioEngine = AVAudioEngine()
+
+    // why: a pilot discard is only honored once a decision window carries this much
+    // contiguous audio, so an isolated buffer the classifier mislabels as pilot can
+    // never silently remove ATC audio; sub-window tails fail open to ASR.
+    private static let decisionWindowSeconds = 1.0
     private var continuation: AsyncStream<LiveTranscriptionEvent>.Continuation?
 
     init(localeIdentifier: String = "en-US", bufferGate: (any SpeechAudioBufferGate)? = nil) {
@@ -92,12 +97,18 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
         }
         self.request = request
 
+        let inputNode = audioEngine.inputNode
+        let recordingFormat = inputNode.outputFormat(forBus: 0)
+
         if bufferGate != nil {
             // why: the gate routes through the nonisolated identifier, so the heavy
-            // classifier work runs off @MainActor; the router serializes append/discard
-            // in capture order so a slow first classifier can't let a later buffer
-            // overtake it into Apple Speech.
-            router = SerialBufferRouter<AVAudioPCMBuffer>(
+            // classifier work runs off @MainActor; the router groups buffers into a
+            // decision window, classifies the whole window once, and serializes the
+            // append/discard in capture order so a slow earlier window can't let a
+            // later one overtake it into Apple Speech.
+            let windowSamples = max(Int(recordingFormat.sampleRate * Self.decisionWindowSeconds), 1)
+            router = UtteranceWindowRouter<AVAudioPCMBuffer>(
+                minimumChunkSamples: windowSamples,
                 classify: { [weak self] samples, sampleRate in
                     guard let self else { return .transcribe(reason: .classifierUnavailable) }
                     return try await self.routeSamples(samples, sampleRate: sampleRate)
@@ -108,8 +119,6 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
             router = nil
         }
 
-        let inputNode = audioEngine.inputNode
-        let recordingFormat = inputNode.outputFormat(forBus: 0)
         inputNode.removeTap(onBus: 0)
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
             let samples = Self.monoFloatSamples(from: buffer)
