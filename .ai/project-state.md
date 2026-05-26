@@ -100,6 +100,13 @@ Independent recovery verification (run `dspeech-supervisor-20260524T203001Z-b9f6
   builder cycle (W1: move classification off `@MainActor` + guarantee FIFO append
   order before a real classifier lands; W2: utterance-aware discard granularity).
   Artifact: `.ai/runs/dspeech-supervisor-20260524T203001Z-b9f6965f-review.md`.
+- **W1 CLEARED** (`541353d`, 2026-05-26): `SerialBufferRouter<Buffer>` classifies
+  off `@MainActor` (nonisolated identifier behind the gate) and applies
+  append/discard strictly in capture/FIFO order; `AppleSpeechLiveTranscriptionEngine`
+  submits tap buffers to it, fails open on classifier error, and `finish()` on
+  cleanup blocks post-stop appends into a released request. `** TEST SUCCEEDED **`
+  on mac24. W2 (utterance-aware discard) still open.
+  Note: `docs/run-notes/2026-05-26-pre-asr-serial-routing.md`.
 
 Honest limitation: there is still **no real local speaker identifier**. The only
 `LocalSpeakerIdentifier` conformer is `UnavailableLocalSpeakerIdentifier`, which

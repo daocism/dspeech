@@ -29,8 +29,14 @@ order:
    + `FluidAudioBackendBuilder`) has landed behind the installed model-pack gate with
    **zero audio egress** and real `extractSpeakerEmbedding`/offline `DiarizerModels.load`
    wiring; a default build still fails open to `UnavailableLocalSpeakerIdentifier`.
-   Before enabling discard in production the next builder MUST first move classification
-   off `@MainActor` with FIFO append ordering (reviewer W1) and make discard
+   **Reviewer W1 is now cleared**: `SerialBufferRouter<Buffer>` (`Dspeech/Core/ASR/`)
+   classifies captured audio off `@MainActor` (via the nonisolated identifier behind
+   the gate) while applying append/discard strictly in capture (FIFO) order — a slow
+   first classification can no longer let a later buffer overtake it into Apple Speech;
+   `AppleSpeechLiveTranscriptionEngine` submits tap buffers to the router instead of an
+   unordered per-buffer `Task`, fails open to append on classifier error, and `finish()`
+   on cleanup stops post-stop buffers from reaching a released request. Before enabling
+   discard in production the next builder MUST still make discard
    utterance-aware, not raw-buffer-level (reviewer W2), and add the ADR 0008
    network-deny integration test + replay-fixture eval lane. The model-pack
    acquisition UX still needs hardening past the current download CTA / enrollment
