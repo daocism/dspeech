@@ -1,29 +1,44 @@
 import Foundation
+import Synchronization
 import Testing
 @testable import Dspeech
 
-// Behavior contract for the utterance-aware pre-ASR routing seam.
+// Behavior contract for the VAD / silence-gap utterance-segmentation seam.
 //
-// `SerialBufferRouter` classifies and routes one capture buffer at a time, so a
-// single buffer that a classifier flags as pilot is discarded in isolation —
-// which can silently remove ATC audio when the classifier is wrong about a tiny
-// fragment. `UtteranceWindowRouter<Buffer>` wraps the serial seam and only lets a
-// discard happen for a *coherent decision window*: it accumulates buffers until
-// the window reaches `minimumChunkSamples`, classifies the whole concatenated
-// window once, and applies that single decision to every buffer in the chunk. A
-// window below threshold is never classified for discard; on `finish()` the
-// pending sub-threshold tail is flushed (fail open) and no buffer is ever
-// appended after the recognition request is ended.
+// W2 cut the discard decision window at a *fixed sample count*
+// (`minimumChunkSamples`, ~1.0 s of audio). A window that straddles a
+// pilot→dispatcher PTT transition could therefore discard up to ~1 s of
+// co-located dispatcher speech (reviewer NOTE A). This iteration replaces the
+// fixed-count cut with an injected `SpeechActivitySegmenter`: the router feeds
+// every submitted block to the segmenter and only cuts a decision window when
+// the segmenter reports a *trailing-silence utterance edge* (`.cutAfterSilence`)
+// or a *conservative max-window cap* (`.cutAtMaxWindow`). Below an utterance
+// edge the window keeps accumulating; on `finish()` the pending uncertain tail
+// is flushed (fail open) and no buffer is ever appended after the recognition
+// request is ended.
 //
 // These tests drive a seam that does not yet exist in production; they are RED
-// (compile failure: "cannot find 'UtteranceWindowRouter' in scope") until the
-// engineer lands it. The seam is exercised through injected closures rather than
-// a real `SFSpeechAudioBufferRecognitionRequest`:
+// (compile failure: "cannot find type 'SpeechActivitySegmenter' in scope",
+// "cannot find 'SegmentationDecision'", "cannot find 'EnergySilenceSegmenter'",
+// and the changed `UtteranceWindowRouter` initializer) until the engineer lands
+// it. The seam is exercised through injected closures + a scripted segmenter
+// rather than a real `SFSpeechAudioBufferRecognitionRequest` or real audio:
+//
+//   protocol SpeechActivitySegmenter: Sendable {
+//       func update(block: [Float], sampleRate: Double) -> SegmentationDecision
+//       func reset()
+//   }
+//
+//   enum SegmentationDecision: Equatable, Sendable {
+//       case accumulate          // not yet at an utterance edge — keep buffering
+//       case cutAfterSilence     // trailing silence closed an utterance — cut now
+//       case cutAtMaxWindow      // conservative cap hit — cut to bound latency/straddle
+//   }
 //
 //   @MainActor
 //   final class UtteranceWindowRouter<Buffer> {
 //       init(
-//           minimumChunkSamples: Int,
+//           segmenter: SpeechActivitySegmenter,
 //           classify: @escaping @Sendable ([Float], Double) async throws -> PreTranscriptionRoutingDecision,
 //           append: @escaping (Buffer) -> Void
 //       )
@@ -32,17 +47,23 @@ import Testing
 //   }
 //
 // Contract the engineer must satisfy:
-//   1. A sub-threshold window is never classified and never discarded; its
-//      buffers are flushed (appended) on finish.
-//   2. A coherent window that classifies `.discard` drops every buffer in the
-//      chunk as a unit.
-//   3. A window that classifies `.transcribe` (any reason), or whose classifier
-//      throws, appends every buffer in the chunk as a unit, in submit order.
-//   4. Chunks are applied in submit order; a later chunk may never overtake an
-//      earlier one whose decision has not yet resolved.
-//   5. `finish()` flushes the pending uncertain tail to `append`, and no buffer
-//      submitted after `finish()` — nor any chunk still classifying when
-//      `finish()` is called — is ever appended.
+//   1. A window is classified only after the segmenter reports an utterance edge
+//      (`.cutAfterSilence`/`.cutAtMaxWindow`), never merely because some sample
+//      count was reached.
+//   2. Two speech bursts split by a silence edge become two separate classifier
+//      decisions, applied in submit (FIFO) order.
+//   3. A pilot-labeled first utterance followed by a non-pilot second utterance
+//      keeps the second utterance — it is not co-discarded just because both
+//      would have fit inside the old fixed 1.0 s window.
+//   4. A continuous speech region with no silence is cut by `.cutAtMaxWindow`, so
+//      the window never grows unbounded.
+//   5. The segmenter is reset after each cut so utterance state does not bleed
+//      across windows.
+//   6. A sub-threshold / silence-only pending tail is flushed (appended) on
+//      `finish()`, never silently discarded.
+//   7. A classifier throw still fails open: the whole window is appended.
+//   8. `finish()` ends the request — no buffer submitted after it, nor any window
+//      still classifying when it is called, is ever appended (W1/W2 invariant).
 @MainActor
 struct UtteranceWindowRouterTests {
 
@@ -108,88 +129,223 @@ struct UtteranceWindowRouterTests {
         }
     }
 
-    @Test("should not classify or discard a sub-threshold window even when it would be pilot")
-    func subThresholdWindowIsNeverDiscarded() async {
+    @Test("should classify a window only after a trailing-silence edge, not after a sample count")
+    func windowClassifiedOnlyAfterSilenceEdgeNotSampleCount() async {
         let gate = WindowGate()
         let (appended, appendContinuation) = AsyncStream<Int>.makeStream()
+        // Tokens 1 and 2 are mid-utterance (.accumulate); token 3 carries the
+        // trailing-silence edge that closes the window.
+        let segmenter = ScriptedSegmenter([
+            1: .accumulate,
+            2: .accumulate,
+            3: .cutAfterSilence,
+        ])
         let router = UtteranceWindowRouter<Int>(
-            minimumChunkSamples: 10,
-            // If the lone short buffer were classified, it would be discarded as
-            // pilot. The router must not classify it at all below threshold.
-            classify: Self.gatedClassify(gate: gate, decisions: [1: .discard(reason: .pilotVoice)]),
+            segmenter: segmenter,
+            classify: Self.gatedClassify(gate: gate, decisions: [1: .transcribe(reason: .nonPilotVoice)]),
             append: { appendContinuation.yield($0) }
         )
 
-        router.submit(1, samples: Self.samples(token: 1, count: 4), sampleRate: 16_000)
-
-        // No chunk is complete, so nothing is classified or routed yet.
+        // Large blocks: under the old fixed-count rule these would have cut after
+        // the first buffer. The segmenter says keep accumulating, so nothing is
+        // classified yet.
+        router.submit(1, samples: Self.samples(token: 1, count: 4_000), sampleRate: 16_000)
+        router.submit(2, samples: Self.samples(token: 2, count: 4_000), sampleRate: 16_000)
+        for _ in 0..<50 { await Task.yield() }
         #expect(await gate.snapshot() == [])
 
-        // finish() flushes the uncertain tail to ASR — the pilot-leaning fragment
-        // is transcribed, not silently dropped.
-        router.finish()
-        appendContinuation.finish()
-
-        var appendedTokens: [Int] = []
-        for await token in appended { appendedTokens.append(token) }
-        #expect(appendedTokens == [1])
-        #expect(await gate.snapshot() == [])
-    }
-
-    @Test("should discard every buffer in a coherent pilot window as a unit")
-    func coherentPilotWindowIsDiscardedAsUnit() async {
-        let gate = WindowGate()
-        await confirmation("no buffer appended", expectedCount: 0) { appended in
-            let router = UtteranceWindowRouter<Int>(
-                minimumChunkSamples: 10,
-                classify: Self.gatedClassify(gate: gate, decisions: [1: .discard(reason: .pilotVoice)]),
-                append: { _ in appended() }
-            )
-
-            // Two buffers of 6 samples each = 12 ≥ 10 → one coherent chunk whose
-            // first sample (token 1) drives the single classification.
-            router.submit(1, samples: Self.samples(token: 1, count: 6), sampleRate: 16_000)
-            router.submit(2, samples: Self.samples(token: 0, count: 6), sampleRate: 16_000)
-
-            await gate.release(1)
-            for _ in 0..<50 { await Task.yield() }
-            #expect(await gate.snapshot() == [.start(1), .finish(1)])
-        }
-    }
-
-    @Test("should append every buffer in a transcribe window as a unit, in submit order")
-    func transcribeWindowAppendsAllBuffersInOrder() async {
-        let gate = WindowGate()
-        let (appended, appendContinuation) = AsyncStream<Int>.makeStream()
-        let router = UtteranceWindowRouter<Int>(
-            minimumChunkSamples: 10,
-            classify: Self.gatedClassify(gate: gate, decisions: [1: .transcribe(reason: .mixedOrLowConfidence)]),
-            append: { appendContinuation.yield($0) }
-        )
-
-        router.submit(1, samples: Self.samples(token: 1, count: 6), sampleRate: 16_000)
-        router.submit(2, samples: Self.samples(token: 0, count: 6), sampleRate: 16_000)
-
+        // The silence edge arrives → the whole [1,2,3] window is classified once.
+        router.submit(3, samples: Self.samples(token: 3, count: 4_000), sampleRate: 16_000)
         await gate.release(1)
 
         var iterator = appended.makeAsyncIterator()
         #expect(await iterator.next() == 1)
         #expect(await iterator.next() == 2)
+        #expect(await iterator.next() == 3)
+        #expect(await gate.snapshot() == [.start(1), .finish(1)])
+    }
+
+    @Test("should produce two separate decisions when two bursts are split by a silence edge")
+    func twoBurstsSplitBySilenceBecomeTwoDecisionsInOrder() async {
+        let gate = WindowGate()
+        let (appended, appendContinuation) = AsyncStream<Int>.makeStream()
+        // Burst A = tokens 1,2 (edge at 2); burst B = tokens 3,4 (edge at 4).
+        let segmenter = ScriptedSegmenter([
+            1: .accumulate, 2: .cutAfterSilence,
+            3: .accumulate, 4: .cutAfterSilence,
+        ])
+        let router = UtteranceWindowRouter<Int>(
+            segmenter: segmenter,
+            classify: Self.gatedClassify(
+                gate: gate,
+                decisions: [
+                    1: .transcribe(reason: .nonPilotVoice),
+                    3: .transcribe(reason: .nonPilotVoice),
+                ]
+            ),
+            append: { appendContinuation.yield($0) }
+        )
+
+        router.submit(1, samples: Self.samples(token: 1, count: 6), sampleRate: 16_000)
+        router.submit(2, samples: Self.samples(token: 0, count: 6), sampleRate: 16_000)
+        router.submit(3, samples: Self.samples(token: 3, count: 6), sampleRate: 16_000)
+        router.submit(4, samples: Self.samples(token: 0, count: 6), sampleRate: 16_000)
+
+        await gate.release(1)
+        await gate.release(3)
+
+        var iterator = appended.makeAsyncIterator()
+        #expect(await iterator.next() == 1)
+        #expect(await iterator.next() == 2)
+        #expect(await iterator.next() == 3)
+        #expect(await iterator.next() == 4)
+        // Two windows, classified once each, in submit order.
+        #expect(await gate.snapshot() == [.start(1), .finish(1), .start(3), .finish(3)])
+    }
+
+    @Test("should keep the non-pilot second utterance when the first utterance is pilot")
+    func pilotThenNonPilotUtteranceKeepsSecondUtterance() async {
+        let gate = WindowGate()
+        let (appended, appendContinuation) = AsyncStream<Int>.makeStream()
+        // Window A (1,2) is pilot → discard. Window B (3,4) is non-pilot → keep.
+        // Under the old fixed 1.0 s window all four small buffers would have been
+        // one chunk and discarded together; the silence edge splits them.
+        let segmenter = ScriptedSegmenter([
+            1: .accumulate, 2: .cutAfterSilence,
+            3: .accumulate, 4: .cutAfterSilence,
+        ])
+        let router = UtteranceWindowRouter<Int>(
+            segmenter: segmenter,
+            classify: Self.gatedClassify(
+                gate: gate,
+                decisions: [
+                    1: .discard(reason: .pilotVoice),
+                    3: .transcribe(reason: .nonPilotVoice),
+                ]
+            ),
+            append: { appendContinuation.yield($0) }
+        )
+
+        router.submit(1, samples: Self.samples(token: 1, count: 6), sampleRate: 16_000)
+        router.submit(2, samples: Self.samples(token: 0, count: 6), sampleRate: 16_000)
+        router.submit(3, samples: Self.samples(token: 3, count: 6), sampleRate: 16_000)
+        router.submit(4, samples: Self.samples(token: 0, count: 6), sampleRate: 16_000)
+
+        await gate.release(1)
+        await gate.release(3)
+        appendContinuation.finish()
+
+        var appendedTokens: [Int] = []
+        for await token in appended { appendedTokens.append(token) }
+        // Pilot window dropped as a unit; the second utterance survives intact.
+        #expect(appendedTokens == [3, 4])
+    }
+
+    @Test("should cut a continuous no-silence region at the max-window cap")
+    func continuousSpeechCutByMaxWindowCap() async {
+        let gate = WindowGate()
+        let (appended, appendContinuation) = AsyncStream<Int>.makeStream()
+        // No silence ever; the cap closes the window so it cannot grow unbounded.
+        let segmenter = ScriptedSegmenter([
+            1: .accumulate,
+            2: .accumulate,
+            3: .cutAtMaxWindow,
+        ])
+        let router = UtteranceWindowRouter<Int>(
+            segmenter: segmenter,
+            classify: Self.gatedClassify(gate: gate, decisions: [1: .transcribe(reason: .nonPilotVoice)]),
+            append: { appendContinuation.yield($0) }
+        )
+
+        router.submit(1, samples: Self.samples(token: 1, count: 6), sampleRate: 16_000)
+        router.submit(2, samples: Self.samples(token: 0, count: 6), sampleRate: 16_000)
+        router.submit(3, samples: Self.samples(token: 0, count: 6), sampleRate: 16_000)
+        await gate.release(1)
+
+        var iterator = appended.makeAsyncIterator()
+        #expect(await iterator.next() == 1)
+        #expect(await iterator.next() == 2)
+        #expect(await iterator.next() == 3)
+        #expect(await gate.snapshot() == [.start(1), .finish(1)])
+    }
+
+    @Test("should reset the segmenter after each cut window")
+    func segmenterResetAfterEachCutWindow() async {
+        let gate = WindowGate()
+        let (appended, appendContinuation) = AsyncStream<Int>.makeStream()
+        let segmenter = ScriptedSegmenter([
+            1: .accumulate, 2: .cutAfterSilence,
+            3: .accumulate, 4: .cutAtMaxWindow,
+        ])
+        let router = UtteranceWindowRouter<Int>(
+            segmenter: segmenter,
+            classify: Self.gatedClassify(
+                gate: gate,
+                decisions: [
+                    1: .transcribe(reason: .nonPilotVoice),
+                    3: .transcribe(reason: .nonPilotVoice),
+                ]
+            ),
+            append: { appendContinuation.yield($0) }
+        )
+
+        router.submit(1, samples: Self.samples(token: 1, count: 6), sampleRate: 16_000)
+        router.submit(2, samples: Self.samples(token: 0, count: 6), sampleRate: 16_000)
+        router.submit(3, samples: Self.samples(token: 3, count: 6), sampleRate: 16_000)
+        router.submit(4, samples: Self.samples(token: 0, count: 6), sampleRate: 16_000)
+
+        await gate.release(1)
+        await gate.release(3)
+
+        var iterator = appended.makeAsyncIterator()
+        #expect(await iterator.next() == 1)
+        #expect(await iterator.next() == 2)
+        #expect(await iterator.next() == 3)
+        #expect(await iterator.next() == 4)
+        // One reset per closed window — no utterance state bleeds across windows.
+        #expect(segmenter.resetCount == 2)
+    }
+
+    @Test("should flush a silence-only pending tail to ASR on finish")
+    func silenceOnlyPendingTailFailsOpenOnFinish() async {
+        let gate = WindowGate()
+        let (appended, appendContinuation) = AsyncStream<Int>.makeStream()
+        // The segmenter never reports an edge, so no window is ever cut.
+        let segmenter = ScriptedSegmenter([:])
+        let router = UtteranceWindowRouter<Int>(
+            segmenter: segmenter,
+            classify: Self.gatedClassify(gate: gate, decisions: [1: .discard(reason: .pilotVoice)]),
+            append: { appendContinuation.yield($0) }
+        )
+
+        router.submit(1, samples: Self.samples(token: 1, count: 4), sampleRate: 16_000)
+        router.submit(2, samples: Self.samples(token: 2, count: 4), sampleRate: 16_000)
+        for _ in 0..<50 { await Task.yield() }
+        #expect(await gate.snapshot() == [])
+
+        router.finish()
+        appendContinuation.finish()
+
+        var appendedTokens: [Int] = []
+        for await token in appended { appendedTokens.append(token) }
+        // Uncertain tail flushed in submit order, never classified for discard.
+        #expect(appendedTokens == [1, 2])
+        #expect(await gate.snapshot() == [])
     }
 
     @Test("should fail open and append the whole window when classification throws")
-    func classifierErrorAppendsWindowAsUnit() async {
+    func classifierErrorFailsOpenAppendingWholeWindow() async {
         let gate = WindowGate()
         let (appended, appendContinuation) = AsyncStream<Int>.makeStream()
+        let segmenter = ScriptedSegmenter([1: .accumulate, 2: .cutAfterSilence])
         let router = UtteranceWindowRouter<Int>(
-            minimumChunkSamples: 10,
+            segmenter: segmenter,
             classify: Self.gatedClassify(gate: gate, decisions: [:], errorTokens: [1]),
             append: { appendContinuation.yield($0) }
         )
 
         router.submit(1, samples: Self.samples(token: 1, count: 6), sampleRate: 16_000)
         router.submit(2, samples: Self.samples(token: 0, count: 6), sampleRate: 16_000)
-
         await gate.release(1)
 
         var iterator = appended.makeAsyncIterator()
@@ -197,13 +353,18 @@ struct UtteranceWindowRouterTests {
         #expect(await iterator.next() == 2)
     }
 
-    @Test("should apply chunks in submit order even when a later chunk classifies first")
-    func chunksAppliedInSubmitOrder() async {
+    @Test("should apply windows in submit order even when a later window classifies first")
+    func windowsAppliedInSubmitOrderWhenLaterClassifiesFirst() async {
         let gate = WindowGate()
         let (appended, appendContinuation) = AsyncStream<Int>.makeStream()
-        // minimumChunkSamples == per-buffer count → every buffer is its own chunk.
+        // Every buffer is its own one-block window (edge on each submit).
+        let segmenter = ScriptedSegmenter([
+            1: .cutAfterSilence,
+            2: .cutAfterSilence,
+            3: .cutAfterSilence,
+        ])
         let router = UtteranceWindowRouter<Int>(
-            minimumChunkSamples: 4,
+            segmenter: segmenter,
             classify: Self.gatedClassify(
                 gate: gate,
                 decisions: [
@@ -219,8 +380,8 @@ struct UtteranceWindowRouterTests {
         router.submit(2, samples: Self.samples(token: 2, count: 4), sampleRate: 16_000)
         router.submit(3, samples: Self.samples(token: 3, count: 4), sampleRate: 16_000)
 
-        // Release out of submit order: a correct serial router still applies chunk
-        // 1, then drops chunk 2 (pilot), then applies chunk 3 — in submit order.
+        // Release out of submit order: a correct serial router still applies window
+        // 1, drops window 2 (pilot), then applies window 3 — in submit order.
         await gate.release(3)
         await gate.release(2)
         await gate.release(1)
@@ -233,37 +394,13 @@ struct UtteranceWindowRouterTests {
         )
     }
 
-    @Test("should flush the pending tail in order on finish")
-    func finishFlushesPendingTailInOrder() async {
-        let gate = WindowGate()
-        let (appended, appendContinuation) = AsyncStream<Int>.makeStream()
-        let router = UtteranceWindowRouter<Int>(
-            minimumChunkSamples: 10,
-            classify: Self.gatedClassify(gate: gate, decisions: [:]),
-            append: { appendContinuation.yield($0) }
-        )
-
-        // Two short buffers totalling 6 samples — below the 10-sample threshold,
-        // so they remain pending and uncertain until finish flushes them.
-        router.submit(1, samples: Self.samples(token: 1, count: 3), sampleRate: 16_000)
-        router.submit(2, samples: Self.samples(token: 2, count: 3), sampleRate: 16_000)
-
-        router.finish()
-        appendContinuation.finish()
-
-        var appendedTokens: [Int] = []
-        for await token in appended { appendedTokens.append(token) }
-        #expect(appendedTokens == [1, 2])
-        // The tail was flushed without ever being classified.
-        #expect(await gate.snapshot() == [])
-    }
-
     @Test("should not append buffers submitted after finish")
-    func finishPreventsFutureAppends() async {
+    func bufferSubmittedAfterFinishIsNeverAppended() async {
         let gate = WindowGate()
         await confirmation("append after finish", expectedCount: 0) { appended in
+            let segmenter = ScriptedSegmenter([1: .cutAfterSilence])
             let router = UtteranceWindowRouter<Int>(
-                minimumChunkSamples: 1,
+                segmenter: segmenter,
                 classify: Self.gatedClassify(gate: gate, decisions: [1: .transcribe(reason: .nonPilotVoice)]),
                 append: { _ in appended() }
             )
@@ -276,17 +413,18 @@ struct UtteranceWindowRouterTests {
         }
     }
 
-    @Test("should not append a chunk still classifying when finish is called")
-    func inFlightChunkDoesNotAppendAfterFinish() async {
+    @Test("should not append a window still classifying when finish is called")
+    func inFlightWindowDoesNotAppendAfterFinish() async {
         let gate = WindowGate()
         await confirmation("append after finish", expectedCount: 0) { appended in
+            let segmenter = ScriptedSegmenter([1: .cutAfterSilence])
             let router = UtteranceWindowRouter<Int>(
-                minimumChunkSamples: 4,
+                segmenter: segmenter,
                 classify: Self.gatedClassify(gate: gate, decisions: [1: .transcribe(reason: .nonPilotVoice)]),
                 append: { _ in appended() }
             )
 
-            // Chunk is complete and classification starts, but the result has not
+            // The window is cut and classification starts, but the result has not
             // resolved when finish() ends the request.
             router.submit(1, samples: Self.samples(token: 1, count: 4), sampleRate: 16_000)
             for _ in 0..<10 { await Task.yield() }
@@ -297,5 +435,186 @@ struct UtteranceWindowRouterTests {
             await gate.release(1)
             for _ in 0..<100 { await Task.yield() }
         }
+    }
+}
+
+// Deterministic, Sendable scripted segmenter. Keys its decision on the first
+// sample (the buffer token) so the test fully controls where windows are cut,
+// with no energy math, no clock, and no randomness. `resetCount` proves the
+// router resets utterance state at each cut.
+fileprivate final class ScriptedSegmenter: SpeechActivitySegmenter {
+    private let decisionForToken: [Int: SegmentationDecision]
+    private let resets = Mutex(0)
+
+    init(_ decisionForToken: [Int: SegmentationDecision]) {
+        self.decisionForToken = decisionForToken
+    }
+
+    func update(block: [Float], sampleRate: Double) -> SegmentationDecision {
+        decisionForToken[Int(block.first ?? -1)] ?? .accumulate
+    }
+
+    func reset() {
+        resets.withLock { $0 += 1 }
+    }
+
+    var resetCount: Int { resets.withLock { $0 } }
+}
+
+// Block builders for the default segmenter: a "loud" block is full-scale (RMS
+// 1.0, above any sane noise floor in (0,1)); a "silent" block is digital zero
+// (RMS 0.0). Using these extremes keeps the specs independent of the exact
+// energy threshold the engineer picks.
+fileprivate func loudBlock(seconds: Double, sampleRate: Double) -> [Float] {
+    [Float](repeating: 1.0, count: max(Int(seconds * sampleRate), 1))
+}
+
+fileprivate func silentBlock(seconds: Double, sampleRate: Double) -> [Float] {
+    [Float](repeating: 0.0, count: max(Int(seconds * sampleRate), 1))
+}
+
+// Behavior contract for the default `EnergySilenceSegmenter` — the pure,
+// deterministic RMS silence-gap detector the router uses in production. These
+// tests pin only formula-agnostic properties (loud > threshold > silent, and the
+// injected timing knobs), never an exact energy constant, so the engineer is
+// free to tune the noise floor. RED until `EnergySilenceSegmenter` exists.
+//
+// Pinned API:
+//   final class EnergySilenceSegmenter: SpeechActivitySegmenter {
+//       init(minSpeechSeconds: Double, minSilenceSeconds: Double, maxWindowSeconds: Double)
+//   }
+@MainActor
+struct EnergySilenceSegmenterTests {
+    private static let sampleRate = 16_000.0
+    private static let block = 0.1                 // seconds per block
+    private static let minSpeech = 0.2
+    private static let minSilence = 0.3
+    private static let maxWindow = 1.0
+
+    private static func makeSegmenter() -> EnergySilenceSegmenter {
+        EnergySilenceSegmenter(
+            minSpeechSeconds: minSpeech,
+            minSilenceSeconds: minSilence,
+            maxWindowSeconds: maxWindow
+        )
+    }
+
+    private static func decisions(
+        _ segmenter: EnergySilenceSegmenter,
+        _ blocks: [[Float]]
+    ) -> [SegmentationDecision] {
+        blocks.map { segmenter.update(block: $0, sampleRate: sampleRate) }
+    }
+
+    @Test("should never cut on silence that has no preceding speech")
+    func silenceWithoutPrecedingSpeechNeverCuts() {
+        let segmenter = Self.makeSegmenter()
+        // Six silent blocks (0.6 s) — well past minSilence, but no utterance ever
+        // opened, so there is nothing to close.
+        let blocks = Array(repeating: silentBlock(seconds: Self.block, sampleRate: Self.sampleRate), count: 6)
+        let result = Self.decisions(segmenter, blocks)
+        #expect(result.allSatisfy { $0 == .accumulate })
+    }
+
+    @Test("should cut after a trailing silence edge once speech has occurred")
+    func trailingSilenceAfterSpeechCutsWindow() {
+        let segmenter = Self.makeSegmenter()
+        let loud = loudBlock(seconds: Self.block, sampleRate: Self.sampleRate)
+        let silent = silentBlock(seconds: Self.block, sampleRate: Self.sampleRate)
+        // 0.3 s speech (>= minSpeech) then up to 0.5 s silence.
+        let blocks = Array(repeating: loud, count: 3) + Array(repeating: silent, count: 5)
+
+        var firstCutIndex: Int?
+        var firstCutDecision: SegmentationDecision = .accumulate
+        for (index, samples) in blocks.enumerated() {
+            let decision = segmenter.update(block: samples, sampleRate: Self.sampleRate)
+            if decision != .accumulate {
+                firstCutIndex = index
+                firstCutDecision = decision
+                break
+            }
+        }
+
+        #expect(firstCutDecision == .cutAfterSilence)
+        let cutIndex = try! #require(firstCutIndex)
+        // Cut lands once trailing silence reaches minSilence — tolerant of a
+        // >= vs > boundary (within one block).
+        let silentBlocksAtCut = cutIndex - 3 + 1
+        #expect(silentBlocksAtCut >= 3)
+        #expect(silentBlocksAtCut <= 4)
+    }
+
+    @Test("should cut continuous speech at the max-window cap")
+    func continuousSpeechCutsAtMaxWindowCap() {
+        let segmenter = Self.makeSegmenter()
+        let loud = loudBlock(seconds: Self.block, sampleRate: Self.sampleRate)
+        let blocks = Array(repeating: loud, count: 12)   // 1.2 s, past the 1.0 s cap
+
+        var firstCutIndex: Int?
+        var firstCutDecision: SegmentationDecision = .accumulate
+        for (index, samples) in blocks.enumerated() {
+            let decision = segmenter.update(block: samples, sampleRate: Self.sampleRate)
+            if decision != .accumulate {
+                firstCutIndex = index
+                firstCutDecision = decision
+                break
+            }
+        }
+
+        #expect(firstCutDecision == .cutAtMaxWindow)
+        let cutIndex = try! #require(firstCutIndex)
+        let secondsAtCut = Double(cutIndex + 1) * Self.block
+        // Never larger than the old fixed 1.0 s window (within one block of slack).
+        #expect(secondsAtCut >= Self.maxWindow - 1e-9)
+        #expect(secondsAtCut <= Self.maxWindow + Self.block + 1e-9)
+    }
+
+    @Test("should not cut after silence when speech was shorter than minSpeechSeconds")
+    func briefSpeechBelowMinSpeechDoesNotCutAfterSilence() {
+        let segmenter = Self.makeSegmenter()
+        let loud = loudBlock(seconds: Self.block, sampleRate: Self.sampleRate)
+        let silent = silentBlock(seconds: Self.block, sampleRate: Self.sampleRate)
+        // 0.1 s speech (< minSpeech) then long silence up to the cap.
+        let blocks = [loud] + Array(repeating: silent, count: 11)
+
+        var firstCutDecision: SegmentationDecision = .accumulate
+        for samples in blocks {
+            let decision = segmenter.update(block: samples, sampleRate: Self.sampleRate)
+            if decision != .accumulate {
+                firstCutDecision = decision
+                break
+            }
+        }
+
+        // Too-short speech is not an utterance; only the cap may close the window.
+        #expect(firstCutDecision == .cutAtMaxWindow)
+    }
+
+    @Test("should produce identical decisions for an identical input sequence")
+    func deterministicForSameInputSequence() {
+        let loud = loudBlock(seconds: Self.block, sampleRate: Self.sampleRate)
+        let silent = silentBlock(seconds: Self.block, sampleRate: Self.sampleRate)
+        let blocks = Array(repeating: loud, count: 3) + Array(repeating: silent, count: 5)
+
+        let first = Self.decisions(Self.makeSegmenter(), blocks)
+        let second = Self.decisions(Self.makeSegmenter(), blocks)
+        #expect(first == second)
+    }
+
+    @Test("should clear accumulated speech and silence on reset")
+    func resetClearsAccumulatedState() {
+        let segmenter = Self.makeSegmenter()
+        let loud = loudBlock(seconds: Self.block, sampleRate: Self.sampleRate)
+        let silent = silentBlock(seconds: Self.block, sampleRate: Self.sampleRate)
+
+        // Drive a full speech→silence cut, then reset.
+        for samples in Array(repeating: loud, count: 3) + Array(repeating: silent, count: 4) {
+            _ = segmenter.update(block: samples, sampleRate: Self.sampleRate)
+        }
+        segmenter.reset()
+
+        // After reset there is no preceding speech, so a lone silent block cannot
+        // close a window.
+        #expect(segmenter.update(block: silent, sampleRate: Self.sampleRate) == .accumulate)
     }
 }
