@@ -16,10 +16,13 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     private var router: UtteranceWindowRouter<AVAudioPCMBuffer>?
     private let audioEngine = AVAudioEngine()
 
-    // why: a pilot discard is only honored once a decision window carries this much
-    // contiguous audio, so an isolated buffer the classifier mislabels as pilot can
-    // never silently remove ATC audio; sub-window tails fail open to ASR.
+    // why: the segmenter cuts a decision window at a trailing-silence utterance edge
+    // (>= minSilence after >= minSpeech of speech) or, failing that, at this
+    // conservative max-window cap — keeping the prior 1.0 s ceiling as a strict upper
+    // bound so this change is never a latency regression; sub-window tails fail open.
     private static let decisionWindowSeconds = 1.0
+    private static let minSpeechSeconds = 0.25
+    private static let minSilenceSeconds = 0.40
     private var continuation: AsyncStream<LiveTranscriptionEvent>.Continuation?
 
     init(localeIdentifier: String = "en-US", bufferGate: (any SpeechAudioBufferGate)? = nil) {
@@ -106,9 +109,13 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
             // decision window, classifies the whole window once, and serializes the
             // append/discard in capture order so a slow earlier window can't let a
             // later one overtake it into Apple Speech.
-            let windowSamples = max(Int(recordingFormat.sampleRate * Self.decisionWindowSeconds), 1)
+            let segmenter = EnergySilenceSegmenter(
+                minSpeechSeconds: Self.minSpeechSeconds,
+                minSilenceSeconds: Self.minSilenceSeconds,
+                maxWindowSeconds: Self.decisionWindowSeconds
+            )
             router = UtteranceWindowRouter<AVAudioPCMBuffer>(
-                minimumChunkSamples: windowSamples,
+                segmenter: segmenter,
                 classify: { [weak self] samples, sampleRate in
                     guard let self else { return .transcribe(reason: .classifierUnavailable) }
                     return try await self.routeSamples(samples, sampleRate: sampleRate)

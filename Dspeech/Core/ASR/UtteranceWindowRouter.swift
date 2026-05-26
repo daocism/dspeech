@@ -8,20 +8,19 @@ final class UtteranceWindowRouter<Buffer> {
         let sampleRate: Double
     }
 
-    private let minimumChunkSamples: Int
+    private let segmenter: SpeechActivitySegmenter
     private let append: (Buffer) -> Void
     private let inner: SerialBufferRouter<[Buffer]>
 
     private var pending: [Pending] = []
-    private var pendingSampleCount = 0
     private var finished = false
 
     init(
-        minimumChunkSamples: Int,
+        segmenter: SpeechActivitySegmenter,
         classify: @escaping @Sendable ([Float], Double) async throws -> PreTranscriptionRoutingDecision,
         append: @escaping (Buffer) -> Void
     ) {
-        self.minimumChunkSamples = max(minimumChunkSamples, 1)
+        self.segmenter = segmenter
         self.append = append
         self.inner = SerialBufferRouter<[Buffer]>(
             classify: classify,
@@ -34,11 +33,13 @@ final class UtteranceWindowRouter<Buffer> {
     func submit(_ buffer: Buffer, samples: [Float], sampleRate: Double) {
         guard !finished else { return }
         pending.append(Pending(buffer: buffer, samples: samples, sampleRate: sampleRate))
-        pendingSampleCount += samples.count
-        // why: a window is only eligible for a confident discard once it carries a
-        // coherent amount of audio; below threshold it is never classified, so an
-        // isolated pilot-leaning fragment can't silently remove ATC audio.
-        if pendingSampleCount >= minimumChunkSamples {
+        // why: the segmenter decides the window boundary from speech/silence shape,
+        // not a fixed sample count — so a window straddling a pilot→dispatcher PTT
+        // transition is cut at the silence gap instead of discarding both as one.
+        switch segmenter.update(block: samples, sampleRate: sampleRate) {
+        case .accumulate:
+            break
+        case .cutAfterSilence, .cutAtMaxWindow:
             cutChunk()
         }
     }
@@ -51,7 +52,6 @@ final class UtteranceWindowRouter<Buffer> {
         // router then blocks any in-flight chunk from appending post-finish.
         let tail = pending.map(\.buffer)
         pending.removeAll()
-        pendingSampleCount = 0
         for buffer in tail { append(buffer) }
         inner.finish()
     }
@@ -61,7 +61,9 @@ final class UtteranceWindowRouter<Buffer> {
         let samples = pending.flatMap(\.samples)
         let sampleRate = pending.last?.sampleRate ?? 0
         pending.removeAll()
-        pendingSampleCount = 0
+        // why: reset per cut so utterance state (speech/silence accumulators) does
+        // not bleed into the next window's boundary decision.
+        segmenter.reset()
         inner.submit(buffers, samples: samples, sampleRate: sampleRate)
     }
 }
