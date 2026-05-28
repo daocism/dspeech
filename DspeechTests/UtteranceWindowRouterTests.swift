@@ -187,9 +187,9 @@ struct UtteranceWindowRouterTests {
         )
 
         router.submit(1, samples: Self.samples(token: 1, count: 6), sampleRate: 16_000)
-        router.submit(2, samples: Self.samples(token: 0, count: 6), sampleRate: 16_000)
+        router.submit(2, samples: Self.samples(token: 2, count: 6), sampleRate: 16_000)
         router.submit(3, samples: Self.samples(token: 3, count: 6), sampleRate: 16_000)
-        router.submit(4, samples: Self.samples(token: 0, count: 6), sampleRate: 16_000)
+        router.submit(4, samples: Self.samples(token: 4, count: 6), sampleRate: 16_000)
 
         await gate.release(1)
         await gate.release(3)
@@ -227,9 +227,9 @@ struct UtteranceWindowRouterTests {
         )
 
         router.submit(1, samples: Self.samples(token: 1, count: 6), sampleRate: 16_000)
-        router.submit(2, samples: Self.samples(token: 0, count: 6), sampleRate: 16_000)
+        router.submit(2, samples: Self.samples(token: 2, count: 6), sampleRate: 16_000)
         router.submit(3, samples: Self.samples(token: 3, count: 6), sampleRate: 16_000)
-        router.submit(4, samples: Self.samples(token: 0, count: 6), sampleRate: 16_000)
+        router.submit(4, samples: Self.samples(token: 4, count: 6), sampleRate: 16_000)
 
         await gate.release(1)
         await gate.release(3)
@@ -258,8 +258,8 @@ struct UtteranceWindowRouterTests {
         )
 
         router.submit(1, samples: Self.samples(token: 1, count: 6), sampleRate: 16_000)
-        router.submit(2, samples: Self.samples(token: 0, count: 6), sampleRate: 16_000)
-        router.submit(3, samples: Self.samples(token: 0, count: 6), sampleRate: 16_000)
+        router.submit(2, samples: Self.samples(token: 2, count: 6), sampleRate: 16_000)
+        router.submit(3, samples: Self.samples(token: 3, count: 6), sampleRate: 16_000)
         await gate.release(1)
 
         var iterator = appended.makeAsyncIterator()
@@ -290,9 +290,9 @@ struct UtteranceWindowRouterTests {
         )
 
         router.submit(1, samples: Self.samples(token: 1, count: 6), sampleRate: 16_000)
-        router.submit(2, samples: Self.samples(token: 0, count: 6), sampleRate: 16_000)
+        router.submit(2, samples: Self.samples(token: 2, count: 6), sampleRate: 16_000)
         router.submit(3, samples: Self.samples(token: 3, count: 6), sampleRate: 16_000)
-        router.submit(4, samples: Self.samples(token: 0, count: 6), sampleRate: 16_000)
+        router.submit(4, samples: Self.samples(token: 4, count: 6), sampleRate: 16_000)
 
         await gate.release(1)
         await gate.release(3)
@@ -345,7 +345,7 @@ struct UtteranceWindowRouterTests {
         )
 
         router.submit(1, samples: Self.samples(token: 1, count: 6), sampleRate: 16_000)
-        router.submit(2, samples: Self.samples(token: 0, count: 6), sampleRate: 16_000)
+        router.submit(2, samples: Self.samples(token: 2, count: 6), sampleRate: 16_000)
         await gate.release(1)
 
         var iterator = appended.makeAsyncIterator()
