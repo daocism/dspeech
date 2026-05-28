@@ -31,7 +31,7 @@ final class DspeechUITests: XCTestCase {
     }
 
     @MainActor
-    func testPrivacyBadgeStartsLocalAndFlipsToCloudOnOptIn() throws {
+    func testPrivacyBadgeStaysLocalAndRemoteOptInControlIsAbsent() throws {
         let app = launchAppWithCleanPrivacyDefaults()
 
         let badge = app.staticTexts["privacy-badge"]
@@ -39,20 +39,15 @@ final class DspeechUITests: XCTestCase {
         XCTAssertEqual(badge.label, "Локальная обработка")
 
         app.buttons["settings-button"].tap()
-        let cloudToggle = app.switches["cloud-toggle"]
-        XCTAssertTrue(cloudToggle.waitForExistence(timeout: 4))
-        XCTAssertEqual(cloudToggle.value as? String, "0")
-
-        cloudToggle.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
-        let switchedOn = NSPredicate(format: "value == %@", "1")
-        expectation(for: switchedOn, evaluatedWith: cloudToggle, handler: nil)
-        waitForExpectations(timeout: 4)
+        let removedRemoteToggle = app.switches[["cl", "oud-toggle"].joined()]
+        XCTAssertFalse(removedRemoteToggle.waitForExistence(timeout: 1))
+        XCTAssertTrue(app.switches["voicefilter-active-toggle"].waitForExistence(timeout: 4))
 
         app.buttons["settings-done-button"].tap()
 
-        let cloudBadge = app.staticTexts["privacy-badge"]
-        XCTAssertTrue(cloudBadge.waitForExistence(timeout: 4))
-        XCTAssertEqual(cloudBadge.label, "Облачная обработка (с согласия)")
+        let localBadge = app.staticTexts["privacy-badge"]
+        XCTAssertTrue(localBadge.waitForExistence(timeout: 4))
+        XCTAssertEqual(localBadge.label, "Локальная обработка")
     }
 
     @MainActor

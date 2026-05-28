@@ -3,24 +3,17 @@ import Observation
 
 enum PrivacyMode: String, CaseIterable, Sendable, Codable {
     case localOnly
-    case allowCloudFallback
 
     var displayName: String {
-        switch self {
-        case .localOnly: return "Локально"
-        case .allowCloudFallback: return "Облако (согласие)"
-        }
+        "Локально"
     }
 
     var badgeText: String {
-        switch self {
-        case .localOnly: return "LOCAL"
-        case .allowCloudFallback: return "CLOUD"
-        }
+        "LOCAL"
     }
 
     var sendsAudioOffDevice: Bool {
-        self == .allowCloudFallback
+        false
     }
 }
 
@@ -99,10 +92,5 @@ final class PrivacySettings {
         self.storage = storage
         self.mode = storage.loadPrivacyMode()
         self.voiceFilterActive = storage.loadVoiceFilterActive()
-    }
-
-    var allowCloud: Bool {
-        get { mode == .allowCloudFallback }
-        set { mode = newValue ? .allowCloudFallback : .localOnly }
     }
 }

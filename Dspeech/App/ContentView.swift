@@ -265,8 +265,7 @@ struct PrivacyBadge: View {
     let isLandscape: Bool
 
     var body: some View {
-        let isLocal = mode == .localOnly
-        let tint: Color = isLocal ? .green : .orange
+        let tint: Color = .green
         Text(mode.badgeText)
             .font(.system(size: isLandscape ? 10 : 11, weight: .bold, design: .monospaced))
             .foregroundStyle(tint)
@@ -277,7 +276,7 @@ struct PrivacyBadge: View {
                 Capsule().stroke(tint.opacity(0.45), lineWidth: 1)
             )
             .accessibilityIdentifier("privacy-badge")
-            .accessibilityLabel(isLocal ? "Локальная обработка" : "Облачная обработка (с согласия)")
+            .accessibilityLabel("Локальная обработка")
     }
 }
 
@@ -337,19 +336,6 @@ struct SettingsView: View {
         NavigationStack {
             Form {
                 Section {
-                    Toggle(isOn: $privacy.allowCloud) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Разрешить облачную обработку")
-                                .font(.body.weight(.medium))
-                            Text(privacy.allowCloud
-                                 ? "Аудио и расшифровки могут уходить с устройства."
-                                 : "Аудио остаётся на устройстве. Облако выключено.")
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .accessibilityIdentifier("cloud-toggle")
-
                     Toggle(isOn: $privacy.voiceFilterActive) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Активный голосовой фильтр")
@@ -365,7 +351,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Приватность")
                 } footer: {
-                    Text("По умолчанию Dspeech обрабатывает звук только локально. Облако включается явно и видно по бейджу LOCAL/CLOUD на главном экране.")
+                    Text("Dspeech обрабатывает звук только локально. Аудио не покидает устройство.")
                 }
 
                 if let voiceFilter {
@@ -379,10 +365,7 @@ struct SettingsView: View {
                 }
                 Section("Перевод") {
                     LabeledContent("Целевой язык", value: "Русский")
-                    LabeledContent(
-                        "Провайдер",
-                        value: privacy.allowCloud ? "Облако (по согласию)" : "Локальный"
-                    )
+                    LabeledContent("Провайдер", value: "Локальный")
                 }
                 Section("О приложении") {
                     LabeledContent("Версия", value: Bundle.main.shortVersion)

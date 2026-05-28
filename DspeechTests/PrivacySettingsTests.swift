@@ -17,47 +17,26 @@ struct PrivacySettingsTests {
         let storage = InMemoryStorage()
         let settings = PrivacySettings(storage: storage)
         #expect(settings.mode == .localOnly)
-        #expect(settings.allowCloud == false)
         #expect(settings.voiceFilterActive == true)
     }
 
-    @Test func togglingAllowCloudSwitchesToCloudFallback() {
-        let storage = InMemoryStorage()
-        let settings = PrivacySettings(storage: storage)
-
-        settings.allowCloud = true
-
-        #expect(settings.mode == .allowCloudFallback)
-        #expect(storage.stored == .allowCloudFallback)
+    @Test func privacyModeSurfaceIsLocalOnly() {
+        #expect(PrivacyMode.allCases == [.localOnly])
     }
 
-    @Test func togglingAllowCloudOffReturnsToLocalOnly() {
+    @Test func modeReflectsStoredLocalValueOnInit() {
         let storage = InMemoryStorage()
-        storage.stored = .allowCloudFallback
+        storage.stored = .localOnly
         let settings = PrivacySettings(storage: storage)
-
-        settings.allowCloud = false
-
         #expect(settings.mode == .localOnly)
-        #expect(storage.stored == .localOnly)
-    }
-
-    @Test func modeReflectsStoredValueOnInit() {
-        let storage = InMemoryStorage()
-        storage.stored = .allowCloudFallback
-        let settings = PrivacySettings(storage: storage)
-        #expect(settings.mode == .allowCloudFallback)
-        #expect(settings.allowCloud)
     }
 
     @Test func localOnlyDoesNotSendAudioOffDevice() {
         #expect(PrivacyMode.localOnly.sendsAudioOffDevice == false)
-        #expect(PrivacyMode.allowCloudFallback.sendsAudioOffDevice == true)
     }
 
     @Test func badgeTextMatchesMode() {
         #expect(PrivacyMode.localOnly.badgeText == "LOCAL")
-        #expect(PrivacyMode.allowCloudFallback.badgeText == "CLOUD")
     }
 
     @Test func voiceFilterActiveDefaultsTrueAndPersistsOff() {
@@ -79,9 +58,6 @@ struct PrivacySettingsTests {
         let storage = UserDefaultsPrivacySettingsStorage(defaults: defaults)
         #expect(storage.loadPrivacyMode() == .localOnly)
 
-        storage.savePrivacyMode(.allowCloudFallback)
-        #expect(storage.loadPrivacyMode() == .allowCloudFallback)
-
         storage.savePrivacyMode(.localOnly)
         #expect(storage.loadPrivacyMode() == .localOnly)
 
@@ -90,6 +66,17 @@ struct PrivacySettingsTests {
         #expect(storage.loadVoiceFilterActive() == false)
         storage.saveVoiceFilterActive(true)
         #expect(storage.loadVoiceFilterActive() == true)
+    }
+
+    @Test func userDefaultsUnknownPrivacyModeResolvesToLocalOnly() {
+        let suiteName = "dspeech.tests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let storage = UserDefaultsPrivacySettingsStorage(defaults: defaults)
+
+        defaults.set("legacyRemoteOptIn", forKey: UserDefaultsPrivacySettingsStorage.privacyModeKey)
+
+        #expect(storage.loadPrivacyMode() == .localOnly)
     }
 
     @Test func userDefaultsParsesVoiceFilterLaunchArguments() {
