@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+
+run_swift_format() {
+  if command -v swift >/dev/null 2>&1 && swift format --help >/dev/null 2>&1; then
+    swift format "$@"
+    return
+  fi
+  if command -v swift-format >/dev/null 2>&1; then
+    swift-format "$@"
+    return
+  fi
+  if command -v xcrun >/dev/null 2>&1 && xcrun -f swift-format >/dev/null 2>&1; then
+    xcrun swift-format "$@"
+    return
+  fi
+  echo "swift format is required for this repository hook." >&2
+  exit 1
+}
+
+require_gitleaks() {
+  if ! command -v gitleaks >/dev/null 2>&1; then
+    echo "gitleaks is required for this repository hook." >&2
+    exit 1
+  fi
+}
+
+mapfile -t staged_swift_files < <(git diff --cached --name-only --diff-filter=ACMR -- '*.swift')
+
+if [ "${#staged_swift_files[@]}" -gt 0 ]; then
+  for file in "${staged_swift_files[@]}"; do
+    if ! git diff --quiet -- "$file"; then
+      echo "Partially staged Swift file detected: $file" >&2
+      echo "Stage or stash unstaged edits before running the formatting hook." >&2
+      exit 1
+    fi
+  done
+  for file in "${staged_swift_files[@]}"; do
+    if [ -f "$file" ]; then
+      run_swift_format format --in-place "$file"
+      git add "$file"
+    fi
+  done
+  run_swift_format lint --strict --recursive Dspeech DspeechTests DspeechUITests
+fi
+
+require_gitleaks
+gitleaks git --staged --redact --verbose
+git diff --cached --binary | gitleaks stdin --redact --verbose
+
+mapfile -t untracked_files < <(git ls-files --others --exclude-standard)
+if [ "${#untracked_files[@]}" -gt 0 ]; then
+  gitleaks dir --redact --verbose "${untracked_files[@]}"
+fi

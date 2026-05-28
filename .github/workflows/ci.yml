@@ -1,0 +1,163 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - feat/**
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    name: Xcode build and test
+    runs-on: macos-26
+    env:
+      PROJECT: Dspeech.xcodeproj
+      SCHEME: Dspeech
+      SIMULATOR_DESTINATION: platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4.1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Select latest Xcode 26
+        run: |
+          set -euo pipefail
+          latest_xcode="$(
+            for candidate in /Applications/Xcode_26*.app /Applications/Xcode.app; do
+              [ -d "$candidate" ] || continue
+              version="$("$candidate/Contents/Developer/usr/bin/xcodebuild" -version | awk '/Xcode/ { print $2 }')"
+              case "$version" in
+                26*) printf '%s\t%s\n' "$version" "$candidate" ;;
+              esac
+            done | python3 -c $'import sys\nrows = [line.rstrip("\\n").split("\\t", 1) for line in sys.stdin if line.strip()]\nif rows:\n    rows.sort(key=lambda row: tuple(int(part) for part in row[0].split(".") if part.isdigit()))\n    print(rows[-1][1])'
+          )"
+          if [ -z "$latest_xcode" ]; then
+            echo "No Xcode 26 app bundle found on runner."
+            exit 1
+          fi
+          echo "DEVELOPER_DIR=$latest_xcode/Contents/Developer" >> "$GITHUB_ENV"
+          "$latest_xcode/Contents/Developer/usr/bin/xcodebuild" -version
+
+      - name: Verify documented simulator exists
+        run: |
+          set -euo pipefail
+          xcrun simctl list devices available | grep -F "iPhone 17 Pro" | grep -F "26.4.1"
+
+      - name: Build and test
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -destination "$SIMULATOR_DESTINATION" \
+            CODE_SIGNING_ALLOWED=NO \
+            build test
+
+      # Manual mac24 parity lane:
+      # DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild \
+      #   -project Dspeech.xcodeproj -scheme Dspeech \
+      #   -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4' \
+      #   CODE_SIGNING_ALLOWED=NO build test
+      #
+      # GitHub macos-15 currently lacks an iOS 26.4 simulator. If this job must
+      # move to macos-15, use an installed iOS 26.2 simulator explicitly instead.
+
+  lint-secret-scan:
+    name: Swift format and secret scan
+    runs-on: macos-26
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Select latest Xcode 26
+        run: |
+          set -euo pipefail
+          latest_xcode="$(
+            for candidate in /Applications/Xcode_26*.app /Applications/Xcode.app; do
+              [ -d "$candidate" ] || continue
+              version="$("$candidate/Contents/Developer/usr/bin/xcodebuild" -version | awk '/Xcode/ { print $2 }')"
+              case "$version" in
+                26*) printf '%s\t%s\n' "$version" "$candidate" ;;
+              esac
+            done | python3 -c $'import sys\nrows = [line.rstrip("\\n").split("\\t", 1) for line in sys.stdin if line.strip()]\nif rows:\n    rows.sort(key=lambda row: tuple(int(part) for part in row[0].split(".") if part.isdigit()))\n    print(rows[-1][1])'
+          )"
+          if [ -z "$latest_xcode" ]; then
+            echo "No Xcode 26 app bundle found on runner."
+            exit 1
+          fi
+          echo "DEVELOPER_DIR=$latest_xcode/Contents/Developer" >> "$GITHUB_ENV"
+
+      - name: Swift format lint
+        run: |
+          set -euo pipefail
+          swift format lint --strict --recursive Dspeech DspeechTests DspeechUITests
+
+      - name: Install gitleaks
+        run: |
+          set -euo pipefail
+          brew install gitleaks
+
+      - name: Gitleaks history scan
+        run: |
+          set -euo pipefail
+          gitleaks git --redact --verbose .
+
+  privacy-manifest:
+    name: Privacy manifest validation
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Validate PrivacyInfo.xcprivacy
+        run: |
+          set -euo pipefail
+          test -f Dspeech/PrivacyInfo.xcprivacy
+          grep -F "PrivacyInfo.xcprivacy in Resources" Dspeech.xcodeproj/project.pbxproj
+          plutil -lint Dspeech/PrivacyInfo.xcprivacy
+          python3 - <<'PY'
+          import plistlib
+          import sys
+          from pathlib import Path
+
+          path = Path("Dspeech/PrivacyInfo.xcprivacy")
+          manifest = plistlib.loads(path.read_bytes())
+          required_root_keys = {
+              "NSPrivacyAccessedAPITypes",
+              "NSPrivacyCollectedDataTypes",
+              "NSPrivacyTracking",
+              "NSPrivacyTrackingDomains",
+          }
+          missing = required_root_keys - manifest.keys()
+          if missing:
+              raise SystemExit(f"Missing root keys: {sorted(missing)}")
+          if manifest["NSPrivacyTracking"] is not False:
+              raise SystemExit("NSPrivacyTracking must be false")
+          if manifest["NSPrivacyCollectedDataTypes"] != []:
+              raise SystemExit("NSPrivacyCollectedDataTypes must be empty")
+          if manifest["NSPrivacyTrackingDomains"] != []:
+              raise SystemExit("NSPrivacyTrackingDomains must be empty")
+
+          user_defaults_entries = [
+              entry
+              for entry in manifest["NSPrivacyAccessedAPITypes"]
+              if entry.get("NSPrivacyAccessedAPIType") == "NSPrivacyAccessedAPICategoryUserDefaults"
+          ]
+          if not user_defaults_entries:
+              raise SystemExit("Missing UserDefaults required-reason API entry")
+          reasons = set()
+          for entry in user_defaults_entries:
+              reasons.update(entry.get("NSPrivacyAccessedAPITypeReasons", []))
+          if "CA92.1" not in reasons:
+              raise SystemExit("Missing UserDefaults reason CA92.1")
+          PY

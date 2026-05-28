@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+message_file="${1:?commit message file is required}"
+subject="$(sed -n '1p' "$message_file")"
+
+if ! printf '%s\n' "$subject" | grep -Eq '^(feat|fix|refactor|docs|test|chore|perf|ci|build|style)(\([a-z0-9._-]+\))?: .+'; then
+  cat >&2 <<'EOF'
+Commit subject must use Conventional Commits:
+  type(scope): imperative summary
+
+Allowed types: feat, fix, refactor, docs, test, chore, perf, ci, build, style
+EOF
+  exit 1
+fi

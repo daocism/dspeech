@@ -3,6 +3,7 @@ xcuserdata/
 *.xcuserstate
 DerivedData/
 build/
+tmp/
 .swiftpm/
 .env
 .env.*
