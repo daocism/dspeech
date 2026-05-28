@@ -14,6 +14,7 @@ The voice-filter routing path is now landed and verified end-to-end as a *seam*:
 - `CLAUDE.md` hard rules win inside this repo.
 - ADRs in `docs/adr/` are append-only source of truth for architecture/product decisions.
 - `docs/PLAN-2026-05-18.md` remains the current iteration plan until superseded by a newer dated plan.
+- New north-star reference for downstream leads: `docs/ai-kb/2026-05-28-best-practices-north-star.md`. It pins the current Apple/Swift/Speech/privacy/TestFlight source bar, records that ADR 0007 is stale relative to the active FluidAudio-backed branch, and keeps ADR 0008 as the release gate.
 - MyInfra Project Workspaces registers this project as `project_id=dspeech` and task prefix `[Dspeech]`.
 - Notion is a read model only; this repo + `docs/ai-kb/` + `.ai/project-state.md` is canonical for AI project memory.
 - Notion connector returned **NOT_FOUND** for active task `369dfa2b-7893-814c-be7e-e7cea26486a6` (no connector reachable from the run environment — re-confirmed run `…29c9c067`, 2026-05-26); repo run-notes + commit SHAs are the canonical handoff. See `docs/run-notes/2026-05-25-speaker-identifier-slice.md`.
