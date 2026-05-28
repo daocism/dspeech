@@ -21,6 +21,10 @@ struct SpeakerMatcherTests {
         )
     }
 
+    private static func unitVector(cosineAgainstXAxis score: Float) -> [Float] {
+        [score, (1 - score * score).squareRoot()]
+    }
+
     @Test func cosineSimilarityIdentical() {
         let a: [Float] = [1, 2, 3, 4]
         #expect(abs(SpeakerMatcher.cosineSimilarity(a, a) - 1.0) < 1e-5)
@@ -74,6 +78,22 @@ struct SpeakerMatcherTests {
         }
     }
 
+    @Test func pilotThresholdBoundaryReturnsPilotWhenSeparated() {
+        let config = SpeakerMatchConfig.default
+        let cand = Self.vector(Self.unitVector(cosineAgainstXAxis: config.pilotMatchThreshold))
+        let profiles = [
+            Self.profile(.primary, [1, 0]),
+            Self.profile(.secondary, [-1, 0])
+        ]
+
+        let decision = SpeakerMatcher.match(candidate: cand, profiles: profiles, config: config)
+        if case let .pilot(slot, _) = decision {
+            #expect(slot == .primary)
+        } else {
+            Issue.record("expected pilot at threshold boundary, got \(decision)")
+        }
+    }
+
     @Test func onePilotBelowThresholdIsNonPilot() {
         let cand = Self.vector([0.2, 1.0, 0, 0])
         let profiles = [Self.profile(.primary, [1.0, 0.1, 0, 0])]
@@ -82,6 +102,19 @@ struct SpeakerMatcherTests {
             #expect(score < 0.72)
         } else {
             Issue.record("expected nonPilot, got \(decision)")
+        }
+    }
+
+    @Test func mixedLowerBoundBoundaryReturnsMixedBelowPilotThreshold() {
+        let config = SpeakerMatchConfig.default
+        let cand = Self.vector(Self.unitVector(cosineAgainstXAxis: config.mixedSpeakerLowerBound))
+        let profiles = [Self.profile(.primary, [1, 0])]
+
+        let decision = SpeakerMatcher.match(candidate: cand, profiles: profiles, config: config)
+        if case let .mixed(score) = decision {
+            #expect(score < config.pilotMatchThreshold)
+        } else {
+            Issue.record("expected mixed at lower-bound boundary, got \(decision)")
         }
     }
 
@@ -110,6 +143,42 @@ struct SpeakerMatcherTests {
             #expect(score > 0.6)
         } else {
             Issue.record("expected mixed ambiguous candidate, got \(decision)")
+        }
+    }
+
+    @Test func separationMarginBoundaryIsInclusive() {
+        let config = SpeakerMatchConfig.default
+        let cand = Self.vector([1, 0])
+        let primary = Self.profile(.primary, [1, 0])
+        let secondaryAtMargin = Self.profile(
+            .secondary,
+            Self.unitVector(cosineAgainstXAxis: 1 - config.separationMargin)
+        )
+        let secondaryInsideMargin = Self.profile(
+            .secondary,
+            Self.unitVector(cosineAgainstXAxis: 1 - config.separationMargin / 2)
+        )
+
+        let atMargin = SpeakerMatcher.match(
+            candidate: cand,
+            profiles: [primary, secondaryAtMargin],
+            config: config
+        )
+        if case let .pilot(slot, _) = atMargin {
+            #expect(slot == .primary)
+        } else {
+            Issue.record("expected pilot at separation-margin boundary, got \(atMargin)")
+        }
+
+        let insideMargin = SpeakerMatcher.match(
+            candidate: cand,
+            profiles: [primary, secondaryInsideMargin],
+            config: config
+        )
+        if case let .mixed(score) = insideMargin {
+            #expect(score >= config.pilotMatchThreshold)
+        } else {
+            Issue.record("expected mixed inside separation margin, got \(insideMargin)")
         }
     }
 
