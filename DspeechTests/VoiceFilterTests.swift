@@ -784,6 +784,39 @@ struct ModelPackStateStorageTests {
     }
 }
 
+struct ModelPackDownloadFailureTests {
+    @Test func integrityInstallErrorsProduceChecksumFailure() {
+        let errors: [ModelPackInstallError] = [
+            .integrityExpectedFileMissing("model.bin"),
+            .integrityUnexpectedFile("extra.bin"),
+            .integrityChecksumMismatch(relativePath: "model.bin", expectedSHA256: "expected", actualSHA256: "actual"),
+            .integrityFileUnreadable("model.bin"),
+            .integrityManifestEmpty
+        ]
+
+        for error in errors {
+            let failure = modelPackDownloadFailure(for: error)
+            #expect(failure.kind == .checksum)
+            #expect(failure.isRetryable)
+            #expect(failure.userSafeReason.contains("контрольной суммы"))
+            #expect(failure.userSafeReason.contains("целостности"))
+        }
+    }
+
+    @Test func otherDownloadErrorsProduceNetworkFailure() {
+        let failures = [
+            modelPackDownloadFailure(for: ModelPackInstallError.filesMissingAfterDownload),
+            modelPackDownloadFailure(for: URLError(.notConnectedToInternet))
+        ]
+
+        for failure in failures {
+            #expect(failure.kind == .network)
+            #expect(failure.isRetryable)
+            #expect(failure.userSafeReason.contains("сети"))
+        }
+    }
+}
+
 struct SpeakerModelPackInstallerTests {
     private static let segmentationFixturePath = "pyannote_segmentation.mlmodelc/model.mil"
     private static let embeddingFixturePath = "wespeaker_v2.mlmodelc/model.mil"

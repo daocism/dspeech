@@ -526,11 +526,7 @@ struct VoiceFilterSettingsSection: View {
                 return
             } catch {
                 if Task.isCancelled { return }
-                transition(to: .failed(ModelPackFailure(
-                    kind: .network,
-                    userSafeReason: "Не удалось скачать пакет модели. Проверьте подключение к сети и попробуйте снова.",
-                    isRetryable: true
-                )))
+                transition(to: .failed(modelPackDownloadFailure(for: error)))
             }
             downloadTask = nil
         }
@@ -763,6 +759,22 @@ struct VoiceFilterSettingsSection: View {
             return "Установка модели…"
         }
     }
+}
+
+func modelPackDownloadFailure(for error: Error) -> ModelPackFailure {
+    if let installError = error as? ModelPackInstallError, installError.isIntegrityFailure {
+        return ModelPackFailure(
+            kind: .checksum,
+            userSafeReason: "Пакет модели не прошёл проверку контрольной суммы или целостности. Повторите загрузку, чтобы скачать проверенную копию.",
+            isRetryable: true
+        )
+    }
+
+    return ModelPackFailure(
+        kind: .network,
+        userSafeReason: "Не удалось скачать пакет модели. Проверьте подключение к сети и попробуйте снова.",
+        isRetryable: true
+    )
 }
 
 private extension Bundle {
