@@ -86,6 +86,7 @@ final class DspeechUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments += [
             "-dspeech.privacy.mode.v1", "localOnly",
+            "-dspeech.privacy.voicefilter.active.v1", "true",
             "-dspeech.voicefilter.modelpack.v1", "absent"
         ]
         app.launch()
@@ -127,10 +128,71 @@ final class DspeechUITests: XCTestCase {
     }
 
     @MainActor
+    func testVoiceFilterActiveKillSwitchDefaultsOnAndCanTurnOff() throws {
+        let app = launchAppWithCleanPrivacyDefaults()
+
+        app.buttons["settings-button"].tap()
+
+        let activeToggle = app.switches["voicefilter-active-toggle"]
+        XCTAssertTrue(activeToggle.waitForExistence(timeout: 4))
+        XCTAssertEqual(activeToggle.value as? String, "1")
+
+        activeToggle.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+        let switchedOff = NSPredicate(format: "value == %@", "0")
+        expectation(for: switchedOff, evaluatedWith: activeToggle, handler: nil)
+        waitForExpectations(timeout: 4)
+    }
+
+    @MainActor
+    func testVoiceFilterRetryButtonIsEnabledForRetryableFailure() throws {
+        let app = XCUIApplication()
+        app.launchArguments += [
+            "-dspeech.privacy.mode.v1", "localOnly",
+            "-dspeech.privacy.voicefilter.active.v1", "true",
+            "-dspeech.voicefilter.modelpack.v1", "failedRetryable"
+        ]
+        app.launch()
+
+        app.buttons["settings-button"].tap()
+
+        let retry = app.buttons["voicefilter-modelpack-retry"]
+        var attempts = 0
+        while !retry.exists && attempts < 8 {
+            app.swipeUp()
+            attempts += 1
+        }
+        XCTAssertTrue(retry.waitForExistence(timeout: 4))
+        XCTAssertTrue(retry.isEnabled)
+    }
+
+    @MainActor
+    func testVoiceFilterAcquisitionShowsPercentText() throws {
+        let app = XCUIApplication()
+        app.launchArguments += [
+            "-dspeech.privacy.mode.v1", "localOnly",
+            "-dspeech.privacy.voicefilter.active.v1", "true",
+            "-dspeech.voicefilter.modelpack.v1", "acquiringHalf"
+        ]
+        app.launch()
+
+        app.buttons["settings-button"].tap()
+
+        let percent = app.staticTexts["voicefilter-modelpack-percent"]
+        var attempts = 0
+        while !percent.exists && attempts < 8 {
+            app.swipeUp()
+            attempts += 1
+        }
+        XCTAssertTrue(percent.waitForExistence(timeout: 4))
+        XCTAssertEqual(percent.label, "42%")
+    }
+
+    @MainActor
     private func launchAppWithCleanPrivacyDefaults() -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += [
-            "-dspeech.privacy.mode.v1", "localOnly"
+            "-dspeech.privacy.mode.v1", "localOnly",
+            "-dspeech.privacy.voicefilter.active.v1", "true"
         ]
         app.launch()
         return app
