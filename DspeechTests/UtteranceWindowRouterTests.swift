@@ -13,9 +13,9 @@ import Testing
 // every submitted block to the segmenter and only cuts a decision window when
 // the segmenter reports a *trailing-silence utterance edge* (`.cutAfterSilence`)
 // or a *conservative max-window cap* (`.cutAtMaxWindow`). Below an utterance
-// edge the window keeps accumulating; on `finish()` the pending uncertain tail
-// is flushed (fail open) and no buffer is ever appended after the recognition
-// request is ended.
+// edge the window keeps accumulating; on `finish()` unresolved submitted audio
+// is flushed (fail open) in FIFO order and late classifier results are ignored
+// so no buffer is appended twice.
 //
 // These tests drive a seam that does not yet exist in production; they are RED
 // (compile failure: "cannot find type 'SpeechActivitySegmenter' in scope",
@@ -62,8 +62,9 @@ import Testing
 //   6. A sub-threshold / silence-only pending tail is flushed (appended) on
 //      `finish()`, never silently discarded.
 //   7. A classifier throw still fails open: the whole window is appended.
-//   8. `finish()` ends the request — no buffer submitted after it, nor any window
-//      still classifying when it is called, is ever appended (W1/W2 invariant).
+//   8. `finish()` finalizes submitted audio in FIFO order: any cut window still
+//      classifying fail-opens before a later pending tail, late classifier results
+//      are ignored, and buffers submitted after finish are never appended.
 @MainActor
 struct UtteranceWindowRouterTests {
 
@@ -415,28 +416,43 @@ struct UtteranceWindowRouterTests {
         }
     }
 
-    @Test("should not append a window still classifying when finish is called")
-    func inFlightWindowDoesNotAppendAfterFinish() async {
+    @Test("should fail open an in-flight cut window before a pending tail on finish")
+    func finishFailOpensInFlightCutWindowBeforePendingTailOnce() async {
         let gate = WindowGate()
-        await confirmation("append after finish", expectedCount: 0) { appended in
-            let segmenter = ScriptedSegmenter([1: .cutAfterSilence])
-            let router = UtteranceWindowRouter<Int>(
-                segmenter: segmenter,
-                classify: Self.gatedClassify(gate: gate, decisions: [1: .transcribe(reason: .nonPilotVoice)]),
-                append: { _ in appended() }
-            )
+        let (appended, appendContinuation) = AsyncStream<Int>.makeStream()
+        let segmenter = ScriptedSegmenter([
+            1: .cutAfterSilence,
+            2: .accumulate,
+        ])
+        let router = UtteranceWindowRouter<Int>(
+            segmenter: segmenter,
+            classify: Self.gatedClassify(gate: gate, decisions: [1: .discard(reason: .pilotVoice)]),
+            append: { appendContinuation.yield($0) }
+        )
 
-            // The window is cut and classification starts, but the result has not
-            // resolved when finish() ends the request.
-            router.submit(1, samples: Self.samples(token: 1, count: 4), sampleRate: 16_000)
-            for _ in 0..<10 { await Task.yield() }
-            router.finish()
-
-            // The in-flight classification now resolves; it must not append into
-            // the ended recognition request.
-            await gate.release(1)
-            for _ in 0..<100 { await Task.yield() }
+        // Window A is cut and starts classifying. Window B is only a pending tail
+        // when finish() fires, so both are unresolved and must fail-open in capture
+        // order instead of appending B while dropping A.
+        router.submit(1, samples: Self.samples(token: 1, count: 4), sampleRate: 16_000)
+        for _ in 0..<50 {
+            if await gate.snapshot() == [.start(1)] { break }
+            await Task.yield()
         }
+        #expect(await gate.snapshot() == [.start(1)])
+
+        router.submit(2, samples: Self.samples(token: 2, count: 4), sampleRate: 16_000)
+        router.finish()
+
+        // The classifier eventually resolves to discard, but finish already
+        // fail-opened A once; the late result must not remove or duplicate it.
+        await gate.release(1)
+        for _ in 0..<100 { await Task.yield() }
+        appendContinuation.finish()
+
+        var appendedTokens: [Int] = []
+        for await token in appended { appendedTokens.append(token) }
+        #expect(appendedTokens == [1, 2])
+        #expect(await gate.snapshot() == [.start(1), .finish(1)])
     }
 }
 

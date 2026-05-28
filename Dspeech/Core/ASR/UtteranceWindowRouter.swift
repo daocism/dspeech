@@ -9,7 +9,6 @@ final class UtteranceWindowRouter<Buffer> {
     }
 
     private let segmenter: SpeechActivitySegmenter
-    private let append: (Buffer) -> Void
     private let inner: SerialBufferRouter<[Buffer]>
 
     private var pending: [Pending] = []
@@ -21,7 +20,6 @@ final class UtteranceWindowRouter<Buffer> {
         append: @escaping (Buffer) -> Void
     ) {
         self.segmenter = segmenter
-        self.append = append
         self.inner = SerialBufferRouter<[Buffer]>(
             classify: classify,
             // why: one classification decides the whole window — every buffer in
@@ -46,13 +44,16 @@ final class UtteranceWindowRouter<Buffer> {
 
     func finish() {
         finished = true
-        // why: the pending tail never reached a decision window, so it is
-        // uncertain — flush it to ASR (fail open) before the request ends rather
-        // than discard it. This runs synchronously, ahead of endAudio(); the inner
-        // router then blocks any in-flight chunk from appending post-finish.
-        let tail = pending.map(\.buffer)
+        // why: the pending tail never reached a decision window, so it is uncertain.
+        // Enqueue it through the serial router before finalizing so an earlier cut
+        // window still classifying fail-opens ahead of it instead of being dropped.
+        let tailBuffers = pending.map(\.buffer)
+        let tailSamples = pending.flatMap(\.samples)
+        let tailSampleRate = pending.last?.sampleRate ?? 0
         pending.removeAll()
-        for buffer in tail { append(buffer) }
+        if !tailBuffers.isEmpty {
+            inner.submit(tailBuffers, samples: tailSamples, sampleRate: tailSampleRate)
+        }
         inner.finish()
     }
 

@@ -12,6 +12,7 @@ final class SerialBufferRouter<Buffer> {
     private let append: (Buffer) -> Void
 
     private var queue: [Item] = []
+    private var current: Item?
     private var isDraining = false
     private var finished = false
 
@@ -30,8 +31,14 @@ final class SerialBufferRouter<Buffer> {
     }
 
     func finish() {
+        guard !finished else { return }
         finished = true
+        let unresolved = [current].compactMap { $0 } + queue
+        current = nil
         queue.removeAll()
+        for item in unresolved {
+            append(item.buffer)
+        }
     }
 
     private func drainIfNeeded() {
@@ -43,6 +50,7 @@ final class SerialBufferRouter<Buffer> {
     private func drain() async {
         while !finished, !queue.isEmpty {
             let item = queue.removeFirst()
+            current = item
             let decision: PreTranscriptionRoutingDecision
             do {
                 decision = try await classify(item.samples, item.sampleRate)
@@ -51,9 +59,11 @@ final class SerialBufferRouter<Buffer> {
                 // silently drop ATC audio, and must not disturb FIFO order.
                 decision = .transcribe(reason: .classifierUnavailable)
             }
-            // why: stop()/cleanup may have called finish() while classifying; a
-            // post-finish buffer must never reach the ended recognition request.
+            // why: stop()/cleanup may have called finish() while classifying; finish
+            // already fail-opened this item in FIFO order, so the late classifier
+            // result must not append it a second time.
             guard !finished else { break }
+            current = nil
             switch decision {
             case .transcribe:
                 append(item.buffer)
@@ -61,6 +71,7 @@ final class SerialBufferRouter<Buffer> {
                 continue
             }
         }
+        current = nil
         isDraining = false
     }
 }
