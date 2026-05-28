@@ -233,12 +233,14 @@ struct UtteranceWindowRouterTests {
 
         await gate.release(1)
         await gate.release(3)
-        appendContinuation.finish()
 
+        var iterator = appended.makeAsyncIterator()
         var appendedTokens: [Int] = []
-        for await token in appended { appendedTokens.append(token) }
+        if let firstToken = await iterator.next() { appendedTokens.append(firstToken) }
+        if let secondToken = await iterator.next() { appendedTokens.append(secondToken) }
         // Pilot window dropped as a unit; the second utterance survives intact.
         #expect(appendedTokens == [3, 4])
+        appendContinuation.finish()
     }
 
     @Test("should cut a continuous no-silence region at the max-window cap")
