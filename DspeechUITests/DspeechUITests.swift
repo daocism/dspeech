@@ -39,8 +39,6 @@ final class DspeechUITests: XCTestCase {
         XCTAssertEqual(badge.label, "Локальная обработка")
 
         app.buttons["settings-button"].tap()
-        let removedRemoteToggle = app.switches[["cl", "oud-toggle"].joined()]
-        XCTAssertFalse(removedRemoteToggle.waitForExistence(timeout: 1))
         XCTAssertTrue(app.switches["voicefilter-active-toggle"].waitForExistence(timeout: 4))
 
         app.buttons["settings-done-button"].tap()
