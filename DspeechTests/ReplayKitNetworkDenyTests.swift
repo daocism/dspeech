@@ -3,27 +3,43 @@ import Testing
 @testable import Dspeech
 
 private final class NetworkAttemptStore: @unchecked Sendable {
+    struct Attempt: Sendable {
+        let sequence: Int
+        let scopeID: UUID?
+        let url: URL
+    }
+
     static let shared = NetworkAttemptStore()
-
     private let lock = NSLock()
-    private var attemptedURLs: [URL] = []
+    private var nextSequence = 0
+    private var attempts: [Attempt] = []
 
-    func reset() {
+    func mark() -> Int {
         lock.withLock {
-            attemptedURLs.removeAll()
+            nextSequence
         }
     }
 
-    func record(_ url: URL) {
+    func record(_ url: URL, scopeID: UUID?) {
         lock.withLock {
-            attemptedURLs.append(url)
+            attempts.append(Attempt(sequence: nextSequence, scopeID: scopeID, url: url))
+            nextSequence += 1
         }
     }
 
-    func snapshot() -> [URL] {
-        lock.withLock { attemptedURLs }
+    func snapshot(scopeID: UUID, since startSequence: Int, includeUnscoped: Bool) -> [URL] {
+        lock.withLock {
+            attempts
+                .filter { attempt in
+                    attempt.sequence >= startSequence
+                        && (attempt.scopeID == scopeID || (includeUnscoped && attempt.scopeID == nil))
+                }
+                .map(\.url)
+        }
     }
 }
+
+private let networkDenyScopeIDKey = "DspeechTests.NetworkDenyScopeID"
 
 private final class DenyAllNetworkURLProtocol: URLProtocol, @unchecked Sendable {
     override class func canInit(with request: URLRequest) -> Bool {
@@ -36,7 +52,8 @@ private final class DenyAllNetworkURLProtocol: URLProtocol, @unchecked Sendable 
 
     override func startLoading() {
         if let url = request.url {
-            NetworkAttemptStore.shared.record(url)
+            let scopeID = URLProtocol.property(forKey: networkDenyScopeIDKey, in: request) as? UUID
+            NetworkAttemptStore.shared.record(url, scopeID: scopeID)
         }
         client?.urlProtocol(self, didFailWithError: URLError(.notConnectedToInternet))
     }
@@ -45,9 +62,18 @@ private final class DenyAllNetworkURLProtocol: URLProtocol, @unchecked Sendable 
 }
 
 private struct NetworkDenyScope {
-    init() {
-        NetworkAttemptStore.shared.reset()
-        URLProtocol.registerClass(DenyAllNetworkURLProtocol.self)
+    private let id = UUID()
+    private let startSequence: Int
+    private let capturesUnscopedAttempts: Bool
+    private let registeredGlobalProtocol: Bool
+
+    init(registerGlobalProtocol: Bool = true) {
+        startSequence = NetworkAttemptStore.shared.mark()
+        capturesUnscopedAttempts = registerGlobalProtocol
+        registeredGlobalProtocol = registerGlobalProtocol
+        if registerGlobalProtocol {
+            URLProtocol.registerClass(DenyAllNetworkURLProtocol.self)
+        }
     }
 
     func makeGuardedSession() -> URLSession {
@@ -56,12 +82,24 @@ private struct NetworkDenyScope {
         return URLSession(configuration: configuration)
     }
 
+    func makeGuardedRequest(url: URL) -> URLRequest {
+        let request = NSMutableURLRequest(url: url)
+        URLProtocol.setProperty(id, forKey: networkDenyScopeIDKey, in: request)
+        return request as URLRequest
+    }
+
     func attempts() -> [URL] {
-        NetworkAttemptStore.shared.snapshot()
+        NetworkAttemptStore.shared.snapshot(
+            scopeID: id,
+            since: startSequence,
+            includeUnscoped: capturesUnscopedAttempts
+        )
     }
 
     func close() {
-        URLProtocol.unregisterClass(DenyAllNetworkURLProtocol.self)
+        if registeredGlobalProtocol {
+            URLProtocol.unregisterClass(DenyAllNetworkURLProtocol.self)
+        }
     }
 }
 
@@ -233,12 +271,13 @@ struct ReplayKitNetworkDenyTests {
     }
 
     @Test func urlSessionGuardFailsRequestsWithoutRealNetwork() async {
-        let scope = NetworkDenyScope()
+        let scope = NetworkDenyScope(registerGlobalProtocol: false)
         defer { scope.close() }
         let session = scope.makeGuardedSession()
+        let request = scope.makeGuardedRequest(url: URL(string: "https://egress.invalid/probe")!)
 
         do {
-            _ = try await session.data(from: URL(string: "https://egress.invalid/probe")!)
+            _ = try await session.data(for: request)
             Issue.record("The guarded URLSession should fail before any real network access.")
         } catch {
             #expect(scope.attempts() == [URL(string: "https://egress.invalid/probe")!])
