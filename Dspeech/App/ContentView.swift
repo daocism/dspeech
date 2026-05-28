@@ -3,7 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @State private var coordinator: CaptureCoordinator
     @State private var voiceFilter: VoiceFilterPipeline
-    @State private var privacy = PrivacySettings()
+    @State private var privacy: PrivacySettings
     @State private var showTranslation: Bool = true
     @State private var showSettings: Bool = false
 
@@ -12,6 +12,7 @@ struct ContentView: View {
         voiceFilter: VoiceFilterPipeline? = nil,
         routing: AudioSessionRouting = LiveAudioSessionRouting()
     ) {
+        let privacySettings = PrivacySettings()
         let filter: VoiceFilterPipeline
         if let voiceFilter {
             filter = voiceFilter
@@ -24,7 +25,8 @@ struct ContentView: View {
                     backendBuilder: backendBuilder
                 ),
                 backendBuilder: backendBuilder,
-                modelPackStorage: modelPackStorage
+                modelPackStorage: modelPackStorage,
+                voiceFilterActive: { privacySettings.voiceFilterActive }
             )
         }
         let resolvedEngine = engine ?? AppleSpeechLiveTranscriptionEngine(
@@ -32,6 +34,7 @@ struct ContentView: View {
         )
         let live = LiveTranscriptionViewModel(engine: resolvedEngine, voiceFilter: filter)
         let monitor = RouteHealthMonitor(routing: routing)
+        _privacy = State(initialValue: privacySettings)
         _voiceFilter = State(initialValue: filter)
         _coordinator = State(initialValue: CaptureCoordinator(
             live: live,
@@ -346,6 +349,19 @@ struct SettingsView: View {
                         }
                     }
                     .accessibilityIdentifier("cloud-toggle")
+
+                    Toggle(isOn: $privacy.voiceFilterActive) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Активный голосовой фильтр")
+                                .font(.body.weight(.medium))
+                            Text(privacy.voiceFilterActive
+                                 ? "Пред-ASR фильтр может скрывать только уверенно распознанную речь пилота."
+                                 : "Пред-ASR фильтр выключен; все аудиобуферы передаются в распознавание.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .accessibilityIdentifier("voicefilter-active-toggle")
                 } header: {
                     Text("Приватность")
                 } footer: {
@@ -613,10 +629,14 @@ struct VoiceFilterSettingsSection: View {
 
     private func acquiringContent(_ acquisition: ModelPackAcquisition) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(acquisition.phase == .downloading ? "Загрузка модели…" : "Установка модели…")
+            Text(acquisitionTitle(acquisition.phase))
                 .font(.subheadline.weight(.semibold))
             ProgressView(value: acquisition.fractionComplete)
                 .accessibilityIdentifier("voicefilter-modelpack-progress")
+            Text("\(acquisition.percentComplete)%")
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("voicefilter-modelpack-percent")
             if let received = acquisition.bytesReceived, let total = acquisition.totalBytes {
                 Text("\(byteString(received)) из \(byteString(total))")
                     .font(.caption.monospacedDigit())
@@ -706,9 +726,10 @@ struct VoiceFilterSettingsSection: View {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             if failure.isRetryable {
-                Button("Повторить загрузку") {}
+                Button("Повторить загрузку") {
+                    startDownload()
+                }
                     .buttonStyle(.bordered)
-                    .disabled(true)
                     .accessibilityIdentifier("voicefilter-modelpack-retry")
             }
             Button("Продолжить без голосового фильтра") {
@@ -749,6 +770,15 @@ struct VoiceFilterSettingsSection: View {
 
     private func byteString(_ bytes: Int64) -> String {
         ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+    }
+
+    private func acquisitionTitle(_ phase: ModelPackAcquisition.Phase) -> String {
+        switch phase {
+        case .downloading:
+            return "Загрузка модели…"
+        case .importing:
+            return "Установка модели…"
+        }
     }
 }
 

@@ -22,6 +22,10 @@ struct ModelPackAcquisition: Equatable, Sendable, Codable {
         self.bytesReceived = bytesReceived
         self.totalBytes = totalBytes
     }
+
+    var percentComplete: Int {
+        Int((fractionComplete * 100).rounded())
+    }
 }
 
 struct InstalledModelPack: Equatable, Sendable, Codable {
@@ -138,8 +142,14 @@ struct UserDefaultsModelPackStateStorage: ModelPackStateStorage, @unchecked Send
     }
 
     func loadState() -> ModelPackState {
-        guard let data = defaults.data(forKey: Self.stateKey),
-              let decoded = try? JSONDecoder().decode(ModelPackState.self, from: data) else {
+        if let raw = defaults.string(forKey: Self.stateKey),
+           let launchState = Self.launchArgumentState(raw) {
+            return launchState
+        }
+        guard let data = defaults.data(forKey: Self.stateKey) else {
+            return .absent
+        }
+        guard let decoded = try? JSONDecoder().decode(ModelPackState.self, from: data) else {
             return .absent
         }
         return decoded.recoveredAfterColdStart()
@@ -148,5 +158,33 @@ struct UserDefaultsModelPackStateStorage: ModelPackStateStorage, @unchecked Send
     func saveState(_ state: ModelPackState) {
         guard let data = try? JSONEncoder().encode(state) else { return }
         defaults.set(data, forKey: Self.stateKey)
+    }
+
+    private static func launchArgumentState(_ raw: String) -> ModelPackState? {
+        switch raw {
+        case "absent":
+            return .absent
+        case "failedRetryable":
+            return .failed(ModelPackFailure(
+                kind: .network,
+                userSafeReason: "Не удалось скачать пакет модели. Проверьте подключение к сети и попробуйте снова.",
+                isRetryable: true
+            ))
+        case "acquiringHalf":
+            return .acquiring(ModelPackAcquisition(
+                phase: .downloading,
+                fractionComplete: 0.42,
+                bytesReceived: 6_300_000,
+                totalBytes: 15_000_000
+            ))
+        case "failedPermanent":
+            return .failed(ModelPackFailure(
+                kind: .unknown,
+                userSafeReason: "Проверка пакета модели не прошла.",
+                isRetryable: false
+            ))
+        default:
+            return nil
+        }
     }
 }

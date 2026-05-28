@@ -526,6 +526,38 @@ struct VoiceFilterPipelineTests {
         }
     }
 
+    @Test func voiceFilterActiveKillSwitchDisablesTextAndPreASRFiltering() async throws {
+        let store = InMemoryStorage()
+        store.enabled = true
+        store.callSign = CallSign(raw: "N123AB")
+        store.profiles = [PilotVoiceProfile(
+            slot: .primary,
+            label: "Captain",
+            voicePrint: VoicePrintVector(values: [1, 0, 0, 0], quality: 0.9)
+        )]
+        let pipeline = VoiceFilterPipeline(
+            identifier: FakeIdentifier(vector: VoicePrintVector(values: [1, 0, 0, 0], quality: 0.92)),
+            storage: store,
+            modelPackStorage: InMemoryModelPackStorage(.installed(Self.installedPack())),
+            voiceFilterActive: { false }
+        )
+
+        let textDecision = pipeline.decide(
+            text: "United 247 cleared",
+            speaker: .pilot(slot: .primary, score: 0.99),
+            timestamp: Date(timeIntervalSince1970: 0)
+        )
+        #expect(textDecision.relevance == .display(reason: .noCallSignConfigured))
+        #expect(textDecision.indicator == .filterOff)
+
+        let speaker = try await pipeline.classify(samples: [0.1, 0.2], sampleRate: 16_000)
+        #expect(speaker == .nonPilot(bestPilotScore: 0))
+        #expect(
+            pipeline.routeBeforeTranscription(speaker: .pilot(slot: .primary, score: 0.99))
+            == .transcribe(reason: .filterDisabled)
+        )
+    }
+
     @Test func disabledPackEnrollThrowsDespitePackMetadata() async {
         let pipeline = VoiceFilterPipeline(
             identifier: FakeIdentifier(vector: VoicePrintVector(values: [1, 0, 0, 0], quality: 0.92)),
@@ -651,6 +683,34 @@ struct ModelPackStateStorageTests {
         defaults.set(Data([0x00, 0x01, 0x02, 0x03]), forKey: UserDefaultsModelPackStateStorage.stateKey)
         let store = UserDefaultsModelPackStateStorage(defaults: defaults)
         #expect(store.loadState() == .absent)
+    }
+
+    @Test func launchArgumentFailedRetryableLoadsFailedState() {
+        let suiteName = "dspeech.tests.modelpack.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set("failedRetryable", forKey: UserDefaultsModelPackStateStorage.stateKey)
+        let store = UserDefaultsModelPackStateStorage(defaults: defaults)
+        let state = store.loadState()
+        guard case .failed(let failure) = state else {
+            Issue.record("expected failed state from launch argument, got \(state)")
+            return
+        }
+        #expect(failure.isRetryable)
+    }
+
+    @Test func launchArgumentAcquiringHalfLoadsAcquiringProgress() {
+        let suiteName = "dspeech.tests.modelpack.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set("acquiringHalf", forKey: UserDefaultsModelPackStateStorage.stateKey)
+        let store = UserDefaultsModelPackStateStorage(defaults: defaults)
+        let state = store.loadState()
+        guard case .acquiring(let acquisition) = state else {
+            Issue.record("expected acquiring state from launch argument, got \(state)")
+            return
+        }
+        #expect(acquisition.percentComplete == 42)
     }
 }
 
@@ -999,6 +1059,21 @@ struct SpeechAudioBufferGateTests {
             identifier: ScriptedIdentifier(decision: .pilot(slot: .primary, score: 0.99)),
             storage: store,
             modelPackStorage: InMemoryModelPackStorage(.installed(Self.installedPack()))
+        )
+        let gate = VoiceFilterSpeechAudioBufferGate(pipeline: pipeline)
+        let route = try await gate.route(samples: [0.1, 0.2, 0.1, 0.2], sampleRate: 16_000)
+        #expect(route == .transcribe(reason: .filterDisabled))
+    }
+
+    @Test func privacyKillSwitchTranscribesEvenWithInstalledPackAndProfile() async throws {
+        let store = InMemoryStorage()
+        store.enabled = true
+        store.profiles = [Self.captainProfile()]
+        let pipeline = VoiceFilterPipeline(
+            identifier: ScriptedIdentifier(decision: .pilot(slot: .primary, score: 0.99)),
+            storage: store,
+            modelPackStorage: InMemoryModelPackStorage(.installed(Self.installedPack())),
+            voiceFilterActive: { false }
         )
         let gate = VoiceFilterSpeechAudioBufferGate(pipeline: pipeline)
         let route = try await gate.route(samples: [0.1, 0.2, 0.1, 0.2], sampleRate: 16_000)

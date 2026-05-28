@@ -20,6 +20,7 @@ final class VoiceFilterPipeline {
     private let storage: VoiceFilterStorage
     private let modelPackStorage: ModelPackStateStorage
     private let matchConfig: SpeakerMatchConfig
+    private let voiceFilterActive: @MainActor () -> Bool
     private var gate: ATCTranscriptGate
 
     private(set) var profiles: [PilotVoiceProfile]
@@ -32,13 +33,15 @@ final class VoiceFilterPipeline {
         backendBuilder: (any LocalSpeakerBackendBuilder)? = nil,
         storage: VoiceFilterStorage = UserDefaultsVoiceFilterStorage(),
         modelPackStorage: ModelPackStateStorage = UserDefaultsModelPackStateStorage(),
-        matchConfig: SpeakerMatchConfig = .default
+        matchConfig: SpeakerMatchConfig = .default,
+        voiceFilterActive: @escaping @MainActor () -> Bool = { true }
     ) {
         self.identifier = identifier
         self.backendBuilder = backendBuilder
         self.storage = storage
         self.modelPackStorage = modelPackStorage
         self.matchConfig = matchConfig
+        self.voiceFilterActive = voiceFilterActive
         self.profiles = storage.loadProfiles()
         self.callSign = storage.loadCallSign()
         self.enabled = storage.loadEnabled()
@@ -138,7 +141,7 @@ final class VoiceFilterPipeline {
     ) -> VoiceFilterDecision {
         let relevance: ATCRelevanceDecision
         let indicator: ATCVoiceIndicator
-        if enabled {
+        if enabled, voiceFilterActive() {
             relevance = gate.evaluate(text: text, speaker: speaker, timestamp: timestamp)
             indicator = Self.indicator(for: speaker, relevance: relevance)
         } else {
@@ -157,7 +160,7 @@ final class VoiceFilterPipeline {
     func routeBeforeTranscription(
         speaker: SpeakerMatchDecision
     ) -> PreTranscriptionRoutingDecision {
-        guard enabled else { return .transcribe(reason: .filterDisabled) }
+        guard enabled, voiceFilterActive() else { return .transcribe(reason: .filterDisabled) }
         guard !profiles.isEmpty else { return .transcribe(reason: .noPilotProfile) }
         switch speaker {
         case .pilot:
@@ -203,7 +206,7 @@ final class VoiceFilterPipeline {
         samples: [Float],
         sampleRate: Double
     ) async throws -> SpeakerMatchDecision {
-        guard enabled, !profiles.isEmpty else {
+        guard enabled, voiceFilterActive(), !profiles.isEmpty else {
             return .nonPilot(bestPilotScore: 0)
         }
         try requireInstalledModelPack()
