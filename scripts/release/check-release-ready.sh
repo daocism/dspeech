@@ -72,7 +72,17 @@ if [ ! -d "tmp/release/Dspeech.xcarchive" ]; then
 elif [ ! -d "tmp/release/Dspeech.xcarchive/Products" ] || [ ! -f "tmp/release/Dspeech.xcarchive/Info.plist" ]; then
   failures+=("unsigned archive is incomplete: tmp/release/Dspeech.xcarchive")
 fi
-require_grep "op://MyInfra-Active/dspeech-app-store-connect-api-key/credential" "docs/release/signed-build-runbook.md" "Runbook must use op:// ASC API key reference"
+for op_ref in \
+  "op://MyInfra-Active/dspeech-apple-distribution-certificate/credential" \
+  "op://MyInfra-Active/dspeech-apple-distribution-certificate-password/credential" \
+  "op://MyInfra-Active/dspeech-app-store-provisioning-profile/credential" \
+  "op://MyInfra-Active/dspeech-app-store-connect-api-key/credential" \
+  "op://MyInfra-Active/dspeech-app-store-connect-api-key-id/credential" \
+  "op://MyInfra-Active/dspeech-app-store-connect-issuer-id/credential"
+do
+  require_grep "$op_ref" "docs/release/signed-build-runbook.md" "Runbook must use op:// signing and ASC references"
+  require_grep "$op_ref" "docs/product/app-store/testflight-setup.md" "TestFlight worksheet must use op:// signing and ASC references"
+done
 require_grep "op run --env-file" "docs/release/signed-build-runbook.md" "Runbook must use op run for upload credentials"
 require_grep "Transporter|Xcode Organizer" "docs/release/signed-build-runbook.md" "Runbook must prefer Xcode or Transporter path"
 require_grep "No CI submission automation" "docs/release/signed-build-runbook.md" "Runbook must block CI submission automation"

@@ -40,10 +40,13 @@ Apple sources:
    - privacy answers are unpublished until approved;
    - no IAP products are expected for this slice.
 
-## Optional fastlane/match flow after credentials exist
+## Optional automation flow after credentials exist
 
 Only adopt this path after creating Dspeech-scoped 1Password items:
 
+- `op://MyInfra-Active/dspeech-apple-distribution-certificate/credential`
+- `op://MyInfra-Active/dspeech-apple-distribution-certificate-password/credential`
+- `op://MyInfra-Active/dspeech-app-store-provisioning-profile/credential`
 - `op://MyInfra-Active/dspeech-app-store-connect-api-key/credential`
 - `op://MyInfra-Active/dspeech-app-store-connect-api-key-id/credential`
 - `op://MyInfra-Active/dspeech-app-store-connect-issuer-id/credential`
@@ -53,30 +56,16 @@ TestFlight operations only. Do not reuse a fleet-wide ASC key here.
 
 Required constraints:
 
-- signing certificates and provisioning profiles live in a private `match` repo
-  or manual Apple Developer portal, never in this repo;
+- signing certificates and provisioning profiles are consumed from Dspeech-scoped
+  `op://` items only, with temporary local import on the Mac build machine;
 - App Store Connect API private key is never committed, printed, or passed in
   argv;
-- Fastlane may build/archive/upload, but it must not submit for beta review,
-  publish privacy answers, edit production metadata, invite external testers, or
-  send emails/DMs without explicit sign-off.
+- automation may build/archive/upload only after explicit approval, but it must
+  not submit for beta review, publish privacy answers, edit production metadata,
+  invite external testers, or send emails/DMs without explicit sign-off.
 
-Example lane shape to implement after approval:
-
-```ruby
-lane :internal_testflight do
-  match(type: "appstore", readonly: true)
-  build_app(
-    project: "Dspeech.xcodeproj",
-    scheme: "Dspeech",
-    export_method: "app-store"
-  )
-  upload_to_testflight(
-    distribute_external: false,
-    skip_waiting_for_build_processing: false
-  )
-end
-```
+No automation lane is defined in this package. Add one only after the six
+`op://` items exist and the release pipeline is re-audited.
 
 ## Internal testers configuration
 
