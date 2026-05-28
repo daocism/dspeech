@@ -1,0 +1,22 @@
+{
+  "fixtures": [
+    {
+      "fixture": "dispatcher-own.wav",
+      "transcript": "Tower N123AB cleared for takeoff",
+      "expectedTranscriptAfterFilter": "Tower N123AB cleared for takeoff",
+      "expectedPilotDiscard": false
+    },
+    {
+      "fixture": "pilot-readback.wav",
+      "transcript": "N123AB rolling",
+      "expectedTranscriptAfterFilter": "",
+      "expectedPilotDiscard": true
+    },
+    {
+      "fixture": "mixed-overlap.wav",
+      "transcript": "N123AB continue climb",
+      "expectedTranscriptAfterFilter": "N123AB continue climb",
+      "expectedPilotDiscard": false
+    }
+  ]
+}
