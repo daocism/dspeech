@@ -63,12 +63,18 @@ struct LiveTranscriptionViewModelTests {
     func saveEnabled(_ enabled: Bool) { self.enabled = enabled }
   }
 
-  private func wait(for predicate: @MainActor () -> Bool, timeoutNs: UInt64 = 1_000_000_000) async {
-    let deadline = Date().addingTimeInterval(Double(timeoutNs) / 1_000_000_000.0)
-    while Date() < deadline {
-      if predicate() { return }
+  @discardableResult
+  private func wait(
+    for predicate: @MainActor () -> Bool,
+    timeout: Duration = .seconds(5)
+  ) async -> Bool {
+    let clock = ContinuousClock()
+    let deadline = clock.now.advanced(by: timeout)
+    while clock.now < deadline {
+      if predicate() { return true }
       try? await Task.sleep(nanoseconds: 5_000_000)
     }
+    return predicate()
   }
 
   @Test func initialState() {
@@ -166,7 +172,12 @@ struct LiveTranscriptionViewModelTests {
     let vm = LiveTranscriptionViewModel(engine: engine)
     await vm.start()
     engine.push(.status(.failed("microphone-permission-denied")))
-    await wait(for: { vm.lastErrorMessage == "microphone-permission-denied" })
+    #expect(
+      await wait(for: {
+        vm.status == .failed("microphone-permission-denied")
+          && vm.lastErrorMessage == "microphone-permission-denied"
+      })
+    )
     #expect(vm.lastErrorMessage == "microphone-permission-denied")
     #expect(vm.isListening == false)
   }
