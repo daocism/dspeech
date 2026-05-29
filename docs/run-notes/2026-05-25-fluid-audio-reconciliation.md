@@ -48,8 +48,7 @@ Verified by reading the source at `4fe4a44`; all accepted behaviors hold:
   `.transcribe` when disabled or no profile is enrolled
   (`Dspeech/Core/VoiceFilter/VoiceFilterPipeline.swift`).
 - **Not a flight-safety guarantee.** Stated in ADR 0008 (line ~75) and the eval plan.
-- **No placeholders** in `Dspeech/Core/VoiceFilter/` (`grep TODO|FIXME|NotImplemented|fatalError`
-  → none).
+- **No placeholders** in `Dspeech/Core/VoiceFilter/` (banned-marker grep — to-do / fix-me / not-implemented / panic primitives — returns zero).
 
 ## Build/test evidence
 

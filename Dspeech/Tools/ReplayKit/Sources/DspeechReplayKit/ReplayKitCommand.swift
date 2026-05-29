@@ -4,12 +4,14 @@ enum ReplayKitError: Error, CustomStringConvertible {
     case invalidArguments(String)
     case invalidFixture(String)
     case missingFixture(String)
+    case thresholdBreach([String])
 
     var description: String {
         switch self {
         case .invalidArguments(let message): message
         case .invalidFixture(let message): message
         case .missingFixture(let message): message
+        case .thresholdBreach(let messages): messages.joined(separator: "\n")
         }
     }
 }
@@ -23,6 +25,56 @@ struct ReplayFixture: Decodable, Sendable {
     let transcript: String
     let expectedTranscriptAfterFilter: String
     let expectedPilotDiscard: Bool
+    // why: real ATC fixtures whose human ground-truth transcript is not yet
+    // available are flagged as `audioOnly`. They exercise the audio reader and
+    // classifier paths but are excluded from WER / precision / recall / FDR
+    // averages so the gate never compares against fabricated text.
+    let audioOnly: Bool?
+
+    var isAudioOnly: Bool { audioOnly ?? false }
+}
+
+struct ReplayThreshold: Decodable, Sendable {
+    let maxAverageWER: Double
+    let minPilotDiscardPrecision: Double
+    let minPilotDiscardRecall: Double
+    let maxFalseDiscardRate: Double
+
+    static let `default` = ReplayThreshold(
+        maxAverageWER: 0.30,
+        minPilotDiscardPrecision: 0.90,
+        minPilotDiscardRecall: 0.80,
+        maxFalseDiscardRate: 0.05
+    )
+
+    func breaches(_ report: ReplayReport) -> [String] {
+        var messages: [String] = []
+        if report.averageWER > maxAverageWER {
+            messages.append(
+                "WER breach: avg \(Self.format(report.averageWER)) > max \(Self.format(maxAverageWER))"
+            )
+        }
+        if report.pilotDiscardPrecision < minPilotDiscardPrecision {
+            messages.append(
+                "pilot-discard-precision breach: \(Self.format(report.pilotDiscardPrecision)) < min \(Self.format(minPilotDiscardPrecision))"
+            )
+        }
+        if report.pilotDiscardRecall < minPilotDiscardRecall {
+            messages.append(
+                "pilot-discard-recall breach: \(Self.format(report.pilotDiscardRecall)) < min \(Self.format(minPilotDiscardRecall))"
+            )
+        }
+        if report.falseDiscardRate > maxFalseDiscardRate {
+            messages.append(
+                "false-discard-rate breach: \(Self.format(report.falseDiscardRate)) > max \(Self.format(maxFalseDiscardRate))"
+            )
+        }
+        return messages
+    }
+
+    private static func format(_ value: Double) -> String {
+        String(format: "%.3f", value)
+    }
 }
 
 struct SourceAudio: Sendable {
@@ -161,32 +213,36 @@ struct ReplayMetrics: Sendable {
     let wer: Double
     let expectedPilotDiscard: Bool
     let actualPilotDiscard: Bool
+    let audioOnly: Bool
 }
 
 struct ReplayReport: Sendable {
     let rows: [ReplayMetrics]
 
+    private var scoredRows: [ReplayMetrics] { rows.filter { !$0.audioOnly } }
+
     var averageWER: Double {
-        guard !rows.isEmpty else { return 0 }
-        return rows.map(\.wer).reduce(0, +) / Double(rows.count)
+        let scored = scoredRows
+        guard !scored.isEmpty else { return 0 }
+        return scored.map(\.wer).reduce(0, +) / Double(scored.count)
     }
 
     var pilotDiscardPrecision: Double {
-        let actual = rows.filter(\.actualPilotDiscard)
+        let actual = scoredRows.filter(\.actualPilotDiscard)
         guard !actual.isEmpty else { return 1 }
         let correct = actual.filter(\.expectedPilotDiscard).count
         return Double(correct) / Double(actual.count)
     }
 
     var pilotDiscardRecall: Double {
-        let expected = rows.filter(\.expectedPilotDiscard)
+        let expected = scoredRows.filter(\.expectedPilotDiscard)
         guard !expected.isEmpty else { return 1 }
         let correct = expected.filter(\.actualPilotDiscard).count
         return Double(correct) / Double(expected.count)
     }
 
     var falseDiscardRate: Double {
-        let expectedKept = rows.filter { !$0.expectedPilotDiscard }
+        let expectedKept = scoredRows.filter { !$0.expectedPilotDiscard }
         guard !expectedKept.isEmpty else { return 0 }
         let falseDiscards = expectedKept.filter(\.actualPilotDiscard).count
         return Double(falseDiscards) / Double(expectedKept.count)
@@ -195,7 +251,10 @@ struct ReplayReport: Sendable {
     func csv() -> String {
         let header = "fixture,WER,pilot-discard-precision,pilot-discard-recall,false-discard-rate"
         let body = rows.map { row in
-            [
+            if row.audioOnly {
+                return [row.fixture, "audio-only", "n/a", "n/a", "n/a"].joined(separator: ",")
+            }
+            return [
                 row.fixture,
                 Self.format(row.wer),
                 Self.format(row.actualPilotDiscard && row.expectedPilotDiscard ? 1 : row.actualPilotDiscard ? 0 : 1),
@@ -239,17 +298,17 @@ struct ReplayEvaluator: Sendable {
             let audio = try audioReader.read(audioURL)
             let speaker = filter.classify(audio: audio)
             let actualTranscript = filter.filteredTranscript(fixture.transcript, speaker: speaker)
-            rows.append(
-                ReplayMetrics(
-                    fixture: fixture.fixture,
-                    wer: WordErrorRate.score(
-                        reference: fixture.expectedTranscriptAfterFilter,
-                        hypothesis: actualTranscript
-                    ),
-                    expectedPilotDiscard: fixture.expectedPilotDiscard,
-                    actualPilotDiscard: actualTranscript.isEmpty && fixture.transcript.isEmpty == false
-                )
+            let metric = ReplayMetrics(
+                fixture: fixture.fixture,
+                wer: fixture.isAudioOnly ? 0 : WordErrorRate.score(
+                    reference: fixture.expectedTranscriptAfterFilter,
+                    hypothesis: actualTranscript
+                ),
+                expectedPilotDiscard: fixture.expectedPilotDiscard,
+                actualPilotDiscard: actualTranscript.isEmpty && fixture.transcript.isEmpty == false,
+                audioOnly: fixture.isAudioOnly
             )
+            rows.append(metric)
         }
 
         return ReplayReport(rows: rows)
@@ -294,10 +353,17 @@ enum WordErrorRate {
 struct ReplayArguments {
     let fixturesDirectory: URL
     let groundTruth: URL
+    let thresholdSource: ThresholdSource
+
+    enum ThresholdSource {
+        case bundledDefault
+        case explicit(URL)
+    }
 
     static func parse(_ arguments: [String]) throws -> ReplayArguments {
         var fixturesDirectory: URL?
         var groundTruth: URL?
+        var thresholdSource: ThresholdSource = .bundledDefault
         var index = 1
         while index < arguments.count {
             switch arguments[index] {
@@ -313,6 +379,12 @@ struct ReplayArguments {
                     throw ReplayKitError.invalidArguments("Missing value for --ground-truth")
                 }
                 groundTruth = URL(fileURLWithPath: arguments[index])
+            case "--threshold":
+                index += 1
+                guard index < arguments.count else {
+                    throw ReplayKitError.invalidArguments("Missing value for --threshold")
+                }
+                thresholdSource = .explicit(URL(fileURLWithPath: arguments[index]))
             case "--help", "-h":
                 throw ReplayKitError.invalidArguments(Self.usage)
             default:
@@ -324,10 +396,61 @@ struct ReplayArguments {
             throw ReplayKitError.invalidArguments(Self.usage)
         }
         let resolvedGroundTruth = groundTruth ?? fixturesDirectory.appendingPathComponent("ground-truth.json")
-        return ReplayArguments(fixturesDirectory: fixturesDirectory, groundTruth: resolvedGroundTruth)
+        return ReplayArguments(
+            fixturesDirectory: fixturesDirectory,
+            groundTruth: resolvedGroundTruth,
+            thresholdSource: thresholdSource
+        )
     }
 
-    private static let usage = "Usage: dspeech-replay --fixtures <directory> [--ground-truth <file>]"
+    private static let usage = "Usage: dspeech-replay --fixtures <directory> [--ground-truth <file>] [--threshold <file>]"
+}
+
+enum ThresholdLoader {
+    static let bundledRelativePath = "Dspeech/Tools/ReplayKit/eval-threshold.json"
+
+    static func load(source: ReplayArguments.ThresholdSource) throws -> ReplayThreshold {
+        switch source {
+        case .bundledDefault:
+            if let bundledURL = locateBundled() {
+                return try decode(bundledURL)
+            }
+            return .default
+        case .explicit(let url):
+            return try decode(url)
+        }
+    }
+
+    private static func decode(_ url: URL) throws -> ReplayThreshold {
+        let data = try Data(contentsOf: url)
+        return try JSONDecoder().decode(ReplayThreshold.self, from: data)
+    }
+
+    // why: the binary may run from `swift run` (cwd = Dspeech/Tools/ReplayKit) or
+    // from the repo root. Walk upwards from the executable directory and the cwd
+    // until the bundled config is found; fall back to the in-binary default if
+    // the file is not present (e.g. compiled binary copied outside the repo).
+    private static func locateBundled() -> URL? {
+        var roots: [URL] = []
+        roots.append(URL(fileURLWithPath: FileManager.default.currentDirectoryPath))
+        roots.append(URL(fileURLWithPath: CommandLine.arguments[0]).deletingLastPathComponent())
+        let segments = bundledRelativePath.split(separator: "/").map(String.init)
+        for root in roots {
+            var cursor: URL? = root
+            while let directory = cursor {
+                let candidate = segments.reduce(directory) { acc, segment in
+                    acc.appendingPathComponent(segment)
+                }
+                if FileManager.default.fileExists(atPath: candidate.path) {
+                    return candidate
+                }
+                let parent = directory.deletingLastPathComponent()
+                if parent.path == directory.path { break }
+                cursor = parent
+            }
+        }
+        return nil
+    }
 }
 
 @main
@@ -337,11 +460,20 @@ struct ReplayKitCommand {
             let arguments = try ReplayArguments.parse(CommandLine.arguments)
             let data = try Data(contentsOf: arguments.groundTruth)
             let manifest = try JSONDecoder().decode(ReplayManifest.self, from: data)
+            let threshold = try ThresholdLoader.load(source: arguments.thresholdSource)
             let report = try ReplayEvaluator().evaluate(
                 fixturesDirectory: arguments.fixturesDirectory,
                 manifest: manifest
             )
             print(report.csv())
+            let breaches = threshold.breaches(report)
+            if !breaches.isEmpty {
+                fputs("ReplayKit threshold breach:\n", stderr)
+                for message in breaches {
+                    fputs("  - \(message)\n", stderr)
+                }
+                exit(2)
+            }
         } catch {
             fputs("ReplayKit error: \(error)\n", stderr)
             exit(1)

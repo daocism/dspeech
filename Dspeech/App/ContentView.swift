@@ -4,8 +4,13 @@ struct ContentView: View {
     @State private var coordinator: CaptureCoordinator
     @State private var voiceFilter: VoiceFilterPipeline
     @State private var privacy: PrivacySettings
-    @State private var showTranslation: Bool = true
     @State private var showSettings: Bool = false
+    // why: live ASR never emits a translatedText (translation pipeline is not wired
+    // yet — ADR 0002 forbids implied off-device work). Keep a constant `true` so
+    // demo/history segments that DO carry translatedText still render side-by-side,
+    // but expose no user-visible toggle or provider copy that would imply a live
+    // translation feature exists.
+    private let showTranslation: Bool = true
 
     init(
         engine: (any LiveTranscriptionEngine)? = nil,
@@ -221,16 +226,6 @@ struct ContentView: View {
                 RouteHealthChip(health: coordinator.routeMonitor.health, isLandscape: isLandscape)
 
                 Spacer(minLength: 8)
-
-                Toggle(isOn: $showTranslation) {
-                    Text("Перевод")
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.white.opacity(0.85))
-                }
-                .toggleStyle(.switch)
-                .tint(.cyan)
-                .fixedSize()
-                .accessibilityIdentifier("translation-toggle")
             }
         }
     }
@@ -362,10 +357,6 @@ struct SettingsView: View {
                     LabeledContent("Язык по умолчанию", value: "Авто")
                     LabeledContent("Модель ASR", value: "Apple Speech")
                     LabeledContent("Режим", value: privacy.mode.displayName)
-                }
-                Section("Перевод") {
-                    LabeledContent("Целевой язык", value: "Русский")
-                    LabeledContent("Провайдер", value: "Локальный")
                 }
                 Section("О приложении") {
                     LabeledContent("Версия", value: Bundle.main.shortVersion)

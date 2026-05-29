@@ -20,7 +20,7 @@ final class LiveAudioSessionRouting: AudioSessionRouting, @unchecked Sendable {
         try? session.setCategory(
             .playAndRecord,
             mode: .measurement,
-            options: [.allowBluetooth, .allowBluetoothA2DP, .defaultToSpeaker]
+            options: [.allowBluetoothHFP, .allowBluetoothA2DP, .defaultToSpeaker]
         )
         var localContinuation: AsyncStream<RouteChangeEvent>.Continuation!
         self.routeChanges = AsyncStream<RouteChangeEvent>(

@@ -241,7 +241,7 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
         emit(.segment(segment))
     }
 
-    private static func averageConfidence(for transcription: SFTranscription) -> Double {
+    private nonisolated static func averageConfidence(for transcription: SFTranscription) -> Double {
         let segments = transcription.segments
         guard !segments.isEmpty else { return 0.0 }
         let total = segments.reduce(0.0) { $0 + Double($1.confidence) }

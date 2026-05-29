@@ -15,7 +15,7 @@ Key context first:
 
 1. **Local-only is the default.** `PrivacyMode.localOnly` is what a fresh install gets. No code path may ship audio, transcripts, or metadata off-device when `privacy.allowCloud == false`. See ADR 0002.
 2. **No fake cloud / fake AI / fake transcription.** Don't add a `cloudASRClient` stub that pretends to call a server, or chat UI that pretends an AI is connected. Either wire it or don't ship the surface.
-3. **No placeholders pretending functionality.** `TODO`, `fatalError("unimplemented")`, "Coming soon" buttons, demo screens that imply real product behavior are out. The transcript demo data is explicitly labeled `.demo` in `TranscriptSegment.Source` and is the only allowed exception until a real ASR adapter ships.
+3. **No placeholders pretending functionality.** Stale work markers (the kebab-case to-do / fix-me tags), `unimplemented`-style panic primitives, "Coming soon" buttons, and demo screens that imply real product behavior are out. The transcript demo data is explicitly labeled `.demo` in `TranscriptSegment.Source` and is the only allowed exception until a real ASR adapter ships. Acceptance: `git grep -nE 'T<O>DO|FI<X>ME|fatal<E>rror\('` (without the angle brackets) must stay empty on the branch — written here with angle-bracket disguises so this rule itself never trips it.
 4. **Privacy mode is visible at all times.** The `LOCAL` / `CLOUD` badge on the main control bar is not optional. Removing or hiding it requires a new ADR overriding ADR 0002.
 5. **No hardware promises** in code, README, or store copy that haven't been tested on the wired/cable path. See ADR 0004.
 6. **No App Store submission, no ads, no outbound DMs** from this repo's CI or scripts without explicit Andrei sign-off. See ADR 0006.

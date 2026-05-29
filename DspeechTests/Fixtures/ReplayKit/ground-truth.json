@@ -17,6 +17,20 @@
       "transcript": "N123AB continue climb",
       "expectedTranscriptAfterFilter": "N123AB continue climb",
       "expectedPilotDiscard": false
+    },
+    {
+      "fixture": "atc-real-img2549.wav",
+      "transcript": "",
+      "expectedTranscriptAfterFilter": "",
+      "expectedPilotDiscard": false,
+      "audioOnly": true
+    },
+    {
+      "fixture": "atc-real-img2551.wav",
+      "transcript": "",
+      "expectedTranscriptAfterFilter": "",
+      "expectedPilotDiscard": false,
+      "audioOnly": true
     }
   ]
 }
