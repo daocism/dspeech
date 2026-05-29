@@ -6,6 +6,7 @@ on:
     branches:
       - main
       - feat/**
+      - fix/**
 
 permissions:
   contents: read
@@ -25,23 +26,7 @@ jobs:
           persist-credentials: false
 
       - name: Select latest Xcode 26
-        run: |
-          set -euo pipefail
-          latest_xcode="$(
-            for candidate in /Applications/Xcode_26*.app /Applications/Xcode.app; do
-              [ -d "$candidate" ] || continue
-              version="$("$candidate/Contents/Developer/usr/bin/xcodebuild" -version | awk '/Xcode/ { print $2 }')"
-              case "$version" in
-                26*) printf '%s\t%s\n' "$version" "$candidate" ;;
-              esac
-            done | python3 -c $'import sys\nrows = [line.rstrip("\\n").split("\\t", 1) for line in sys.stdin if line.strip()]\nif rows:\n    rows.sort(key=lambda row: tuple(int(part) for part in row[0].split(".") if part.isdigit()))\n    print(rows[-1][1])'
-          )"
-          if [ -z "$latest_xcode" ]; then
-            echo "No Xcode 26 app bundle found on runner."
-            exit 1
-          fi
-          echo "DEVELOPER_DIR=$latest_xcode/Contents/Developer" >> "$GITHUB_ENV"
-          "$latest_xcode/Contents/Developer/usr/bin/xcodebuild" -version
+        run: scripts/ci/select-xcode26.sh
 
       - name: Verify documented simulator exists
         run: |
@@ -78,22 +63,7 @@ jobs:
           persist-credentials: false
 
       - name: Select latest Xcode 26
-        run: |
-          set -euo pipefail
-          latest_xcode="$(
-            for candidate in /Applications/Xcode_26*.app /Applications/Xcode.app; do
-              [ -d "$candidate" ] || continue
-              version="$("$candidate/Contents/Developer/usr/bin/xcodebuild" -version | awk '/Xcode/ { print $2 }')"
-              case "$version" in
-                26*) printf '%s\t%s\n' "$version" "$candidate" ;;
-              esac
-            done | python3 -c $'import sys\nrows = [line.rstrip("\\n").split("\\t", 1) for line in sys.stdin if line.strip()]\nif rows:\n    rows.sort(key=lambda row: tuple(int(part) for part in row[0].split(".") if part.isdigit()))\n    print(rows[-1][1])'
-          )"
-          if [ -z "$latest_xcode" ]; then
-            echo "No Xcode 26 app bundle found on runner."
-            exit 1
-          fi
-          echo "DEVELOPER_DIR=$latest_xcode/Contents/Developer" >> "$GITHUB_ENV"
+        run: scripts/ci/select-xcode26.sh
 
       - name: Swift format lint
         run: |

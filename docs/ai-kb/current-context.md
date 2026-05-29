@@ -18,6 +18,7 @@ The voice-filter routing path is now landed and verified end-to-end as a *seam*:
 - MyInfra Project Workspaces registers this project as `project_id=dspeech` and task prefix `[Dspeech]`.
 - Notion is a read model only; this repo + `docs/ai-kb/` + `.ai/project-state.md` is canonical for AI project memory.
 - Notion connector returned **NOT_FOUND** for active task `369dfa2b-7893-814c-be7e-e7cea26486a6` (no connector reachable from the run environment — re-confirmed run `…29c9c067`, 2026-05-26); repo run-notes + commit SHAs are the canonical handoff. See `docs/run-notes/2026-05-25-speaker-identifier-slice.md`.
+- CI is stop-the-line for Dspeech leads: red GitHub Actions runs must be fixed in-loop, and a real green Actions run is required when CI is the deliverable. The portable Xcode 26 selector lives at `scripts/ci/select-xcode26.sh`; the script-only CI auto-fix watchdog lives at `scripts/ci/dspeech_ci_watchdog.py` with runbook `docs/runbooks/dspeech-ci-autofix-watchdog.md`.
 
 ## Current next priority
 

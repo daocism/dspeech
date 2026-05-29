@@ -80,6 +80,12 @@ Do not store Dspeech-scoped knowledge in global Mr.Dao/Claude memory. If work ch
 4. ADR-worthy decisions get an ADR in `docs/adr/` in the same branch as the code that implements them.
 5. Commit messages: conventional commits. Co-author Claude.
 
+## Standing CI policy
+
+Any red CI run or failing GitHub check is stop-the-line work owned by the current Dspeech lead. Fix it in-loop before declaring the task done, and keep the branch/PR focused on restoring the check.
+
+When CI is the deliverable, a local `process exited 0`, syntax check, dry run, or green local build is not enough. The completion proof is a real green GitHub Actions run on the relevant branch or PR.
+
 ## What you may NOT do without asking Andrei
 
 - Buy hardware (any).
