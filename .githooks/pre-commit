@@ -28,7 +28,10 @@ require_gitleaks() {
   fi
 }
 
-mapfile -t staged_swift_files < <(git diff --cached --name-only --diff-filter=ACMR -- '*.swift')
+staged_swift_files=()
+while IFS= read -r file; do
+  staged_swift_files+=("$file")
+done < <(git diff --cached --name-only --diff-filter=ACMR -- '*.swift')
 
 if [ "${#staged_swift_files[@]}" -gt 0 ]; then
   for file in "${staged_swift_files[@]}"; do
@@ -51,7 +54,10 @@ require_gitleaks
 gitleaks git --staged --redact --verbose
 git diff --cached --binary | gitleaks stdin --redact --verbose
 
-mapfile -t untracked_files < <(git ls-files --others --exclude-standard)
+untracked_files=()
+while IFS= read -r file; do
+  untracked_files+=("$file")
+done < <(git ls-files --others --exclude-standard)
 if [ "${#untracked_files[@]}" -gt 0 ]; then
   gitleaks dir --redact --verbose "${untracked_files[@]}"
 fi

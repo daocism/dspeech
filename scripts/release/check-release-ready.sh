@@ -55,8 +55,8 @@ done
 
 require_grep "pull_request:" ".github/workflows/ci.yml" "CI must run on pull_request"
 require_grep "branches:" ".github/workflows/ci.yml" "CI push branches must be configured"
-require_grep "macos-26" ".github/workflows/ci.yml" "CI must use macos-26 for iOS 26.4-ish simulator"
-require_grep "OS=26\\.4\\.1" ".github/workflows/ci.yml" "CI must target documented iOS 26.4.1 simulator"
+require_grep "macos-26" ".github/workflows/ci.yml" "CI must use macos-26 for iOS 26 simulator"
+require_grep "select-ios-simulator\\.sh" ".github/workflows/ci.yml" "CI must select an available iOS 26 simulator from the selected Xcode"
 require_grep "swift format lint --strict --recursive" ".github/workflows/ci.yml" "CI must run strict swift format lint"
 require_grep "gitleaks git --redact --verbose" ".github/workflows/ci.yml" "CI must run gitleaks with redaction"
 require_grep "fetch-depth: 0" ".github/workflows/ci.yml" "Gitleaks action checkout must use full history"
