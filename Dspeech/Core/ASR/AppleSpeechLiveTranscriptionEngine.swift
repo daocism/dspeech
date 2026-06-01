@@ -8,7 +8,8 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     didSet { emit(.status(status)) }
   }
 
-  private let localeIdentifier: String
+  private let localeProvider: @MainActor () -> String
+  private var activeLocaleIdentifier = "en-US"
   private let bufferGate: (any SpeechAudioBufferGate)?
   private var recognizer: SFSpeechRecognizer?
   private var request: SFSpeechAudioBufferRecognitionRequest?
@@ -39,8 +40,11 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     let sampleRate: Double
   }
 
-  init(localeIdentifier: String = "en-US", bufferGate: (any SpeechAudioBufferGate)? = nil) {
-    self.localeIdentifier = localeIdentifier
+  init(
+    localeProvider: @escaping @MainActor () -> String = { "en-US" },
+    bufferGate: (any SpeechAudioBufferGate)? = nil
+  ) {
+    self.localeProvider = localeProvider
     self.bufferGate = bufferGate
   }
 
@@ -72,7 +76,9 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
       return
     }
 
-    let locale = Locale(identifier: localeIdentifier)
+    let localeID = localeProvider()
+    activeLocaleIdentifier = localeID
+    let locale = Locale(identifier: localeID)
     guard let recognizer = SFSpeechRecognizer(locale: locale), recognizer.isAvailable else {
       status = .failed("recognizer-unavailable")
       return
@@ -167,7 +173,7 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     audioEngine.prepare()
     try audioEngine.start()
 
-    let localePrefix = String(localeIdentifier.prefix(2))
+    let localePrefix = String(activeLocaleIdentifier.prefix(2))
     task = recognizer.recognitionTask(with: request) { @Sendable [weak self] result, error in
       let event: LiveTranscriptionEvent?
       let isFinal: Bool

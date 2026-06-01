@@ -4,6 +4,7 @@ struct ContentView: View {
   @State private var coordinator: CaptureCoordinator
   @State private var voiceFilter: VoiceFilterPipeline
   @State private var privacy: PrivacySettings
+  @State private var recognition: RecognitionSettings
   @State private var showSettings: Bool = false
 
   init(
@@ -12,6 +13,7 @@ struct ContentView: View {
     routing: AudioSessionRouting = LiveAudioSessionRouting()
   ) {
     let privacySettings = PrivacySettings()
+    let recognitionSettings = RecognitionSettings()
     let filter: VoiceFilterPipeline
     if let voiceFilter {
       filter = voiceFilter
@@ -31,11 +33,13 @@ struct ContentView: View {
     let resolvedEngine =
       engine
       ?? AppleSpeechLiveTranscriptionEngine(
+        localeProvider: { recognitionSettings.localeIdentifier },
         bufferGate: VoiceFilterSpeechAudioBufferGate(pipeline: filter)
       )
     let live = LiveTranscriptionViewModel(engine: resolvedEngine, voiceFilter: filter)
     let monitor = RouteHealthMonitor(routing: routing)
     _privacy = State(initialValue: privacySettings)
+    _recognition = State(initialValue: recognitionSettings)
     _voiceFilter = State(initialValue: filter)
     _coordinator = State(
       initialValue: CaptureCoordinator(
@@ -98,7 +102,7 @@ struct ContentView: View {
     .statusBarHidden(true)
     .preferredColorScheme(.dark)
     .sheet(isPresented: $showSettings) {
-      SettingsView(privacy: privacy, voiceFilter: voiceFilter)
+      SettingsView(privacy: privacy, recognition: recognition, voiceFilter: voiceFilter)
     }
     .onAppear { coordinator.beginObservingRouteChanges() }
     .onDisappear { coordinator.endObservingRouteChanges() }
@@ -328,11 +332,16 @@ struct RouteHealthChip: View {
 
 struct SettingsView: View {
   @Bindable var privacy: PrivacySettings
+  @Bindable var recognition: RecognitionSettings
   var voiceFilter: VoiceFilterPipeline?
   @Environment(\.dismiss) private var dismiss
 
-  init(privacy: PrivacySettings, voiceFilter: VoiceFilterPipeline? = nil) {
+  init(
+    privacy: PrivacySettings, recognition: RecognitionSettings,
+    voiceFilter: VoiceFilterPipeline? = nil
+  ) {
     self.privacy = privacy
+    self.recognition = recognition
     self.voiceFilter = voiceFilter
   }
 
@@ -365,7 +374,12 @@ struct SettingsView: View {
         }
 
         Section("Распознавание") {
-          LabeledContent("Язык по умолчанию", value: "Авто")
+          Picker("Язык распознавания", selection: $recognition.localeIdentifier) {
+            ForEach(recognition.availableLocales) { locale in
+              Text(locale.displayName).tag(locale.identifier)
+            }
+          }
+          .accessibilityIdentifier("recognition-locale-picker")
           LabeledContent("Модель ASR", value: "Apple Speech")
           LabeledContent("Режим", value: privacy.mode.displayName)
         }

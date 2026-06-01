@@ -356,7 +356,7 @@ struct ReplayKitNetworkDenyTests {
 
     let pipeline = Self.makePipeline()
     let gate = VoiceFilterSpeechAudioBufferGate(pipeline: pipeline)
-    let engine = AppleSpeechLiveTranscriptionEngine(localeIdentifier: "en-US", bufferGate: gate)
+    let engine = AppleSpeechLiveTranscriptionEngine(localeProvider: { "en-US" }, bufferGate: gate)
     let buffer = Self.makeFloatBuffer(samples: Array(repeating: 0.92, count: 256))
     let samples = try #require(AppleSpeechLiveTranscriptionEngine.monoFloatSamples(from: buffer))
 
