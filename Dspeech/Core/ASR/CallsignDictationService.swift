@@ -1,143 +1,147 @@
 @preconcurrency import AVFoundation
-@preconcurrency import Speech
 import Foundation
 import Observation
+@preconcurrency import Speech
 
 @MainActor
 @Observable
 final class CallsignDictationService {
-    enum Status: Equatable {
-        case idle
-        case listening
-        case unavailable(String)
+  enum Status: Equatable {
+    case idle
+    case listening
+    case unavailable(String)
+  }
+
+  private(set) var status: Status = .idle
+  private(set) var liveTranscript: String = ""
+
+  private let localeIdentifier: String
+  private let audioEngine = AVAudioEngine()
+  private var recognizer: SFSpeechRecognizer?
+  private var request: SFSpeechAudioBufferRecognitionRequest?
+  private var task: SFSpeechRecognitionTask?
+
+  init(localeIdentifier: String = "en-US") {
+    self.localeIdentifier = localeIdentifier
+  }
+
+  var isListening: Bool { status == .listening }
+
+  var unavailableReason: String? {
+    if case .unavailable(let reason) = status { return reason }
+    return nil
+  }
+
+  func toggle() async {
+    if isListening { stop() } else { await start() }
+  }
+
+  func start() async {
+    guard !isListening else { return }
+    liveTranscript = ""
+
+    guard await Self.requestSpeechAuthorization() else {
+      status = .unavailable("Нет доступа к распознаванию речи. Разрешите его в Настройках.")
+      return
     }
-
-    private(set) var status: Status = .idle
-    private(set) var liveTranscript: String = ""
-
-    private let localeIdentifier: String
-    private let audioEngine = AVAudioEngine()
-    private var recognizer: SFSpeechRecognizer?
-    private var request: SFSpeechAudioBufferRecognitionRequest?
-    private var task: SFSpeechRecognitionTask?
-
-    init(localeIdentifier: String = "en-US") {
-        self.localeIdentifier = localeIdentifier
+    guard await Self.requestMicrophonePermission() else {
+      status = .unavailable("Нет доступа к микрофону. Разрешите его в Настройках.")
+      return
     }
-
-    var isListening: Bool { status == .listening }
-
-    var unavailableReason: String? {
-        if case let .unavailable(reason) = status { return reason }
-        return nil
+    guard let recognizer = SFSpeechRecognizer(locale: Locale(identifier: localeIdentifier)),
+      recognizer.isAvailable
+    else {
+      status = .unavailable("Распознаватель речи недоступен на этом устройстве.")
+      return
     }
-
-    func toggle() async {
-        if isListening { stop() } else { await start() }
+    guard recognizer.supportsOnDeviceRecognition else {
+      status = .unavailable(
+        "Офлайн-распознавание для \(localeIdentifier) не установлено. Голосовой ввод позывного требует локальной модели."
+      )
+      return
     }
+    self.recognizer = recognizer
 
-    func start() async {
-        guard !isListening else { return }
-        liveTranscript = ""
-
-        guard await Self.requestSpeechAuthorization() else {
-            status = .unavailable("Нет доступа к распознаванию речи. Разрешите его в Настройках.")
-            return
-        }
-        guard await Self.requestMicrophonePermission() else {
-            status = .unavailable("Нет доступа к микрофону. Разрешите его в Настройках.")
-            return
-        }
-        guard let recognizer = SFSpeechRecognizer(locale: Locale(identifier: localeIdentifier)),
-              recognizer.isAvailable else {
-            status = .unavailable("Распознаватель речи недоступен на этом устройстве.")
-            return
-        }
-        guard recognizer.supportsOnDeviceRecognition else {
-            status = .unavailable("Офлайн-распознавание для \(localeIdentifier) не установлено. Голосовой ввод позывного требует локальной модели.")
-            return
-        }
-        self.recognizer = recognizer
-
-        do {
-            try begin(recognizer: recognizer)
-            status = .listening
-        } catch {
-            status = .unavailable("Не удалось запустить запись: \(error.localizedDescription)")
-            cleanup()
-        }
+    do {
+      try begin(recognizer: recognizer)
+      status = .listening
+    } catch {
+      status = .unavailable("Не удалось запустить запись: \(error.localizedDescription)")
+      cleanup()
     }
+  }
 
-    func stop() {
-        guard isListening else { return }
-        cleanup()
-        status = .idle
+  func stop() {
+    guard isListening else { return }
+    cleanup()
+    status = .idle
+  }
+
+  private func begin(recognizer: SFSpeechRecognizer) throws {
+    let session = AVAudioSession.sharedInstance()
+    try session.setCategory(.record, mode: .measurement, options: [.duckOthers])
+    try session.setActive(true, options: .notifyOthersOnDeactivation)
+
+    let request = SFSpeechAudioBufferRecognitionRequest()
+    request.shouldReportPartialResults = true
+    request.requiresOnDeviceRecognition = true
+    request.taskHint = .dictation
+    self.request = request
+
+    let inputNode = audioEngine.inputNode
+    let recordingFormat = inputNode.outputFormat(forBus: 0)
+    inputNode.removeTap(onBus: 0)
+    let tapRequest = request
+    inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) {
+      @Sendable buffer, _ in
+      tapRequest.append(buffer)
     }
+    audioEngine.prepare()
+    try audioEngine.start()
 
-    private func begin(recognizer: SFSpeechRecognizer) throws {
-        let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.record, mode: .measurement, options: [.duckOthers])
-        try session.setActive(true, options: .notifyOthersOnDeactivation)
-
-        let request = SFSpeechAudioBufferRecognitionRequest()
-        request.shouldReportPartialResults = true
-        request.requiresOnDeviceRecognition = true
-        request.taskHint = .dictation
-        self.request = request
-
-        let inputNode = audioEngine.inputNode
-        let recordingFormat = inputNode.outputFormat(forBus: 0)
-        inputNode.removeTap(onBus: 0)
-        let tapRequest = request
-        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { @Sendable buffer, _ in
-            tapRequest.append(buffer)
+    task = recognizer.recognitionTask(with: request) { @Sendable [weak self] result, error in
+      let text = result?.bestTranscription.formattedString
+      let finished = (result?.isFinal ?? false) || error != nil
+      Task { @MainActor [weak self] in
+        guard let self else { return }
+        if let text { self.liveTranscript = text }
+        if finished, self.isListening {
+          self.cleanup()
+          self.status = .idle
         }
-        audioEngine.prepare()
-        try audioEngine.start()
-
-        task = recognizer.recognitionTask(with: request) { @Sendable [weak self] result, error in
-            let text = result?.bestTranscription.formattedString
-            let finished = (result?.isFinal ?? false) || error != nil
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                if let text { self.liveTranscript = text }
-                if finished, self.isListening {
-                    self.cleanup()
-                    self.status = .idle
-                }
-            }
-        }
+      }
     }
+  }
 
-    private func cleanup() {
-        if audioEngine.isRunning {
-            audioEngine.stop()
-        }
-        audioEngine.inputNode.removeTap(onBus: 0)
-        request?.endAudio()
-        task?.cancel()
-        task = nil
-        request = nil
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+  private func cleanup() {
+    if audioEngine.isRunning {
+      audioEngine.stop()
     }
+    audioEngine.inputNode.removeTap(onBus: 0)
+    request?.endAudio()
+    task?.cancel()
+    task = nil
+    request = nil
+    try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+  }
 
-    private nonisolated static func requestSpeechAuthorization() async -> Bool {
-        await withCheckedContinuation { continuation in
-            SFSpeechRecognizer.requestAuthorization { status in
-                continuation.resume(returning: status == .authorized)
-            }
-        }
+  private nonisolated static func requestSpeechAuthorization() async -> Bool {
+    await withCheckedContinuation { continuation in
+      SFSpeechRecognizer.requestAuthorization { status in
+        continuation.resume(returning: status == .authorized)
+      }
     }
+  }
 
-    private nonisolated static func requestMicrophonePermission() async -> Bool {
-        if #available(iOS 17.0, *) {
-            return await AVAudioApplication.requestRecordPermission()
-        } else {
-            return await withCheckedContinuation { continuation in
-                AVAudioSession.sharedInstance().requestRecordPermission { granted in
-                    continuation.resume(returning: granted)
-                }
-            }
+  private nonisolated static func requestMicrophonePermission() async -> Bool {
+    if #available(iOS 17.0, *) {
+      return await AVAudioApplication.requestRecordPermission()
+    } else {
+      return await withCheckedContinuation { continuation in
+        AVAudioSession.sharedInstance().requestRecordPermission { granted in
+          continuation.resume(returning: granted)
         }
+      }
     }
+  }
 }
