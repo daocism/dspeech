@@ -128,3 +128,23 @@ jobs:
           if "CA92.1" not in reasons:
               raise SystemExit("Missing UserDefaults reason CA92.1")
           PY
+
+  replay-eval:
+    name: Offline ATC voice-filter replay eval
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Select latest Xcode 26
+        run: scripts/ci/select-xcode26.sh
+
+      - name: Run offline replay eval (ADR 0008 gate)
+        run: |
+          set -euo pipefail
+          swift run --package-path Dspeech/Tools/ReplayKit dspeech-replay \
+            --fixtures DspeechTests/Fixtures/ReplayKit \
+            --ground-truth DspeechTests/Fixtures/ReplayKit/ground-truth.json \
+            --threshold Dspeech/Tools/ReplayKit/eval-threshold.json
