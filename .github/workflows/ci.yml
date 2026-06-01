@@ -6,6 +6,7 @@ on:
     branches:
       - main
       - feat/**
+      - fix/**
 
 permissions:
   contents: read
@@ -17,7 +18,6 @@ jobs:
     env:
       PROJECT: Dspeech.xcodeproj
       SCHEME: Dspeech
-      SIMULATOR_DESTINATION: platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4.1
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,28 +25,10 @@ jobs:
           persist-credentials: false
 
       - name: Select latest Xcode 26
-        run: |
-          set -euo pipefail
-          latest_xcode="$(
-            for candidate in /Applications/Xcode_26*.app /Applications/Xcode.app; do
-              [ -d "$candidate" ] || continue
-              version="$("$candidate/Contents/Developer/usr/bin/xcodebuild" -version | awk '/Xcode/ { print $2 }')"
-              case "$version" in
-                26*) printf '%s\t%s\n' "$version" "$candidate" ;;
-              esac
-            done | python3 -c $'import sys\nrows = [line.rstrip("\\n").split("\\t", 1) for line in sys.stdin if line.strip()]\nif rows:\n    rows.sort(key=lambda row: tuple(int(part) for part in row[0].split(".") if part.isdigit()))\n    print(rows[-1][1])'
-          )"
-          if [ -z "$latest_xcode" ]; then
-            echo "No Xcode 26 app bundle found on runner."
-            exit 1
-          fi
-          echo "DEVELOPER_DIR=$latest_xcode/Contents/Developer" >> "$GITHUB_ENV"
-          "$latest_xcode/Contents/Developer/usr/bin/xcodebuild" -version
+        run: scripts/ci/select-xcode26.sh
 
-      - name: Verify documented simulator exists
-        run: |
-          set -euo pipefail
-          xcrun simctl list devices available | grep -F "iPhone 17 Pro" | grep -F "26.4.1"
+      - name: Select iOS simulator
+        run: scripts/ci/select-ios-simulator.sh
 
       - name: Build and test
         run: |
@@ -64,8 +46,8 @@ jobs:
       #   -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4' \
       #   CODE_SIGNING_ALLOWED=NO build test
       #
-      # GitHub macos-15 currently lacks an iOS 26.4 simulator. If this job must
-      # move to macos-15, use an installed iOS 26.2 simulator explicitly instead.
+      # Hosted CI selects the latest available iPhone 17 Pro iOS 26.x simulator
+      # from the selected Xcode instead of pinning a runner-image patch version.
 
   lint-secret-scan:
     name: Swift format and secret scan
@@ -78,22 +60,7 @@ jobs:
           persist-credentials: false
 
       - name: Select latest Xcode 26
-        run: |
-          set -euo pipefail
-          latest_xcode="$(
-            for candidate in /Applications/Xcode_26*.app /Applications/Xcode.app; do
-              [ -d "$candidate" ] || continue
-              version="$("$candidate/Contents/Developer/usr/bin/xcodebuild" -version | awk '/Xcode/ { print $2 }')"
-              case "$version" in
-                26*) printf '%s\t%s\n' "$version" "$candidate" ;;
-              esac
-            done | python3 -c $'import sys\nrows = [line.rstrip("\\n").split("\\t", 1) for line in sys.stdin if line.strip()]\nif rows:\n    rows.sort(key=lambda row: tuple(int(part) for part in row[0].split(".") if part.isdigit()))\n    print(rows[-1][1])'
-          )"
-          if [ -z "$latest_xcode" ]; then
-            echo "No Xcode 26 app bundle found on runner."
-            exit 1
-          fi
-          echo "DEVELOPER_DIR=$latest_xcode/Contents/Developer" >> "$GITHUB_ENV"
+        run: scripts/ci/select-xcode26.sh
 
       - name: Swift format lint
         run: |
