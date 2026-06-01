@@ -75,4 +75,15 @@ struct SpeechActivitySegmenterTests {
       segmenter.update(block: block(seconds: 0.5, amplitude: 0.005), sampleRate: Self.sampleRate)
         == .cutAfterSilence)
   }
+
+  @Test func cutAfterSilenceTakesPrecedenceOverMaxWindow() {
+    // why: when a block both completes an utterance (speech + trailing silence) and
+    // exceeds maxWindow, the silence edge is the meaningful cut and is checked first.
+    let segmenter = makeSegmenter()
+    _ = segmenter.update(block: block(seconds: 0.3, amplitude: 0.5), sampleRate: Self.sampleRate)
+    // 0.8s silence: trailingSilence >= 0.40 AND window 0.3 + 0.8 = 1.1 >= 1.0.
+    #expect(
+      segmenter.update(block: block(seconds: 0.8, amplitude: 0.0), sampleRate: Self.sampleRate)
+        == .cutAfterSilence)
+  }
 }
