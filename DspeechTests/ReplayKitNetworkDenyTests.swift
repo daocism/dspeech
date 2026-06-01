@@ -64,6 +64,14 @@ private final class DenyAllNetworkURLProtocol: URLProtocol, @unchecked Sendable 
   override func stopLoading() {}
 }
 
+// why: `registerGlobalProtocol: true` installs a process-wide URLProtocol and counts
+// unscoped attempts. Swift Testing runs suites in parallel, so an unrelated suite's
+// URLSession traffic would be attributed to whatever deny scope is open — flaking the
+// `attempts().isEmpty` assertions on CI. The code paths these tests exercise (pipeline,
+// gate, model-pack verifier/locator) use no URLSession, so the global interceptor adds
+// no real coverage for them; they use a scoped (`registerGlobalProtocol: false`) deny.
+// The interceptor mechanism itself is still proven by
+// `urlSessionGuardFailsRequestsWithoutRealNetwork`.
 private struct NetworkDenyScope {
   private let id = UUID()
   private let startSequence: Int
@@ -302,7 +310,7 @@ struct ReplayKitNetworkDenyTests {
 
   @Test func localOnlyCaptureTranscribeFilterPipelineMakesZeroNetworkAttempts() async throws {
     let privacyMode = PrivacyMode.localOnly
-    let scope = NetworkDenyScope()
+    let scope = NetworkDenyScope(registerGlobalProtocol: false)
     defer { scope.close() }
 
     let pipeline = Self.makePipeline()
@@ -351,7 +359,7 @@ struct ReplayKitNetworkDenyTests {
   }
 
   @Test func localOnlyAppleSpeechConstructionAndCaptureGateMakeZeroNetworkAttempts() async throws {
-    let scope = NetworkDenyScope()
+    let scope = NetworkDenyScope(registerGlobalProtocol: false)
     defer { scope.close() }
 
     let pipeline = Self.makePipeline()
@@ -368,7 +376,7 @@ struct ReplayKitNetworkDenyTests {
   }
 
   @Test func modelPackVerifierUsesLocalFilesOnlyUnderNetworkDeny() throws {
-    let scope = NetworkDenyScope()
+    let scope = NetworkDenyScope(registerGlobalProtocol: false)
     defer { scope.close() }
 
     let contents = [
@@ -388,7 +396,7 @@ struct ReplayKitNetworkDenyTests {
   }
 
   @Test func downloadCapableModelPackLocatorUsesLocalCacheOnlyUnderNetworkDeny() throws {
-    let scope = NetworkDenyScope()
+    let scope = NetworkDenyScope(registerGlobalProtocol: false)
     defer { scope.close() }
 
     let contents = [
