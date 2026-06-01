@@ -115,6 +115,9 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     request.shouldReportPartialResults = true
     request.requiresOnDeviceRecognition = true
     request.taskHint = .dictation
+    // why: bias the on-device LM toward ICAO phonetics + ATC phraseology it would
+    // otherwise under-weight; local-only, no privacy/network impact.
+    request.contextualStrings = ATCContextualVocabulary.strings()
     if #available(iOS 16.0, *) {
       request.addsPunctuation = true
     }
