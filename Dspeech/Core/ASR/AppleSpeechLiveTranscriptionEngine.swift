@@ -25,6 +25,20 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
   private static let minSilenceSeconds = 0.40
   private var continuation: AsyncStream<LiveTranscriptionEvent>.Continuation?
 
+  // why: the realtime audio tap must never touch @MainActor state synchronously —
+  // doing so trips swift_task_isCurrentExecutor -> dispatch_assert_queue_fail on the
+  // RealtimeMessenger thread (EXC_BREAKPOINT). The tap deep-copies each recycled
+  // buffer and hands it to this ordered, Sendable stream; a single @MainActor
+  // consumer drains it in FIFO capture order into the router/request.
+  private var captureContinuation: AsyncStream<CapturedAudioBuffer>.Continuation?
+  private var consumeTask: Task<Void, Never>?
+
+  private struct CapturedAudioBuffer: @unchecked Sendable {
+    let buffer: AVAudioPCMBuffer
+    let samples: [Float]
+    let sampleRate: Double
+  }
+
   init(localeIdentifier: String = "en-US", bufferGate: (any SpeechAudioBufferGate)? = nil) {
     self.localeIdentifier = localeIdentifier
     self.bufferGate = bufferGate
@@ -126,13 +140,29 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
       router = nil
     }
 
-    inputNode.removeTap(onBus: 0)
-    inputNode.installTap(
-      onBus: 0,
-      bufferSize: 1024,
-      format: recordingFormat,
-      block: Self.makeTapHandler(owner: self)
+    let (captureStream, audioContinuation) = AsyncStream<CapturedAudioBuffer>.makeStream(
+      bufferingPolicy: .unbounded
     )
+    captureContinuation = audioContinuation
+    consumeTask = Task { @MainActor [weak self] in
+      for await captured in captureStream {
+        guard let self else { break }
+        self.routeCaptured(captured)
+      }
+    }
+
+    inputNode.removeTap(onBus: 0)
+    // why: this tap block is nonisolated and captures only the Sendable continuation
+    // (never self / @MainActor state), so it runs on the realtime audio thread with
+    // no isolation assertion. It deep-copies the recycled buffer and yields it in
+    // capture order for the @MainActor consumer above to route.
+    inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, _ in
+      guard let copy = buffer.dspeechDeepCopy() else { return }
+      let samples = Self.monoFloatSamples(from: copy) ?? []
+      audioContinuation.yield(
+        CapturedAudioBuffer(buffer: copy, samples: samples, sampleRate: copy.format.sampleRate)
+      )
+    }
 
     audioEngine.prepare()
     try audioEngine.start()
@@ -190,27 +220,14 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     return try await bufferGate.route(samples: samples, sampleRate: sampleRate)
   }
 
-  private func routeBuffer(_ buffer: AVAudioPCMBuffer, samples: [Float]?, sampleRate: Double) {
+  private func routeCaptured(_ captured: CapturedAudioBuffer) {
     guard let router else {
-      request?.append(buffer)
+      request?.append(captured.buffer)
       return
     }
-    // why: a non-float / empty buffer can't be classified; route it through the
-    // serial router with empty samples so it fails open to ASR while keeping FIFO
-    // order with classified buffers ahead of and behind it.
-    router.submit(buffer, samples: samples ?? [], sampleRate: sampleRate)
-  }
-
-  private nonisolated static func makeTapHandler(owner: AppleSpeechLiveTranscriptionEngine)
-    -> AVAudioNodeTapBlock
-  {
-    { [weak owner] buffer, _ in
-      let samples = Self.monoFloatSamples(from: buffer)
-      let sampleRate = buffer.format.sampleRate
-      Task { @MainActor [weak owner] in
-        owner?.routeBuffer(buffer, samples: samples, sampleRate: sampleRate)
-      }
-    }
+    // why: empty samples (non-float buffer) fail open to ASR while keeping FIFO
+    // order with classified buffers ahead of and behind it in the serial router.
+    router.submit(captured.buffer, samples: captured.samples, sampleRate: captured.sampleRate)
   }
 
   nonisolated static func monoFloatSamples(from buffer: AVAudioPCMBuffer) -> [Float]? {
@@ -241,20 +258,6 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     return mono
   }
 
-  private func emitFinalSegment(text: String, transcription: SFTranscription) {
-    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !trimmed.isEmpty else { return }
-    let confidence = Self.averageConfidence(for: transcription)
-    let segment = TranscriptSegment(
-      text: trimmed,
-      translatedText: nil,
-      confidence: confidence,
-      sourceLanguageCode: String(localeIdentifier.prefix(2)),
-      source: .liveATC
-    )
-    emit(.segment(segment))
-  }
-
   private nonisolated static func averageConfidence(for transcription: SFTranscription) -> Double {
     let segments = transcription.segments
     guard !segments.isEmpty else { return 0.0 }
@@ -268,6 +271,12 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
       audioEngine.stop()
     }
     audioEngine.inputNode.removeTap(onBus: 0)
+    // why: stop the producer first — finish the stream and cancel the consumer — so
+    // no captured buffer is routed after teardown; then fail-open the router queue.
+    captureContinuation?.finish()
+    captureContinuation = nil
+    consumeTask?.cancel()
+    consumeTask = nil
     // why: finish() before nil-ing the request so any buffer still classifying
     // off-main can't append into an ended/released recognition request.
     router?.finish()
@@ -301,5 +310,36 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
         }
       }
     }
+  }
+}
+
+extension AVAudioPCMBuffer {
+  // why: AVAudioEngine reuses the tap's buffer storage across callbacks, so any
+  // buffer handed to async work must be deep-copied synchronously inside the tap or
+  // its samples are overwritten before they are read.
+  func dspeechDeepCopy() -> AVAudioPCMBuffer? {
+    guard let copy = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCapacity) else {
+      return nil
+    }
+    copy.frameLength = frameLength
+    let frames = Int(frameLength)
+    let channels = Int(format.channelCount)
+    guard frames > 0, channels > 0 else { return copy }
+    if let source = floatChannelData, let destination = copy.floatChannelData {
+      for channel in 0..<channels {
+        destination[channel].update(from: source[channel], count: frames)
+      }
+    } else if let source = int16ChannelData, let destination = copy.int16ChannelData {
+      for channel in 0..<channels {
+        destination[channel].update(from: source[channel], count: frames)
+      }
+    } else if let source = int32ChannelData, let destination = copy.int32ChannelData {
+      for channel in 0..<channels {
+        destination[channel].update(from: source[channel], count: frames)
+      }
+    } else {
+      return nil
+    }
+    return copy
   }
 }
