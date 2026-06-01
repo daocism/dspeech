@@ -21,21 +21,25 @@ The voice-filter routing path is now landed and verified end-to-end as a *seam*:
 
 ## Current next priority
 
-The voice-filter routing scaffold (route-health UX → model-pack execution gate →
-pre-ASR buffer gate → W1 serial FIFO routing → W2 utterance-window discard) is
-complete and verified; **both reviewer asks W1 and W2 are now cleared**. The next
-highest-leverage work, in order:
+2026-06-01 run (`docs/run-notes/2026-06-01-asr-locale-concurrency-interleaved.md`):
+landed the live-tap actor-isolation crash fix (ordered `AsyncStream` handoff),
+user-configurable recognition locale (the en-US-vs-French ATC defect),
+interleaved-PCM-buffer correctness for the external-cable path, exhaustive ICAO/
+segmenter tests, and a host-based recognition validation (SFSpeech/SpeechAnalyzer do
+not run in the Simulator). The voice-filter routing scaffold (route-health UX →
+model-pack execution gate → pre-ASR buffer gate → W1 serial FIFO routing → W2
+utterance-window discard) is complete and verified; **both reviewer asks W1 and W2 are
+now cleared**. The next highest-leverage work, in order:
 
-1. **VAD / silence-gap utterance segmentation** — the W2 window boundary is a fixed
-   1.0 s sample count (`decisionWindowSeconds`), not silence-segmented, so a window
-   straddling a pilot→dispatcher PTT transition that scores ≥ `pilotMatchThreshold`
-   (0.72) can discard up to ~1 s of co-located dispatcher speech (reviewer NOTE A,
-   the only substantive carry-forward; disclosed as a residual risk, not a coverage
-   gap — it is a property of the embedding over real audio, not unit-testable at the
-   router seam). Replace the fixed window with a VAD silence-gap boundary so decision
-   windows align to utterance edges before discard is enabled in production. The
-   model-pack acquisition UX past the current download CTA / enrollment surface still
-   needs hardening alongside this.
+1. **VAD / silence-gap utterance segmentation — implemented.** `EnergySilenceSegmenter`
+   now cuts the decision window on a trailing-silence utterance edge (≥ `minSilence`
+   after ≥ `minSpeech`) or a max-window cap, replacing the fixed sample-count window;
+   `SpeechActivitySegmenterTests` pins the cut decisions. The residual PTT-straddle
+   risk (reviewer NOTE A) remains — a window spanning a pilot→dispatcher transition
+   that scores ≥ `pilotMatchThreshold` (0.72) can still discard co-located dispatcher
+   speech — but it is a property of the embedding over real audio, not a router-seam
+   gap. Remaining: tune `minSilence`/`energyThreshold` against real ATC, and harden the
+   model-pack acquisition UX past the download CTA / enrollment surface.
 2. **ADR 0008 network-deny integration test + replay / source-audio validation kit**
    — a network-deny test proving zero egress under load, plus a fixture harness that
    feeds recorded ATC source audio through the ASR + filter pipeline so
