@@ -251,15 +251,29 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     }
 
     var mono = [Float](repeating: 0, count: frameLength)
-    for channel in 0..<channelCount {
-      let pointer = channelData[channel]
-      for frame in 0..<frameLength {
-        mono[frame] += pointer[frame]
-      }
-    }
     let scale = 1.0 / Float(channelCount)
-    for frame in 0..<frameLength {
-      mono[frame] *= scale
+    if buffer.format.isInterleaved {
+      // why: interleaved multichannel lives in a single pointer as L,R,L,R…; index
+      // by frame*channelCount + channel, not per-channel pointers (which would be
+      // out of bounds for interleaved external-interface input).
+      let pointer = channelData[0]
+      for frame in 0..<frameLength {
+        var sum: Float = 0
+        for channel in 0..<channelCount {
+          sum += pointer[frame * channelCount + channel]
+        }
+        mono[frame] = sum * scale
+      }
+    } else {
+      for channel in 0..<channelCount {
+        let pointer = channelData[channel]
+        for frame in 0..<frameLength {
+          mono[frame] += pointer[frame]
+        }
+      }
+      for frame in 0..<frameLength {
+        mono[frame] *= scale
+      }
     }
     return mono
   }
@@ -331,17 +345,23 @@ extension AVAudioPCMBuffer {
     let frames = Int(frameLength)
     let channels = Int(format.channelCount)
     guard frames > 0, channels > 0 else { return copy }
+    // why: interleaved buffers expose ONE channel pointer holding frames*channels
+    // samples (L,R,L,R…); deinterleaved expose `channels` pointers of `frames` each.
+    // Indexing per-channel on an interleaved buffer reads out of bounds and copies
+    // only half the audio — silent corruption on external USB / line-in routes.
+    let pointerCount = format.isInterleaved ? 1 : channels
+    let elementsPerPointer = format.isInterleaved ? frames * channels : frames
     if let source = floatChannelData, let destination = copy.floatChannelData {
-      for channel in 0..<channels {
-        destination[channel].update(from: source[channel], count: frames)
+      for index in 0..<pointerCount {
+        destination[index].update(from: source[index], count: elementsPerPointer)
       }
     } else if let source = int16ChannelData, let destination = copy.int16ChannelData {
-      for channel in 0..<channels {
-        destination[channel].update(from: source[channel], count: frames)
+      for index in 0..<pointerCount {
+        destination[index].update(from: source[index], count: elementsPerPointer)
       }
     } else if let source = int32ChannelData, let destination = copy.int32ChannelData {
-      for channel in 0..<channels {
-        destination[channel].update(from: source[channel], count: frames)
+      for index in 0..<pointerCount {
+        destination[index].update(from: source[index], count: elementsPerPointer)
       }
     } else {
       return nil
