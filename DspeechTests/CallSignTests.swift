@@ -46,4 +46,22 @@ struct CallSignTests {
     let cs = try #require(CallSign(raw: "N123AB"))
     #expect(cs.matches(in: "United 247 contact ground point niner") == false)
   }
+
+  @Test func phoneticExpansionCoversFullAlphabet() throws {
+    let cs = try #require(CallSign(raw: "ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
+    #expect(
+      cs.phoneticTokens == [
+        "ALPHA", "BRAVO", "CHARLIE", "DELTA", "ECHO", "FOXTROT", "GOLF", "HOTEL", "INDIA",
+        "JULIETT", "KILO", "LIMA", "MIKE", "NOVEMBER", "OSCAR", "PAPA", "QUEBEC", "ROMEO",
+        "SIERRA", "TANGO", "UNIFORM", "VICTOR", "WHISKEY", "XRAY", "YANKEE", "ZULU",
+      ])
+  }
+
+  @Test func phoneticExpansionCoversAllDigits() throws {
+    let cs = try #require(CallSign(raw: "0123456789"))
+    #expect(
+      cs.phoneticTokens == [
+        "ZERO", "ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINER",
+      ])
+  }
 }
