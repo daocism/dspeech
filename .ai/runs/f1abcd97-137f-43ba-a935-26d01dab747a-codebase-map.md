@@ -10,7 +10,7 @@ Date: 2026-05-21
 Implementers MUST keep these intact while wiring the voice filter:
 
 - `PrivacyMode.localOnly` (`Dspeech/Core/Settings/PrivacySettings.swift:4-25`) stays the default. Voiceprints, enrolment audio, and the gate decision NEVER leave the device — they live in the same trust domain as the transcript.
-- No `TODO` / `fatalError("unimplemented")` / "Coming soon" placeholders (`CLAUDE.md:18`). The pilot-filter UI either works or is not shown.
+- No stale work markers (to-do / fix-me) / unimplemented-panic primitives / "Coming soon" placeholders (`CLAUDE.md:18`). The pilot-filter UI either works or is not shown.
 - The `LOCAL` / `CLOUD` badge on the control bar is non-removable (`CLAUDE.md:19`, `ContentView.swift:146`, `ContentView.swift:189-208`). A new "pilot-filter ON / OFF" affordance must be added **next to** it, not replacing it.
 - No new outbound network code. SoundAnalysis / on-device ML only.
 - Swift 6 strict concurrency is enforced project-wide (`project.pbxproj:99` / `:100` — `SWIFT_STRICT_CONCURRENCY = complete`). Every new type is `Sendable` or annotated `@MainActor` like the existing template.

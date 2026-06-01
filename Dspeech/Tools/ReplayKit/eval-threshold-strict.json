@@ -1,0 +1,7 @@
+{
+  "comment": "Strict ReplayKit threshold profile for the verifier-breach acceptance test. maxAverageWER < 0 forces a gate breach against any real (non-negative) WER so the alternate-threshold path is exercised at least once on the branch. Not used by CI by default; pass via `--threshold eval-threshold-strict.json` from the breach test.",
+  "maxAverageWER": -0.0001,
+  "minPilotDiscardPrecision": 1.0,
+  "minPilotDiscardRecall": 1.0,
+  "maxFalseDiscardRate": 0.0
+}

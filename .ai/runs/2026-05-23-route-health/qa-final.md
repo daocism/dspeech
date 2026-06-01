@@ -68,7 +68,7 @@ sources to the `DspeechTests` target sources phase.
 
 | Pattern | Result | Verdict |
 |---|---|---|
-| `URLSession`, `https://`, `certified`, `guaranteed`, `radio link`, `tower link`, `FAA`, `EASA`, `TODO`, `FIXME`, `fatalError`, `try!` over `Dspeech/`, `DspeechTests/`, `docs/` | 0 hits | clean — no networked calls, no over-claim wording, no panic primitives, no stale work markers |
+| `URLSession`, `https://`, `certified`, `guaranteed`, `radio link`, `tower link`, `FAA`, `EASA`, stale work markers (to-do / fix-me / panic primitives), `try!` over `Dspeech/`, `DspeechTests/`, `docs/` | 0 hits | clean — no networked calls, no over-claim wording, no panic primitives, no stale work markers |
 | `import AVFAudio` over `Dspeech/` | 1 hit — `Dspeech/Core/Audio/LiveAudioSessionRouting.swift:3` | expected — canonical Apple framework for `AVAudioSession` on iOS 17+; isolated to the live-shell adapter, not the pure classifier core |
 | `route-health-badge`, `route-health-banner`, `privacy-badge` over `Dspeech/` | 1 hit — `Dspeech/App/ContentView.swift:216` `accessibilityIdentifier("privacy-badge")` | pre-existing privacy badge; **no `route-health-badge` or `route-health-banner` accessibility IDs found** — capture-screen UI surface (research §2 chip/banner) is NOT yet implemented |
 

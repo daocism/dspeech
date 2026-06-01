@@ -10,10 +10,12 @@ Canonical registry: `/home/user/projects/MyInfra/config/project-workspaces/proje
 ## Current phase
 
 Privacy-first, offline-first ATC/cockpit transcription. On `feat/local-pilot-voice-filter`
-the local voice-filter core, the route-health model/monitor layer, **and** the
-route-health capture UX are all landed. Next product work is real local speaker
-identification and the surrounding model-pack / pre-ASR routing, plus a
-replay/route validation kit and App Store readiness.
+the local voice-filter core, the route-health model/monitor layer, the route-health
+capture UX, a real offline FluidAudio speaker identifier, and the pre-ASR routing seam
+(W1 serial FIFO routing + W2 utterance-window discard granularity) are all landed.
+Next product work is VAD/silence-gap utterance segmentation (replacing the fixed 1.0 s
+decision window), the ADR 0008 network-deny integration test + replay/route validation
+kit, and App Store readiness.
 
 ## Active branches
 
@@ -22,6 +24,41 @@ replay/route validation kit and App Store readiness.
 - `project-workspace-bootstrap-20260521` — AI memory skeleton (merged groundwork).
 
 ## Last successful run
+
+2026-05-26 (builder run `dspeech-builder-20260526T110023Z-29c9c067`):
+**W2 — utterance-aware pre-ASR pilot suppression — LANDED and reviewer-approved.**
+The pre-ASR discard decision moved from raw-tap-buffer level to a coherent ~1.0 s
+**utterance window**, so a single mislabeled tap buffer can no longer punch a hole in
+an ATC utterance. New `Dspeech/Core/ASR/UtteranceWindowRouter.swift` accumulates tap
+buffers until `minimumChunkSamples` (`recordingFormat.sampleRate × 1.0 s`), classifies
+the whole concatenated window once, and applies that one decision to every member
+buffer as a unit (append-all or discard-all); sub-threshold windows are never
+classified and are flushed fail-open on `finish()`. It wraps the unchanged W1
+`SerialBufferRouter<[Buffer]>`, so the off-`@MainActor` / FIFO / fail-open-on-throw /
+no-append-after-stop guarantees are reused, not reimplemented.
+`AppleSpeechLiveTranscriptionEngine` now feeds this window router.
+SHAs: contract `2ce3570` → feat `aee9c8c` → test-evidence `d3d95ad` → tester-unit
+verification `90dc4d8` → reviewer `977d5a4` (origin tip `977d5a4`, this docs commit
+sits on top). Tests: full `DspeechTests` on mac24 (iPhone 17 Pro / iOS 26.4),
+`-only-testing:DspeechTests` → **`** TEST SUCCEEDED **`**; 8 new
+`UtteranceWindowRouterTests` (C1–C6 coverage) + the 5 W1 `SerialBufferRouterTests`
+regression guard + the rest of the domain suite all green. Tester-unit verdict: **PASS,
+does not block merge**; confirmed zero audio-egress (no URLSession/socket/cloud in the
+W2 diff). Reviewer verdict: **APPROVE_WITH_NOTES** — no change requested this cycle.
+Non-blocking notes carried forward: NOTE A (MEDIUM, already disclosed) the fixed-1.0 s
+window is not VAD/silence-segmented, so a window straddling a pilot→dispatcher
+transition scoring ≥ `pilotMatchThreshold` (0.72) can discard up to ~1 s of co-located
+dispatcher speech — the reason VAD segmentation is the next slice; NOTE B (LOW) a window
+cut/in-flight at `finish()` is dropped while the later sub-threshold tail is flushed
+(bounded to audio in flight at stop, disclosed in the run note); NOTE C (LOW) ASR now
+receives ~1 s batches so Apple Speech partials update ~once/second (latency, not
+correctness). Notion task `369dfa2b-7893-814c-be7e-e7cea26486a6`: **Notion NOT_FOUND** —
+no connector reachable from the run environment (same as CEO inspection); repo run-notes
++ commit SHAs are the canonical handoff. Evidence:
+`docs/run-notes/2026-05-26-utterance-window-pre-asr.md` (engineer),
+`docs/run-notes/2026-05-26-tester-unit-utterance-window-pre-asr.md` (tester),
+`.ai/runs/dspeech-builder-20260526T110023Z-29c9c067-reviewer.md` (reviewer),
+`.ai/runs/dspeech-builder-20260526T110023Z-29c9c067-researcher-codebase.md` (contract).
 
 2026-05-25 (workflow audit, run `dspeech-supervisor-20260525T203100Z-a08f1596`):
 **Builder run `dspeech-builder-20260525T190042Z-c2188fe3`'s `Blocked` finalizer is a
@@ -168,14 +205,21 @@ ATC callsign/continuation gate indicators, mac24 simulator tests passed.
 
 ## Remaining highest-leverage product work
 
-1. **Real local speaker identification** — FluidAudio/CoreML-backed
-   `LocalSpeakerIdentifier` replacing the deferred stub (ADR 0007), with the
-   model-pack download/enable UX and pre-ASR audio routing so pilot suppression
-   runs before STT, not just as a post-ASR callsign gate.
-2. **Replay / route validation kit** — recorded-route + sample-audio harness so
-   route-health and voice-filter behavior is verifiable without live hardware.
+1. **VAD / silence-gap utterance segmentation** — replace the fixed 1.0 s
+   `decisionWindowSeconds` window boundary in `UtteranceWindowRouter` with a
+   silence-gap-segmented boundary so a decision window no longer straddles a
+   pilot→dispatcher PTT transition. This is the direct fix for reviewer NOTE A
+   (the only substantive carry-forward) and tightens utterance boundaries before
+   discard is enabled in production. The model-pack acquisition UX past the current
+   download CTA / enrollment surface still needs hardening alongside this.
+2. **ADR 0008 network-deny integration test + replay / source-audio validation
+   kit** — a network-deny test proving zero egress under load, plus a fixture
+   harness that feeds recorded ATC source audio through the ASR + filter pipeline so
+   transcription/filter quality (and the W2 straddle case) is regression-testable
+   without aircraft hardware. Required before enabling discard in production.
 3. **App Store readiness** — privacy nutrition labels, on-device/offline
-   messaging, screenshots, TestFlight build.
+   messaging, screenshots, TestFlight build — only after 1 + 2 yield a real
+   installable local build.
 
 All of the above stay privacy-first and offline-first. No flight-safety
 certification is claimed and none is implied; route-health is advisory.

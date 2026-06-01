@@ -1,0 +1,150 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - feat/**
+      - fix/**
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    name: Xcode build and test
+    runs-on: macos-26
+    env:
+      PROJECT: Dspeech.xcodeproj
+      SCHEME: Dspeech
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Select latest Xcode 26
+        run: scripts/ci/select-xcode26.sh
+
+      - name: Select iOS simulator
+        run: scripts/ci/select-ios-simulator.sh
+
+      - name: Build and test
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -destination "$SIMULATOR_DESTINATION" \
+            CODE_SIGNING_ALLOWED=NO \
+            build test
+
+      # Manual mac24 parity lane:
+      # DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild \
+      #   -project Dspeech.xcodeproj -scheme Dspeech \
+      #   -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4' \
+      #   CODE_SIGNING_ALLOWED=NO build test
+      #
+      # Hosted CI selects the latest available iPhone 17 Pro iOS 26.x simulator
+      # from the selected Xcode instead of pinning a runner-image patch version.
+
+  lint-secret-scan:
+    name: Swift format and secret scan
+    runs-on: macos-26
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Select latest Xcode 26
+        run: scripts/ci/select-xcode26.sh
+
+      - name: Swift format lint
+        run: |
+          set -euo pipefail
+          swift format lint --strict --recursive Dspeech DspeechTests DspeechUITests
+
+      - name: Install gitleaks
+        run: |
+          set -euo pipefail
+          brew install gitleaks
+
+      - name: Gitleaks history scan
+        run: |
+          set -euo pipefail
+          gitleaks git --redact --verbose .
+
+  privacy-manifest:
+    name: Privacy manifest validation
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Validate PrivacyInfo.xcprivacy
+        run: |
+          set -euo pipefail
+          test -f Dspeech/PrivacyInfo.xcprivacy
+          grep -F "PrivacyInfo.xcprivacy in Resources" Dspeech.xcodeproj/project.pbxproj
+          plutil -lint Dspeech/PrivacyInfo.xcprivacy
+          python3 - <<'PY'
+          import plistlib
+          import sys
+          from pathlib import Path
+
+          path = Path("Dspeech/PrivacyInfo.xcprivacy")
+          manifest = plistlib.loads(path.read_bytes())
+          required_root_keys = {
+              "NSPrivacyAccessedAPITypes",
+              "NSPrivacyCollectedDataTypes",
+              "NSPrivacyTracking",
+              "NSPrivacyTrackingDomains",
+          }
+          missing = required_root_keys - manifest.keys()
+          if missing:
+              raise SystemExit(f"Missing root keys: {sorted(missing)}")
+          if manifest["NSPrivacyTracking"] is not False:
+              raise SystemExit("NSPrivacyTracking must be false")
+          if manifest["NSPrivacyCollectedDataTypes"] != []:
+              raise SystemExit("NSPrivacyCollectedDataTypes must be empty")
+          if manifest["NSPrivacyTrackingDomains"] != []:
+              raise SystemExit("NSPrivacyTrackingDomains must be empty")
+
+          user_defaults_entries = [
+              entry
+              for entry in manifest["NSPrivacyAccessedAPITypes"]
+              if entry.get("NSPrivacyAccessedAPIType") == "NSPrivacyAccessedAPICategoryUserDefaults"
+          ]
+          if not user_defaults_entries:
+              raise SystemExit("Missing UserDefaults required-reason API entry")
+          reasons = set()
+          for entry in user_defaults_entries:
+              reasons.update(entry.get("NSPrivacyAccessedAPITypeReasons", []))
+          if "CA92.1" not in reasons:
+              raise SystemExit("Missing UserDefaults reason CA92.1")
+          PY
+
+  replay-eval:
+    name: Offline ATC voice-filter replay eval
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Select latest Xcode 26
+        run: scripts/ci/select-xcode26.sh
+
+      - name: Run offline replay eval (ADR 0008 gate)
+        run: |
+          set -euo pipefail
+          swift run --package-path Dspeech/Tools/ReplayKit dspeech-replay \
+            --fixtures DspeechTests/Fixtures/ReplayKit \
+            --ground-truth DspeechTests/Fixtures/ReplayKit/ground-truth.json \
+            --threshold Dspeech/Tools/ReplayKit/eval-threshold.json

@@ -2,74 +2,96 @@ import Foundation
 import Observation
 
 enum PrivacyMode: String, CaseIterable, Sendable, Codable {
-    case localOnly
-    case allowCloudFallback
+  case localOnly
 
-    var displayName: String {
-        switch self {
-        case .localOnly: return "Локально"
-        case .allowCloudFallback: return "Облако (согласие)"
-        }
-    }
+  var displayName: String {
+    "Локально"
+  }
 
-    var badgeText: String {
-        switch self {
-        case .localOnly: return "LOCAL"
-        case .allowCloudFallback: return "CLOUD"
-        }
-    }
+  var badgeText: String {
+    "LOCAL"
+  }
 
-    var sendsAudioOffDevice: Bool {
-        self == .allowCloudFallback
-    }
+  var sendsAudioOffDevice: Bool {
+    false
+  }
 }
 
 protocol PrivacySettingsStorage: Sendable {
-    func loadPrivacyMode() -> PrivacyMode
-    func savePrivacyMode(_ mode: PrivacyMode)
+  func loadPrivacyMode() -> PrivacyMode
+  func savePrivacyMode(_ mode: PrivacyMode)
+
+  func loadVoiceFilterActive() -> Bool
+  func saveVoiceFilterActive(_ active: Bool)
 }
 
 struct UserDefaultsPrivacySettingsStorage: PrivacySettingsStorage, @unchecked Sendable {
-    static let privacyModeKey = "dspeech.privacy.mode.v1"
+  static let privacyModeKey = "dspeech.privacy.mode.v1"
+  static let voiceFilterActiveKey = "dspeech.privacy.voicefilter.active.v1"
 
-    let defaults: UserDefaults
+  let defaults: UserDefaults
 
-    init(defaults: UserDefaults = .standard) {
-        self.defaults = defaults
+  init(defaults: UserDefaults = .standard) {
+    self.defaults = defaults
+  }
+
+  func loadPrivacyMode() -> PrivacyMode {
+    guard let raw = defaults.string(forKey: Self.privacyModeKey),
+      let mode = PrivacyMode(rawValue: raw)
+    else {
+      return .localOnly
     }
+    return mode
+  }
 
-    func loadPrivacyMode() -> PrivacyMode {
-        guard let raw = defaults.string(forKey: Self.privacyModeKey),
-              let mode = PrivacyMode(rawValue: raw) else {
-            return .localOnly
-        }
-        return mode
-    }
+  func savePrivacyMode(_ mode: PrivacyMode) {
+    defaults.set(mode.rawValue, forKey: Self.privacyModeKey)
+  }
 
-    func savePrivacyMode(_ mode: PrivacyMode) {
-        defaults.set(mode.rawValue, forKey: Self.privacyModeKey)
+  func loadVoiceFilterActive() -> Bool {
+    if let active = defaults.object(forKey: Self.voiceFilterActiveKey) as? Bool {
+      return active
     }
+    if let raw = defaults.string(forKey: Self.voiceFilterActiveKey) {
+      switch raw.lowercased() {
+      case "1", "true", "yes":
+        return true
+      case "0", "false", "no":
+        return false
+      default:
+        return true
+      }
+    }
+    return true
+  }
+
+  func saveVoiceFilterActive(_ active: Bool) {
+    defaults.set(active, forKey: Self.voiceFilterActiveKey)
+  }
 }
 
 @MainActor
 @Observable
 final class PrivacySettings {
-    private let storage: PrivacySettingsStorage
+  private let storage: PrivacySettingsStorage
 
-    var mode: PrivacyMode {
-        didSet {
-            guard mode != oldValue else { return }
-            storage.savePrivacyMode(mode)
-        }
+  var mode: PrivacyMode {
+    didSet {
+      guard mode != oldValue else { return }
+      storage.savePrivacyMode(mode)
     }
+  }
 
-    init(storage: PrivacySettingsStorage = UserDefaultsPrivacySettingsStorage()) {
-        self.storage = storage
-        self.mode = storage.loadPrivacyMode()
+  var voiceFilterActive: Bool {
+    didSet {
+      guard voiceFilterActive != oldValue else { return }
+      storage.saveVoiceFilterActive(voiceFilterActive)
     }
+  }
 
-    var allowCloud: Bool {
-        get { mode == .allowCloudFallback }
-        set { mode = newValue ? .allowCloudFallback : .localOnly }
-    }
+  init(storage: PrivacySettingsStorage = UserDefaultsPrivacySettingsStorage()) {
+    self.storage = storage
+    self.mode = storage.loadPrivacyMode()
+    self.voiceFilterActive = storage.loadVoiceFilterActive()
+  }
 }

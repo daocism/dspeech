@@ -1,0 +1,7 @@
+{
+  "comment": "ReplayKit acceptance thresholds for the offline ATC voice-filter eval. Tightening these here gates CI; loosening requires an ADR.",
+  "maxAverageWER": 0.30,
+  "minPilotDiscardPrecision": 0.90,
+  "minPilotDiscardRecall": 0.80,
+  "maxFalseDiscardRate": 0.05
+}
