@@ -44,7 +44,7 @@ if [ -z "$BUILD_ID" ] || [ -z "$INSTALL_ID" ]; then
   exit 1
 fi
 
-echo "▸ Building + signing for device $BUILD_ID…"
+echo "▸ Building + signing for device ${BUILD_ID}…"
 xcodebuild -project Dspeech.xcodeproj -scheme "$SCHEME" -configuration Debug \
   -destination "platform=iOS,id=$BUILD_ID" \
   -derivedDataPath "$DERIVED" -allowProvisioningUpdates build
@@ -52,7 +52,7 @@ xcodebuild -project Dspeech.xcodeproj -scheme "$SCHEME" -configuration Debug \
 APP="$DERIVED/Build/Products/Debug-iphoneos/${SCHEME}.app"
 [ -d "$APP" ] || { echo "✗ Build product not found at $APP"; exit 1; }
 
-echo "▸ Installing to $INSTALL_ID…"
+echo "▸ Installing to ${INSTALL_ID}…"
 xcrun devicectl device install app --device "$INSTALL_ID" "$APP"
 
 echo "▸ Launching…"
