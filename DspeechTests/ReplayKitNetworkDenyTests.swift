@@ -411,7 +411,11 @@ struct ReplayKitNetworkDenyTests {
 
     try Self.writeModelPackFixture(contents, at: modelDir)
 
-    let located = try #require(SpeakerModelPackInstaller.locateModelDirectory(in: parent))
+    // why: isolate from the real on-device FluidAudio cache (modelCacheRoot()), which a
+    // prior model-pack download leaves populated with the full 10-file model — otherwise
+    // the locator returns that cache instead of this 2-file fixture and verify throws.
+    let located = try #require(
+      SpeakerModelPackInstaller.locateModelDirectory(in: parent, cacheRoot: parent))
     let verified = try SpeakerModelPackInstaller.verifyModelPack(
       at: located,
       manifest: Self.manifest(for: contents)

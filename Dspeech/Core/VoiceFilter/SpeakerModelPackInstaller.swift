@@ -122,9 +122,9 @@ struct SpeakerModelPackInstaller: Sendable {
 
   static func locateModelDirectory(
     in root: URL = fluidAudioRoot(),
+    cacheRoot: URL = modelCacheRoot(),
     fileManager: FileManager = .default
   ) -> URL? {
-    let cacheRoot = modelCacheRoot()
     let directCandidates = [
       cacheRoot.appendingPathComponent(Repo.diarizer.folderName, isDirectory: true),
       cacheRoot.appendingPathComponent("speaker-diarization-coreml", isDirectory: true),

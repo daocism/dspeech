@@ -238,7 +238,7 @@ final class DspeechUITests: XCTestCase {
 
     let enableToggle = app.switches["translation-enabled-toggle"]
     var attempts = 0
-    while !enableToggle.exists && attempts < 12 {
+    while !enableToggle.exists && attempts < 14 {
       app.swipeUp()
       attempts += 1
     }
@@ -246,8 +246,14 @@ final class DspeechUITests: XCTestCase {
       enableToggle.waitForExistence(timeout: 4),
       "settings must expose an on-device translation toggle")
 
+    // the picker sits just below the toggle in the same section — scroll on until it renders
     let picker = app.descendants(matching: .any)
       .matching(identifier: "translation-target-picker").firstMatch
+    var pickerAttempts = 0
+    while !picker.exists && pickerAttempts < 8 {
+      app.swipeUp()
+      pickerAttempts += 1
+    }
     XCTAssertTrue(
       picker.waitForExistence(timeout: 4),
       "settings must expose a target-language picker")
