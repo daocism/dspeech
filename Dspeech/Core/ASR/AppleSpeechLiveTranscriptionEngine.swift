@@ -14,6 +14,10 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
   private var recognizer: SFSpeechRecognizer?
   private var request: SFSpeechAudioBufferRecognitionRequest?
   private var task: SFSpeechRecognitionTask?
+  // why: monotonically bumped on every (re)install and on cleanup; a recognitionTask
+  // callback only acts if its captured generation still matches, so a superseded or
+  // cancelled task can never flip the live session's state.
+  private var taskGeneration = 0
   private var router: UtteranceWindowRouter<AVAudioPCMBuffer>?
   private let audioEngine = AVAudioEngine()
 
@@ -83,12 +87,21 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
       status = .failed("recognizer-unavailable")
       return
     }
+    // why: requiresOnDeviceRecognition=true (privacy: local-only) errors immediately at
+    // runtime if the locale's on-device dictation asset isn't provisioned. Check up front
+    // and surface it, rather than letting the recognitionTask die silently mid-session
+    // (the F1 "tap mic → listening 1 s → nothing" defect).
+    guard recognizer.supportsOnDeviceRecognition else {
+      status = .failed("on-device-model-missing: \(localeID)")
+      return
+    }
     recognizer.defaultTaskHint = .dictation
     self.recognizer = recognizer
 
     do {
       try beginAudioSession()
-      try startEngineAndTask(recognizer: recognizer)
+      installRecognition(recognizer: recognizer)
+      try startEngine()
       status = .listening
     } catch {
       status = .failed("start-failed: \(error.localizedDescription)")
@@ -110,21 +123,15 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     try session.setActive(true, options: .notifyOthersOnDeactivation)
   }
 
-  private func startEngineAndTask(recognizer: SFSpeechRecognizer) throws {
-    let request = SFSpeechAudioBufferRecognitionRequest()
-    request.shouldReportPartialResults = true
-    request.requiresOnDeviceRecognition = true
-    request.taskHint = .dictation
-    // why: bias the on-device LM toward ICAO phonetics + ATC phraseology it would
-    // otherwise under-weight; local-only, no privacy/network impact.
-    request.contextualStrings = ATCContextualVocabulary.strings()
-    if #available(iOS 16.0, *) {
-      request.addsPunctuation = true
-    }
-    self.request = request
-
+  private func startEngine() throws {
     let inputNode = audioEngine.inputNode
     let recordingFormat = inputNode.outputFormat(forBus: 0)
+    // why: on some device routes (mic not yet granted, mid route-change, certain
+    // external interfaces) the input format reports 0 Hz / 0 channels; installing a
+    // tap with it throws deep inside CoreAudio. Surface it as an explicit failure.
+    guard recordingFormat.channelCount > 0, recordingFormat.sampleRate > 0 else {
+      throw LiveEngineError.invalidInputFormat
+    }
 
     if bufferGate != nil {
       // why: the gate routes through the nonisolated identifier, so the heavy
@@ -175,9 +182,31 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
 
     audioEngine.prepare()
     try audioEngine.start()
+  }
 
+  // why: the recognition request/task is created separately from the audio engine so a
+  // finished task (utterance final, or an on-device "no speech yet" timeout) can be
+  // replaced WITHOUT tearing down the mic + tap — keeping live transcription continuous
+  // instead of stopping after the first utterance or the first beat of silence.
+  private func installRecognition(recognizer: SFSpeechRecognizer) {
+    let request = SFSpeechAudioBufferRecognitionRequest()
+    request.shouldReportPartialResults = true
+    request.requiresOnDeviceRecognition = true
+    request.taskHint = .dictation
+    // why: bias the on-device LM toward ICAO phonetics + ATC phraseology it would
+    // otherwise under-weight; local-only, no privacy/network impact.
+    request.contextualStrings = ATCContextualVocabulary.strings()
+    request.addsPunctuation = true
+    self.request = request
+
+    taskGeneration += 1
+    let generation = taskGeneration
     let localePrefix = String(activeLocaleIdentifier.prefix(2))
+
     task = recognizer.recognitionTask(with: request) { @Sendable [weak self] result, error in
+      let failure: ASRFailure? = (error as NSError?).map {
+        ASRFailure(domain: $0.domain, code: $0.code, message: $0.localizedDescription)
+      }
       let event: LiveTranscriptionEvent?
       let isFinal: Bool
       if let result {
@@ -206,20 +235,37 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
         event = nil
         isFinal = false
       }
-      let terminal = isFinal || error != nil
       Task { @MainActor [weak self] in
-        guard let self else { return }
-        if let event {
-          self.emit(event)
-        }
-        if terminal {
-          self.cleanup()
-          if self.status == .listening {
-            self.status = .stopped
-          }
+        // why: ignore callbacks from a superseded task — restart/cleanup bump the
+        // generation, so a cancelled task can't flip state for the live session.
+        guard let self, self.taskGeneration == generation else { return }
+        if let event { self.emit(event) }
+        if isFinal || failure != nil {
+          self.handleTermination(failure: failure)
         }
       }
     }
+  }
+
+  private func handleTermination(failure: ASRFailure?) {
+    guard status == .listening, let recognizer else { return }
+    if let failure, !failure.isBenignNoSpeech {
+      // why: surface the real recognition error instead of swallowing it into a benign
+      // .stopped — the #1 silent-failure that hid the F1 break from the user.
+      cleanup()
+      status = .failed("asr-error: \(failure.domain)#\(failure.code) \(failure.message)")
+      return
+    }
+    restartRecognition(recognizer: recognizer)
+  }
+
+  private func restartRecognition(recognizer: SFSpeechRecognizer) {
+    guard status == .listening, audioEngine.isRunning else { return }
+    request?.endAudio()
+    task?.cancel()
+    task = nil
+    request = nil
+    installRecognition(recognizer: recognizer)
   }
 
   private func routeSamples(_ samples: [Float], sampleRate: Double) async throws
@@ -290,6 +336,7 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
   }
 
   private func cleanup() {
+    taskGeneration += 1
     if audioEngine.isRunning {
       audioEngine.stop()
     }
@@ -370,5 +417,21 @@ extension AVAudioPCMBuffer {
       return nil
     }
     return copy
+  }
+}
+
+private enum LiveEngineError: Error {
+  case invalidInputFormat
+}
+
+private struct ASRFailure: Sendable {
+  let domain: String
+  let code: Int
+  let message: String
+
+  // why: kAFAssistantErrorDomain code 1110 = "No speech detected" — a silence timeout,
+  // not a fault; let the session restart and keep listening rather than show .failed.
+  var isBenignNoSpeech: Bool {
+    domain == "kAFAssistantErrorDomain" && code == 1110
   }
 }
