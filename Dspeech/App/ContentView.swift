@@ -155,8 +155,10 @@ struct ContentView: View {
     }
     .onChange(of: translation.enabled) { _, enabled in
       if enabled {
+        // why: arming the config fires .translationTask, which retranslates after
+        // prepareTranslation — a synchronous retranslateAll here would be a second,
+        // redundant batch and flicker every gloss (clear -> refill).
         updateTranslationConfig()
-        coordinator.live.retranslateAll()
       } else {
         translationConfig = nil
         coordinator.live.clearTranslations()
@@ -165,7 +167,6 @@ struct ContentView: View {
     .onChange(of: translation.targetCode) { _, _ in
       guard translation.enabled else { return }
       updateTranslationConfig()
-      coordinator.live.retranslateAll()
     }
     .onChange(of: recognition.localeIdentifier) { _, _ in
       if translation.enabled { updateTranslationConfig() }

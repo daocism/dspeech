@@ -300,4 +300,25 @@ struct LiveTranscriptionViewModelTests {
     #expect(await wait(for: { backend.translateCallCount > firstCount }))
     #expect(vm.translations[seg.id] == "перевод")
   }
+
+  @Test func taskSupersededByResetDoesNotWriteStaleGloss() async {
+    let engine = FakeEngine()
+    let backend = FakeTranslationBackend()
+    backend.suspendUntilReleased = true
+    backend.translationResult = "STALE"
+    let vm = translatingVM(engine: engine, backend: backend, target: "ru")
+    await vm.start()
+    let seg = makeSegment("Descend")
+    engine.push(.segment(seg))
+    // the translation task is in-flight, suspended inside translate before it writes
+    #expect(await wait(for: { backend.translateCallCount == 1 }))
+    #expect(vm.translations[seg.id] == nil)
+
+    vm.reset()  // clears the per-segment token; the in-flight task is now superseded
+    backend.releaseAll()  // task resumes and returns "STALE", but its token no longer matches
+
+    // would land if the token guard were missing; with it, the stale write is dropped
+    _ = await wait(for: { vm.translations[seg.id] == "STALE" }, timeout: .milliseconds(400))
+    #expect(vm.translations.isEmpty)
+  }
 }
