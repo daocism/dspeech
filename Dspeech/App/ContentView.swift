@@ -6,11 +6,14 @@ struct ContentView: View {
   @State private var privacy: PrivacySettings
   @State private var recognition: RecognitionSettings
   @State private var showSettings: Bool = false
+  @State private var onboarding: OnboardingState
+  @Environment(\.scenePhase) private var scenePhase
 
   init(
     engine: (any LiveTranscriptionEngine)? = nil,
     voiceFilter: VoiceFilterPipeline? = nil,
-    routing: AudioSessionRouting = LiveAudioSessionRouting()
+    routing: AudioSessionRouting = LiveAudioSessionRouting(),
+    onboarding: OnboardingState? = nil
   ) {
     let privacySettings = PrivacySettings()
     let recognitionSettings = RecognitionSettings()
@@ -41,6 +44,7 @@ struct ContentView: View {
     _privacy = State(initialValue: privacySettings)
     _recognition = State(initialValue: recognitionSettings)
     _voiceFilter = State(initialValue: filter)
+    _onboarding = State(initialValue: onboarding ?? OnboardingState())
     _coordinator = State(
       initialValue: CaptureCoordinator(
         live: live,
@@ -106,6 +110,18 @@ struct ContentView: View {
     }
     .onAppear { coordinator.beginObservingRouteChanges() }
     .onDisappear { coordinator.endObservingRouteChanges() }
+    .onChange(of: scenePhase) { _, newPhase in
+      if newPhase == .background {
+        coordinator.stopForBackground()
+      }
+    }
+    .fullScreenCover(isPresented: onboardingPresented) {
+      OnboardingView { onboarding.complete() }
+    }
+  }
+
+  private var onboardingPresented: Binding<Bool> {
+    Binding(get: { !onboarding.hasCompletedOnboarding }, set: { _ in })
   }
 
   @ViewBuilder

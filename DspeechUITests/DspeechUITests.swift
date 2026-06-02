@@ -88,6 +88,7 @@ final class DspeechUITests: XCTestCase {
     app.launchArguments += [
       "-dspeech.privacy.mode.v1", "localOnly",
       "-dspeech.privacy.voicefilter.active.v1", "true",
+      "-dspeech.onboarding.completed.v1", "true",
       "-dspeech.voicefilter.modelpack.v1", "absent",
     ]
     app.launch()
@@ -154,6 +155,7 @@ final class DspeechUITests: XCTestCase {
     app.launchArguments += [
       "-dspeech.privacy.mode.v1", "localOnly",
       "-dspeech.privacy.voicefilter.active.v1", "true",
+      "-dspeech.onboarding.completed.v1", "true",
       "-dspeech.voicefilter.modelpack.v1", "failedRetryable",
     ]
     app.launch()
@@ -176,6 +178,7 @@ final class DspeechUITests: XCTestCase {
     app.launchArguments += [
       "-dspeech.privacy.mode.v1", "localOnly",
       "-dspeech.privacy.voicefilter.active.v1", "true",
+      "-dspeech.onboarding.completed.v1", "true",
       "-dspeech.voicefilter.modelpack.v1", "acquiringHalf",
     ]
     app.launch()
@@ -193,11 +196,49 @@ final class DspeechUITests: XCTestCase {
   }
 
   @MainActor
+  func testFirstRunOnboardingShowsCardsThenRevealsTranscript() throws {
+    let app = XCUIApplication()
+    app.launchArguments += [
+      "-dspeech.privacy.mode.v1", "localOnly",
+      "-dspeech.privacy.voicefilter.active.v1", "true",
+      "-dspeech.onboarding.completed.v1", "false",
+    ]
+    app.launch()
+
+    XCTAssertTrue(
+      app.staticTexts["Только приём"].waitForExistence(timeout: 8),
+      "first run must show the onboarding receive-only card")
+    XCTAssertFalse(
+      app.buttons["onboarding-done-button"].exists,
+      "done button must only appear on the last card")
+
+    for _ in 0..<2 {
+      let next = app.buttons["onboarding-next-button"]
+      XCTAssertTrue(next.waitForExistence(timeout: 4))
+      next.tap()
+    }
+
+    let done = app.buttons["onboarding-done-button"]
+    XCTAssertTrue(
+      done.waitForExistence(timeout: 4),
+      "advancing to the last card must reveal the done button")
+    done.tap()
+
+    XCTAssertTrue(
+      app.staticTexts["Dspeech"].waitForExistence(timeout: 6),
+      "completing onboarding must reveal the transcript surface")
+    XCTAssertFalse(
+      app.staticTexts["Только приём"].waitForExistence(timeout: 2),
+      "onboarding must be dismissed after completion")
+  }
+
+  @MainActor
   private func launchAppWithCleanPrivacyDefaults() -> XCUIApplication {
     let app = XCUIApplication()
     app.launchArguments += [
       "-dspeech.privacy.mode.v1", "localOnly",
       "-dspeech.privacy.voicefilter.active.v1", "true",
+      "-dspeech.onboarding.completed.v1", "true",
     ]
     app.launch()
     return app

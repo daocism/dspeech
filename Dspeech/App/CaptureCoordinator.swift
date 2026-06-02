@@ -54,6 +54,14 @@ final class CaptureCoordinator {
     }
   }
 
+  // why: F8 — when the app moves to the background we stop ASR cleanly rather than
+  // capture covertly. Receive-only product, no UIBackgroundModes audio entitlement,
+  // so this also matches what the OS would do on suspension, made explicit.
+  func stopForBackground() {
+    guard live.isListening else { return }
+    live.stop()
+  }
+
   func handleRouteEvent(_ event: RouteChangeEvent) {
     routeMonitor.handle(event: event)
     if routeMonitor.lastNotice?.kind == .lost, live.isListening {

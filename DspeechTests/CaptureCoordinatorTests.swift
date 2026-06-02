@@ -169,6 +169,30 @@ struct CaptureCoordinatorTests {
     #expect(engine.stopCallCount == 1)
   }
 
+  @Test func stopForBackgroundStopsWhenListening() async {
+    let (coordinator, engine, _) = Self.makeCoordinator(
+      route: RouteSnapshot(inputs: [Self.port(.usbAudio)]),
+      availableInputs: [Self.port(.usbAudio)]
+    )
+    await coordinator.start()
+    await Self.wait(for: { coordinator.live.isListening })
+    #expect(engine.startCallCount == 1)
+
+    coordinator.stopForBackground()
+    await Self.wait(for: { engine.stopCallCount == 1 })
+
+    #expect(engine.stopCallCount == 1)
+  }
+
+  @Test func stopForBackgroundIsNoOpWhenIdle() {
+    let (coordinator, engine, _) = Self.makeCoordinator(
+      route: RouteSnapshot(inputs: [Self.port(.usbAudio)]),
+      availableInputs: [Self.port(.usbAudio)]
+    )
+    coordinator.stopForBackground()
+    #expect(engine.stopCallCount == 0)
+  }
+
   @Test func blockedMessageAvoidsForbiddenPhrases() {
     for health in [
       RouteHealth.suitableExternal,
