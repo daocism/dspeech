@@ -120,7 +120,10 @@ struct ContentView: View {
     .sheet(isPresented: $showSettings) {
       SettingsView(
         privacy: privacy, recognition: recognition, translation: translation,
-        audioSource: audioSource, voiceFilter: voiceFilter)
+        audioSource: audioSource,
+        translationUnavailable: liveViewModel.translationUnavailable,
+        captureActive: liveViewModel.isListening,
+        voiceFilter: voiceFilter)
     }
     .onAppear {
       coordinator.beginObservingRouteChanges()
@@ -440,6 +443,8 @@ struct SettingsView: View {
   @Bindable var recognition: RecognitionSettings
   @Bindable var translation: TranslationSettings
   var audioSource: AudioSourceController
+  var translationUnavailable: Bool
+  var captureActive: Bool
   var voiceFilter: VoiceFilterPipeline?
   @Environment(\.dismiss) private var dismiss
 
@@ -447,12 +452,16 @@ struct SettingsView: View {
     privacy: PrivacySettings, recognition: RecognitionSettings,
     translation: TranslationSettings,
     audioSource: AudioSourceController,
+    translationUnavailable: Bool = false,
+    captureActive: Bool = false,
     voiceFilter: VoiceFilterPipeline? = nil
   ) {
     self.privacy = privacy
     self.recognition = recognition
     self.translation = translation
     self.audioSource = audioSource
+    self.translationUnavailable = translationUnavailable
+    self.captureActive = captureActive
     self.voiceFilter = voiceFilter
   }
 
@@ -503,6 +512,26 @@ struct SettingsView: View {
             .font(.footnote)
             .foregroundStyle(.secondary)
           }
+          Button {
+            if audioSource.isMetering {
+              audioSource.stopMetering()
+            } else {
+              audioSource.startMetering()
+            }
+          } label: {
+            Label(
+              audioSource.isMetering ? "Остановить проверку" : "Проверить уровень входа",
+              systemImage: audioSource.isMetering ? "stop.circle" : "waveform")
+          }
+          .disabled(captureActive)
+          .accessibilityIdentifier("audio-meter-toggle")
+          if audioSource.isMetering {
+            HStack(spacing: 12) {
+              Text("Уровень").font(.footnote).foregroundStyle(.secondary)
+              InputLevelBar(level: audioSource.inputLevel).frame(height: 8)
+            }
+            .accessibilityIdentifier("audio-input-level")
+          }
         } header: {
           Text("Источник звука")
         } footer: {
@@ -529,6 +558,15 @@ struct SettingsView: View {
             }
           }
           .accessibilityIdentifier("translation-target-picker")
+          if translation.enabled && translationUnavailable {
+            Label(
+              "Языковой пакет не установлен. Выключите и снова включите перевод — iOS предложит загрузку.",
+              systemImage: "exclamationmark.triangle.fill"
+            )
+            .font(.footnote)
+            .foregroundStyle(.orange)
+            .accessibilityIdentifier("translation-pack-unavailable")
+          }
         } header: {
           Text("Перевод")
         } footer: {
@@ -541,6 +579,7 @@ struct SettingsView: View {
         }
       }
       .onAppear { audioSource.refresh() }
+      .onDisappear { audioSource.stopMetering() }
       .navigationTitle("Настройки")
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
@@ -971,6 +1010,21 @@ extension Bundle {
   }
 }
 
+private struct InputLevelBar: View {
+  let level: Double
+
+  var body: some View {
+    GeometryReader { geo in
+      ZStack(alignment: .leading) {
+        Capsule().fill(.white.opacity(0.15))
+        Capsule()
+          .fill(.cyan)
+          .frame(width: geo.size.width * CGFloat(max(0, min(1, level))))
+      }
+    }
+  }
+}
+
 private struct PartialTranscriptCard: View {
   let text: String
   let isLandscape: Bool
@@ -1014,12 +1068,14 @@ private struct TranscriptSegmentCard: View {
   // why: PRD F2 — the transcript honors Dynamic Type; @ScaledMetric scales the base
   // size with the user's accessibility text setting (minimumScaleFactor caps growth).
   @ScaledMetric(relativeTo: .title) private var baseTranscriptSize: CGFloat = 30
+  @State private var expanded = false
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
       badgeRow
       transcriptText
       glossLine
+      if expanded { detailRow }
     }
     .padding(.horizontal, 14)
     .padding(.vertical, 12)
@@ -1032,6 +1088,23 @@ private struct TranscriptSegmentCard: View {
       RoundedRectangle(cornerRadius: 18, style: .continuous)
         .stroke(.white.opacity(0.10), lineWidth: 1)
     }
+    .contentShape(Rectangle())
+    .onTapGesture { withAnimation(.easeInOut(duration: 0.15)) { expanded.toggle() } }
+    .accessibilityIdentifier("transcript-segment")
+  }
+
+  // why: PRD main view — tapping a segment expands its details (timestamp + confidence).
+  private var detailRow: some View {
+    HStack(spacing: 14) {
+      Label(
+        segment.startedAt.formatted(date: .omitted, time: .standard),
+        systemImage: "clock")
+      Text("conf \(segment.confidence.formatted(.percent.precision(.fractionLength(0))))")
+      Spacer(minLength: 0)
+    }
+    .font(.caption.monospacedDigit())
+    .foregroundStyle(.white.opacity(0.6))
+    .accessibilityIdentifier("transcript-segment-details")
   }
 
   private var badgeRow: some View {
@@ -1094,10 +1167,24 @@ private struct TranscriptSegmentCard: View {
   }
 }
 
-#Preview("Portrait") {
-  ContentView()
-}
+#if DEBUG
+  // why: the Canvas preview must not spin up the live AVAudioSession / mic — inject a
+  // fake routing and an already-completed onboarding so the cockpit renders reliably
+  // without device entitlements. DEBUG-only so none of this ships in release.
+  private struct PreviewCompletedOnboardingStorage: OnboardingStateStorage {
+    func loadHasCompletedOnboarding() -> Bool { true }
+    func saveHasCompletedOnboarding(_ completed: Bool) {}
+  }
 
-#Preview("Landscape", traits: .landscapeLeft) {
-  ContentView()
-}
+  @MainActor private func previewCockpit() -> ContentView {
+    let mic = PortSnapshot(portType: .builtInMic, portName: "iPhone", uid: "preview-mic")
+    return ContentView(
+      routing: FakeAudioSessionRouting(
+        currentRoute: RouteSnapshot(inputs: [mic]), availableInputs: [mic]),
+      onboarding: OnboardingState(storage: PreviewCompletedOnboardingStorage()))
+  }
+
+  #Preview("Portrait") { previewCockpit() }
+
+  #Preview("Landscape", traits: .landscapeLeft) { previewCockpit() }
+#endif

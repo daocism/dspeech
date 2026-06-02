@@ -6,14 +6,45 @@ import Observation
 final class AudioSourceController {
   private let routing: any AudioSessionRouting
   private let settings: AudioSettings
+  private let meter: any InputLevelMetering
 
   private(set) var availableInputs: [PortSnapshot] = []
   private(set) var selectedUID: String = ""
+  private(set) var inputLevel: Double = 0
+  private(set) var isMetering = false
+  private var meterTask: Task<Void, Never>?
 
-  init(routing: any AudioSessionRouting, settings: AudioSettings = AudioSettings()) {
+  init(
+    routing: any AudioSessionRouting,
+    settings: AudioSettings = AudioSettings(),
+    meter: any InputLevelMetering = AVAudioEngineInputLevelMeter()
+  ) {
     self.routing = routing
     self.settings = settings
+    self.meter = meter
     refresh()
+  }
+
+  // why: a transient "test level" meter for the audio-source settings — only run
+  // when ASR is not capturing (the caller gates on isListening) so two engines
+  // never tap the input at once.
+  func startMetering() {
+    stopMetering()
+    isMetering = true
+    meterTask = Task { @MainActor [weak self] in
+      guard let self else { return }
+      for await level in self.meter.levels() {
+        self.inputLevel = level
+      }
+    }
+  }
+
+  func stopMetering() {
+    meterTask?.cancel()
+    meterTask = nil
+    meter.stop()
+    inputLevel = 0
+    isMetering = false
   }
 
   var hasSelectableInputs: Bool { !availableInputs.isEmpty }

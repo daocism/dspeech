@@ -65,4 +65,52 @@ struct AudioSourceControllerTests {
     controller.select(uid: "nonexistent")
     #expect(routing.preferredInputCalls.isEmpty)
   }
+
+  final class FakeInputLevelMeter: InputLevelMetering, @unchecked Sendable {
+    let values: [Double]
+    private(set) var stopCount = 0
+    init(values: [Double]) { self.values = values }
+    func levels() -> AsyncStream<Double> {
+      AsyncStream { continuation in
+        for value in values { continuation.yield(value) }
+        continuation.finish()
+      }
+    }
+    func stop() { stopCount += 1 }
+  }
+
+  private func makeController(meter: FakeInputLevelMeter) -> AudioSourceController {
+    AudioSourceController(
+      routing: FakeAudioSessionRouting(availableInputs: [port(.builtInMic, "Mic", "u-mic")]),
+      settings: AudioSettings(storage: InMemoryStorage()),
+      meter: meter)
+  }
+
+  private func waitUntil(
+    _ predicate: @MainActor () -> Bool, timeout: Duration = .seconds(2)
+  ) async {
+    let deadline = ContinuousClock().now.advanced(by: timeout)
+    while ContinuousClock().now < deadline {
+      if predicate() { return }
+      try? await Task.sleep(nanoseconds: 5_000_000)
+    }
+  }
+
+  @Test func startMeteringPublishesLevels() async {
+    let meter = FakeInputLevelMeter(values: [0.0, 0.5, 0.9])
+    let controller = makeController(meter: meter)
+    controller.startMetering()
+    await waitUntil { controller.inputLevel == 0.9 }
+    #expect(controller.inputLevel == 0.9)
+  }
+
+  @Test func stopMeteringStopsMeterAndResetsLevel() async {
+    let meter = FakeInputLevelMeter(values: [0.5])
+    let controller = makeController(meter: meter)
+    controller.startMetering()
+    await waitUntil { controller.inputLevel == 0.5 }
+    controller.stopMetering()
+    #expect(controller.inputLevel == 0)
+    #expect(meter.stopCount >= 1)
+  }
 }
