@@ -21,6 +21,23 @@ The voice-filter routing path is now landed and verified end-to-end as a *seam*:
 
 ## Current next priority
 
+2026-06-02c **F1 silent-failure fix + device-verification gate** (`docs/run-notes/2026-06-02c-f1-asr-silent-failure-fix.md`):
+live ASR shipped broken — mic flashed to listening then died silently in ~1 s. Root cause:
+the engine swallowed the `recognitionTask` error into a benign `.stopped` AND never restarted
+the single task across utterance/silence finals, so a continuous session was impossible.
+Fixed: `AppleSpeechLiveTranscriptionEngine` lifecycle rewrite (sustain session across finals,
+surface real errors as `.failed`, `supportsOnDeviceRecognition` + input-format guards,
+task-generation token) + same-class fixes in `CallsignDictationService` and
+`AudioSourceController.select`. **Why it escaped: every gate was a proxy — FakeEngine unit
+tests + Simulator (which cannot run on-device Speech) + an F1 "test on your phone" checklist;
+nothing ran the real Speech stack on real hardware.** New DEVICE-ONLY tests in
+`DspeechTests/OnDeviceSpeechRecognitionTests.swift` (recognizer on-device support, synthesized→
+real-recognizer, engine-sustains-listening-through-silence). **GATE: Simulator-green is NOT
+sufficient for F1/F5/dictation — a physical-device test lane is mandatory before any
+"works on device" claim.** Open backlog (MEDIUM/LOW silent-failure siblings + missing device
+integration tests) enumerated in the run-note. See global memory
+`feedback_verify_primary_capability_on_real_target`.
+
 2026-06-02b polish (`docs/run-notes/2026-06-02b-polish-icon-signing-install.md`): app icon,
 DEVELOPMENT_TEAM signing (Personal Team `NW2XAS56AW`), F5 input-level meter (button-driven),
 translation-pack indicator, tap-to-expand, F2 monospaced+Dynamic Type, #if DEBUG probe gate,
