@@ -49,15 +49,20 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
   // engine is exercised. Tests pass `false` to reach the AVAudioEngine path on the
   // Simulator; production always uses the default (true).
   private let requireOnDeviceModel: Bool
+  // why: test seam — lets a Simulator test drive the audio-capture path without the
+  // permission prompt (which would hang a non-UI test). Production always requests.
+  private let skipPermissionRequests: Bool
 
   init(
     localeProvider: @escaping @MainActor () -> String = { "en-US" },
     bufferGate: (any SpeechAudioBufferGate)? = nil,
-    requireOnDeviceModel: Bool = true
+    requireOnDeviceModel: Bool = true,
+    skipPermissionRequests: Bool = false
   ) {
     self.localeProvider = localeProvider
     self.bufferGate = bufferGate
     self.requireOnDeviceModel = requireOnDeviceModel
+    self.skipPermissionRequests = skipPermissionRequests
   }
 
   func events() -> AsyncStream<LiveTranscriptionEvent> {
@@ -76,45 +81,50 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     guard status != .listening else { return }
     status = .requestingPermission
 
-    let speechAuthorized = await Self.requestSpeechAuthorization()
-    guard speechAuthorized else {
-      status = .failed("speech-permission-denied")
-      return
-    }
+    if !skipPermissionRequests {
+      let speechAuthorized = await Self.requestSpeechAuthorization()
+      guard speechAuthorized else {
+        status = .failed("speech-permission-denied")
+        return
+      }
 
-    let micAllowed = await Self.requestMicrophonePermission()
-    guard micAllowed else {
-      status = .failed("microphone-permission-denied")
-      return
+      let micAllowed = await Self.requestMicrophonePermission()
+      guard micAllowed else {
+        status = .failed("microphone-permission-denied")
+        return
+      }
     }
 
     let localeID = localeProvider()
     activeLocaleIdentifier = localeID
     let locale = Locale(identifier: localeID)
-    guard let recognizer = SFSpeechRecognizer(locale: locale), recognizer.isAvailable else {
-      status = .failed("recognizer-unavailable")
-      return
+    // why: under the skip-permission test seam, tolerate a nil/unavailable recognizer so
+    // the audio-capture path is still exercised (a Simulator may report it unavailable).
+    let recognizer = SFSpeechRecognizer(locale: locale)
+    if !skipPermissionRequests {
+      guard let recognizer, recognizer.isAvailable else {
+        status = .failed("recognizer-unavailable")
+        return
+      }
     }
     // why: requiresOnDeviceRecognition=true (privacy: local-only) errors immediately at
     // runtime if the locale's on-device dictation asset isn't provisioned. Check up front
     // and surface it, rather than letting the recognitionTask die silently mid-session
     // (the F1 "tap mic → listening 1 s → nothing" defect).
-    if requireOnDeviceModel {
+    if requireOnDeviceModel, let recognizer {
       guard recognizer.supportsOnDeviceRecognition else {
         status = .failed("on-device-model-missing: \(localeID)")
         return
       }
     }
-    recognizer.defaultTaskHint = .dictation
+    recognizer?.defaultTaskHint = .dictation
     self.recognizer = recognizer
 
     do {
       try beginAudioSession()
-      // why: bring up AVAudioEngine FIRST, then attach the recognition task — creating an
-      // on-device SFSpeechRecognitionTask before the audio pipeline is live crashes in the
-      // Speech/AudioToolbox stack (and lets the task finalize before any audio arrives).
+      // why: bring up AVAudioEngine before attaching the recognition task.
       try startEngine()
-      installRecognition(recognizer: recognizer)
+      if let recognizer { installRecognition(recognizer: recognizer) }
       status = .listening
     } catch {
       status = .failed("start-failed: \(error.localizedDescription)")
@@ -189,11 +199,15 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     // tap-build time. nil removes the mismatch; the guard above still fails-fast on a dead
     // (0 Hz / 0-channel) input. recordingFormat is kept only for that guard.
     //
-    // why: this tap block is nonisolated and captures only the Sendable continuation
-    // (never self / @MainActor state), so it runs on the realtime audio thread with
-    // no isolation assertion. It deep-copies the recycled buffer and yields it in
-    // capture order for the @MainActor consumer above to route.
-    inputNode.installTap(onBus: 0, bufferSize: 1024, format: nil) { buffer, _ in
+    // why: the `@Sendable` on this block is LOAD-BEARING, not cosmetic. This type is
+    // @MainActor, so a bare closure literal here inherits @MainActor isolation; when
+    // AVFAudio invokes it on its realtime RealtimeMessenger thread, Swift asserts
+    // swift_task_isCurrentExecutor(MainActor) → false → dispatch_assert_queue_fail
+    // (EXC_BREAKPOINT) and the app crashes on the first captured buffer. `@Sendable`
+    // forces the block nonisolated so it legally runs off-MainActor. It captures only
+    // the Sendable continuation (never self / @MainActor state), deep-copies the
+    // recycled buffer, and yields it in capture order for the @MainActor consumer.
+    inputNode.installTap(onBus: 0, bufferSize: 1024, format: nil) { @Sendable buffer, _ in
       guard let copy = buffer.dspeechDeepCopy() else { return }
       let samples = Self.monoFloatSamples(from: copy) ?? []
       audioContinuation.yield(

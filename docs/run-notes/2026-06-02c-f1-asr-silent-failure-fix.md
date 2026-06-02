@@ -53,6 +53,29 @@ engine" change was a wrong guess (reverted-in-effect); the real fix is the tap f
 Continuous-flight requirement (one tap → whole flight) is satisfied by the sustained
 session (mic+tap stay up; recognition task recycled per utterance/1110).
 
+## ADDENDUM 2 — the ACTUAL mic-tap crash: a `@MainActor` tap closure missing `@Sendable`
+The `format:nil` change (addendum 1) fixed the input-level METER abort, but the **ASR mic
+tap still crashed every time**. I got the real cause by reproducing on the **Simulator**
+(skip-permission test seam → `AppleSpeechLiveTranscriptionEngine` audio path) and reading
+the symbolicated backtrace:
+```
+dispatch_assert_queue_fail ← swift_task_isCurrentExecutor
+  ← <startEngine installTap closure (AVAudioPCMBuffer, AVAudioTime)>
+  ← AVAudioNodeTap::TapMessage::RealtimeMessenger_Perform
+```
+**Root cause:** the engine is `@MainActor`, so the bare `installTap { buffer, _ in … }`
+closure inherited `@MainActor` isolation. AVFAudio invokes it on its realtime
+`RealtimeMessenger` thread → Swift asserts `isCurrentExecutor(MainActor)` → false →
+`dispatch_assert_queue_fail` (EXC_BREAKPOINT) on the FIRST captured buffer. It was LATENT
+until the session-sustain fix kept the tap installed long enough for a buffer to arrive
+(before, the tap was torn down within ~1 s). Proof: the meter tap (a non-`@MainActor`
+type) never crashed; `CallsignDictationService`'s tap already had `@Sendable`; the ASR tap
+was the only one missing it. **Fix:** mark the tap block `@Sendable` so it's nonisolated
+and legally runs off-MainActor (it only captures the Sendable continuation). Verified on
+the Simulator: buffers now flow through the realtime tap (`route #0 → appended #0 → …`)
+with no crash; the suite is green. Lesson banked: `feedback_ios_crash_debugging_methodology`
+(an AVAudioEngine tap/realtime callback on a `@MainActor` type MUST be `@Sendable`).
+
 ## Fixed in this change
 - **Engine lifecycle rewrite**: `installRecognition` separated from `startEngine`; on a
   clean final / benign no-speech the task is **restarted while the mic+tap keep running**

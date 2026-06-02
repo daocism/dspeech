@@ -128,18 +128,14 @@ struct OnDeviceSpeechRecognitionTests {
   // hang in a non-UI test); the meter test above covers the Simulator unconditionally.
   @Test
   func engineAudioPathInstallsTapWithoutCrashing() async throws {
-    guard SFSpeechRecognizer.authorizationStatus() != .notDetermined else {
-      print("[OnDeviceSpeech] speech auth undetermined; skipping (meter test covers the sim)")
-      return
-    }
     let engine = AppleSpeechLiveTranscriptionEngine(
-      localeProvider: { "en-US" }, requireOnDeviceModel: false)
+      localeProvider: { "en-US" }, requireOnDeviceModel: false, skipPermissionRequests: true)
     await engine.start()
-    try await Task.sleep(nanoseconds: 1_500_000_000)
+    try await Task.sleep(nanoseconds: 2_500_000_000)
     let terminal = engine.status
     engine.stop()
     print("[OnDeviceSpeech] engineAudioPath terminal=\(terminal)")
-    #expect(terminal != .idle)  // start() ran to completion without aborting in installTap
+    #expect(terminal != .idle)  // start() ran to completion without aborting in the capture path
   }
 
   // MARK: - helpers
