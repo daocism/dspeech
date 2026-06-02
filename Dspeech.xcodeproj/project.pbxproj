@@ -75,6 +75,7 @@
 		A00000000000000000000601 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000600 /* Assets.xcassets */; };
 		A00000000000000000000701 /* InputLevelMeter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000700 /* InputLevelMeter.swift */; };
 		A00000000000000000000703 /* AudioLevelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000702 /* AudioLevelTests.swift */; };
+		A00000000000000000000801 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000800 /* Localizable.xcstrings */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -153,6 +154,7 @@
 		A00000000000000000000600 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A00000000000000000000700 /* InputLevelMeter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputLevelMeter.swift; sourceTree = "<group>"; };
 		A00000000000000000000702 /* AudioLevelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioLevelTests.swift; sourceTree = "<group>"; };
+		A00000000000000000000800 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -164,7 +166,7 @@
 /* Begin PBXGroup section */
 		A00000000000000000000002 = {isa = PBXGroup; children = ( A00000000000000000000004 /* Dspeech */, A00000000000000000000010 /* DspeechTests */, A00000000000000000000011 /* DspeechUITests */, A00000000000000000000003 /* Products */, ); sourceTree = "<group>"; };
 		A00000000000000000000003 /* Products */ = {isa = PBXGroup; children = ( A00000000000000000000015 /* Dspeech.app */, A00000000000000000000016 /* DspeechTests.xctest */, A00000000000000000000017 /* DspeechUITests.xctest */, ); name = Products; sourceTree = "<group>"; };
-		A00000000000000000000004 /* Dspeech */ = {isa = PBXGroup; children = ( A00000000000000000000005 /* App */, A00000000000000000000006 /* Core */, A00000000000000000000204 /* PrivacyInfo.xcprivacy */, A00000000000000000000600 /* Assets.xcassets */, ); path = Dspeech; sourceTree = "<group>"; };
+		A00000000000000000000004 /* Dspeech */ = {isa = PBXGroup; children = ( A00000000000000000000005 /* App */, A00000000000000000000006 /* Core */, A00000000000000000000204 /* PrivacyInfo.xcprivacy */, A00000000000000000000600 /* Assets.xcassets */, A00000000000000000000800 /* Localizable.xcstrings */, ); path = Dspeech; sourceTree = "<group>"; };
 		A00000000000000000000005 /* App */ = {isa = PBXGroup; children = ( A00000000000000000000043 /* DspeechApp.swift */, A00000000000000000000044 /* ContentView.swift */, A00000000000000000000045 /* TranscriptDemoViewModel.swift */, A00000000000000000000072 /* LiveTranscriptionViewModel.swift */, A00000000000000000000105 /* RouteHealthMonitor.swift */, A00000000000000000000111 /* CaptureCoordinator.swift */, A00000000000000000000208 /* SimulatorSpeechProbe.swift */, A00000000000000000000402 /* OnboardingView.swift */, A00000000000000000000515 /* AudioSourceController.swift */, ); path = App; sourceTree = "<group>"; };
 		A00000000000000000000006 /* Core */ = {isa = PBXGroup; children = ( A00000000000000000000007 /* Models */, A00000000000000000000008 /* Audio */, A00000000000000000000009 /* ASR */, A00000000000000000000063 /* Settings */, A00000000000000000000096 /* VoiceFilter */, A00000000000000000000500 /* Translation */, ); path = Core; sourceTree = "<group>"; };
 		A00000000000000000000500 /* Translation */ = {isa = PBXGroup; children = ( A00000000000000000000501 /* TranslationServiceProtocol.swift */, A00000000000000000000503 /* TranslationService.swift */, ); path = Translation; sourceTree = "<group>"; };
@@ -184,11 +186,11 @@
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		A00000000000000000000001 /* Project object */ = {isa = PBXProject; attributes = {BuildIndependentTargetsInParallel = 1; LastSwiftUpdateCheck = 2640; LastUpgradeCheck = 2640; TargetAttributes = { A00000000000000000000012 = {CreatedOnToolsVersion = 26.4; }; A00000000000000000000013 = {CreatedOnToolsVersion = 26.4; TestTargetID = A00000000000000000000012; }; A00000000000000000000014 = {CreatedOnToolsVersion = 26.4; TestTargetID = A00000000000000000000012; }; }; }; buildConfigurationList = A00000000000000000000031 /* Build configuration list for PBXProject "Dspeech" */; compatibilityVersion = "Xcode 16.0"; developmentRegion = en; hasScannedForEncodings = 0; knownRegions = ( en, Base, ); mainGroup = A00000000000000000000002; minimizedProjectReferenceProxies = 1; packageReferences = ( A00000000000000000000200 /* XCRemoteSwiftPackageReference "FluidAudio" */, ); preferredProjectObjectVersion = 77; productRefGroup = A00000000000000000000003 /* Products */; projectDirPath = ""; projectRoot = ""; targets = ( A00000000000000000000012 /* Dspeech */, A00000000000000000000013 /* DspeechTests */, A00000000000000000000014 /* DspeechUITests */, ); };
+		A00000000000000000000001 /* Project object */ = {isa = PBXProject; attributes = {BuildIndependentTargetsInParallel = 1; LastSwiftUpdateCheck = 2640; LastUpgradeCheck = 2640; TargetAttributes = { A00000000000000000000012 = {CreatedOnToolsVersion = 26.4; }; A00000000000000000000013 = {CreatedOnToolsVersion = 26.4; TestTargetID = A00000000000000000000012; }; A00000000000000000000014 = {CreatedOnToolsVersion = 26.4; TestTargetID = A00000000000000000000012; }; }; }; buildConfigurationList = A00000000000000000000031 /* Build configuration list for PBXProject "Dspeech" */; compatibilityVersion = "Xcode 16.0"; developmentRegion = en; hasScannedForEncodings = 0; knownRegions = ( en, Base, ru, uk, es, fr, de, it, pt, "zh-Hans", ja, ); mainGroup = A00000000000000000000002; minimizedProjectReferenceProxies = 1; packageReferences = ( A00000000000000000000200 /* XCRemoteSwiftPackageReference "FluidAudio" */, ); preferredProjectObjectVersion = 77; productRefGroup = A00000000000000000000003 /* Products */; projectDirPath = ""; projectRoot = ""; targets = ( A00000000000000000000012 /* Dspeech */, A00000000000000000000013 /* DspeechTests */, A00000000000000000000014 /* DspeechUITests */, ); };
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		A00000000000000000000020 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = ( A00000000000000000000203 /* PrivacyInfo.xcprivacy in Resources */, A00000000000000000000601 /* Assets.xcassets in Resources */, ); runOnlyForDeploymentPostprocessing = 0; };
+		A00000000000000000000020 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = ( A00000000000000000000203 /* PrivacyInfo.xcprivacy in Resources */, A00000000000000000000601 /* Assets.xcassets in Resources */, A00000000000000000000801 /* Localizable.xcstrings in Resources */, ); runOnlyForDeploymentPostprocessing = 0; };
 		A00000000000000000000023 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = ( ); runOnlyForDeploymentPostprocessing = 0; };
 		A00000000000000000000026 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = ( ); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXResourcesBuildPhase section */

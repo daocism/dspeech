@@ -81,12 +81,14 @@ struct ContentView: View {
   private var emptyStateText: String {
     switch liveViewModel.status {
     case .idle, .stopped:
-      return
-        "Нажмите «Старт» и говорите — расшифровка появится здесь.\nЛокальная обработка, аудио не покидает устройство."
+      return String(
+        localized:
+          "Нажмите «Старт» и говорите — расшифровка появится здесь.\nЛокальная обработка, аудио не покидает устройство."
+      )
     case .requestingPermission:
-      return "Запрос доступа к микрофону и распознаванию речи…"
+      return String(localized: "Запрос доступа к микрофону и распознаванию речи…")
     case .ready, .listening:
-      return "Слушаю…"
+      return String(localized: "Слушаю…")
     case .failed(let message):
       return "Ошибка: \(message)"
     }
@@ -108,11 +110,15 @@ struct ContentView: View {
           controlBar(isLandscape: isLandscape)
           routeBanner(isLandscape: isLandscape)
           transcriptArea(isLandscape: isLandscape)
-          bottomBar(isLandscape: isLandscape)
         }
         .padding(.horizontal, isLandscape ? 16 : 18)
         .padding(.top, isLandscape ? 6 : 10)
         .padding(.bottom, isLandscape ? 8 : 14)
+
+        // why: Start + Clear/error float over the transcript (no opaque footer strip);
+        // the transcript fills the full height and scrolls its content clear of them.
+        bottomLeftControls(isLandscape: isLandscape)
+        startControls(isLandscape: isLandscape)
       }
     }
     .statusBarHidden(true)
@@ -255,6 +261,8 @@ struct ContentView: View {
           }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        // why: clear the floating Start button so the last segment can scroll above it.
+        .padding(.bottom, 84)
       }
       .scrollIndicators(.hidden)
     }
@@ -264,27 +272,8 @@ struct ContentView: View {
   // Start), so they grab attention once and never nag after the user has used the app.
   private var showHints: Bool { liveViewModel.status == .idle }
 
-  private func bottomBar(isLandscape: Bool) -> some View {
+  private func startControls(isLandscape: Bool) -> some View {
     HStack(spacing: 12) {
-      if !liveViewModel.segments.isEmpty {
-        Button("Очистить") {
-          liveViewModel.reset()
-        }
-        .font(.subheadline.weight(.medium))
-        .foregroundStyle(.white.opacity(0.8))
-        .accessibilityIdentifier("clear-button")
-      }
-
-      if let error = liveViewModel.lastErrorMessage {
-        Text(error)
-          .font(.caption.monospaced())
-          .foregroundStyle(.orange)
-          .lineLimit(2)
-          .accessibilityIdentifier("error-banner")
-      }
-
-      Spacer(minLength: 8)
-
       if showHints {
         HintBubble(text: "Нажмите, чтобы начать распознавание")
       }
@@ -295,6 +284,32 @@ struct ContentView: View {
         Task { await toggleListening() }
       }
     }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+    .padding(.trailing, isLandscape ? 16 : 18)
+    .padding(.bottom, isLandscape ? 10 : 16)
+  }
+
+  private func bottomLeftControls(isLandscape: Bool) -> some View {
+    HStack(spacing: 10) {
+      if !liveViewModel.segments.isEmpty {
+        Button("Очистить") {
+          liveViewModel.reset()
+        }
+        .font(.subheadline.weight(.medium))
+        .foregroundStyle(.white.opacity(0.85))
+        .accessibilityIdentifier("clear-button")
+      }
+      if let error = liveViewModel.lastErrorMessage {
+        Text(error)
+          .font(.caption.monospaced())
+          .foregroundStyle(.orange)
+          .lineLimit(2)
+          .accessibilityIdentifier("error-banner")
+      }
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+    .padding(.leading, isLandscape ? 16 : 18)
+    .padding(.bottom, isLandscape ? 16 : 24)
   }
 
   private func toggleListening() async {
@@ -442,6 +457,19 @@ struct SettingsView: View {
     self.voiceFilter = voiceFilter
   }
 
+  // why: "" = follow the device language (default). A non-empty code writes the
+  // standard AppleLanguages override, which iOS applies on the next launch — the clean
+  // in-app language switch, no bundle swizzling.
+  @State private var appLanguage: String =
+    (UserDefaults.standard.array(forKey: "AppleLanguages") as? [String])?.first ?? ""
+
+  private static let appLanguages: [(code: String, name: String)] = [
+    ("", String(localized: "Системный")),
+    ("en", "English"), ("ru", "Русский"), ("uk", "Українська"),
+    ("es", "Español"), ("fr", "Français"), ("de", "Deutsch"),
+    ("it", "Italiano"), ("pt", "Português"), ("zh-Hans", "简体中文"), ("ja", "日本語"),
+  ]
+
   private var audioSourceBinding: Binding<String> {
     Binding(get: { audioSource.selectedUID }, set: { audioSource.select(uid: $0) })
   }
@@ -550,6 +578,25 @@ struct SettingsView: View {
           Text(
             "Перевод выполняется на устройстве через системные языковые пакеты Apple. При первом включении iOS предложит скачать языковой пакет. Аудио и текст не покидают iPhone."
           )
+        }
+        Section {
+          Picker("Язык приложения", selection: $appLanguage) {
+            ForEach(Self.appLanguages, id: \.code) { lang in
+              Text(lang.name).tag(lang.code)
+            }
+          }
+          .accessibilityIdentifier("app-language-picker")
+          .onChange(of: appLanguage) { _, code in
+            if code.isEmpty {
+              UserDefaults.standard.removeObject(forKey: "AppleLanguages")
+            } else {
+              UserDefaults.standard.set([code], forKey: "AppleLanguages")
+            }
+          }
+        } header: {
+          Text("Язык приложения")
+        } footer: {
+          Text("Перезапустите приложение, чтобы сменить язык.")
         }
         Section("О приложении") {
           LabeledContent("Версия", value: Bundle.main.shortVersion)

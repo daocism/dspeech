@@ -85,6 +85,7 @@ final class DspeechUITests: XCTestCase {
   func testVoiceFilterModelPackDownloadCTAIsEnabledAndStartsAcquisition() throws {
     let app = XCUIApplication()
     app.launchArguments += [
+      "-AppleLanguages", "(ru)", "-AppleLocale", "ru_RU",
       "-dspeech.privacy.mode.v1", "localOnly",
       "-dspeech.privacy.voicefilter.active.v1", "true",
       "-dspeech.onboarding.completed.v1", "true",
@@ -152,6 +153,7 @@ final class DspeechUITests: XCTestCase {
   func testVoiceFilterRetryButtonIsEnabledForRetryableFailure() throws {
     let app = XCUIApplication()
     app.launchArguments += [
+      "-AppleLanguages", "(ru)", "-AppleLocale", "ru_RU",
       "-dspeech.privacy.mode.v1", "localOnly",
       "-dspeech.privacy.voicefilter.active.v1", "true",
       "-dspeech.onboarding.completed.v1", "true",
@@ -175,6 +177,7 @@ final class DspeechUITests: XCTestCase {
   func testVoiceFilterAcquisitionShowsPercentText() throws {
     let app = XCUIApplication()
     app.launchArguments += [
+      "-AppleLanguages", "(ru)", "-AppleLocale", "ru_RU",
       "-dspeech.privacy.mode.v1", "localOnly",
       "-dspeech.privacy.voicefilter.active.v1", "true",
       "-dspeech.onboarding.completed.v1", "true",
@@ -198,6 +201,7 @@ final class DspeechUITests: XCTestCase {
   func testFirstRunOnboardingShowsCardsThenRevealsTranscript() throws {
     let app = XCUIApplication()
     app.launchArguments += [
+      "-AppleLanguages", "(ru)", "-AppleLocale", "ru_RU",
       "-dspeech.privacy.mode.v1", "localOnly",
       "-dspeech.privacy.voicefilter.active.v1", "true",
       "-dspeech.onboarding.completed.v1", "false",
@@ -279,6 +283,7 @@ final class DspeechUITests: XCTestCase {
   private func launchAppWithCleanPrivacyDefaults() -> XCUIApplication {
     let app = XCUIApplication()
     app.launchArguments += [
+      "-AppleLanguages", "(ru)", "-AppleLocale", "ru_RU",
       "-dspeech.privacy.mode.v1", "localOnly",
       "-dspeech.privacy.voicefilter.active.v1", "true",
       "-dspeech.onboarding.completed.v1", "true",
