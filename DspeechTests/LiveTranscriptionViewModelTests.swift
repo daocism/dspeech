@@ -206,4 +206,98 @@ struct LiveTranscriptionViewModelTests {
     #expect(vm.segments.isEmpty)
     #expect(vm.partialText.isEmpty)
   }
+
+  // MARK: - Translation orchestration (F3)
+
+  private func translatingVM(
+    engine: FakeEngine,
+    backend: FakeTranslationBackend,
+    target: String?
+  ) -> LiveTranscriptionViewModel {
+    LiveTranscriptionViewModel(
+      engine: engine,
+      translator: backend,
+      translationTarget: { target.map { Locale.Language(identifier: $0) } }
+    )
+  }
+
+  @Test func translatesFinalizedSegmentWhenEnabled() async {
+    let engine = FakeEngine()
+    let backend = FakeTranslationBackend()
+    backend.translationResult = "Снижайтесь до трёх тысяч"
+    let vm = translatingVM(engine: engine, backend: backend, target: "ru")
+    await vm.start()
+    let seg = makeSegment("Descend and maintain three thousand")
+    engine.push(.segment(seg))
+    #expect(await wait(for: { vm.translations[seg.id] == "Снижайтесь до трёх тысяч" }))
+    #expect(backend.translateCallCount == 1)
+  }
+
+  @Test func skipsTranslationWhenTargetEqualsSource() async {
+    let engine = FakeEngine()
+    let backend = FakeTranslationBackend()
+    let vm = translatingVM(engine: engine, backend: backend, target: "en")
+    await vm.start()
+    let seg = makeSegment("Descend and maintain three thousand")
+    engine.push(.segment(seg))
+    await wait(for: { vm.segments.count == 1 })
+    _ = await wait(for: { backend.translateCallCount > 0 }, timeout: .milliseconds(300))
+    #expect(backend.translateCallCount == 0)
+    #expect(vm.translations[seg.id] == nil)
+  }
+
+  @Test func doesNotTranslateWhenDisabled() async {
+    let engine = FakeEngine()
+    let backend = FakeTranslationBackend()
+    let vm = translatingVM(engine: engine, backend: backend, target: nil)
+    await vm.start()
+    let seg = makeSegment("Descend")
+    engine.push(.segment(seg))
+    await wait(for: { vm.segments.count == 1 })
+    _ = await wait(for: { backend.translateCallCount > 0 }, timeout: .milliseconds(300))
+    #expect(backend.translateCallCount == 0)
+  }
+
+  @Test func missingLanguagePackMarksUnavailable() async {
+    let engine = FakeEngine()
+    let backend = FakeTranslationBackend()
+    backend.translateError = .languagePackNotInstalled(
+      source: Locale.Language(identifier: "en"),
+      target: Locale.Language(identifier: "ru"))
+    let vm = translatingVM(engine: engine, backend: backend, target: "ru")
+    await vm.start()
+    let seg = makeSegment("Descend")
+    engine.push(.segment(seg))
+    #expect(await wait(for: { vm.translationUnavailable }))
+    #expect(vm.translations[seg.id] == nil)
+  }
+
+  @Test func resetClearsTranslations() async {
+    let engine = FakeEngine()
+    let backend = FakeTranslationBackend()
+    backend.translationResult = "перевод"
+    let vm = translatingVM(engine: engine, backend: backend, target: "ru")
+    await vm.start()
+    let seg = makeSegment("Descend")
+    engine.push(.segment(seg))
+    await wait(for: { vm.translations[seg.id] == "перевод" })
+    vm.reset()
+    #expect(vm.translations.isEmpty)
+    #expect(vm.translationUnavailable == false)
+  }
+
+  @Test func retranslateAllRetranslatesExistingSegments() async {
+    let engine = FakeEngine()
+    let backend = FakeTranslationBackend()
+    backend.translationResult = "перевод"
+    let vm = translatingVM(engine: engine, backend: backend, target: "ru")
+    await vm.start()
+    let seg = makeSegment("Descend")
+    engine.push(.segment(seg))
+    await wait(for: { vm.translations[seg.id] == "перевод" })
+    let firstCount = backend.translateCallCount
+    vm.retranslateAll()
+    #expect(await wait(for: { backend.translateCallCount > firstCount }))
+    #expect(vm.translations[seg.id] == "перевод")
+  }
 }

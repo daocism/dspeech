@@ -125,6 +125,10 @@ struct ContentView: View {
     .onAppear {
       coordinator.beginObservingRouteChanges()
       audioSource.applyPersistedPreference()
+      // why: .onChange(of:) does not fire for state restored from UserDefaults, so
+      // a returning user who left translation ON needs the config armed here — it
+      // drives .translationTask -> prepareTranslation (the only pack-download path).
+      updateTranslationConfig()
     }
     .onDisappear { coordinator.endObservingRouteChanges() }
     .onChange(of: scenePhase) { _, newPhase in
@@ -183,8 +187,11 @@ struct ContentView: View {
   }
 
   private func glossText(for segment: TranscriptSegment) -> String? {
-    guard translation.enabled else { return nil }
-    return liveViewModel.translations[segment.id] ?? segment.translatedText
+    // why: only ever surface a real engine-produced translation — never the demo
+    // fixture's canned translatedText, which would be a fake-AI gloss (CLAUDE.md #2)
+    // and would render instantly offline with no language-pack download.
+    guard translation.enabled, segment.source != .demo else { return nil }
+    return liveViewModel.translations[segment.id]
   }
 
   private var translationEnabledBinding: Binding<Bool> {

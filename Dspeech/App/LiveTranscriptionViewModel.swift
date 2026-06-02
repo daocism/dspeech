@@ -18,6 +18,7 @@ final class LiveTranscriptionViewModel {
   private let translationTarget: @MainActor () -> Locale.Language?
   private var eventTask: Task<Void, Never>?
   private var translationTasks: [UUID: Task<Void, Never>] = [:]
+  private var translationTaskTokens: [UUID: UUID] = [:]
 
   init(
     engine: any LiveTranscriptionEngine,
@@ -75,6 +76,7 @@ final class LiveTranscriptionViewModel {
   func clearTranslations() {
     for task in translationTasks.values { task.cancel() }
     translationTasks.removeAll()
+    translationTaskTokens.removeAll()
     translations.removeAll()
     translationUnavailable = false
   }
@@ -96,20 +98,34 @@ final class LiveTranscriptionViewModel {
     let id = segment.id
     let text = segment.text
     translationTasks[id]?.cancel()
+    let token = UUID()
+    translationTaskTokens[id] = token
     translationTasks[id] = Task { @MainActor [weak self] in
       guard let self else { return }
-      defer { self.translationTasks[id] = nil }
+      // why: clear the slot only if this task still owns it — a superseding task
+      // (retranslate / target change) may have replaced it after this was cancelled.
+      defer {
+        if self.translationTaskTokens[id] == token {
+          self.translationTasks[id] = nil
+          self.translationTaskTokens[id] = nil
+        }
+      }
+      let result: String
       do {
-        let result = try await translator.translate(text, from: source, into: target)
-        guard !Task.isCancelled else { return }
-        self.translations[id] = result
-        self.translationUnavailable = false
+        result = try await translator.translate(text, from: source, into: target)
       } catch TranslationServiceError.languagePackNotInstalled {
-        self.translationUnavailable = true
+        // why: token guard so a cancelled/superseded task can't flip state for a
+        // segment that is no longer current (e.g. after reset/clearTranslations).
+        if self.translationTaskTokens[id] == token { self.translationUnavailable = true }
+        return
       } catch {
         // why: translation is best-effort and never blocks the transcript; other
         // failures simply leave the segment un-glossed.
+        return
       }
+      guard self.translationTaskTokens[id] == token else { return }
+      self.translations[id] = result
+      self.translationUnavailable = false
     }
   }
 
