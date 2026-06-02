@@ -111,12 +111,18 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     // runtime if the locale's on-device dictation asset isn't provisioned. Check up front
     // and surface it, rather than letting the recognitionTask die silently mid-session
     // (the F1 "tap mic → listening 1 s → nothing" defect).
-    if requireOnDeviceModel, let recognizer {
-      guard recognizer.supportsOnDeviceRecognition else {
-        status = .failed("on-device-model-missing: \(localeID)")
-        return
+    // why: skipped on the Simulator — no Simulator has an on-device dictation model, so
+    // supportsOnDeviceRecognition is always false there; gating this guard off lets the
+    // Simulator reach the capture/recognition path (it uses server recognition below,
+    // compiled out of device builds). On a real device the guard is fully in force.
+    #if !targetEnvironment(simulator)
+      if requireOnDeviceModel, let recognizer {
+        guard recognizer.supportsOnDeviceRecognition else {
+          status = .failed("on-device-model-missing: \(localeID)")
+          return
+        }
       }
-    }
+    #endif
     recognizer?.defaultTaskHint = .dictation
     self.recognizer = recognizer
 
@@ -226,7 +232,16 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
   private func installRecognition(recognizer: SFSpeechRecognizer) {
     let request = SFSpeechAudioBufferRecognitionRequest()
     request.shouldReportPartialResults = true
-    request.requiresOnDeviceRecognition = true
+    // why: the Simulator has no on-device dictation model — requiresOnDeviceRecognition=true
+    // dead-ends in `kLSRErrorDomain#300` on the very first result. Use SERVER recognition on
+    // the SIMULATOR ONLY so the app actually transcribes during development and the suite can
+    // exercise the real Speech pipeline. This branch is compiled OUT of device builds, so a
+    // shipped device stays strictly on-device (ADR 0002 / privacy: localOnly is preserved).
+    #if targetEnvironment(simulator)
+      request.requiresOnDeviceRecognition = false
+    #else
+      request.requiresOnDeviceRecognition = true
+    #endif
     request.taskHint = .dictation
     // why: bias the on-device LM toward ICAO phonetics + ATC phraseology it would
     // otherwise under-weight; local-only, no privacy/network impact.

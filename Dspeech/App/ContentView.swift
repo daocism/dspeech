@@ -90,7 +90,7 @@ struct ContentView: View {
     case .ready, .listening:
       return String(localized: "Слушаю…")
     case .failed(let message):
-      return "Ошибка: \(message)"
+      return RecognitionFailureText.userFacing(message)
     }
   }
 
@@ -300,10 +300,10 @@ struct ContentView: View {
         .accessibilityIdentifier("clear-button")
       }
       if let error = liveViewModel.lastErrorMessage {
-        Text(error)
-          .font(.caption.monospaced())
+        Text(RecognitionFailureText.userFacing(error))
+          .font(.caption)
           .foregroundStyle(.orange)
-          .lineLimit(2)
+          .lineLimit(3)
           .accessibilityIdentifier("error-banner")
       }
     }
