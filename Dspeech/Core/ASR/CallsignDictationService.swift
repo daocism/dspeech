@@ -102,11 +102,23 @@ final class CallsignDictationService {
     task = recognizer.recognitionTask(with: request) { @Sendable [weak self] result, error in
       let text = result?.bestTranscription.formattedString
       let finished = (result?.isFinal ?? false) || error != nil
+      // why: surface a real recognition fault instead of silently returning to .idle
+      // (which looks identical to "never started"); a "no speech" timeout (1110) is a
+      // clean end, not a fault.
+      let hardError: String?
+      if let ns = error as NSError?, !(ns.domain == "kAFAssistantErrorDomain" && ns.code == 1110) {
+        hardError = "\(ns.domain)#\(ns.code) \(ns.localizedDescription)"
+      } else {
+        hardError = nil
+      }
       Task { @MainActor [weak self] in
-        guard let self else { return }
+        guard let self, self.isListening else { return }
         if let text { self.liveTranscript = text }
-        if finished, self.isListening {
-          self.cleanup()
+        guard finished else { return }
+        self.cleanup()
+        if let hardError {
+          self.status = .unavailable("Не удалось распознать речь: \(hardError)")
+        } else {
           self.status = .idle
         }
       }

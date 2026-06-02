@@ -12,6 +12,7 @@ final class AudioSourceController {
   private(set) var selectedUID: String = ""
   private(set) var inputLevel: Double = 0
   private(set) var isMetering = false
+  private(set) var selectionError: String?
   private var meterTask: Task<Void, Never>?
 
   init(
@@ -74,11 +75,17 @@ final class AudioSourceController {
 
   func select(uid: String) {
     guard let port = availableInputs.first(where: { $0.uid == uid }) else { return }
-    selectedUID = uid
-    settings.setPreferred(uid: uid, type: port.portType.rawValue)
-    // why: the OS can reject a preferred input that vanished between enumeration
-    // and selection; route-health monitoring reflects the actual active input, so
-    // a rejected preference surfaces there rather than throwing to a dead end.
-    try? routing.setPreferredInput(uid: uid)
+    // why: apply the preferred input FIRST and only reflect/persist it if the OS
+    // accepted it — otherwise the picker and the saved preference would claim a source
+    // the system rejected (vanished/again-in-use), silently lying to the user.
+    do {
+      try routing.setPreferredInput(uid: uid)
+      selectedUID = uid
+      settings.setPreferred(uid: uid, type: port.portType.rawValue)
+      selectionError = nil
+    } catch {
+      selectionError = "Не удалось выбрать этот вход: \(error.localizedDescription)"
+      selectedUID = routing.currentRouteSnapshot.inputs.first?.uid ?? selectedUID
+    }
   }
 }

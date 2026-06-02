@@ -517,6 +517,12 @@ struct SettingsView: View {
             .font(.footnote)
             .foregroundStyle(.secondary)
           }
+          if let selectionError = audioSource.selectionError {
+            Text(selectionError)
+              .font(.footnote)
+              .foregroundStyle(.orange)
+              .accessibilityIdentifier("audio-source-error")
+          }
           Button {
             if audioSource.isMetering {
               audioSource.stopMetering()
