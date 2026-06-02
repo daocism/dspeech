@@ -974,6 +974,7 @@ extension Bundle {
 private struct PartialTranscriptCard: View {
   let text: String
   let isLandscape: Bool
+  @ScaledMetric(relativeTo: .title2) private var basePartialSize: CGFloat = 26
 
   var body: some View {
     HStack(alignment: .top, spacing: 10) {
@@ -982,7 +983,11 @@ private struct PartialTranscriptCard: View {
         .foregroundStyle(.cyan.opacity(0.9))
         .padding(.top, 4)
       Text(text)
-        .font(.system(size: isLandscape ? 22 : 26, weight: .medium, design: .rounded))
+        .font(
+          .system(
+            size: isLandscape ? basePartialSize * (22.0 / 26.0) : basePartialSize,
+            weight: .medium, design: .monospaced)
+        )
         .foregroundStyle(.white.opacity(0.85))
         .italic()
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1006,6 +1011,9 @@ private struct TranscriptSegmentCard: View {
   let segment: TranscriptSegment
   let translatedText: String?
   let isLandscape: Bool
+  // why: PRD F2 — the transcript honors Dynamic Type; @ScaledMetric scales the base
+  // size with the user's accessibility text setting (minimumScaleFactor caps growth).
+  @ScaledMetric(relativeTo: .title) private var baseTranscriptSize: CGFloat = 30
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
@@ -1063,7 +1071,11 @@ private struct TranscriptSegmentCard: View {
   @ViewBuilder
   private var transcriptText: some View {
     Text(segment.text)
-      .font(.system(size: isLandscape ? 26 : 30, weight: .semibold, design: .rounded))
+      .font(
+        .system(
+          size: isLandscape ? baseTranscriptSize * (26.0 / 30.0) : baseTranscriptSize,
+          weight: .semibold, design: .monospaced)
+      )
       .foregroundStyle(.white)
       .frame(maxWidth: .infinity, alignment: .leading)
       .minimumScaleFactor(0.6)
