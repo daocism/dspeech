@@ -35,10 +35,18 @@ protocol InputLevelMetering: Sendable {
           return
         }
         input.removeTap(onBus: 0)
+        // why: pass format:nil so the tap uses the input bus's OWN current format. Passing
+        // a separately-read AVAudioFormat trips an NSException abort inside
+        // AUGraphNodeBaseV3::CreateRecordingTap ("required condition is false:
+        // format.sampleRate == hwFormat.sampleRate") whenever it doesn't match the live
+        // hardware/render format (Simulator output-vs-render mismatch; a hw rate that
+        // shifted after setActive). nil removes the mismatch; the guard above still bails
+        // on a dead (0 Hz) input.
+        //
         // why: the tap is nonisolated/realtime; it computes RMS synchronously and
         // yields only a Sendable Double — no AVAudioPCMBuffer escapes the callback,
         // so there is no actor-isolation hazard under Swift 6 complete concurrency.
-        input.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in
+        input.installTap(onBus: 0, bufferSize: 1024, format: nil) { buffer, _ in
           continuation.yield(
             AudioLevel.normalized(rms: AVAudioEngineInputLevelMeter.rms(of: buffer)))
         }

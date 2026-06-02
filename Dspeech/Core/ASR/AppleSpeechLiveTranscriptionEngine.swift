@@ -44,12 +44,20 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     let sampleRate: Double
   }
 
+  // why: test seam — the Simulator has no on-device dictation asset, so the
+  // supportsOnDeviceRecognition guard would short-circuit start() before the audio
+  // engine is exercised. Tests pass `false` to reach the AVAudioEngine path on the
+  // Simulator; production always uses the default (true).
+  private let requireOnDeviceModel: Bool
+
   init(
     localeProvider: @escaping @MainActor () -> String = { "en-US" },
-    bufferGate: (any SpeechAudioBufferGate)? = nil
+    bufferGate: (any SpeechAudioBufferGate)? = nil,
+    requireOnDeviceModel: Bool = true
   ) {
     self.localeProvider = localeProvider
     self.bufferGate = bufferGate
+    self.requireOnDeviceModel = requireOnDeviceModel
   }
 
   func events() -> AsyncStream<LiveTranscriptionEvent> {
@@ -91,17 +99,22 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     // runtime if the locale's on-device dictation asset isn't provisioned. Check up front
     // and surface it, rather than letting the recognitionTask die silently mid-session
     // (the F1 "tap mic → listening 1 s → nothing" defect).
-    guard recognizer.supportsOnDeviceRecognition else {
-      status = .failed("on-device-model-missing: \(localeID)")
-      return
+    if requireOnDeviceModel {
+      guard recognizer.supportsOnDeviceRecognition else {
+        status = .failed("on-device-model-missing: \(localeID)")
+        return
+      }
     }
     recognizer.defaultTaskHint = .dictation
     self.recognizer = recognizer
 
     do {
       try beginAudioSession()
-      installRecognition(recognizer: recognizer)
+      // why: bring up AVAudioEngine FIRST, then attach the recognition task — creating an
+      // on-device SFSpeechRecognitionTask before the audio pipeline is live crashes in the
+      // Speech/AudioToolbox stack (and lets the task finalize before any audio arrives).
       try startEngine()
+      installRecognition(recognizer: recognizer)
       status = .listening
     } catch {
       status = .failed("start-failed: \(error.localizedDescription)")
@@ -168,11 +181,19 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     }
 
     inputNode.removeTap(onBus: 0)
+    // why: format:nil — the tap uses the input bus's OWN current format. Passing a
+    // separately-read AVAudioFormat (recordingFormat) trips an NSException abort inside
+    // AUGraphNodeBaseV3::CreateRecordingTap ("required condition is false:
+    // format.sampleRate == hwFormat.sampleRate") when it doesn't match the live hardware
+    // rate — which .measurement mode reconfigures, so the cached value is stale at
+    // tap-build time. nil removes the mismatch; the guard above still fails-fast on a dead
+    // (0 Hz / 0-channel) input. recordingFormat is kept only for that guard.
+    //
     // why: this tap block is nonisolated and captures only the Sendable continuation
     // (never self / @MainActor state), so it runs on the realtime audio thread with
     // no isolation assertion. It deep-copies the recycled buffer and yields it in
     // capture order for the @MainActor consumer above to route.
-    inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, _ in
+    inputNode.installTap(onBus: 0, bufferSize: 1024, format: nil) { buffer, _ in
       guard let copy = buffer.dspeechDeepCopy() else { return }
       let samples = Self.monoFloatSamples(from: copy) ?? []
       audioContinuation.yield(
