@@ -78,6 +78,7 @@ import Foundation
       PortSnapshot(
         portType: AudioPortType(rawValue: port.portType.rawValue),
         portName: port.portName,
+        uid: port.uid,
         hasHardwareVoiceProcessing: false
       )
     }

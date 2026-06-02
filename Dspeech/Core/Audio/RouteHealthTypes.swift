@@ -62,11 +62,18 @@ enum AudioPortType: Equatable, Sendable {
 struct PortSnapshot: Equatable, Sendable {
   let portType: AudioPortType
   let portName: String
+  let uid: String
   let hasHardwareVoiceProcessing: Bool
 
-  init(portType: AudioPortType, portName: String, hasHardwareVoiceProcessing: Bool = false) {
+  init(
+    portType: AudioPortType,
+    portName: String,
+    uid: String = "",
+    hasHardwareVoiceProcessing: Bool = false
+  ) {
     self.portType = portType
     self.portName = portName
+    self.uid = uid
     self.hasHardwareVoiceProcessing = hasHardwareVoiceProcessing
   }
 }

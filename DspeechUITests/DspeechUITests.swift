@@ -254,6 +254,22 @@ final class DspeechUITests: XCTestCase {
   }
 
   @MainActor
+  func testSettingsExposesAudioSourceSection() throws {
+    let app = launchAppWithCleanPrivacyDefaults()
+    app.buttons["settings-button"].tap()
+
+    let header = app.staticTexts["Источник звука"]
+    var attempts = 0
+    while !header.exists && attempts < 12 {
+      app.swipeUp()
+      attempts += 1
+    }
+    XCTAssertTrue(
+      header.waitForExistence(timeout: 4),
+      "settings must expose an audio source section")
+  }
+
+  @MainActor
   private func launchAppWithCleanPrivacyDefaults() -> XCUIApplication {
     let app = XCUIApplication()
     app.launchArguments += [

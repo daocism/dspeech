@@ -7,6 +7,7 @@ struct ContentView: View {
   @State private var privacy: PrivacySettings
   @State private var recognition: RecognitionSettings
   @State private var translation: TranslationSettings
+  @State private var audioSource: AudioSourceController
   @State private var showSettings: Bool = false
   @State private var onboarding: OnboardingState
   @State private var translationConfig: TranslationSession.Configuration?
@@ -54,6 +55,7 @@ struct ContentView: View {
     _recognition = State(initialValue: recognitionSettings)
     _voiceFilter = State(initialValue: filter)
     _translation = State(initialValue: translationSettings)
+    _audioSource = State(initialValue: AudioSourceController(routing: routing))
     _onboarding = State(initialValue: onboarding ?? OnboardingState())
     _coordinator = State(
       initialValue: CaptureCoordinator(
@@ -118,9 +120,12 @@ struct ContentView: View {
     .sheet(isPresented: $showSettings) {
       SettingsView(
         privacy: privacy, recognition: recognition, translation: translation,
-        voiceFilter: voiceFilter)
+        audioSource: audioSource, voiceFilter: voiceFilter)
     }
-    .onAppear { coordinator.beginObservingRouteChanges() }
+    .onAppear {
+      coordinator.beginObservingRouteChanges()
+      audioSource.applyPersistedPreference()
+    }
     .onDisappear { coordinator.endObservingRouteChanges() }
     .onChange(of: scenePhase) { _, newPhase in
       if newPhase == .background {
@@ -426,18 +431,25 @@ struct SettingsView: View {
   @Bindable var privacy: PrivacySettings
   @Bindable var recognition: RecognitionSettings
   @Bindable var translation: TranslationSettings
+  var audioSource: AudioSourceController
   var voiceFilter: VoiceFilterPipeline?
   @Environment(\.dismiss) private var dismiss
 
   init(
     privacy: PrivacySettings, recognition: RecognitionSettings,
     translation: TranslationSettings,
+    audioSource: AudioSourceController,
     voiceFilter: VoiceFilterPipeline? = nil
   ) {
     self.privacy = privacy
     self.recognition = recognition
     self.translation = translation
+    self.audioSource = audioSource
     self.voiceFilter = voiceFilter
+  }
+
+  private var audioSourceBinding: Binding<String> {
+    Binding(get: { audioSource.selectedUID }, set: { audioSource.select(uid: $0) })
   }
 
   var body: some View {
@@ -468,6 +480,28 @@ struct SettingsView: View {
           VoiceFilterSettingsSection(pipeline: voiceFilter)
         }
 
+        Section {
+          if audioSource.hasSelectableInputs {
+            Picker("Вход", selection: audioSourceBinding) {
+              ForEach(audioSource.availableInputs, id: \.uid) { input in
+                Text(input.portName).tag(input.uid)
+              }
+            }
+            .accessibilityIdentifier("audio-source-picker")
+          } else {
+            Text(
+              "Источник входа не обнаружен. Подключите проводной вход (USB-C / TRRS) или используйте встроенный микрофон."
+            )
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+          }
+        } header: {
+          Text("Источник звука")
+        } footer: {
+          Text(
+            "Выбор сохраняется для этого устройства. Встроенный микрофон — для проб; для кокпита подключите проводной вход."
+          )
+        }
         Section("Распознавание") {
           Picker("Язык распознавания", selection: $recognition.localeIdentifier) {
             ForEach(recognition.availableLocales) { locale in
@@ -498,6 +532,7 @@ struct SettingsView: View {
           LabeledContent("Версия", value: Bundle.main.shortVersion)
         }
       }
+      .onAppear { audioSource.refresh() }
       .navigationTitle("Настройки")
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
