@@ -21,6 +21,19 @@ The voice-filter routing path is now landed and verified end-to-end as a *seam*:
 
 ## Current next priority
 
+2026-06-02 run (`docs/run-notes/2026-06-02-mvp-completion-translation-audio-onboarding.md`):
+**MVP feature-completion landed** on `feat/mvp-completion-2026-06-02` (5 commits, suite
+green, 0 warnings, device-arch compiles). PRD gates closed: §3 first-run onboarding, F8
+background ASR stop, **F3 on-device translation** (Apple Translation framework,
+`TranslationSession(installedSource:target:)`, local-only, per-segment gloss, target picker,
+pack download via `prepareTranslation`), and **F5 audio source picker** (per-device
+persistence). Two adversarial review passes; all confirmed findings fixed (incl. a removed
+fake-AI demo-gloss surface and per-segment translation token guards). Deferred + documented:
+F5 live input-level meter, in-app `translationUnavailable` surfacing, suppressed-segment
+translation skip, `.translationTask` cold-launch UITest. **Remaining before TestFlight:**
+device signing (Andrei's Apple ID/Team — none in 1Password) + the ADR 0008 network-deny /
+replay validation kit + App Store metadata. Older priorities below remain valid.
+
 2026-06-01 run (`docs/run-notes/2026-06-01-asr-locale-concurrency-interleaved.md`):
 landed the live-tap actor-isolation crash fix (ordered `AsyncStream` handoff),
 user-configurable recognition locale (the en-US-vs-French ATC defect),

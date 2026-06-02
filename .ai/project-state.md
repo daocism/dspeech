@@ -9,6 +9,15 @@ Canonical registry: `/home/user/projects/MyInfra/config/project-workspaces/proje
 
 ## Current phase
 
+2026-06-02: **MVP feature-completion** on `feat/mvp-completion-2026-06-02` (5 commits,
+suite green, 0 warnings, device-arch compiles). Closed PRD gates §3 first-run onboarding,
+F8 background ASR stop, F3 on-device translation (Apple Translation framework, local-only),
+F5 audio source picker (per-device persistence). Two adversarial review passes; all
+confirmed findings fixed. Remaining before TestFlight: device signing (Andrei's Apple ID/
+Team) + ADR 0008 network-deny/replay kit + App Store metadata. Deferred polish (documented
+in `docs/run-notes/2026-06-02-mvp-completion-translation-audio-onboarding.md`): F5 level
+meter, in-app translation-unavailable surfacing.
+
 Privacy-first, offline-first ATC/cockpit transcription. On `feat/local-pilot-voice-filter`
 the local voice-filter core, the route-health model/monitor layer, the route-health
 capture UX, a real offline FluidAudio speaker identifier, and the pre-ASR routing seam
