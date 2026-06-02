@@ -13,7 +13,7 @@ final class DspeechUITests: XCTestCase {
     XCTAssertTrue(app.staticTexts["Dspeech"].waitForExistence(timeout: 8))
     assertKnownDemoTranscriptAppears(in: app)
     assertLocalOnlyBadgeIsVisible(in: app)
-    assertTranslationControlsAreAbsent(in: app)
+    assertTranslationToggleVisibleAndDefaultsOff(in: app)
     assertCloudOrRemoteOptInControlsAreAbsent(in: app)
     XCTAssertTrue(app.buttons["settings-button"].exists)
   }
@@ -42,7 +42,6 @@ final class DspeechUITests: XCTestCase {
     assertCloudOrRemoteOptInControlsAreAbsent(in: app)
 
     app.buttons["settings-button"].tap()
-    assertTranslationControlsAreAbsent(in: app)
     assertCloudOrRemoteOptInControlsAreAbsent(in: app)
     XCTAssertTrue(app.switches["voicefilter-active-toggle"].waitForExistence(timeout: 4))
 
@@ -233,6 +232,28 @@ final class DspeechUITests: XCTestCase {
   }
 
   @MainActor
+  func testSettingsExposesOnDeviceTranslationControls() throws {
+    let app = launchAppWithCleanPrivacyDefaults()
+    app.buttons["settings-button"].tap()
+
+    let enableToggle = app.switches["translation-enabled-toggle"]
+    var attempts = 0
+    while !enableToggle.exists && attempts < 12 {
+      app.swipeUp()
+      attempts += 1
+    }
+    XCTAssertTrue(
+      enableToggle.waitForExistence(timeout: 4),
+      "settings must expose an on-device translation toggle")
+
+    let picker = app.descendants(matching: .any)
+      .matching(identifier: "translation-target-picker").firstMatch
+    XCTAssertTrue(
+      picker.waitForExistence(timeout: 4),
+      "settings must expose a target-language picker")
+  }
+
+  @MainActor
   private func launchAppWithCleanPrivacyDefaults() -> XCUIApplication {
     let app = XCUIApplication()
     app.launchArguments += [
@@ -291,32 +312,22 @@ final class DspeechUITests: XCTestCase {
   }
 
   @MainActor
-  private func assertTranslationControlsAreAbsent(
+  private func assertTranslationToggleVisibleAndDefaultsOff(
     in app: XCUIApplication,
     file: StaticString = #filePath,
     line: UInt = #line
   ) {
-    XCTAssertFalse(
-      app.switches["translation-toggle"].exists,
-      "fake translation toggle must not ship",
+    let toggle = app.switches["translation-toggle"]
+    XCTAssertTrue(
+      toggle.waitForExistence(timeout: 8),
+      "real on-device translation toggle must be present on the main surface",
       file: file,
       line: line
     )
-    XCTAssertFalse(
-      app.staticTexts["Перевод"].exists,
-      "translation settings section title must not ship until translation is real",
-      file: file,
-      line: line
-    )
-    XCTAssertFalse(
-      app.staticTexts["Провайдер"].exists,
-      "translation provider copy must not ship until translation is real",
-      file: file,
-      line: line
-    )
-    XCTAssertFalse(
-      app.staticTexts["Целевой язык"].exists,
-      "translation target-language copy must not ship until translation is real",
+    XCTAssertEqual(
+      toggle.value as? String,
+      "0",
+      "translation must default off (no silent translation, no cloud)",
       file: file,
       line: line
     )

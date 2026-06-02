@@ -1,12 +1,15 @@
 import SwiftUI
+import Translation
 
 struct ContentView: View {
   @State private var coordinator: CaptureCoordinator
   @State private var voiceFilter: VoiceFilterPipeline
   @State private var privacy: PrivacySettings
   @State private var recognition: RecognitionSettings
+  @State private var translation: TranslationSettings
   @State private var showSettings: Bool = false
   @State private var onboarding: OnboardingState
+  @State private var translationConfig: TranslationSession.Configuration?
   @Environment(\.scenePhase) private var scenePhase
 
   init(
@@ -39,11 +42,18 @@ struct ContentView: View {
         localeProvider: { recognitionSettings.localeIdentifier },
         bufferGate: VoiceFilterSpeechAudioBufferGate(pipeline: filter)
       )
-    let live = LiveTranscriptionViewModel(engine: resolvedEngine, voiceFilter: filter)
+    let translationSettings = TranslationSettings()
+    let live = LiveTranscriptionViewModel(
+      engine: resolvedEngine,
+      voiceFilter: filter,
+      translator: LocalTranslationService(backend: AppleTranslationService()),
+      translationTarget: { translationSettings.enabled ? translationSettings.targetLanguage : nil }
+    )
     let monitor = RouteHealthMonitor(routing: routing)
     _privacy = State(initialValue: privacySettings)
     _recognition = State(initialValue: recognitionSettings)
     _voiceFilter = State(initialValue: filter)
+    _translation = State(initialValue: translationSettings)
     _onboarding = State(initialValue: onboarding ?? OnboardingState())
     _coordinator = State(
       initialValue: CaptureCoordinator(
@@ -106,7 +116,9 @@ struct ContentView: View {
     .statusBarHidden(true)
     .preferredColorScheme(.dark)
     .sheet(isPresented: $showSettings) {
-      SettingsView(privacy: privacy, recognition: recognition, voiceFilter: voiceFilter)
+      SettingsView(
+        privacy: privacy, recognition: recognition, translation: translation,
+        voiceFilter: voiceFilter)
     }
     .onAppear { coordinator.beginObservingRouteChanges() }
     .onDisappear { coordinator.endObservingRouteChanges() }
@@ -118,10 +130,72 @@ struct ContentView: View {
     .fullScreenCover(isPresented: onboardingPresented) {
       OnboardingView { onboarding.complete() }
     }
+    .translationTask(translationConfig) { @Sendable [live = coordinator.live] session in
+      do {
+        // why: prepareTranslation presents Apple's system download sheet for a
+        // not-yet-installed pair and resolves once assets are on device; a no-op
+        // if already installed. Apple owns the transport (ADR 0002). Capturing the
+        // @MainActor view model (not self) keeps the non-Sendable session inside
+        // this nonisolated closure — no cross-actor send.
+        try await session.prepareTranslation()
+        await live.retranslateAll()
+      } catch {
+        // why: user dismissed the system sheet or the pair is unsupported —
+        // translation stays unavailable; the transcript is never blocked.
+      }
+    }
+    .onChange(of: translation.enabled) { _, enabled in
+      if enabled {
+        updateTranslationConfig()
+        coordinator.live.retranslateAll()
+      } else {
+        translationConfig = nil
+        coordinator.live.clearTranslations()
+      }
+    }
+    .onChange(of: translation.targetCode) { _, _ in
+      guard translation.enabled else { return }
+      updateTranslationConfig()
+      coordinator.live.retranslateAll()
+    }
+    .onChange(of: recognition.localeIdentifier) { _, _ in
+      if translation.enabled { updateTranslationConfig() }
+    }
   }
 
   private var onboardingPresented: Binding<Bool> {
     Binding(get: { !onboarding.hasCompletedOnboarding }, set: { _ in })
+  }
+
+  private func updateTranslationConfig() {
+    guard translation.enabled else {
+      translationConfig = nil
+      return
+    }
+    let source = Locale.Language(identifier: recognition.localeIdentifier)
+    translationConfig = TranslationSession.Configuration(
+      source: source, target: translation.targetLanguage)
+  }
+
+  private func glossText(for segment: TranscriptSegment) -> String? {
+    guard translation.enabled else { return nil }
+    return liveViewModel.translations[segment.id] ?? segment.translatedText
+  }
+
+  private var translationEnabledBinding: Binding<Bool> {
+    Binding(get: { translation.enabled }, set: { translation.enabled = $0 })
+  }
+
+  private func translationToggle(isLandscape: Bool) -> some View {
+    HStack(spacing: 6) {
+      Text("Перевод")
+        .font(.system(size: isLandscape ? 12 : 13, weight: .semibold))
+        .foregroundStyle(.white.opacity(0.85))
+      Toggle("Перевод", isOn: translationEnabledBinding)
+        .labelsHidden()
+        .tint(.cyan)
+        .accessibilityIdentifier("translation-toggle")
+    }
   }
 
   @ViewBuilder
@@ -172,6 +246,7 @@ struct ContentView: View {
           ForEach(displayedSegments) { segment in
             TranscriptSegmentCard(
               segment: segment,
+              translatedText: glossText(for: segment),
               isLandscape: isLandscape
             )
           }
@@ -247,6 +322,7 @@ struct ContentView: View {
 
         Spacer(minLength: 8)
 
+        translationToggle(isLandscape: isLandscape)
         settingsButton(isLandscape: isLandscape)
       }
 
@@ -349,15 +425,18 @@ struct RouteHealthChip: View {
 struct SettingsView: View {
   @Bindable var privacy: PrivacySettings
   @Bindable var recognition: RecognitionSettings
+  @Bindable var translation: TranslationSettings
   var voiceFilter: VoiceFilterPipeline?
   @Environment(\.dismiss) private var dismiss
 
   init(
     privacy: PrivacySettings, recognition: RecognitionSettings,
+    translation: TranslationSettings,
     voiceFilter: VoiceFilterPipeline? = nil
   ) {
     self.privacy = privacy
     self.recognition = recognition
+    self.translation = translation
     self.voiceFilter = voiceFilter
   }
 
@@ -398,6 +477,22 @@ struct SettingsView: View {
           .accessibilityIdentifier("recognition-locale-picker")
           LabeledContent("Модель ASR", value: "Apple Speech")
           LabeledContent("Режим", value: privacy.mode.displayName)
+        }
+        Section {
+          Toggle("Перевод на устройстве", isOn: $translation.enabled)
+            .accessibilityIdentifier("translation-enabled-toggle")
+          Picker("Целевой язык", selection: $translation.targetCode) {
+            ForEach(translation.availableTargets) { option in
+              Text(option.displayName).tag(option.code)
+            }
+          }
+          .accessibilityIdentifier("translation-target-picker")
+        } header: {
+          Text("Перевод")
+        } footer: {
+          Text(
+            "Перевод выполняется на устройстве через системные языковые пакеты Apple. При первом включении iOS предложит скачать языковой пакет. Аудио и текст не покидают iPhone."
+          )
         }
         Section("О приложении") {
           LabeledContent("Версия", value: Bundle.main.shortVersion)
@@ -866,12 +961,14 @@ private struct PartialTranscriptCard: View {
 
 private struct TranscriptSegmentCard: View {
   let segment: TranscriptSegment
+  let translatedText: String?
   let isLandscape: Bool
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
       badgeRow
       transcriptText
+      glossLine
     }
     .padding(.horizontal, 14)
     .padding(.vertical, 12)
@@ -927,6 +1024,18 @@ private struct TranscriptSegmentCard: View {
       .foregroundStyle(.white)
       .frame(maxWidth: .infinity, alignment: .leading)
       .minimumScaleFactor(0.6)
+  }
+
+  @ViewBuilder
+  private var glossLine: some View {
+    if let translatedText, !translatedText.isEmpty {
+      Text(translatedText)
+        .font(.system(size: isLandscape ? 18 : 20, weight: .regular, design: .rounded))
+        .italic()
+        .foregroundStyle(.cyan.opacity(0.85))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityIdentifier("transcript-translation")
+    }
   }
 }
 

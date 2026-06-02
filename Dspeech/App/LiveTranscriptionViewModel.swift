@@ -9,14 +9,26 @@ final class LiveTranscriptionViewModel {
   private(set) var status: LiveTranscriptionStatus = .idle
   private(set) var filterIndicators: [UUID: ATCVoiceIndicator] = [:]
   private(set) var suppressedSegmentIDs: Set<UUID> = []
+  private(set) var translations: [UUID: String] = [:]
+  private(set) var translationUnavailable = false
 
   private let engine: any LiveTranscriptionEngine
   private let voiceFilter: VoiceFilterPipeline?
+  private let translator: (any TranslationService)?
+  private let translationTarget: @MainActor () -> Locale.Language?
   private var eventTask: Task<Void, Never>?
+  private var translationTasks: [UUID: Task<Void, Never>] = [:]
 
-  init(engine: any LiveTranscriptionEngine, voiceFilter: VoiceFilterPipeline? = nil) {
+  init(
+    engine: any LiveTranscriptionEngine,
+    voiceFilter: VoiceFilterPipeline? = nil,
+    translator: (any TranslationService)? = nil,
+    translationTarget: @escaping @MainActor () -> Locale.Language? = { nil }
+  ) {
     self.engine = engine
     self.voiceFilter = voiceFilter
+    self.translator = translator
+    self.translationTarget = translationTarget
   }
 
   var visibleSegments: [TranscriptSegment] {
@@ -57,10 +69,53 @@ final class LiveTranscriptionViewModel {
     partialText = ""
     filterIndicators.removeAll()
     suppressedSegmentIDs.removeAll()
+    clearTranslations()
+  }
+
+  func clearTranslations() {
+    for task in translationTasks.values { task.cancel() }
+    translationTasks.removeAll()
+    translations.removeAll()
+    translationUnavailable = false
+  }
+
+  func retranslateAll() {
+    clearTranslations()
+    for segment in segments { maybeTranslate(segment) }
+  }
+
+  private func maybeTranslate(_ segment: TranscriptSegment) {
+    guard let translator, let target = translationTarget() else { return }
+    let source = Locale.Language(identifier: segment.sourceLanguageCode)
+    // why: skip a same-language no-op (en->en) so the gloss doesn't echo the transcript.
+    if let from = source.languageCode?.identifier,
+      let to = target.languageCode?.identifier, from == to
+    {
+      return
+    }
+    let id = segment.id
+    let text = segment.text
+    translationTasks[id]?.cancel()
+    translationTasks[id] = Task { @MainActor [weak self] in
+      guard let self else { return }
+      defer { self.translationTasks[id] = nil }
+      do {
+        let result = try await translator.translate(text, from: source, into: target)
+        guard !Task.isCancelled else { return }
+        self.translations[id] = result
+        self.translationUnavailable = false
+      } catch TranslationServiceError.languagePackNotInstalled {
+        self.translationUnavailable = true
+      } catch {
+        // why: translation is best-effort and never blocks the transcript; other
+        // failures simply leave the segment un-glossed.
+      }
+    }
   }
 
   private func append(segment: TranscriptSegment) {
     segments.append(segment)
+    maybeTranslate(segment)
     guard let pipeline = voiceFilter, pipeline.enabled else { return }
     // Phase 1 (ADR 0007): no real speaker classifier — treat every segment as
     // non-pilot so the callsign-relevance gate (ATCTranscriptGate) can decide.
