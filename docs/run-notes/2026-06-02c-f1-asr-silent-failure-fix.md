@@ -34,6 +34,25 @@ So nothing ever ran the real `SFSpeechRecognizer` / `AVAudioEngine` on real hard
 green suite certified the plumbing around F1 while F1 itself was untouched. Fleet memory:
 `feedback_verify_primary_capability_on_real_target` (global).
 
+## ADDENDUM — the silent-failure fix REVEALED/INTRODUCED a hard crash (installTap), now fixed
+During device verification the app began **crashing on every mic tap** (`Crash: Dspeech at
+<external symbol>`). Ground truth came from a Simulator crash report
+(`~/Library/Logs/DiagnosticReports/Dspeech-*.ips`), NOT from guessing:
+`+[NSException raise:format:]` → `AUGraphNodeBaseV3::CreateRecordingTap` →
+`-[AVAudioNode installTapOnBus:bufferSize:format:block:]`. **Root cause:** `installTap`
+was given a separately-read `outputFormat(forBus:0)`; when that ≠ the node's live
+hardware/render format it aborts on `required condition is false: format.sampleRate ==
+hwFormat.sampleRate`. Triggers: Simulator output-vs-render mismatch; on device,
+`AVAudioSession` mode `.measurement` reconfigures the hw sample rate so a pre-`start()`
+cached format is stale. **Fix (61fb383):** pass `format: nil` to `installTap` (uses the
+bus's own current format — no mismatch) at BOTH crash sites —
+`AppleSpeechLiveTranscriptionEngine` and `AVAudioEngineInputLevelMeter`. Verified on the
+Simulator: the meter test reproduced the abort and now passes. Method lesson banked in
+global memory `feedback_ios_crash_debugging_methodology`. The earlier "reorder task before
+engine" change was a wrong guess (reverted-in-effect); the real fix is the tap format.
+Continuous-flight requirement (one tap → whole flight) is satisfied by the sustained
+session (mic+tap stay up; recognition task recycled per utterance/1110).
+
 ## Fixed in this change
 - **Engine lifecycle rewrite**: `installRecognition` separated from `startEngine`; on a
   clean final / benign no-speech the task is **restarted while the mic+tap keep running**
