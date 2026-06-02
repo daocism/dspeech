@@ -13,8 +13,8 @@ final class DspeechUITests: XCTestCase {
     XCTAssertTrue(app.staticTexts["Dspeech"].waitForExistence(timeout: 8))
     assertKnownDemoTranscriptAppears(in: app)
     assertLocalOnlyBadgeIsVisible(in: app)
-    assertTranslationToggleVisibleAndDefaultsOff(in: app)
     assertCloudOrRemoteOptInControlsAreAbsent(in: app)
+    XCTAssertTrue(app.buttons["start-button"].waitForExistence(timeout: 4))
     XCTAssertTrue(app.buttons["settings-button"].exists)
   }
 
@@ -328,28 +328,6 @@ final class DspeechUITests: XCTestCase {
       badge.label,
       "Локальная обработка",
       "privacy badge must stay in local-only mode",
-      file: file,
-      line: line
-    )
-  }
-
-  @MainActor
-  private func assertTranslationToggleVisibleAndDefaultsOff(
-    in app: XCUIApplication,
-    file: StaticString = #filePath,
-    line: UInt = #line
-  ) {
-    let toggle = app.switches["translation-toggle"]
-    XCTAssertTrue(
-      toggle.waitForExistence(timeout: 8),
-      "real on-device translation toggle must be present on the main surface",
-      file: file,
-      line: line
-    )
-    XCTAssertEqual(
-      toggle.value as? String,
-      "0",
-      "translation must default off (no silent translation, no cloud)",
       file: file,
       line: line
     )

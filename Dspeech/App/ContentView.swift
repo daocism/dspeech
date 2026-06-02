@@ -198,22 +198,6 @@ struct ContentView: View {
     return liveViewModel.translations[segment.id]
   }
 
-  private var translationEnabledBinding: Binding<Bool> {
-    Binding(get: { translation.enabled }, set: { translation.enabled = $0 })
-  }
-
-  private func translationToggle(isLandscape: Bool) -> some View {
-    HStack(spacing: 6) {
-      Text("Перевод")
-        .font(.system(size: isLandscape ? 12 : 13, weight: .semibold))
-        .foregroundStyle(.white.opacity(0.85))
-      Toggle("Перевод", isOn: translationEnabledBinding)
-        .labelsHidden()
-        .tint(.cyan)
-        .accessibilityIdentifier("translation-toggle")
-    }
-  }
-
   @ViewBuilder
   private func routeBanner(isLandscape: Bool) -> some View {
     if let message = coordinator.routeBanner ?? coordinator.startBlockedMessage {
@@ -276,31 +260,12 @@ struct ContentView: View {
     }
   }
 
+  // why: launch-time hints show only in the pristine idle state (before the first
+  // Start), so they grab attention once and never nag after the user has used the app.
+  private var showHints: Bool { liveViewModel.status == .idle }
+
   private func bottomBar(isLandscape: Bool) -> some View {
     HStack(spacing: 12) {
-      let startDisabled = !liveViewModel.isListening && !coordinator.canStart
-      Button {
-        Task { await toggleListening() }
-      } label: {
-        HStack(spacing: 8) {
-          Image(systemName: liveViewModel.isListening ? "stop.fill" : "mic.fill")
-          Text(liveViewModel.isListening ? "Стоп" : "Старт")
-            .font(.headline)
-        }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 10)
-        .frame(minWidth: isLandscape ? 110 : 130)
-        .background(
-          Capsule().fill(
-            liveViewModel.isListening ? Color.red.opacity(0.85) : Color.cyan.opacity(0.85))
-        )
-        .foregroundStyle(.white)
-        .opacity(startDisabled ? 0.4 : 1)
-      }
-      .buttonStyle(.plain)
-      .disabled(startDisabled)
-      .accessibilityIdentifier(liveViewModel.isListening ? "stop-button" : "start-button")
-
       if !liveViewModel.segments.isEmpty {
         Button("Очистить") {
           liveViewModel.reset()
@@ -310,14 +275,24 @@ struct ContentView: View {
         .accessibilityIdentifier("clear-button")
       }
 
-      Spacer()
-
       if let error = liveViewModel.lastErrorMessage {
         Text(error)
           .font(.caption.monospaced())
           .foregroundStyle(.orange)
           .lineLimit(2)
           .accessibilityIdentifier("error-banner")
+      }
+
+      Spacer(minLength: 8)
+
+      if showHints {
+        HintBubble(text: "Нажмите, чтобы начать распознавание")
+      }
+      StartButton(
+        isListening: liveViewModel.isListening,
+        disabled: !liveViewModel.isListening && !coordinator.canStart
+      ) {
+        Task { await toggleListening() }
       }
     }
   }
@@ -327,8 +302,8 @@ struct ContentView: View {
   }
 
   private func controlBar(isLandscape: Bool) -> some View {
-    VStack(spacing: isLandscape ? 6 : 10) {
-      HStack(spacing: 10) {
+    HStack(alignment: .center, spacing: 10) {
+      VStack(alignment: .leading, spacing: isLandscape ? 6 : 10) {
         Text("Dspeech")
           .font(.system(size: isLandscape ? 22 : 28, weight: .bold, design: .rounded))
           .foregroundStyle(.white)
@@ -336,28 +311,30 @@ struct ContentView: View {
           .fixedSize(horizontal: true, vertical: false)
           .accessibilityIdentifier("app-title")
 
-        Spacer(minLength: 8)
-
-        translationToggle(isLandscape: isLandscape)
-        settingsButton(isLandscape: isLandscape)
+        HStack(spacing: 8) {
+          PrivacyBadge(mode: privacy.mode, isLandscape: isLandscape)
+          RouteHealthChip(health: coordinator.routeMonitor.health, isLandscape: isLandscape)
+        }
       }
 
-      HStack(spacing: 8) {
-        PrivacyBadge(mode: privacy.mode, isLandscape: isLandscape)
-        RouteHealthChip(health: coordinator.routeMonitor.health, isLandscape: isLandscape)
+      Spacer(minLength: 8)
 
-        Spacer(minLength: 8)
+      if showHints {
+        HintBubble(text: "Настройки здесь")
       }
+      settingsButton(isLandscape: isLandscape)
     }
   }
 
   private func settingsButton(isLandscape: Bool) -> some View {
-    let diameter: CGFloat = isLandscape ? 32 : 36
+    // why: sized to span the left column (title top → LOCAL badge bottom) per the
+    // requested proportion.
+    let diameter: CGFloat = isLandscape ? 46 : 56
     return Button {
       showSettings = true
     } label: {
       Image(systemName: "gearshape.fill")
-        .font(.system(size: isLandscape ? 15 : 17, weight: .semibold))
+        .font(.system(size: isLandscape ? 22 : 26, weight: .semibold))
         .foregroundStyle(.white.opacity(0.9))
         .frame(width: diameter, height: diameter)
         .background(
@@ -1007,6 +984,74 @@ func modelPackDownloadFailure(for error: Error) -> ModelPackFailure {
 extension Bundle {
   fileprivate var shortVersion: String {
     (infoDictionary?["CFBundleShortVersionString"] as? String) ?? "—"
+  }
+}
+
+private struct StartButton: View {
+  let isListening: Bool
+  let disabled: Bool
+  let action: () -> Void
+  @State private var glowAngle = 0.0
+
+  var body: some View {
+    Button(action: action) {
+      ZStack {
+        Circle()
+          .fill(isListening ? Color.red.opacity(0.85) : Color.gray.opacity(0.55))
+        if !isListening {
+          // why: a glow that travels around the rim (rotating angular gradient) plus a
+          // cyan dashed border, to pull attention to the idle Start control.
+          Circle()
+            .stroke(
+              AngularGradient(
+                gradient: Gradient(colors: [.cyan.opacity(0), .cyan, .cyan.opacity(0)]),
+                center: .center),
+              lineWidth: 4
+            )
+            .blur(radius: 5)
+            .rotationEffect(.degrees(glowAngle))
+          Circle()
+            .strokeBorder(Color.cyan, style: StrokeStyle(lineWidth: 2.5, dash: [5, 4]))
+        }
+        Image(systemName: isListening ? "stop.fill" : "mic.fill")
+          .font(.system(size: 26, weight: .bold))
+          .foregroundStyle(.white)
+      }
+      .frame(width: 64, height: 64)
+      .opacity(disabled ? 0.45 : 1)
+    }
+    .buttonStyle(.plain)
+    .disabled(disabled)
+    .accessibilityIdentifier(isListening ? "stop-button" : "start-button")
+    .accessibilityLabel(isListening ? "Стоп" : "Старт")
+    .onAppear {
+      withAnimation(.linear(duration: 2.4).repeatForever(autoreverses: false)) {
+        glowAngle = 360
+      }
+    }
+  }
+}
+
+private struct HintBubble: View {
+  let text: LocalizedStringKey
+
+  var body: some View {
+    HStack(spacing: 5) {
+      Text(text)
+        .font(.subheadline.weight(.semibold))
+        .foregroundStyle(.black)
+        .multilineTextAlignment(.trailing)
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+      // why: a trail of shrinking circles pointing toward the button to its right.
+      Circle().fill(.white).frame(width: 9, height: 9)
+      Circle().fill(.white).frame(width: 6, height: 6)
+      Circle().fill(.white).frame(width: 3.5, height: 3.5)
+    }
+    .shadow(color: .black.opacity(0.25), radius: 6, y: 2)
+    .transition(.opacity.combined(with: .scale(scale: 0.9)))
   }
 }
 
