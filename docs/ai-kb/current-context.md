@@ -21,6 +21,15 @@ The voice-filter routing path is now landed and verified end-to-end as a *seam*:
 
 ## Current next priority
 
+2026-06-02b polish (`docs/run-notes/2026-06-02b-polish-icon-signing-install.md`): app icon,
+DEVELOPMENT_TEAM signing (Personal Team `NW2XAS56AW`), F5 input-level meter (button-driven),
+translation-pack indicator, tap-to-expand, F2 monospaced+Dynamic Type, #if DEBUG probe gate,
+preview-safe Canvas, dead-code removal, and a network-deny locator-test isolation fix
+(`locateModelDirectory(cacheRoot:)`). Device-install ready (`scripts/run-on-device.sh`,
+`docs/DEVICE-INSTALL-WORKFLOW.md`, `docs/ON-DEVICE-TEST-CHECKLIST.md`); **only remaining
+user step: enable Developer Mode on the iPhone**. All PRD gates F1-F5/F8/§3 closed; F6/F7
+device-only.
+
 2026-06-02 run (`docs/run-notes/2026-06-02-mvp-completion-translation-audio-onboarding.md`):
 **MVP feature-completion landed** on `feat/mvp-completion-2026-06-02` (5 commits, suite
 green, 0 warnings, device-arch compiles). PRD gates closed: §3 first-run onboarding, F8
