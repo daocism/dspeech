@@ -5,11 +5,17 @@ test → tweak → reinstall. Two tiers — pick by whether you have a paid Appl
 Program.
 
 ## One-time iPhone setup (required for ALL local installs)
-1. Connect the iPhone by cable, unlock it, tap **Trust This Computer** + passcode.
-2. Enable **Developer Mode**: Settings → Privacy & Security → Developer Mode → On →
-   Restart → after reboot tap "Turn On" + passcode. (Required on iOS 16+; NOT needed for
-   TestFlight builds, NOT on the Simulator.) Until this is on, the device shows as
-   `unavailable` / `developerModeStatus: disabled` to Xcode and `devicectl`.
+1. Connect the iPhone by a **data** cable, unlock it, tap **Trust This Computer** +
+   passcode. (If `devicectl list devices` shows `transport: None`, the data link isn't
+   live — charge-only cable, locked phone, or Trust not granted.)
+2. **Reveal + enable Developer Mode.** On iOS 16+ (incl. iOS 26) the Developer Mode row is
+   **hidden** in Settings → Privacy & Security until the Mac talks to the device. Surface it:
+   open **Xcode → Window → Devices and Simulators (⇧⌘2)** and select the iPhone (Xcode
+   shows "Developer Mode disabled" and prepares the device) — or just attempt an install
+   (`./scripts/run-on-device.sh` / ⌘R). NOW Settings → Privacy & Security → **Developer
+   Mode** appears → On → Restart → after reboot tap "Turn On" + passcode. (NOT needed for
+   TestFlight builds, NOT on the Simulator.) Until it's on, the device reads
+   `developerModeStatus: disabled` / `unavailable` to Xcode and `devicectl`.
 3. Apple ID is already added in Xcode → Settings → Accounts (Personal Team `NW2XAS56AW`).
    The project is set to automatic signing with that team, so no per-build team picking.
 
