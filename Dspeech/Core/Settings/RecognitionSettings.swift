@@ -169,8 +169,14 @@ final class RecognitionSettings {
       supported: capable, displayLocale: displayLocale)
     let resolved = RecognitionLocaleCatalog.resolve(
       stored: localeIdentifier, supported: capable, preferredLanguages: preferredLanguages)
-    if resolved != localeIdentifier { localeIdentifier = resolved }
-    await refreshSelectedDownloadState()
+    if resolved != localeIdentifier {
+      // why: changing the selection drives the view's .onChange → refreshSelectedDownloadState();
+      // don't also poll here or the same device check runs twice.
+      localeIdentifier = resolved
+    } else {
+      // selection unchanged → .onChange won't fire, so check the download state once here.
+      await refreshSelectedDownloadState()
+    }
   }
 
   func refreshSelectedDownloadState() async {
