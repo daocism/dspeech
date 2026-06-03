@@ -2,7 +2,7 @@
 
 Mode: tech-lead review plus scoped Codex implementation passes. This file now tracks both the original findings and the fixes already landed by Codex.
 Reviewer: Codex.
-Repository state: `fix/review-hardening-2026-06-03`; this note records Codex fixes through the voice-enrollment recorder lifecycle pass.
+Repository state: `fix/review-hardening-2026-06-03`; this note records Codex fixes through the audio-route preparation failure pass.
 
 ## Verification evidence
 
@@ -63,6 +63,10 @@ Scope completed in this pass:
 - `Dspeech/Core/ASR/VoiceEnrollmentRecorder.swift` now has injectable microphone authorization and audio-capture seams, a `.starting` state, session UUID ownership, serial `AsyncStream` ingestion, deep-copied tap buffers, and an async stop contract that drains accepted buffers before returning while ignoring late or stale buffers.
 - `Dspeech/App/ContentView.swift` now awaits recorder `stop()` before enrolling a voice sample, so the UI sends deterministic samples into `VoiceFilterPipeline`.
 - `DspeechTests/VoiceEnrollmentRecorderTests.swift` is added to the `DspeechTests` target and covers start success, microphone denial, invalid input format, engine start failure, duplicate start idempotence, stop with samples, stop with no samples, late buffer rejection, stale prior-session buffer rejection, and restart clearing old samples.
+- `Dspeech/Core/Audio/AudioSessionRouting.swift` now exposes typed `AudioRoutePreparationStatus` / `AudioRoutePreparationFailure`, and `LiveAudioSessionRouting` records `.playAndRecord` category-priming failure instead of erasing it with `try?`.
+- `Dspeech/App/AudioSourceController.swift`, `RouteHealthMonitor`, and `CaptureCoordinator` now consult route preparation before deriving inputs or Start availability, so a category failure blocks Start and surfaces a typed reason instead of pretending the microphone is simply absent.
+- `Dspeech/App/ContentView.swift` surfaces route-preparation failure in Settings with accessibility id `audio-route-preparation-error` and suppresses the generic "no input" fallback while the typed failure is present.
+- `DspeechTests/AudioSourceControllerTests.swift`, `RouteHealthMonitorTests.swift`, and `CaptureCoordinatorTests.swift` now cover route-preparation success, category failure before route refresh, no fake input claim, persisted-preference suppression, and typed Start blocking.
 
 Verification for this pass:
 - XcodeBuildMCP `test_sim` still failed before build because `xcrun` could not find `simctl` under the active CommandLineTools developer directory.
@@ -195,6 +199,24 @@ Verification for this pass:
   - banned-marker grep over app/tests/docs/scripts returned empty.
   - source-only stale implementation text grep over `Dspeech DspeechTests DspeechUITests` returned empty for old RED/missing-seam phrases.
   - `VoiceEnrollmentRecorderTests.swift` target membership check found file reference, build file, group membership, and `DspeechTests` sources membership in `Dspeech.xcodeproj/project.pbxproj`.
+- Focused audio-route preparation suite passed after the F20 patch:
+  - command: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project Dspeech.xcodeproj -scheme Dspeech -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4' CODE_SIGNING_ALLOWED=NO -only-testing:DspeechTests/AudioSourceControllerTests -only-testing:DspeechTests/RouteHealthMonitorTests -only-testing:DspeechTests/CaptureCoordinatorTests build test`
+  - result: `** TEST SUCCEEDED **`
+  - xcresult: `/Users/andre/Library/Developer/Xcode/DerivedData/Dspeech-agmpzhijbukadidbkcyaauytxvwx/Logs/Test/Run-Dspeech-2026.06.03_14-26-31-+0200.xcresult`
+- Unit-only suite passed after the F20 patch:
+  - command: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project Dspeech.xcodeproj -scheme Dspeech -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4' CODE_SIGNING_ALLOWED=NO -only-testing:DspeechTests build test`
+  - result: `** TEST SUCCEEDED **`
+  - xcresult: `/Users/andre/Library/Developer/Xcode/DerivedData/Dspeech-agmpzhijbukadidbkcyaauytxvwx/Logs/Test/Run-Dspeech-2026.06.03_14-27-19-+0200.xcresult`
+- Full simulator build and test passed after the F20 patch:
+  - command: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project Dspeech.xcodeproj -scheme Dspeech -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4' CODE_SIGNING_ALLOWED=NO build test`
+  - result: `** TEST SUCCEEDED **`
+  - xcresult: `/Users/andre/Library/Developer/Xcode/DerivedData/Dspeech-agmpzhijbukadidbkcyaauytxvwx/Logs/Test/Run-Dspeech-2026.06.03_14-28-00-+0200.xcresult`
+  - UI suite ran 13 tests with 0 failures; unit suite passed with the existing synthesized-speech device capability test skipped on simulator.
+- Final hygiene was repeated after the F20/spec update:
+  - `swift format lint --strict --recursive Dspeech DspeechTests DspeechUITests` passed.
+  - `git diff --check` passed.
+  - banned-marker grep over app/tests/docs/scripts returned empty.
+  - source-only stale implementation text grep over `Dspeech DspeechTests DspeechUITests` returned empty for old RED/missing-seam phrases.
 
 Findings status after this pass:
 - `F1`, `F2`, and `F12` are addressed for callsign dictation by code plus tests above.
@@ -203,6 +225,7 @@ Findings status after this pass:
 - `F5` is addressed for persisted audio-input reapply by code plus tests above.
 - `F6` is addressed for corrupt local voice/model state by typed persistence issues, visible recovery UI, non-retryable corrupt model-pack failure state, and tests above.
 - `F19` is addressed for voice enrollment recorder lifecycle by injected seams, session-owned stream ingestion, async drain-on-stop semantics, late/stale buffer rejection, and direct recorder unit tests.
+- `F20` is addressed for audio-route category priming by typed route-preparation status, visible Settings/Main Start failure copy, Start blocking before snapshot fallback, and fake-routing tests.
 - `F9` and `F28` are addressed for the main Start lifecycle/UI contract by code plus tests above.
 - `F10` is addressed for the product contract: delete now removes local model files before clearing state, and delete failure is visible.
 - `F29` is addressed by removing stale implementation-phase comments from current green test seams.
@@ -564,6 +587,8 @@ Builder requirement:
 - Add tests for: start success, mic denied, invalid input format, engine start failure, duplicate start idempotence, stop with samples, stop with no samples, late buffer after stop ignored, stale prior-session buffer ignored, and restart clearing old samples.
 
 ### F20 MEDIUM: Audio-route category priming failure is swallowed before Start availability is computed
+
+Status after Codex implementation pass: addressed. `LiveAudioSessionRouting` records category-priming failure as `AudioRoutePreparationFailure`, `AudioSourceController` and `RouteHealthMonitor` consult that state before route snapshot fallback, Settings and Start show the typed reason, and fake-routing tests pin success/failure paths without real `AVAudioSession`.
 
 Evidence:
 - `Dspeech/Core/Audio/LiveAudioSessionRouting.swift:16-25` explains that priming `.playAndRecord` is required so `currentRoute` and `availableInputs` expose microphones before capture starts.

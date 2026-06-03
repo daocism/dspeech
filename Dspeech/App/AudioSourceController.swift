@@ -14,6 +14,7 @@ final class AudioSourceController {
   private(set) var isMetering = false
   private(set) var selectionError: String?
   private(set) var inputLevelError: String?
+  private(set) var routePreparationFailure: AudioRoutePreparationFailure?
   private var meterTask: Task<Void, Never>?
 
   init(
@@ -64,6 +65,13 @@ final class AudioSourceController {
   var hasSelectableInputs: Bool { !availableInputs.isEmpty }
 
   func refresh() {
+    routePreparationFailure = routing.routePreparationStatus.failure
+    guard routePreparationFailure == nil else {
+      availableInputs = []
+      selectedUID = ""
+      selectionError = nil
+      return
+    }
     availableInputs = routing.availableInputSnapshots
     if let resolved = PreferredInputResolver.resolve(
       uid: settings.preferredInputUID,
@@ -81,6 +89,7 @@ final class AudioSourceController {
   // before the user opens settings. A vanished device is simply skipped; an OS
   // rejection is visible because otherwise Settings would claim an inactive source.
   func applyPersistedPreference() {
+    guard routePreparationFailure == nil else { return }
     guard let uid = settings.preferredInputUID,
       let port = availableInputs.first(where: { $0.uid == uid })
     else { return }
@@ -96,6 +105,7 @@ final class AudioSourceController {
   }
 
   func select(uid: String) {
+    guard routePreparationFailure == nil else { return }
     guard let port = availableInputs.first(where: { $0.uid == uid }) else { return }
     // why: apply the preferred input FIRST and only reflect/persist it if the OS
     // accepted it — otherwise the picker and the saved preference would claim a source

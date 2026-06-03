@@ -7,6 +7,7 @@ final class RouteHealthMonitor {
   private(set) var assessment: RouteHealthAssessment
   private(set) var lastNotice: RouteChangeNotice?
   private(set) var lastEvent: RouteChangeEvent?
+  private(set) var routePreparationFailure: AudioRoutePreparationFailure?
 
   private let routing: AudioSessionRouting
   private let now: @Sendable () -> Date
@@ -18,10 +19,8 @@ final class RouteHealthMonitor {
   ) {
     self.routing = routing
     self.now = now
-    self.assessment = RouteHealthClassifier.classify(
-      route: routing.currentRouteSnapshot,
-      availableInputs: routing.availableInputSnapshots
-    )
+    self.routePreparationFailure = routing.routePreparationStatus.failure
+    self.assessment = Self.assessment(for: routing)
   }
 
   var health: RouteHealth { assessment.health }
@@ -29,7 +28,7 @@ final class RouteHealthMonitor {
   var primaryInputTypeRaw: String? { assessment.primaryInputTypeRaw }
 
   var blocksStart: Bool {
-    assessment.health == .noInput
+    routePreparationFailure != nil || assessment.health == .noInput
   }
 
   func start() {
@@ -49,19 +48,15 @@ final class RouteHealthMonitor {
   }
 
   func refreshFromRouting() {
-    assessment = RouteHealthClassifier.classify(
-      route: routing.currentRouteSnapshot,
-      availableInputs: routing.availableInputSnapshots
-    )
+    routePreparationFailure = routing.routePreparationStatus.failure
+    assessment = Self.assessment(for: routing)
   }
 
   func handle(event: RouteChangeEvent) {
     lastEvent = event
+    routePreparationFailure = routing.routePreparationStatus.failure
     let previous = assessment
-    let recomputed = RouteHealthClassifier.classify(
-      route: routing.currentRouteSnapshot,
-      availableInputs: routing.availableInputSnapshots
-    )
+    let recomputed = Self.assessment(for: routing)
     assessment = recomputed
 
     switch event {
@@ -114,6 +109,16 @@ final class RouteHealthMonitor {
 
   private static func didImprove(from old: RouteHealth, to new: RouteHealth) -> Bool {
     rank(new) > rank(old)
+  }
+
+  private static func assessment(for routing: AudioSessionRouting) -> RouteHealthAssessment {
+    guard routing.routePreparationStatus.failure == nil else {
+      return RouteHealthAssessment(health: .noInput)
+    }
+    return RouteHealthClassifier.classify(
+      route: routing.currentRouteSnapshot,
+      availableInputs: routing.availableInputSnapshots
+    )
   }
 
   private static func rank(_ h: RouteHealth) -> Int {

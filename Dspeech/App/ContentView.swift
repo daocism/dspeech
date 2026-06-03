@@ -517,6 +517,12 @@ struct SettingsView: View {
         }
 
         Section {
+          if let routeFailure = audioSource.routePreparationFailure {
+            Text(routeFailure.userFacingMessage)
+              .font(.footnote)
+              .foregroundStyle(.red)
+              .accessibilityIdentifier("audio-route-preparation-error")
+          }
           if audioSource.hasSelectableInputs {
             Picker("Вход", selection: audioSourceBinding) {
               ForEach(audioSource.availableInputs, id: \.uid) { input in
@@ -524,7 +530,7 @@ struct SettingsView: View {
               }
             }
             .accessibilityIdentifier("audio-source-picker")
-          } else {
+          } else if audioSource.routePreparationFailure == nil {
             Text(
               "Источник входа не обнаружен. Подключите проводной вход (USB-C / TRRS) или используйте встроенный микрофон."
             )

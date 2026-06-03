@@ -28,6 +28,9 @@ final class CaptureCoordinator {
   var primaryInputName: String? { routeMonitor.primaryInputName }
 
   var routeBanner: String? {
+    if let failure = routeMonitor.routePreparationFailure {
+      return failure.userFacingMessage
+    }
     guard let notice = routeMonitor.lastNotice, notice.isUserVisible else { return nil }
     let text = notice.bannerText
     return text.isEmpty ? nil : text
@@ -35,7 +38,9 @@ final class CaptureCoordinator {
 
   func start() async {
     guard !routeMonitor.blocksStart else {
-      startBlockedMessage = CaptureCoordinator.blockedMessage(for: routeMonitor.health)
+      startBlockedMessage =
+        routeMonitor.routePreparationFailure?.userFacingMessage
+        ?? CaptureCoordinator.blockedMessage(for: routeMonitor.health)
       return
     }
     startBlockedMessage = nil
