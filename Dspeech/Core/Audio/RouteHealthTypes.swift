@@ -116,6 +116,9 @@ enum RouteChangeEvent: Equatable, Sendable {
   case wakeFromSleep
   case noSuitableRouteForCategory
   case routeConfigurationChange
+  case interruptionBegan
+  case interruptionEnded(shouldResume: Bool)
+  case mediaServicesWereReset
   case unknown(Int)
 }
 
@@ -124,6 +127,9 @@ struct RouteChangeNotice: Equatable, Sendable {
     case improved
     case lost
     case noSuitableRoute
+    case interruptionBegan
+    case interruptionEnded(shouldResume: Bool)
+    case mediaServicesReset
     case silent
   }
 

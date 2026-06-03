@@ -3,6 +3,10 @@ import Testing
 
 @testable import Dspeech
 
+#if canImport(AVFAudio)
+  import AVFAudio
+#endif
+
 @MainActor
 struct RouteHealthMonitorTests {
   private static func port(_ type: AudioPortType, name: String = "X") -> PortSnapshot {
@@ -89,6 +93,90 @@ struct RouteHealthMonitorTests {
     #expect(monitor.health == .noInput)
   }
 
+  @Test func interruptionBeganBlocksStartAndShowsNotice() {
+    let fake = FakeAudioSessionRouting(
+      currentRoute: RouteSnapshot(inputs: [Self.port(.usbAudio, name: "USB Tap")]),
+      availableInputs: [Self.port(.usbAudio, name: "USB Tap")]
+    )
+    let monitor = RouteHealthMonitor(routing: fake)
+    #expect(!monitor.blocksStart)
+
+    monitor.handle(event: .interruptionBegan)
+
+    #expect(monitor.isAudioSessionInterrupted)
+    #expect(monitor.blocksStart)
+    #expect(monitor.lastNotice?.kind == .interruptionBegan)
+    #expect(monitor.lastNotice?.isUserVisible == true)
+    #expect(monitor.lastNotice?.bannerText.isEmpty == false)
+  }
+
+  @Test func interruptionEndedUnblocksStartWhenRouteIsHealthy() {
+    let fake = FakeAudioSessionRouting(
+      currentRoute: RouteSnapshot(inputs: [Self.port(.usbAudio, name: "USB Tap")]),
+      availableInputs: [Self.port(.usbAudio, name: "USB Tap")]
+    )
+    let monitor = RouteHealthMonitor(routing: fake)
+    monitor.handle(event: .interruptionBegan)
+    #expect(monitor.blocksStart)
+
+    monitor.handle(event: .interruptionEnded(shouldResume: true))
+
+    #expect(!monitor.isAudioSessionInterrupted)
+    #expect(!monitor.blocksStart)
+    #expect(monitor.lastNotice?.kind == .interruptionEnded(shouldResume: true))
+    #expect(monitor.lastNotice?.isUserVisible == true)
+  }
+
+  @Test func mediaServicesResetShowsVisibleNoticeAndRecomputesRoute() {
+    let fake = FakeAudioSessionRouting(
+      currentRoute: RouteSnapshot(inputs: [Self.port(.usbAudio, name: "USB Tap")]),
+      availableInputs: [Self.port(.usbAudio, name: "USB Tap")]
+    )
+    let monitor = RouteHealthMonitor(routing: fake)
+    monitor.handle(event: .interruptionBegan)
+    fake.updateRoute(
+      RouteSnapshot(inputs: [Self.port(.builtInMic, name: "iPhone Mic")]),
+      availableInputs: [Self.port(.builtInMic, name: "iPhone Mic")]
+    )
+
+    monitor.handle(event: .mediaServicesWereReset)
+
+    #expect(!monitor.isAudioSessionInterrupted)
+    #expect(monitor.health == .cautionBuiltIn)
+    #expect(monitor.lastNotice?.kind == .mediaServicesReset)
+    #expect(monitor.lastNotice?.isUserVisible == true)
+    #expect(monitor.lastNotice?.portName == "iPhone Mic")
+  }
+
+  #if canImport(AVFAudio)
+    @Test func interruptionUserInfoNSNumberValuesMapToRouteEvents() {
+      let began = LiveAudioSessionRouting.event(
+        forInterruptionUserInfo: [
+          AVAudioSessionInterruptionTypeKey:
+            NSNumber(value: AVAudioSession.InterruptionType.began.rawValue)
+        ]
+      )
+      let endedWithoutResume = LiveAudioSessionRouting.event(
+        forInterruptionUserInfo: [
+          AVAudioSessionInterruptionTypeKey:
+            NSNumber(value: AVAudioSession.InterruptionType.ended.rawValue)
+        ]
+      )
+      let endedWithResume = LiveAudioSessionRouting.event(
+        forInterruptionUserInfo: [
+          AVAudioSessionInterruptionTypeKey:
+            NSNumber(value: AVAudioSession.InterruptionType.ended.rawValue),
+          AVAudioSessionInterruptionOptionKey:
+            NSNumber(value: AVAudioSession.InterruptionOptions.shouldResume.rawValue),
+        ]
+      )
+
+      #expect(began == .interruptionBegan)
+      #expect(endedWithoutResume == .interruptionEnded(shouldResume: false))
+      #expect(endedWithResume == .interruptionEnded(shouldResume: true))
+    }
+  #endif
+
   @Test func categoryChangeIsSilent() {
     let fake = FakeAudioSessionRouting(
       currentRoute: RouteSnapshot(inputs: [Self.port(.usbAudio)]),
@@ -123,7 +211,16 @@ struct RouteHealthMonitorTests {
   }
 
   @Test func bannerCopyAvoidsCertifiedLanguage() {
-    let kinds: [RouteChangeNotice.Kind] = [.improved, .lost, .noSuitableRoute, .silent]
+    let kinds: [RouteChangeNotice.Kind] = [
+      .improved,
+      .lost,
+      .noSuitableRoute,
+      .interruptionBegan,
+      .interruptionEnded(shouldResume: true),
+      .interruptionEnded(shouldResume: false),
+      .mediaServicesReset,
+      .silent,
+    ]
     for kind in kinds {
       let notice = RouteChangeNotice(kind: kind, portName: "USB Tap", timestamp: Date())
       let banner = notice.bannerText.lowercased()
@@ -142,7 +239,15 @@ struct RouteHealthMonitorTests {
   }
 
   @Test func bannerTextIsNonEmptyForVisibleKinds() {
-    for kind in [RouteChangeNotice.Kind.improved, .lost, .noSuitableRoute] {
+    for kind in [
+      RouteChangeNotice.Kind.improved,
+      .lost,
+      .noSuitableRoute,
+      .interruptionBegan,
+      .interruptionEnded(shouldResume: true),
+      .interruptionEnded(shouldResume: false),
+      .mediaServicesReset,
+    ] {
       let notice = RouteChangeNotice(kind: kind, portName: "USB Tap", timestamp: Date())
       #expect(
         !notice.bannerText.isEmpty,
