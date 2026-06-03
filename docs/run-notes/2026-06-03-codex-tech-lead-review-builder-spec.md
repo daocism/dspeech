@@ -2,7 +2,7 @@
 
 Mode: tech-lead review plus scoped Codex implementation passes. This file now tracks both the original findings and the fixes already landed by Codex.
 Reviewer: Codex.
-Repository state: `fix/review-hardening-2026-06-03`; this note records Codex fixes through the AirPlay route-health pass.
+Repository state: `fix/review-hardening-2026-06-03`; this note records Codex fixes through the local-only ASR policy pass.
 
 ## Verification evidence
 
@@ -70,6 +70,9 @@ Scope completed in this pass:
 - `AudioPortType.airPlay` is now treated as output-only. `RouteHealthClassifier` maps AirPlay direct/available-only routes to `.unsuitableOutputOnly`, and mixed AirPlay plus USB available inputs prefer the USB capture input.
 - `RouteHealthMonitor` now blocks Start for `.unsuitableOutputOnly` as well as `.noInput` and route-preparation failures, and no longer treats output-only route arrival as an improved capture source.
 - `DspeechTests/RouteHealthClassifierTests.swift`, `RouteHealthMonitorTests.swift`, and `CaptureCoordinatorTests.swift` cover AirPlay output-only classification, USB capture preference, output-only Start blocking, and silent output-only route-change handling.
+- `AppleSpeechLiveTranscriptionEngine` now requires on-device recognition for live requests on every platform. The main Simulator app path surfaces missing on-device Speech support as a visible failure instead of using server Speech while the UI still says `LOCAL`.
+- `DspeechTests/OnDeviceSpeechRecognitionTests.swift` now separates Simulator policy/tap-lifecycle checks from physical-device transcript proof. The device-only synthesized Speech test requires a non-empty transcript, and tap/crash repro tests assert concrete events or terminal states instead of accepting `Bool(true)`.
+- `SimulatorSpeechProbe` remains the explicit debug/probe lane that may try server Speech fallback. Its JSON now records per-result `requiresOnDeviceRecognition` / `usedServerFallback` plus envelope-level `firstAttemptRequiresOnDeviceRecognition` / `allowsServerFallback`, so probe output cannot be confused with the main local-only app contract.
 
 Verification for this pass:
 - XcodeBuildMCP `test_sim` still failed before build because `xcrun` could not find `simctl` under the active CommandLineTools developer directory.
@@ -233,6 +236,19 @@ Verification for this pass:
   - result: `** TEST SUCCEEDED **`
   - xcresult: `/Users/andre/Library/Developer/Xcode/DerivedData/Dspeech-agmpzhijbukadidbkcyaauytxvwx/Logs/Test/Run-Dspeech-2026.06.03_14-37-48-+0200.xcresult`
   - UI suite ran 13 tests with 0 failures; unit suite passed with the existing synthesized-speech device capability test skipped on simulator.
+- Focused local-only ASR policy suite passed after the F14/F27 patch:
+  - command: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project Dspeech.xcodeproj -scheme Dspeech -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4' CODE_SIGNING_ALLOWED=NO -only-testing:DspeechTests/OnDeviceSpeechRecognitionTests -only-testing:DspeechTests/AppleSpeechLiveTranscriptionEngineLifecycleTests -only-testing:DspeechTests/RecognitionFailureTextTests build test`
+  - result: `** TEST SUCCEEDED **`
+  - xcresult: `/Users/andre/Library/Developer/Xcode/DerivedData/Dspeech-agmpzhijbukadidbkcyaauytxvwx/Logs/Test/Run-Dspeech-2026.06.03_14-47-20-+0200.xcresult`
+- Unit-only suite passed after the F14/F27 patch:
+  - command: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project Dspeech.xcodeproj -scheme Dspeech -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4' CODE_SIGNING_ALLOWED=NO -only-testing:DspeechTests build test`
+  - result: `** TEST SUCCEEDED **`
+  - xcresult: `/Users/andre/Library/Developer/Xcode/DerivedData/Dspeech-agmpzhijbukadidbkcyaauytxvwx/Logs/Test/Run-Dspeech-2026.06.03_14-48-18-+0200.xcresult`
+- Full simulator build and test passed after the F14/F27 patch:
+  - command: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project Dspeech.xcodeproj -scheme Dspeech -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4' CODE_SIGNING_ALLOWED=NO build test`
+  - result: `** TEST SUCCEEDED **`
+  - xcresult: `/Users/andre/Library/Developer/Xcode/DerivedData/Dspeech-agmpzhijbukadidbkcyaauytxvwx/Logs/Test/Run-Dspeech-2026.06.03_14-53-21-+0200.xcresult`
+  - UI suite ran 13 tests with 0 failures; `testStartTransitionsToListeningOrVisibleFailure` passed by observing the visible `error-banner` path while the `LOCAL` privacy badge remained visible.
 
 Findings status after this pass:
 - `F1`, `F2`, and `F12` are addressed for callsign dictation by code plus tests above.
@@ -243,6 +259,8 @@ Findings status after this pass:
 - `F19` is addressed for voice enrollment recorder lifecycle by injected seams, session-owned stream ingestion, async drain-on-stop semantics, late/stale buffer rejection, and direct recorder unit tests.
 - `F20` is addressed for audio-route category priming by typed route-preparation status, visible Settings/Main Start failure copy, Start blocking before snapshot fallback, and fake-routing tests.
 - `F21` is addressed for AirPlay route health by treating AirPlay as output-only until real capture-route evidence exists, blocking Start for output-only routes, and covering the conservative behavior with tests.
+- `F14` is addressed for test honesty by making the physical-device ASR happy path require a transcript, keeping the Simulator skip explicit, and replacing crash-only `Bool(true)` assertions with event/terminal-state assertions.
+- `F27` is addressed for the main app path by removing Simulator server Speech fallback from live ASR requests, keeping fallback only in explicit probe artifacts, and proving Simulator Start reaches a visible failure instead of silent server-backed `LOCAL`.
 - `F9` and `F28` are addressed for the main Start lifecycle/UI contract by code plus tests above.
 - `F10` is addressed for the product contract: delete now removes local model files before clearing state, and delete failure is visible.
 - `F29` is addressed by removing stale implementation-phase comments from current green test seams.
@@ -490,7 +508,9 @@ Builder requirement:
 
 ### F14 HIGH: Device-only Speech happy path can pass without a transcript
 
-Evidence:
+Status after Codex implementation pass: addressed for test honesty. Physical-device Speech proof still must be run before claiming device ASR is empirically fixed.
+
+Pre-fix evidence:
 - `DspeechTests/OnDeviceSpeechRecognitionTests.swift:87-105` is named `recognizesSynthesizedSpeechEndToEnd`.
 - `DspeechTests/OnDeviceSpeechRecognitionTests.swift:95-103` accepts a `kAFAssistantErrorDomain#1110` failure as a successful outcome.
 - `DspeechTests/OnDeviceSpeechRecognitionTests.swift:107-115` has a crash-only meter tap test whose final assertion is `#expect(Bool(true))`.
@@ -735,7 +755,9 @@ Builder requirement:
 
 ### F27 HIGH: Simulator local-only ASR can use server recognition while the UI still says LOCAL
 
-Evidence:
+Status after Codex implementation pass: addressed for the main app path. Server Speech fallback remains only in the explicit debug `SimulatorSpeechProbe`, and probe JSON now labels the fallback.
+
+Pre-fix evidence:
 - `Dspeech/App/ContentView.swift:41-46` constructs `AppleSpeechLiveTranscriptionEngine` for the main app surface.
 - `Dspeech/App/ContentView.swift:333-335` and `Dspeech/App/ContentView.swift:375-392` show the `LOCAL` privacy badge from `PrivacyMode.localOnly`.
 - `Dspeech/Core/ASR/AppleSpeechLiveTranscriptionEngine.swift:235-244` sets `request.requiresOnDeviceRecognition = false` under `#if targetEnvironment(simulator)`.

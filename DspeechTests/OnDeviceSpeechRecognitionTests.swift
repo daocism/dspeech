@@ -6,11 +6,9 @@ import Testing
 @testable import Dspeech
 
 // why: this suite exercises the REAL Apple Speech stack and the live engine on whatever
-// target runs it. It used to `guard !isSimulator else { return }` in three tests — which
-// silently PASSED on the Simulator while testing nothing (the theater that let the F1
-// "recognizer-unavailable / kLSRErrorDomain#300" defects ship green). It no longer skips:
-// on the Simulator the engine uses server recognition (see AppleSpeechLiveTranscriptionEngine
-// #if targetEnvironment(simulator)), so these run for real here.
+// target runs it. Simulator runs can prove construction, local-only policy, and tap
+// lifecycle. They cannot prove an ASR happy path because the main app is forbidden from
+// falling back to server recognition while the UI says LOCAL.
 // why: .serialized — they share the process-wide AVAudioSession / mic; Swift Testing's
 // default parallelism makes them contend (IPCAUClient failures, empty buffers, a crash).
 @Suite(.serialized)
@@ -39,8 +37,7 @@ struct OnDeviceSpeechRecognitionTests {
     }
   }
 
-  // A real, supported locale exists and is available (server-backed on the Simulator,
-  // on-device on hardware). This is the locale a "downloaded language" resolves to.
+  // A real, supported locale exists. This is the locale a "downloaded language" resolves to.
   @Test func recognizerExistsForEnUS() {
     let recognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
     let available = recognizer?.isAvailable ?? false
@@ -61,23 +58,32 @@ struct OnDeviceSpeechRecognitionTests {
     #expect(SFSpeechRecognizer(locale: Locale(identifier: "zz-ZZ")) == nil)
   }
 
-  // Regression guard for the user's symptom: start() for a supported locale must REACH
-  // .listening (not dead-end at recognizer-unavailable / on-device-model-missing). On the
-  // Simulator this is meaningful now because the on-device-model guard is skipped there and
-  // recognition falls back to server. skipPermissionRequests avoids the auth dialog that
-  // would hang a non-UI test; .listening is set synchronously by start() before any task
-  // callback, so this is deterministic regardless of auth/network.
-  @Test func engineReachesListeningForSupportedLocale() async {
+  @Test func liveSpeechRequestsAlwaysRequireOnDeviceRecognition() {
+    #expect(AppleSpeechLiveTranscriptionEngine.liveRequestsRequireOnDeviceRecognition)
+  }
+
+  // Regression guard for local-only truthfulness: start() for a supported locale may
+  // listen if an on-device model is present, or fail visibly when it is missing. It must
+  // never switch to server recognition just to keep the normal LOCAL UI green on Simulator.
+  @Test func engineStartUsesLocalOnlySpeechPolicy() async {
     let engine = AppleSpeechLiveTranscriptionEngine(
       localeProvider: { "en-US" }, skipPermissionRequests: true)
     await engine.start()
     let status = engine.status
     engine.stop()
-    print("[OnDeviceSpeech] engineReachesListening status=\(status)")
-    #expect(
-      status == .listening,
-      "engine did not reach .listening for en-US (recognizer-unavailable/model-missing dead-end); got \(status)"
-    )
+    print("[OnDeviceSpeech] engineStartUsesLocalOnlySpeechPolicy status=\(status)")
+    switch status {
+    case .listening:
+      #expect(status == .listening)
+    case .failed(let message):
+      #expect(
+        message.hasPrefix("on-device-model-missing: "),
+        "local-only start may fail for a missing on-device model, not with \(message)")
+    default:
+      #expect(
+        Bool(false),
+        "local-only start reached neither listening nor visible failure: \(status)")
+    }
   }
 
   // The real F1 happy path: synthesize speech and feed it through the on-device recognizer,
@@ -96,23 +102,27 @@ struct OnDeviceSpeechRecognitionTests {
       print("[OnDeviceSpeech] transcript: \(text)")
       #expect(!text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
     case .failure(let domain, let code, let description):
-      // why: 1110 "no speech detected" is acceptable — synthetic TTS doesn't always latch the
-      // recognizer. Any OTHER hard error is a genuine recognition fault.
-      let benignNoSpeech = domain == "kAFAssistantErrorDomain" && code == 1110
       print("[OnDeviceSpeech] recognition outcome \(domain)#\(code) \(description)")
-      #expect(benignNoSpeech, "recognition hard-errored: \(domain)#\(code) \(description)")
+      #expect(
+        Bool(false),
+        "device ASR happy path produced no transcript: \(domain)#\(code) \(description)")
     }
   }
 
   // Crash-repro that runs on the Simulator: the input-level meter installs an AVAudioEngine
-  // tap with no permission gate; reaching the end without aborting is the pass condition.
+  // tap with no permission gate and must emit either a level or a typed visible failure.
   @Test func inputLevelMeterInstallsTapWithoutCrashing() async throws {
     let meter = AVAudioEngineInputLevelMeter()
-    let drain = Task { for await _ in meter.events() { break } }
-    try await Task.sleep(nanoseconds: 800_000_000)
+    let event = await Self.firstMeterEvent(from: meter)
     meter.stop()
-    drain.cancel()
-    #expect(Bool(true))
+    switch event {
+    case .level(let value):
+      #expect(value >= 0 && value <= 1)
+    case .failed(let message):
+      #expect(!message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+    case nil:
+      #expect(Bool(false), "meter emitted neither a level nor a typed failure")
+    }
   }
 
   // Crash-repro for the ASR engine's AVAudioEngine tap path (the @Sendable realtime closure).
@@ -124,7 +134,16 @@ struct OnDeviceSpeechRecognitionTests {
     let terminal = engine.status
     engine.stop()
     print("[OnDeviceSpeech] engineAudioPath terminal=\(terminal)")
-    #expect(terminal != .idle)
+    switch terminal {
+    case .listening:
+      #expect(terminal == .listening)
+    case .requestingPermission:
+      #expect(terminal == .requestingPermission)
+    case .failed(let message):
+      #expect(!RecognitionFailureText.userFacing(message).isEmpty)
+    default:
+      #expect(Bool(false), "engine audio path reached invalid terminal state \(terminal)")
+    }
   }
 
   // MARK: - helpers
@@ -151,13 +170,8 @@ struct OnDeviceSpeechRecognitionTests {
     await withCheckedContinuation {
       (continuation: CheckedContinuation<RecognitionOutcome, Never>) in
       let request = SFSpeechAudioBufferRecognitionRequest()
-      // why: match the Simulator's server-recognition path so this test reflects what the
-      // app actually does there; on hardware the engine uses on-device.
-      #if targetEnvironment(simulator)
-        request.requiresOnDeviceRecognition = false
-      #else
-        request.requiresOnDeviceRecognition = true
-      #endif
+      request.requiresOnDeviceRecognition =
+        AppleSpeechLiveTranscriptionEngine.liveRequestsRequireOnDeviceRecognition
       request.shouldReportPartialResults = false
       request.taskHint = .dictation
       let completion = OneShot<RecognitionOutcome>(continuation)
@@ -178,6 +192,24 @@ struct OnDeviceSpeechRecognitionTests {
       }
       request.endAudio()
       _ = task
+    }
+  }
+
+  private static func firstMeterEvent(
+    from meter: any InputLevelMetering
+  ) async -> InputLevelMeterEvent? {
+    await withTaskGroup(of: InputLevelMeterEvent?.self) { group in
+      group.addTask {
+        var iterator = meter.events().makeAsyncIterator()
+        return await iterator.next()
+      }
+      group.addTask {
+        try? await Task.sleep(nanoseconds: 3_000_000_000)
+        return nil
+      }
+      let event = await group.next() ?? nil
+      group.cancelAll()
+      return event
     }
   }
 }
