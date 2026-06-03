@@ -2,7 +2,7 @@
 
 Mode: tech-lead review plus scoped Codex implementation passes. This file now tracks both the original findings and the fixes already landed by Codex.
 Reviewer: Codex.
-Repository state: `fix/review-hardening-2026-06-03`; this note records Codex fixes through the translation failure visibility pass.
+Repository state: `fix/review-hardening-2026-06-03`; this note records Codex fixes through the corrupt persisted-state pass.
 
 ## Verification evidence
 
@@ -55,6 +55,11 @@ Scope completed in this pass:
 - `Dspeech/App/ContentView.swift` maps `.translationTask` preparation failures through `TranslationFailure.preparation(...)` instead of swallowing them, guards preparation errors with a config token, and Settings surfaces the reason with accessibility id `translation-failure`.
 - `Dspeech/App/RecognitionFailureText.swift`, `DspeechTests/LiveTranscriptionViewModelTests.swift`, `DspeechTests/TranslationServiceTests.swift`, and `DspeechTests/RecognitionFailureTextTests.swift` now cover user-safe translation failure copy, service failure mapping, preparation failure mapping, stale preparation error rejection, and recovery after success.
 - `DspeechTests/UtteranceWindowRouterTests.swift` no longer contains the remaining stale `RED until EnergySilenceSegmenter exists` comment now that the production segmenter and tests are green.
+- `Dspeech/Core/VoiceFilter/VoiceFilterStorage.swift` now loads voice-filter persistence through a typed `VoiceFilterStorageSnapshot` with explicit `VoiceFilterStorageIssue` values for corrupt profiles, callsign, gate config, and enabled flag.
+- `Dspeech/Core/VoiceFilter/VoiceFilterPipeline.swift` now initializes from one storage snapshot, exposes pending storage issues, and can clear only the corrupt persisted keys without rewriting healthy settings.
+- `Dspeech/Core/VoiceFilter/ModelPackState.swift` now maps corrupt or unknown persisted model-pack state to `.failed(.corruptState)` with non-retryable user-safe copy instead of `.absent`.
+- `Dspeech/App/ContentView.swift` now surfaces corrupt local voice-filter settings with `voicefilter-storage-corrupt` plus `voicefilter-storage-recovery`, and corrupt model-pack state uses the existing non-retryable continue-without path.
+- `DspeechTests/VoiceFilterTests.swift` and `DspeechUITests/DspeechUITests.swift` now cover corrupt storage snapshots, selective corrupt-key clearing, pipeline issue propagation/reset, corrupt model-pack state, and UI recovery visibility.
 
 Verification for this pass:
 - XcodeBuildMCP `test_sim` still failed before build because `xcrun` could not find `simctl` under the active CommandLineTools developer directory.
@@ -149,12 +154,31 @@ Verification for this pass:
   - `swift format lint --strict --recursive Dspeech DspeechTests DspeechUITests` passed.
   - `git diff --check` passed.
   - banned-marker grep over app/tests/docs/scripts returned empty.
+- Focused corrupt-state unit suite passed after the F6 patch:
+  - command: `swift format lint --strict --recursive Dspeech DspeechTests DspeechUITests && DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project Dspeech.xcodeproj -scheme Dspeech -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4' CODE_SIGNING_ALLOWED=NO -only-testing:DspeechTests/VoiceFilterStorageTests -only-testing:DspeechTests/ModelPackStateStorageTests -only-testing:DspeechTests/VoiceFilterPipelineTests build test`
+  - result: `** TEST SUCCEEDED **`
+  - xcresult: `/Users/andre/Library/Developer/Xcode/DerivedData/Dspeech-agmpzhijbukadidbkcyaauytxvwx/Logs/Test/Run-Dspeech-2026.06.03_13-58-25-+0200.xcresult`
+- Focused corrupt-state UI suite passed after the F6 patch:
+  - command: `swift format lint --strict --recursive Dspeech DspeechTests DspeechUITests && DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project Dspeech.xcodeproj -scheme Dspeech -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4' CODE_SIGNING_ALLOWED=NO -only-testing:DspeechUITests/DspeechUITests/testCorruptVoiceFilterStorageShowsRecoveryBanner -only-testing:DspeechUITests/DspeechUITests/testCorruptModelPackStateShowsContinueWithoutPath build test`
+  - result: `** TEST SUCCEEDED **`
+  - xcresult: `/Users/andre/Library/Developer/Xcode/DerivedData/Dspeech-agmpzhijbukadidbkcyaauytxvwx/Logs/Test/Run-Dspeech-2026.06.03_14-00-20-+0200.xcresult`
+- Full simulator build and test passed after the F6 patch:
+  - command: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project Dspeech.xcodeproj -scheme Dspeech -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4' CODE_SIGNING_ALLOWED=NO build test`
+  - result: `** TEST SUCCEEDED **`
+  - xcresult: `/Users/andre/Library/Developer/Xcode/DerivedData/Dspeech-agmpzhijbukadidbkcyaauytxvwx/Logs/Test/Run-Dspeech-2026.06.03_14-01-22-+0200.xcresult`
+  - UI suite ran 13 tests with 0 failures; unit suite passed with the existing synthesized-speech device capability test skipped on simulator.
+- Final hygiene was repeated after the F6/spec update:
+  - `swift format lint --strict --recursive Dspeech DspeechTests DspeechUITests` passed.
+  - `git diff --check` passed.
+  - banned-marker grep over app/tests/docs/scripts returned empty.
+  - source-only stale implementation text grep over `Dspeech DspeechTests DspeechUITests` returned empty for old RED/missing-seam phrases.
 
 Findings status after this pass:
 - `F1`, `F2`, and `F12` are addressed for callsign dictation by code plus tests above.
 - `F3` is addressed for translation failure visibility by typed failure state, Settings copy, `.translationTask` preparation mapping, config-token stale error rejection, and tests above.
 - `F4` is addressed for meter start/format failures by typed meter events, visible Settings error state, and tests above.
 - `F5` is addressed for persisted audio-input reapply by code plus tests above.
+- `F6` is addressed for corrupt local voice/model state by typed persistence issues, visible recovery UI, non-retryable corrupt model-pack failure state, and tests above.
 - `F9` and `F28` are addressed for the main Start lifecycle/UI contract by code plus tests above.
 - `F10` is addressed for the product contract: delete now removes local model files before clearing state, and delete failure is visible.
 - `F29` is addressed by removing stale implementation-phase comments from current green test seams.
@@ -245,6 +269,8 @@ Builder requirement:
 - Add tests for persisted preference rejection and successful reapply.
 
 ### F6 MEDIUM: Corrupt local voice/model state is still collapsed into absent/default
+
+Status after Codex implementation pass: addressed. Voice-filter storage now distinguishes absence from corrupt persisted values, Settings exposes a user-safe reset path for corrupt local voice-filter data, and corrupt model-pack state becomes `.failed(.corruptState)` instead of pretending the pack was never installed.
 
 Evidence:
 - `Dspeech/Core/VoiceFilter/VoiceFilterStorage.swift:29-59` decodes corrupt profile/callsign/config data into empty/default/nil.

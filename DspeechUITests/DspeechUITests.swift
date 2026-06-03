@@ -236,6 +236,57 @@ final class DspeechUITests: XCTestCase {
   }
 
   @MainActor
+  func testCorruptVoiceFilterStorageShowsRecoveryBanner() throws {
+    let app = XCUIApplication()
+    app.launchArguments += [
+      "-AppleLanguages", "(ru)", "-AppleLocale", "ru_RU",
+      "-dspeech.privacy.mode.v1", "localOnly",
+      "-dspeech.privacy.voicefilter.active.v1", "true",
+      "-dspeech.onboarding.completed.v1", "true",
+      "-dspeech.voicefilter.enabled.v1", "not-a-bool",
+    ]
+    app.launch()
+
+    app.buttons["settings-button"].tap()
+
+    let banner = app.descendants(matching: .any)
+      .matching(identifier: "voicefilter-storage-corrupt").firstMatch
+    var attempts = 0
+    while !banner.exists && attempts < 8 {
+      app.swipeUp()
+      attempts += 1
+    }
+    XCTAssertTrue(banner.waitForExistence(timeout: 4))
+    XCTAssertTrue(app.buttons["voicefilter-storage-recovery"].exists)
+  }
+
+  @MainActor
+  func testCorruptModelPackStateShowsContinueWithoutPath() throws {
+    let app = XCUIApplication()
+    app.launchArguments += [
+      "-AppleLanguages", "(ru)", "-AppleLocale", "ru_RU",
+      "-dspeech.privacy.mode.v1", "localOnly",
+      "-dspeech.privacy.voicefilter.active.v1", "true",
+      "-dspeech.onboarding.completed.v1", "true",
+      "-dspeech.voicefilter.modelpack.v1", "not-a-model-pack-state",
+    ]
+    app.launch()
+
+    app.buttons["settings-button"].tap()
+
+    let failed = app.descendants(matching: .any)
+      .matching(identifier: "voicefilter-modelpack-failed").firstMatch
+    var attempts = 0
+    while !failed.exists && attempts < 8 {
+      app.swipeUp()
+      attempts += 1
+    }
+    XCTAssertTrue(failed.waitForExistence(timeout: 4))
+    XCTAssertFalse(app.buttons["voicefilter-modelpack-retry"].exists)
+    XCTAssertTrue(app.buttons["voicefilter-modelpack-continue-without"].exists)
+  }
+
+  @MainActor
   func testVoiceFilterAcquisitionShowsPercentText() throws {
     let app = XCUIApplication()
     app.launchArguments += [

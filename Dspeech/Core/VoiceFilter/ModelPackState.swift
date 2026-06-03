@@ -66,6 +66,7 @@ struct ModelPackFailure: Equatable, Sendable, Codable {
     case dimensionMismatch
     case disk
     case cancelled
+    case corruptState
     case unknown
   }
 
@@ -143,18 +144,21 @@ struct UserDefaultsModelPackStateStorage: ModelPackStateStorage, @unchecked Send
   }
 
   func loadState() -> ModelPackState {
-    if let raw = defaults.string(forKey: Self.stateKey),
-      let launchState = Self.launchArgumentState(raw)
-    {
-      return launchState
+    if let raw = defaults.string(forKey: Self.stateKey) {
+      if let launchState = Self.launchArgumentState(raw) {
+        return launchState
+      }
+      return .failed(Self.corruptPersistedStateFailure)
     }
     guard let data = defaults.data(forKey: Self.stateKey) else {
       return .absent
     }
-    guard let decoded = try? JSONDecoder().decode(ModelPackState.self, from: data) else {
-      return .absent
+    do {
+      let decoded = try JSONDecoder().decode(ModelPackState.self, from: data)
+      return decoded.recoveredAfterColdStart()
+    } catch {
+      return .failed(Self.corruptPersistedStateFailure)
     }
-    return decoded.recoveredAfterColdStart()
   }
 
   func saveState(_ state: ModelPackState) {
@@ -193,4 +197,11 @@ struct UserDefaultsModelPackStateStorage: ModelPackStateStorage, @unchecked Send
       return nil
     }
   }
+
+  private static let corruptPersistedStateFailure = ModelPackFailure(
+    kind: .corruptState,
+    userSafeReason:
+      "Сохранённое состояние пакета голосовой модели повреждено. Продолжите без голосового фильтра и при необходимости скачайте пакет заново.",
+    isRetryable: false
+  )
 }
