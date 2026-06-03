@@ -33,10 +33,15 @@ jobs:
       - name: Build and test
         run: |
           set -euo pipefail
+          # why: -parallel-testing-enabled NO — the suite has real-audio tests that share the
+          # process-wide AVAudioSession (OnDeviceSpeechRecognitionTests) and timing-sensitive
+          # async tests; running them in parallel starves/contends and flakes. Serial is the
+          # correct mode for this suite and matches the locally-verified green run.
           xcodebuild \
             -project "$PROJECT" \
             -scheme "$SCHEME" \
             -destination "$SIMULATOR_DESTINATION" \
+            -parallel-testing-enabled NO \
             CODE_SIGNING_ALLOWED=NO \
             build test
 
