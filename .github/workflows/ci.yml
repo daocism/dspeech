@@ -37,10 +37,17 @@ jobs:
           # mode shares one sim with the real-audio unit tests and breaks app launch/terminate).
           # The CaptureCoordinator timing flake is fixed at the source (5s waits), not by
           # forcing serial.
+          # why: -retry-tests-on-failure (max 3 iterations) — XCUITests on the hosted runner
+          # intermittently hit "Timed out while evaluating UI query" under CPU contention from
+          # the parallel real-audio unit tests. Retry recovers a transient timeout; a genuinely
+          # broken test still fails ALL attempts (not a skip/xfail, so real breakage is not
+          # masked). Only failed tests are retried, so passing runs add no time.
           xcodebuild \
             -project "$PROJECT" \
             -scheme "$SCHEME" \
             -destination "$SIMULATOR_DESTINATION" \
+            -test-iterations 3 \
+            -retry-tests-on-failure \
             CODE_SIGNING_ALLOWED=NO \
             build test
 
