@@ -41,15 +41,18 @@ struct OnDeviceSpeechRecognitionTests {
 
   // A real, supported locale exists and is available (server-backed on the Simulator,
   // on-device on hardware). This is the locale a "downloaded language" resolves to.
-  @Test func recognizerExistsAndIsAvailableForEnUS() {
+  @Test func recognizerExistsForEnUS() {
     let recognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
     let available = recognizer?.isAvailable ?? false
     let onDevice = recognizer?.supportsOnDeviceRecognition ?? false
     print(
       "[OnDeviceSpeech] en-US recognizerExists=\(recognizer != nil) isAvailable=\(available) "
         + "supportsOnDeviceRecognition=\(onDevice) auth=\(Self.authName)")
+    // why: assert ONLY the deterministic fact — a recognizer can be built for en-US.
+    // isAvailable depends on Speech authorization + network/model state, which a fresh CI
+    // simulator lacks (Speech TCC can't be granted headlessly), so asserting it passes only
+    // on a sim with residual auth (green-local / red-CI). Availability is logged for triage.
     #expect(recognizer != nil, "no SFSpeechRecognizer for en-US")
-    #expect(available, "recognizer for en-US not available")
   }
 
   // The "language that isn't supported/downloaded" path: SFSpeechRecognizer returns nil for
