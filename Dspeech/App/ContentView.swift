@@ -885,7 +885,7 @@ struct VoiceFilterSettingsSection: View {
 
   private func toggleEnrollment(slot: PilotVoiceProfile.Slot) async {
     if recordingSlot == slot {
-      let result = recorder.stop()
+      let result = await recorder.stop()
       recordingSlot = nil
       guard let result else {
         enrollMessage = "Запись не получилась — попробуйте снова."
