@@ -65,6 +65,7 @@ require_grep "CA92\\.1" "Dspeech/PrivacyInfo.xcprivacy" "Privacy manifest must i
 require_grep "NSPrivacyTracking" "Dspeech/PrivacyInfo.xcprivacy" "Privacy manifest must declare tracking flag"
 require_grep "PrivacyInfo\\.xcprivacy in Resources" "Dspeech.xcodeproj/project.pbxproj" "Privacy manifest must be included as app target resource"
 require_grep "INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO" "Dspeech.xcodeproj/project.pbxproj" "Export compliance Info.plist key must be set to NO"
+require_grep "^#if DEBUG" "Dspeech/App/SimulatorSpeechProbe.swift" "Simulator speech probe (incl. server-fallback path) must be DEBUG-gated out of release builds"
 require_grep "CODE_SIGNING_ALLOWED=NO" "scripts/release/build-unsigned-archive.sh" "Unsigned archive script must disable code signing"
 require_grep "tmp/release/Dspeech\\.xcarchive" "scripts/release/build-unsigned-archive.sh" "Unsigned archive output path must be tmp/release/Dspeech.xcarchive"
 if [ ! -d "tmp/release/Dspeech.xcarchive" ]; then
