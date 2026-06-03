@@ -5,6 +5,7 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$repo_root"
 
 failures=()
+warnings=()
 
 require_file() {
   local path="$1"
@@ -68,22 +69,83 @@ require_grep "INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO" "Dspeech.xcodepr
 require_grep "^#if DEBUG" "Dspeech/App/SimulatorSpeechProbe.swift" "Simulator speech probe (incl. server-fallback path) must be DEBUG-gated out of release builds"
 require_grep "CODE_SIGNING_ALLOWED=NO" "scripts/release/build-unsigned-archive.sh" "Unsigned archive script must disable code signing"
 require_grep "tmp/release/Dspeech\\.xcarchive" "scripts/release/build-unsigned-archive.sh" "Unsigned archive output path must be tmp/release/Dspeech.xcarchive"
-if [ ! -d "tmp/release/Dspeech.xcarchive" ]; then
-  failures+=("missing unsigned archive: tmp/release/Dspeech.xcarchive")
-elif [ ! -d "tmp/release/Dspeech.xcarchive/Products" ] || [ ! -f "tmp/release/Dspeech.xcarchive/Info.plist" ]; then
-  failures+=("unsigned archive is incomplete: tmp/release/Dspeech.xcarchive")
+# why: BUILD a fresh unsigned archive and validate IT — never a stale tmp/ artifact. A
+# stale archive previously let "release ready" pass while the source tree had moved on.
+# DSPEECH_SKIP_ARCHIVE=1 is for fast doc-only runs and records a loud warning so a skipped
+# build can never be mistaken for a verified one.
+archive_path="tmp/release/Dspeech.xcarchive"
+app_binary="$archive_path/Products/Applications/Dspeech.app/Dspeech"
+if [ "${DSPEECH_SKIP_ARCHIVE:-0}" = "1" ]; then
+  warnings+=("archive build SKIPPED (DSPEECH_SKIP_ARCHIVE=1) — unsigned readiness NOT freshly verified")
+elif [ "$(uname -s)" = "Darwin" ] && command -v xcodebuild >/dev/null 2>&1; then
+  echo "Building fresh unsigned archive for release readiness check..."
+  if ! scripts/release/build-unsigned-archive.sh >tmp/release-archive-build.log 2>&1; then
+    failures+=("fresh unsigned archive build failed (see tmp/release-archive-build.log)")
+  fi
+else
+  failures+=("cannot build unsigned archive: xcodebuild unavailable on this host")
 fi
-for op_ref in \
-  "op://MyInfra-Active/dspeech-apple-distribution-certificate/credential" \
-  "op://MyInfra-Active/dspeech-apple-distribution-certificate-password/credential" \
-  "op://MyInfra-Active/dspeech-app-store-provisioning-profile/credential" \
-  "op://MyInfra-Active/dspeech-app-store-connect-api-key/credential" \
-  "op://MyInfra-Active/dspeech-app-store-connect-api-key-id/credential" \
+
+if [ ! -d "$archive_path/Products" ] || [ ! -f "$archive_path/Info.plist" ]; then
+  failures+=("unsigned archive missing or incomplete: $archive_path")
+elif [ ! -f "$app_binary" ]; then
+  failures+=("release app binary not found in archive: $app_binary")
+else
+  # [#1] the simulator speech probe (and its requiresOnDeviceRecognition:false server
+  # fallback) must not exist in a Release binary. A Release binary is partially stripped so
+  # `nm` misses Swift symbols; scan for the probe's unique DEBUG-only string literals instead
+  # — they survive stripping and only appear if SimulatorSpeechProbe.swift compiled in. Guard
+  # against a false pass by first asserting `strings` can see a literal that is ALWAYS present.
+  if ! strings -a "$app_binary" 2>/dev/null | grep -qF "FluidInference/speaker-diarization-coreml"; then
+    failures+=("release binary string scan unreliable (sentinel literal absent) — cannot verify probe exclusion")
+  else
+    probe_markers="$(strings -a "$app_binary" 2>/dev/null \
+      | grep -E "sfspeech-probe-result|dspeech-sfspeech-probe|Dspeech Speech Probe" || true)"
+    if [ -n "$probe_markers" ]; then
+      failures+=("speech-probe string literals present in the RELEASE binary — probe leaked past #if DEBUG")
+    fi
+  fi
+fi
+signing_refs=(
+  "op://MyInfra-Active/dspeech-apple-distribution-certificate/credential"
+  "op://MyInfra-Active/dspeech-apple-distribution-certificate-password/credential"
+  "op://MyInfra-Active/dspeech-app-store-provisioning-profile/credential"
+  "op://MyInfra-Active/dspeech-app-store-connect-api-key/credential"
+  "op://MyInfra-Active/dspeech-app-store-connect-api-key-id/credential"
   "op://MyInfra-Active/dspeech-app-store-connect-issuer-id/credential"
-do
+)
+for op_ref in "${signing_refs[@]}"; do
   require_grep "$op_ref" "docs/release/signed-build-runbook.md" "Runbook must use op:// signing and ASC references"
   require_grep "$op_ref" "docs/product/app-store/testflight-setup.md" "TestFlight worksheet must use op:// signing and ASC references"
 done
+
+# Validate the ACTUAL signing/ASC secrets, not just that the runbook names them. Signed /
+# TestFlight distribution stays blocked until all are present (CLAUDE.md hard rule 6); report
+# the real state so an unsigned-only pass never masquerades as full release readiness.
+signing_present=0
+signing_missing=()
+signing_checked=0
+signing_ready=0
+if command -v op >/dev/null 2>&1 && op whoami >/dev/null 2>&1; then
+  signing_checked=1
+  for ref in "${signing_refs[@]}"; do
+    if op read "$ref" >/dev/null 2>&1; then
+      signing_present=$((signing_present + 1))
+    else
+      signing_missing+=("$ref")
+    fi
+  done
+  if [ "${#signing_missing[@]}" -eq 0 ]; then
+    signing_ready=1
+  fi
+else
+  warnings+=("signing/ASC secret validation skipped — op CLI unavailable or not signed in")
+fi
+
+# Opt-in hard gate for when a signed build is actually being prepared.
+if [ "${DSPEECH_REQUIRE_SIGNING:-0}" = "1" ] && [ "$signing_ready" != "1" ]; then
+  failures+=("signed/TestFlight prerequisites not met: ${#signing_missing[@]}/6 signing/ASC secret(s) missing")
+fi
 require_grep "op run --env-file" "docs/release/signed-build-runbook.md" "Runbook must use op run for upload credentials"
 require_grep "Transporter|Xcode Organizer" "docs/release/signed-build-runbook.md" "Runbook must prefer Xcode or Transporter path"
 require_grep "No CI submission automation" "docs/release/signed-build-runbook.md" "Runbook must block CI submission automation"
@@ -142,10 +204,23 @@ if "CA92.1" not in reasons:
     raise SystemExit("Missing UserDefaults reason CA92.1")
 PY
 
+if [ "${#warnings[@]}" -gt 0 ]; then
+  printf 'Warnings:\n'
+  printf ' - %s\n' "${warnings[@]}"
+fi
+
 if [ "${#failures[@]}" -gt 0 ]; then
   printf 'Release readiness check failed:\n' >&2
   printf ' - %s\n' "${failures[@]}" >&2
   exit 1
 fi
 
-echo "Release readiness checks passed."
+if [ "$signing_ready" = "1" ]; then
+  echo "Signed/TestFlight prerequisites: READY (6/6 signing+ASC secrets present)."
+elif [ "$signing_checked" = "1" ]; then
+  echo "Signed/TestFlight prerequisites: NOT READY (${signing_present}/6 secrets present) — unsigned archive only, not submittable."
+else
+  echo "Signed/TestFlight prerequisites: UNVERIFIED (op unavailable)."
+fi
+
+echo "Unsigned release-readiness checks passed (fresh archive built and validated)."
