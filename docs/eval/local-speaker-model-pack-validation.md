@@ -70,7 +70,7 @@ Simulator / CI lane (must be green before the feature ships behind its toggle):
 - [ ] Network-deny integration test green (§1) on iPhone 17 Pro / iOS 26.4 sim.
 - [x] Missing-pack-throws test green (no silent auto-download). — `VoiceFilterPipelineTests.absentPackEnrollThrowsModelUnavailable` / `absentPackClassifyThrowsModelUnavailable` (commit `3dfc246`, mac24 iPhone 17 Pro / iOS 26.4). An *available* identifier behind an `.absent`/`.disabled` pack throws `modelUnavailable`; no acquisition/download code exists to auto-fetch.
 - [ ] Download-phase boundary test green (egress only during `downloading`, one-directional).
-- [ ] Source-override (`baseURL`) test green.
+- [x] Source-override (`baseURL`) test green. — `ReplayKitNetworkDenyTests.modelSourceOverrideFlowsToFluidAudioDownloadBaseURL`: an Info.plist `DspeechModelRegistryBaseURL` override is applied to `ModelRegistry.baseURL` (the URL FluidAudio's `DownloadUtils` actually fetches from) via `SpeakerModelPackInstaller.applyConfiguredRegistryBaseURL`, which the download path calls; absent configuration leaves FluidAudio's own resolution untouched (mac24 iPhone 17 Pro / iOS 26.4).
 - [ ] Privacy-badge invariance test green across all five states.
 - [x] Model-pack state-machine round-trip persistence test green (storage-protocol injected). — `ModelPackStateStorageTests` (round-trip absent/installed/failed/disabled, `.acquiring`→`.absent` cold-start recovery, missing/corrupt→`.absent`); `UserDefaultsModelPackStateStorage` via the injected `ModelPackStateStorage` protocol (commit `3dfc246`, mac24 iPhone 17 Pro / iOS 26.4).
 - [ ] Embedding dimension asserted (256) against the live backend.
@@ -84,3 +84,22 @@ Physical-device lane (opportunistic; not a ship blocker for the toggled feature)
 - [ ] Wired-path SNR/PTT-leakage observations recorded (existing cable; deferred).
 
 When evidence is produced, link the exact test command and result here and in the run note — assertions without pasted output do not count.
+
+### What the network-deny tests do and do not prove
+
+Be honest about the boundary so a green run is not over-read (this was a review finding):
+
+- **They prove:** the exercised offline code paths (model-pack verify/locate, the
+  enroll→classify→route pipeline with an installed pack, Apple-Speech engine construction +
+  capture gate) complete without going through the scoped guard, and the missing-pack path
+  throws rather than auto-downloading. The source override is proven to flow to the real
+  FluidAudio download base URL.
+- **They do NOT prove** the absence of *all* process egress. `URLProtocol`-based denial only
+  intercepts the shared/default session and explicitly-tagged requests; a dependency using its
+  own `URLSession` (FluidAudio constructs `ModelRegistry.configuredSession()`) can bypass it,
+  and the simulator's own OS background traffic makes a process-wide "zero attempts" assertion
+  unreliable — which is why the suite uses a scoped guard, not a global one.
+- **The real systemic-egress proof is device-level:** run the installed-pack enroll→classify
+  path on a physical device under OS network monitoring (Network Instrument / a Network
+  Extension content filter). Tracked with the on-device ASR verification lane; not a blocker
+  for the toggled feature's simulator gate, but required before any claim of "no egress, ever."

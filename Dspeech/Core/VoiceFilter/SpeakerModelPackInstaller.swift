@@ -61,6 +61,22 @@ struct SpeakerModelPackInstaller: Sendable {
   static func resolvedRegistrySource(bundle: Bundle = .main) -> String {
     "\(registryBaseURLOverride(bundle: bundle) ?? ModelRegistry.baseURL)/\(source)"
   }
+
+  // Applies the configured override to the FluidAudio download base URL that DownloadUtils
+  // actually fetches from, and returns the effective value. The download path calls this so
+  // the override is proven to flow all the way to FluidAudio, not just resolved in isolation.
+  @discardableResult
+  static func applyConfiguredRegistryBaseURL(infoDictionary: [String: Any]?) -> String {
+    if let override = registryBaseURLOverride(infoDictionary: infoDictionary) {
+      ModelRegistry.baseURL = override
+    }
+    return ModelRegistry.baseURL
+  }
+
+  @discardableResult
+  static func applyConfiguredRegistryBaseURL(bundle: Bundle = .main) -> String {
+    applyConfiguredRegistryBaseURL(infoDictionary: bundle.infoDictionary)
+  }
   static let segmentationFile = FluidAudioBackendBuilder.segmentationModelFileName
   static let embeddingFile = FluidAudioBackendBuilder.embeddingModelFileName
   static let expectedModelFileManifest: [ExpectedModelFile] = [
@@ -276,9 +292,7 @@ struct SpeakerModelPackInstaller: Sendable {
     to cacheRoot: URL,
     progress: @escaping @Sendable (ModelPackAcquisition) -> Void
   ) async throws {
-    if let override = registryBaseURLOverride() {
-      ModelRegistry.baseURL = override
-    }
+    applyConfiguredRegistryBaseURL()
     try await DownloadUtils.downloadRepo(
       .diarizer, to: cacheRoot,
       progressHandler: { snapshot in
