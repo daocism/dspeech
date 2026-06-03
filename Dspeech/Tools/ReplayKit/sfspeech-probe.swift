@@ -4,11 +4,14 @@ struct ProbeResult: Codable {
   let fixture: String
   let transcript: String?
   let error: String?
+  let requiresOnDeviceRecognition: Bool
+  let usedServerFallback: Bool
 }
 
 struct ProbeEnvelope: Codable {
   let locale: String
-  let requiresOnDeviceRecognition: Bool
+  let firstAttemptRequiresOnDeviceRecognition: Bool
+  let allowsServerFallback: Bool
   let authorizationStatus: String
   let recognizerAvailable: Bool
   let supportsOnDeviceRecognition: Bool
