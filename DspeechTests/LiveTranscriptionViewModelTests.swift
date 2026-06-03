@@ -310,6 +310,21 @@ struct LiveTranscriptionViewModelTests {
     )
   }
 
+  private func expectTranslationFailure(
+    _ error: TranslationServiceError,
+    expected: TranslationFailure
+  ) async {
+    let engine = FakeEngine()
+    let backend = FakeTranslationBackend()
+    backend.translateError = error
+    let vm = translatingVM(engine: engine, backend: backend, target: "ru")
+    await vm.start()
+    let seg = makeSegment("Descend")
+    engine.push(.segment(seg))
+    #expect(await wait(for: { vm.translationFailure == expected }))
+    #expect(vm.translations[seg.id] == nil)
+  }
+
   @Test func translatesFinalizedSegmentWhenEnabled() async {
     let engine = FakeEngine()
     let backend = FakeTranslationBackend()
@@ -350,15 +365,123 @@ struct LiveTranscriptionViewModelTests {
   @Test func missingLanguagePackMarksUnavailable() async {
     let engine = FakeEngine()
     let backend = FakeTranslationBackend()
+    let expected = TranslationFailure.languagePackNotInstalled(
+      source: Locale.Language(identifier: "en"), target: Locale.Language(identifier: "ru"))
     backend.translateError = .languagePackNotInstalled(
-      source: Locale.Language(identifier: "en"),
-      target: Locale.Language(identifier: "ru"))
+      source: Locale.Language(identifier: "en"), target: Locale.Language(identifier: "ru"))
     let vm = translatingVM(engine: engine, backend: backend, target: "ru")
     await vm.start()
     let seg = makeSegment("Descend")
     engine.push(.segment(seg))
-    #expect(await wait(for: { vm.translationUnavailable }))
+    #expect(await wait(for: { vm.translationFailure == expected }))
+    #expect(vm.translationUnavailable)
     #expect(vm.translations[seg.id] == nil)
+  }
+
+  @Test func unsupportedSourceLanguageMarksVisibleFailure() async {
+    let source = Locale.Language(identifier: "zz")
+    await expectTranslationFailure(
+      .sourceLanguageUnsupported(source),
+      expected: .sourceLanguageUnsupported(source))
+  }
+
+  @Test func unsupportedTargetLanguageMarksVisibleFailure() async {
+    let target = Locale.Language(identifier: "zz")
+    await expectTranslationFailure(
+      .targetLanguageUnsupported(target),
+      expected: .targetLanguageUnsupported(target))
+  }
+
+  @Test func unsupportedLanguagePairMarksVisibleFailure() async {
+    let source = Locale.Language(identifier: "en")
+    let target = Locale.Language(identifier: "ru")
+    await expectTranslationFailure(
+      .languagePairingUnsupported(source: source, target: target),
+      expected: .languagePairingUnsupported(source: source, target: target))
+  }
+
+  @Test func emptyTranslationInputMarksVisibleFailure() async {
+    await expectTranslationFailure(.emptyInput, expected: .emptyInput)
+  }
+
+  @Test func cancelledTranslationSessionMarksVisibleFailure() async {
+    await expectTranslationFailure(.sessionCancelled, expected: .sessionCancelled)
+  }
+
+  @Test func engineTranslationFailureMarksVisibleFailure() async {
+    await expectTranslationFailure(
+      .engineFailure("backend-token-42"),
+      expected: .engineFailure("backend-token-42"))
+  }
+
+  @Test func successfulTranslationClearsPreviousFailure() async {
+    let engine = FakeEngine()
+    let backend = FakeTranslationBackend()
+    backend.translateError = .engineFailure("first-failure")
+    let vm = translatingVM(engine: engine, backend: backend, target: "ru")
+    await vm.start()
+    engine.push(.segment(makeSegment("Descend")))
+    #expect(await wait(for: { vm.translationFailure == .engineFailure("first-failure") }))
+
+    backend.translateError = nil
+    backend.translationResult = "перевод"
+    let recovered = makeSegment("Maintain three thousand")
+    engine.push(.segment(recovered))
+
+    #expect(await wait(for: { vm.translations[recovered.id] == "перевод" }))
+    #expect(vm.translationFailure == nil)
+  }
+
+  @Test func clearTranslationsClearsTranslationFailure() async {
+    let engine = FakeEngine()
+    let backend = FakeTranslationBackend()
+    backend.translateError = .engineFailure("failure")
+    let vm = translatingVM(engine: engine, backend: backend, target: "ru")
+    await vm.start()
+    engine.push(.segment(makeSegment("Descend")))
+    #expect(await wait(for: { vm.translationFailure == .engineFailure("failure") }))
+
+    vm.clearTranslations()
+
+    #expect(vm.translationFailure == nil)
+    #expect(vm.translations.isEmpty)
+  }
+
+  @Test func preparationFailureIsRecorded() {
+    let engine = FakeEngine()
+    let backend = FakeTranslationBackend()
+    let vm = translatingVM(engine: engine, backend: backend, target: "ru")
+
+    let token = vm.beginTranslationPreparation()
+    vm.recordTranslationPreparationFailure(.preparationFailed("download-token-42"), token: token)
+
+    #expect(vm.translationFailure == .preparationFailed("download-token-42"))
+  }
+
+  @Test func stalePreparationFailureAfterClearTranslationsIsIgnored() {
+    let engine = FakeEngine()
+    let backend = FakeTranslationBackend()
+    let vm = translatingVM(engine: engine, backend: backend, target: "ru")
+
+    let staleToken = vm.beginTranslationPreparation()
+    vm.clearTranslations()
+    vm.recordTranslationPreparationFailure(.preparationFailed("stale-download"), token: staleToken)
+
+    #expect(vm.translationFailure == nil)
+  }
+
+  @Test func newPreparationClearsPreviousTranslationFailure() {
+    let engine = FakeEngine()
+    let backend = FakeTranslationBackend()
+    let vm = translatingVM(engine: engine, backend: backend, target: "ru")
+
+    let token = vm.beginTranslationPreparation()
+    vm.recordTranslationPreparationFailure(.preparationFailed("old-download"), token: token)
+    #expect(vm.translationFailure == .preparationFailed("old-download"))
+
+    _ = vm.beginTranslationPreparation()
+
+    #expect(vm.translationFailure == nil)
   }
 
   @Test func resetClearsTranslations() async {
@@ -372,7 +495,7 @@ struct LiveTranscriptionViewModelTests {
     await wait(for: { vm.translations[seg.id] == "перевод" })
     vm.reset()
     #expect(vm.translations.isEmpty)
-    #expect(vm.translationUnavailable == false)
+    #expect(vm.translationFailure == nil)
   }
 
   @Test func retranslateAllRetranslatesExistingSegments() async {

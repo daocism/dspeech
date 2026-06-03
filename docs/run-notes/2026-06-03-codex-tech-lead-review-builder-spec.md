@@ -2,7 +2,7 @@
 
 Mode: tech-lead review plus scoped Codex implementation passes. This file now tracks both the original findings and the fixes already landed by Codex.
 Reviewer: Codex.
-Repository state: `fix/review-hardening-2026-06-03`, dirty working tree with reviewed implementation changes in app/test/project files.
+Repository state: `fix/review-hardening-2026-06-03`; this note records Codex fixes through the translation failure visibility pass.
 
 ## Verification evidence
 
@@ -50,6 +50,11 @@ Scope completed in this pass:
 - `Dspeech/App/ContentView.swift` surfaces meter failure in Settings with accessibility id `audio-meter-error`.
 - `DspeechTests/AudioSourceControllerTests.swift` covers normal meter levels, stop cleanup, and visible failure handling; `DspeechTests/OnDeviceSpeechRecognitionTests.swift` now consumes typed meter events.
 - `DspeechTests/LiveTranscriptionViewModelTests.swift` hardens `retranslateAllRetranslatesExistingSegments()` so it waits for the new translated gloss, not just an internal translation call count.
+- `Dspeech/Core/Translation/TranslationServiceProtocol.swift` now exposes typed `TranslationFailure` state that preserves missing-pack, unsupported-language, unsupported-pair, cancellation, preparation, and engine failures without collapsing them to a boolean.
+- `Dspeech/App/LiveTranscriptionViewModel.swift` records translation service failures and clears them only on a successful translation or explicit translation reset.
+- `Dspeech/App/ContentView.swift` maps `.translationTask` preparation failures through `TranslationFailure.preparation(...)` instead of swallowing them, guards preparation errors with a config token, and Settings surfaces the reason with accessibility id `translation-failure`.
+- `Dspeech/App/RecognitionFailureText.swift`, `DspeechTests/LiveTranscriptionViewModelTests.swift`, `DspeechTests/TranslationServiceTests.swift`, and `DspeechTests/RecognitionFailureTextTests.swift` now cover user-safe translation failure copy, service failure mapping, preparation failure mapping, stale preparation error rejection, and recovery after success.
+- `DspeechTests/UtteranceWindowRouterTests.swift` no longer contains the remaining stale `RED until EnergySilenceSegmenter exists` comment now that the production segmenter and tests are green.
 
 Verification for this pass:
 - XcodeBuildMCP `test_sim` still failed before build because `xcrun` could not find `simctl` under the active CommandLineTools developer directory.
@@ -127,9 +132,27 @@ Verification for this pass:
   - `swift format lint --strict --recursive Dspeech DspeechTests DspeechUITests` passed.
   - `git diff --check` passed.
   - banned-marker grep over app/tests/docs/scripts returned empty.
+- Focused translation failure suite passed after the F3 patch:
+  - command: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project Dspeech.xcodeproj -scheme Dspeech -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4' CODE_SIGNING_ALLOWED=NO -only-testing:DspeechTests/LiveTranscriptionViewModelTests -only-testing:DspeechTests/TranslationServiceTests -only-testing:DspeechTests/TranslationFailureTextTests build test`
+  - result: `** TEST SUCCEEDED **`
+  - xcresult: `/Users/andre/Library/Developer/Xcode/DerivedData/Dspeech-agmpzhijbukadidbkcyaauytxvwx/Logs/Test/Run-Dspeech-2026.06.03_13-48-22-+0200.xcresult`
+- Unit-only suite passed after the F3 patch:
+  - command: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project Dspeech.xcodeproj -scheme Dspeech -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4' CODE_SIGNING_ALLOWED=NO -only-testing:DspeechTests build test`
+  - result: `** TEST SUCCEEDED **`
+  - xcresult: `/Users/andre/Library/Developer/Xcode/DerivedData/Dspeech-agmpzhijbukadidbkcyaauytxvwx/Logs/Test/Run-Dspeech-2026.06.03_13-41-16-+0200.xcresult`
+- Full simulator build and test passed after the F3 patch:
+  - command: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project Dspeech.xcodeproj -scheme Dspeech -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4' CODE_SIGNING_ALLOWED=NO build test`
+  - result: `** TEST SUCCEEDED **`
+  - xcresult: `/Users/andre/Library/Developer/Xcode/DerivedData/Dspeech-agmpzhijbukadidbkcyaauytxvwx/Logs/Test/Run-Dspeech-2026.06.03_13-49-02-+0200.xcresult`
+  - UI suite ran 11 tests with 0 failures; the strengthened Start test again passed by observing the typed failure path in this simulator environment.
+- Final hygiene was repeated after the F3/spec update:
+  - `swift format lint --strict --recursive Dspeech DspeechTests DspeechUITests` passed.
+  - `git diff --check` passed.
+  - banned-marker grep over app/tests/docs/scripts returned empty.
 
 Findings status after this pass:
 - `F1`, `F2`, and `F12` are addressed for callsign dictation by code plus tests above.
+- `F3` is addressed for translation failure visibility by typed failure state, Settings copy, `.translationTask` preparation mapping, config-token stale error rejection, and tests above.
 - `F4` is addressed for meter start/format failures by typed meter events, visible Settings error state, and tests above.
 - `F5` is addressed for persisted audio-input reapply by code plus tests above.
 - `F9` and `F28` are addressed for the main Start lifecycle/UI contract by code plus tests above.
@@ -171,6 +194,8 @@ Builder requirement:
 - Remove or sharply justify every `@unchecked Sendable` in this file. If any remains, document the invariant in the spec and pin it with a concurrency/lifecycle test.
 
 ### F3 MEDIUM: Translation failures still fail silently
+
+Status after Codex implementation pass: addressed. Translation service and preparation failures now become typed `TranslationFailure` values, Settings renders a reason with `translation-failure`, stale preparation errors are token-guarded, and tests cover all service cases plus preparation mapping.
 
 Evidence:
 - `Dspeech/App/LiveTranscriptionViewModel.swift:141-151` only surfaces `.languagePackNotInstalled`; other `TranslationServiceError` values silently leave the segment un-glossed.

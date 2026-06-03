@@ -49,3 +49,44 @@ enum RecognitionFailureText {
     return String(localized: "Не удалось распознать речь. Повторите попытку.")
   }
 }
+
+enum TranslationFailureText {
+  static func userFacing(_ failure: TranslationFailure) -> String {
+    switch failure {
+    case .emptyInput:
+      return String(localized: "Нечего переводить: сегмент пустой.")
+    case .sourceLanguageUnsupported:
+      return String(
+        localized:
+          "Этот язык распознавания не поддерживается для локального перевода. Выберите другой язык распознавания."
+      )
+    case .targetLanguageUnsupported:
+      return String(
+        localized:
+          "Целевой язык не поддерживается для локального перевода. Выберите другой язык перевода."
+      )
+    case .languagePairingUnsupported:
+      return String(
+        localized:
+          "Эта языковая пара не поддерживается для локального перевода. Выберите другой целевой язык."
+      )
+    case .languagePackNotInstalled:
+      return String(
+        localized:
+          "Языковой пакет перевода не установлен. Выключите и снова включите перевод — iOS предложит загрузку."
+      )
+    case .sessionCancelled, .preparationCancelled:
+      return String(
+        localized:
+          "Подготовка локального перевода отменена. Включите перевод снова, если он нужен."
+      )
+    case .preparationFailed:
+      return String(
+        localized:
+          "Не удалось подготовить локальный перевод. Проверьте языковой пакет и повторите попытку."
+      )
+    case .engineFailure:
+      return String(localized: "Системный перевод не выполнился. Повторите попытку.")
+    }
+  }
+}

@@ -62,3 +62,48 @@ struct RecognitionFailureTextTests {
     #expect(!mic.isEmpty && !speech.isEmpty)
   }
 }
+
+struct TranslationFailureTextTests {
+  private static let allFailures: [TranslationFailure] = [
+    .emptyInput,
+    .sourceLanguageUnsupported(Locale.Language(identifier: "zz")),
+    .targetLanguageUnsupported(Locale.Language(identifier: "zz")),
+    .languagePairingUnsupported(
+      source: Locale.Language(identifier: "en"), target: Locale.Language(identifier: "ru")),
+    .languagePackNotInstalled(
+      source: Locale.Language(identifier: "en"), target: Locale.Language(identifier: "ru")),
+    .sessionCancelled,
+    .preparationCancelled,
+    .preparationFailed("TranslationBackend#42 raw token"),
+    .engineFailure("EngineFailure#99 raw token"),
+  ]
+
+  private static let forbiddenTokens = [
+    "TranslationBackend#42", "EngineFailure#99", "raw token",
+  ]
+
+  @Test(arguments: allFailures)
+  func everyFailureMapsToHumanTextWithoutRawTokenLeak(failure: TranslationFailure) {
+    let text = TranslationFailureText.userFacing(failure)
+    #expect(!text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+    for token in Self.forbiddenTokens {
+      #expect(
+        !text.contains(token),
+        "user-facing translation text leaked raw token \(token): \(text)")
+    }
+  }
+
+  @Test func distinctTranslationFailuresHaveDistinctCopy() {
+    let missingPack = TranslationFailureText.userFacing(
+      .languagePackNotInstalled(
+        source: Locale.Language(identifier: "en"), target: Locale.Language(identifier: "ru")))
+    let unsupportedPair = TranslationFailureText.userFacing(
+      .languagePairingUnsupported(
+        source: Locale.Language(identifier: "en"), target: Locale.Language(identifier: "ru")))
+    let engineFailure = TranslationFailureText.userFacing(.engineFailure("engine"))
+
+    #expect(missingPack != unsupportedPair)
+    #expect(unsupportedPair != engineFailure)
+    #expect(missingPack != engineFailure)
+  }
+}

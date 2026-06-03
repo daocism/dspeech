@@ -12,6 +12,7 @@ struct ContentView: View {
   @State private var showSettings: Bool = false
   @State private var onboarding: OnboardingState
   @State private var translationConfig: TranslationSession.Configuration?
+  @State private var translationPreparationToken = UUID()
   @Environment(\.scenePhase) private var scenePhase
 
   init(
@@ -131,7 +132,7 @@ struct ContentView: View {
       SettingsView(
         privacy: privacy, recognition: recognition, translation: translation,
         audioSource: audioSource,
-        translationUnavailable: liveViewModel.translationUnavailable,
+        translationFailure: liveViewModel.translationFailure,
         captureActive: liveViewModel.isListening,
         voiceFilter: voiceFilter)
     }
@@ -152,7 +153,13 @@ struct ContentView: View {
     .fullScreenCover(isPresented: onboardingPresented) {
       OnboardingView { onboarding.complete() }
     }
-    .translationTask(translationConfig) { @Sendable [live = coordinator.live] session in
+    .translationTask(translationConfig) {
+      @Sendable [
+        live = coordinator.live,
+        source = Locale.Language(identifier: recognition.localeIdentifier),
+        target = translation.targetLanguage,
+        token = translationPreparationToken,
+      ] session in
       do {
         // why: prepareTranslation presents Apple's system download sheet for a
         // not-yet-installed pair and resolves once assets are on device; a no-op
@@ -162,8 +169,9 @@ struct ContentView: View {
         try await session.prepareTranslation()
         await live.retranslateAll()
       } catch {
-        // why: user dismissed the system sheet or the pair is unsupported —
-        // translation stays unavailable; the transcript is never blocked.
+        await live.recordTranslationPreparationFailure(
+          .preparation(error, source: source, target: target),
+          token: token)
       }
     }
     .onChange(of: translation.enabled) { _, enabled in
@@ -193,9 +201,11 @@ struct ContentView: View {
   private func updateTranslationConfig() {
     guard translation.enabled else {
       translationConfig = nil
+      coordinator.live.clearTranslations()
       return
     }
     let source = Locale.Language(identifier: recognition.localeIdentifier)
+    translationPreparationToken = coordinator.live.beginTranslationPreparation()
     translationConfig = TranslationSession.Configuration(
       source: source, target: translation.targetLanguage)
   }
@@ -439,7 +449,7 @@ struct SettingsView: View {
   @Bindable var recognition: RecognitionSettings
   @Bindable var translation: TranslationSettings
   var audioSource: AudioSourceController
-  var translationUnavailable: Bool
+  var translationFailure: TranslationFailure?
   var captureActive: Bool
   var voiceFilter: VoiceFilterPipeline?
   @Environment(\.dismiss) private var dismiss
@@ -448,7 +458,7 @@ struct SettingsView: View {
     privacy: PrivacySettings, recognition: RecognitionSettings,
     translation: TranslationSettings,
     audioSource: AudioSourceController,
-    translationUnavailable: Bool = false,
+    translationFailure: TranslationFailure? = nil,
     captureActive: Bool = false,
     voiceFilter: VoiceFilterPipeline? = nil
   ) {
@@ -456,7 +466,7 @@ struct SettingsView: View {
     self.recognition = recognition
     self.translation = translation
     self.audioSource = audioSource
-    self.translationUnavailable = translationUnavailable
+    self.translationFailure = translationFailure
     self.captureActive = captureActive
     self.voiceFilter = voiceFilter
   }
@@ -602,14 +612,14 @@ struct SettingsView: View {
             }
           }
           .accessibilityIdentifier("translation-target-picker")
-          if translation.enabled && translationUnavailable {
+          if translation.enabled, let translationFailure {
             Label(
-              "Языковой пакет не установлен. Выключите и снова включите перевод — iOS предложит загрузку.",
+              TranslationFailureText.userFacing(translationFailure),
               systemImage: "exclamationmark.triangle.fill"
             )
             .font(.footnote)
             .foregroundStyle(.orange)
-            .accessibilityIdentifier("translation-pack-unavailable")
+            .accessibilityIdentifier("translation-failure")
           }
         } header: {
           Text("Перевод")

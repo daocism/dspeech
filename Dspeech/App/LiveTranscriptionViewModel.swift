@@ -10,7 +10,7 @@ final class LiveTranscriptionViewModel {
   private(set) var filterIndicators: [UUID: ATCVoiceIndicator] = [:]
   private(set) var suppressedSegmentIDs: Set<UUID> = []
   private(set) var translations: [UUID: String] = [:]
-  private(set) var translationUnavailable = false
+  private(set) var translationFailure: TranslationFailure?
   // why: the demo/mockup transcript is a first-run illustration only. Once the user has
   // started a real session it must never reappear over (or instead of) real content — the
   // "press Stop and the transcript turns back into demo" confusion.
@@ -23,6 +23,7 @@ final class LiveTranscriptionViewModel {
   private var eventTask: Task<Void, Never>?
   private var translationTasks: [UUID: Task<Void, Never>] = [:]
   private var translationTaskTokens: [UUID: UUID] = [:]
+  private var translationPreparationToken = UUID()
   private var startInFlight = false
   // why: a Stop-committed partial has no language of its own; reuse the last real segment's
   // language, defaulting to the device language (matches the device-language default policy).
@@ -65,6 +66,11 @@ final class LiveTranscriptionViewModel {
   var lastErrorMessage: String? {
     if case .failed(let message) = status { return message }
     return nil
+  }
+
+  var translationUnavailable: Bool {
+    if case .languagePackNotInstalled = translationFailure { return true }
+    return false
   }
 
   func start() async {
@@ -110,11 +116,24 @@ final class LiveTranscriptionViewModel {
   }
 
   func clearTranslations() {
+    translationPreparationToken = UUID()
     for task in translationTasks.values { task.cancel() }
     translationTasks.removeAll()
     translationTaskTokens.removeAll()
     translations.removeAll()
-    translationUnavailable = false
+    translationFailure = nil
+  }
+
+  func beginTranslationPreparation() -> UUID {
+    let token = UUID()
+    translationPreparationToken = token
+    translationFailure = nil
+    return token
+  }
+
+  func recordTranslationPreparationFailure(_ failure: TranslationFailure, token: UUID) {
+    guard token == translationPreparationToken else { return }
+    translationFailure = failure
   }
 
   func retranslateAll() {
@@ -149,19 +168,20 @@ final class LiveTranscriptionViewModel {
       let result: String
       do {
         result = try await translator.translate(text, from: source, into: target)
-      } catch TranslationServiceError.languagePackNotInstalled {
-        // why: token guard so a cancelled/superseded task can't flip state for a
-        // segment that is no longer current (e.g. after reset/clearTranslations).
-        if self.translationTaskTokens[id] == token { self.translationUnavailable = true }
+      } catch let error as TranslationServiceError {
+        if self.translationTaskTokens[id] == token {
+          self.translationFailure = .service(error)
+        }
         return
       } catch {
-        // why: translation is best-effort and never blocks the transcript; other
-        // failures simply leave the segment un-glossed.
+        if self.translationTaskTokens[id] == token {
+          self.translationFailure = .engineFailure(String(describing: error))
+        }
         return
       }
       guard self.translationTaskTokens[id] == token else { return }
       self.translations[id] = result
-      self.translationUnavailable = false
+      self.translationFailure = nil
     }
   }
 
