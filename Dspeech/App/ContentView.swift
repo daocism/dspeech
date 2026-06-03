@@ -19,10 +19,12 @@ struct ContentView: View {
     engine: (any LiveTranscriptionEngine)? = nil,
     voiceFilter: VoiceFilterPipeline? = nil,
     routing: AudioSessionRouting = LiveAudioSessionRouting(),
-    onboarding: OnboardingState? = nil
+    onboarding: OnboardingState? = nil,
+    recognitionAvailability: (any OnDeviceLocaleAvailability)? = nil
   ) {
     let privacySettings = PrivacySettings()
-    let recognitionSettings = RecognitionSettings()
+    let recognitionSettings = RecognitionSettings(
+      availability: recognitionAvailability ?? SystemOnDeviceLocaleAvailability())
     let filter: VoiceFilterPipeline
     if let voiceFilter {
       filter = voiceFilter
@@ -42,7 +44,7 @@ struct ContentView: View {
     let resolvedEngine =
       engine
       ?? AppleSpeechLiveTranscriptionEngine(
-        localeProvider: { recognitionSettings.localeIdentifier },
+        localeProvider: { recognitionSettings.activeLocaleIdentifier },
         bufferGate: VoiceFilterSpeechAudioBufferGate(pipeline: filter)
       )
     let translationSettings = TranslationSettings()
@@ -144,6 +146,10 @@ struct ContentView: View {
       // drives .translationTask -> prepareTranslation (the only pack-download path).
       updateTranslationConfig()
     }
+    .task {
+      await recognition.refreshCapableLocales()
+      if translation.enabled { updateTranslationConfig() }
+    }
     .onDisappear { coordinator.endObservingRouteChanges() }
     .onChange(of: scenePhase) { _, newPhase in
       if newPhase == .background {
@@ -156,10 +162,12 @@ struct ContentView: View {
     .translationTask(translationConfig) {
       @Sendable [
         live = coordinator.live,
-        source = Locale.Language(identifier: recognition.localeIdentifier),
+        sourceIdentifier = recognition.activeLocaleIdentifier,
         target = translation.targetLanguage,
         token = translationPreparationToken,
       ] session in
+      guard let sourceIdentifier else { return }
+      let source = Locale.Language(identifier: sourceIdentifier)
       do {
         // why: prepareTranslation presents Apple's system download sheet for a
         // not-yet-installed pair and resolves once assets are on device; a no-op
@@ -204,7 +212,12 @@ struct ContentView: View {
       coordinator.live.clearTranslations()
       return
     }
-    let source = Locale.Language(identifier: recognition.localeIdentifier)
+    guard let localeIdentifier = recognition.activeLocaleIdentifier else {
+      translationConfig = nil
+      coordinator.live.clearTranslations()
+      return
+    }
+    let source = Locale.Language(identifier: localeIdentifier)
     translationPreparationToken = coordinator.live.beginTranslationPreparation()
     translationConfig = TranslationSession.Configuration(
       source: source, target: translation.targetLanguage)
@@ -577,12 +590,35 @@ struct SettingsView: View {
           )
         }
         Section("Распознавание") {
-          Picker("Язык распознавания", selection: $recognition.localeIdentifier) {
-            ForEach(recognition.availableLocales) { locale in
-              Text(locale.displayName).tag(locale.identifier)
+          switch recognition.localeAvailabilityState {
+          case .loading:
+            HStack {
+              ProgressView()
+              Text("Проверяю локальные языки распознавания…")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
             }
+            .accessibilityIdentifier("recognition-locale-loading")
+          case .available:
+            Picker("Язык распознавания", selection: $recognition.localeIdentifier) {
+              ForEach(recognition.availableLocales) { locale in
+                Text(locale.displayName).tag(Optional(locale.identifier))
+              }
+            }
+            .accessibilityIdentifier("recognition-locale-picker")
+          case .unavailable:
+            VStack(alignment: .leading, spacing: 6) {
+              Text("Нет доступных локальных языков распознавания.")
+                .font(.footnote)
+                .foregroundStyle(.orange)
+              Text(
+                "Проверьте языки диктовки в Настройках iPhone. Dspeech не подставляет облачное распознавание вместо локального режима."
+              )
+              .font(.footnote)
+              .foregroundStyle(.secondary)
+            }
+            .accessibilityIdentifier("recognition-locale-unavailable")
           }
-          .accessibilityIdentifier("recognition-locale-picker")
           if recognition.selectedNeedsDownload {
             VStack(alignment: .leading, spacing: 6) {
               Text(

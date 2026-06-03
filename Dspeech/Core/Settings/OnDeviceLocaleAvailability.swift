@@ -13,6 +13,21 @@ protocol OnDeviceLocaleAvailability: Sendable {
   func isDownloaded(_ locale: Locale) async -> Bool
 }
 
+enum OnDeviceLocaleResolver {
+  static func capableLocales(
+    recognizerSupported: Set<Locale>,
+    onDeviceSupported: Set<Locale>
+  ) -> Set<Locale> {
+    guard !onDeviceSupported.isEmpty else { return [] }
+    let onDeviceKeys = Set(onDeviceSupported.map { $0.identifier(.bcp47) })
+    let capable = recognizerSupported.filter { onDeviceKeys.contains($0.identifier(.bcp47)) }
+    if !capable.isEmpty { return capable }
+    // why: intersection empty can be a BCP-47/script decoration mismatch. The
+    // SpeechTranscriber list is still the authoritative on-device-capable set.
+    return onDeviceSupported
+  }
+}
+
 struct SystemOnDeviceLocaleAvailability: OnDeviceLocaleAvailability {
   func capableLocales() async -> Set<Locale> {
     let recognizerSupported = SFSpeechRecognizer.supportedLocales()
@@ -21,14 +36,9 @@ struct SystemOnDeviceLocaleAvailability: OnDeviceLocaleAvailability {
     // (SFSpeechRecognizer) can actually use. Compare by BCP-47 — SpeechTranscriber locales
     // may carry different region/script decoration than the recognizer's.
     let onDevice = await SpeechTranscriber.supportedLocales
-    let onDeviceKeys = Set(onDevice.map { $0.identifier(.bcp47) })
-    let capable = recognizerSupported.filter { onDeviceKeys.contains($0.identifier(.bcp47)) }
-    if !capable.isEmpty { return capable }
-    // why: intersection empty (a BCP-47/decoration mismatch, or a data hiccup) — fall back to
-    // the on-device list itself, which is STILL on-device-capable. Never fall back to the full
-    // recognizer set: that would re-introduce the server-only languages the user asked to
-    // hide. Only when the device reports no on-device support at all do we surface that set.
-    return onDevice.isEmpty ? recognizerSupported : Set(onDevice)
+    return OnDeviceLocaleResolver.capableLocales(
+      recognizerSupported: recognizerSupported,
+      onDeviceSupported: Set(onDevice))
   }
 
   func isDownloaded(_ locale: Locale) async -> Bool {

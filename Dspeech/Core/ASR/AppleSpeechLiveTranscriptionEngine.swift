@@ -8,7 +8,7 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     didSet { emit(.status(status)) }
   }
 
-  private let localeProvider: @MainActor () -> String
+  private let localeProvider: @MainActor () -> String?
   private var activeLocaleIdentifier = "en-US"
   private let bufferGate: (any SpeechAudioBufferGate)?
   private var recognizer: SFSpeechRecognizer?
@@ -58,7 +58,7 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
   nonisolated static var liveRequestsRequireOnDeviceRecognition: Bool { true }
 
   init(
-    localeProvider: @escaping @MainActor () -> String = { "en-US" },
+    localeProvider: @escaping @MainActor () -> String? = { "en-US" },
     bufferGate: (any SpeechAudioBufferGate)? = nil,
     requireOnDeviceModel: Bool = true,
     skipPermissionRequests: Bool = false,
@@ -105,7 +105,10 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
       }
     }
 
-    let localeID = localeProvider()
+    guard let localeID = localeProvider() else {
+      status = .failed("recognition-locale-unavailable")
+      return
+    }
     activeLocaleIdentifier = localeID
     let locale = Locale(identifier: localeID)
     // why: under the skip-permission test seam, tolerate a nil/unavailable recognizer so

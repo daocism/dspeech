@@ -13,6 +13,12 @@ struct RecognitionLocale: Identifiable, Equatable, Sendable {
   var id: String { identifier }
 }
 
+enum RecognitionLocaleAvailabilityState: Equatable, Sendable {
+  case loading
+  case available
+  case unavailable
+}
+
 protocol RecognitionSettingsStorage: Sendable {
   func loadLocaleIdentifier() -> String?
   func saveLocaleIdentifier(_ identifier: String)
@@ -39,8 +45,6 @@ struct UserDefaultsRecognitionSettingsStorage: RecognitionSettingsStorage, @unch
 // Pure, dependency-injected locale logic so it is testable without the device's
 // installed SFSpeech locales: production passes SFSpeechRecognizer.supportedLocales().
 enum RecognitionLocaleCatalog {
-  static let fallbackIdentifier = "en-US"
-
   static func sortedLocales(
     supported: Set<Locale>,
     displayLocale: Locale = .current
@@ -62,7 +66,7 @@ enum RecognitionLocaleCatalog {
     stored: String?,
     supported: Set<Locale>,
     preferredLanguages: [String]
-  ) -> String {
+  ) -> String? {
     let identifiers = Set(supported.map(\.identifier))
     if let stored, identifiers.contains(stored) { return stored }
     return defaultIdentifier(supported: supported, preferredLanguages: preferredLanguages)
@@ -71,7 +75,7 @@ enum RecognitionLocaleCatalog {
   static func defaultIdentifier(
     supported: Set<Locale>,
     preferredLanguages: [String]
-  ) -> String {
+  ) -> String? {
     // why: the default recognition language ALWAYS follows the device language when Apple
     // Speech supports it (English is only a last resort when the device language is fully
     // unsupported). Sort for deterministic region selection. Compare via canonical Locale
@@ -105,7 +109,7 @@ enum RecognitionLocaleCatalog {
     }) {
       return english
     }
-    return identifiers.first ?? fallbackIdentifier
+    return identifiers.first
   }
 }
 
@@ -119,6 +123,7 @@ final class RecognitionSettings {
   // why: starts as the recognizer's full supported set (sync, so the picker is never empty at
   // launch) and is narrowed to the on-device-CAPABLE set by refreshCapableLocales().
   private(set) var availableLocales: [RecognitionLocale]
+  private(set) var localeAvailabilityState: RecognitionLocaleAvailabilityState
   // why: drives the "Download <language>" affordance — true when the selected locale is
   // capable on-device but its model isn't downloaded yet. Updated async (model state is I/O).
   private(set) var selectedNeedsDownload = false
@@ -127,15 +132,22 @@ final class RecognitionSettings {
   // current generation; only the latest one is allowed to commit (kills the race).
   @ObservationIgnored private var downloadStateGeneration = 0
 
-  var localeIdentifier: String {
+  var localeIdentifier: String? {
     didSet {
       guard localeIdentifier != oldValue else { return }
-      storage.saveLocaleIdentifier(localeIdentifier)
+      if let localeIdentifier {
+        storage.saveLocaleIdentifier(localeIdentifier)
+      } else {
+        selectedNeedsDownload = false
+      }
     }
   }
 
   var selectedDisplayName: String {
-    availableLocales.first { $0.identifier == localeIdentifier }?.displayName
+    guard let localeIdentifier else {
+      return String(localized: "Нет доступного языка распознавания")
+    }
+    return availableLocales.first { $0.identifier == localeIdentifier }?.displayName
       ?? displayLocale.localizedString(forIdentifier: localeIdentifier) ?? localeIdentifier
   }
 
@@ -154,6 +166,7 @@ final class RecognitionSettings {
       supported: supportedLocales,
       displayLocale: displayLocale
     )
+    self.localeAvailabilityState = .loading
     self.localeIdentifier = RecognitionLocaleCatalog.resolve(
       stored: storage.loadLocaleIdentifier(),
       supported: supportedLocales,
@@ -161,27 +174,41 @@ final class RecognitionSettings {
     )
   }
 
+  var activeLocaleIdentifier: String? {
+    localeAvailabilityState == .available ? localeIdentifier : nil
+  }
+
   // why: narrow the picker to languages Apple can actually recognize on-device, and keep the
   // current selection valid against that narrowed set. Call from the Settings view.
   func refreshCapableLocales() async {
+    localeAvailabilityState = .loading
     let capable = await availability.capableLocales()
     availableLocales = RecognitionLocaleCatalog.sortedLocales(
       supported: capable, displayLocale: displayLocale)
-    let resolved = RecognitionLocaleCatalog.resolve(
-      stored: localeIdentifier, supported: capable, preferredLanguages: preferredLanguages)
-    if resolved != localeIdentifier {
-      // why: changing the selection drives the view's .onChange → refreshSelectedDownloadState();
-      // don't also poll here or the same device check runs twice.
-      localeIdentifier = resolved
-    } else {
-      // selection unchanged → .onChange won't fire, so check the download state once here.
-      await refreshSelectedDownloadState()
+    guard !capable.isEmpty else {
+      localeIdentifier = nil
+      selectedNeedsDownload = false
+      localeAvailabilityState = .unavailable
+      return
     }
+    let resolved = RecognitionLocaleCatalog.resolve(
+      stored: localeIdentifier ?? storage.loadLocaleIdentifier(),
+      supported: capable,
+      preferredLanguages: preferredLanguages)
+    localeAvailabilityState = .available
+    if resolved != localeIdentifier {
+      localeIdentifier = resolved
+    }
+    await refreshSelectedDownloadState()
   }
 
   func refreshSelectedDownloadState() async {
     downloadStateGeneration += 1
     let generation = downloadStateGeneration
+    guard let localeIdentifier else {
+      selectedNeedsDownload = false
+      return
+    }
     let downloaded = await availability.isDownloaded(Locale(identifier: localeIdentifier))
     // why: a newer check superseded this one (fast picker change) — drop the stale result so
     // selectedNeedsDownload always reflects the CURRENT selection, not whichever async check

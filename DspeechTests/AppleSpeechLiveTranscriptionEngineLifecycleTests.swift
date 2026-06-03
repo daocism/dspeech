@@ -63,6 +63,18 @@ struct AppleSpeechLiveTranscriptionEngineLifecycleTests {
     #expect(engine.status == .stopped)
   }
 
+  @Test func startFailsVisiblyWhenRecognitionLocaleIsUnavailable() async {
+    let engine = AppleSpeechLiveTranscriptionEngine(
+      localeProvider: { nil },
+      requireOnDeviceModel: false,
+      authorizer: ImmediateLiveSpeechAuthorizer()
+    )
+
+    await engine.start()
+
+    #expect(engine.status == .failed("recognition-locale-unavailable"))
+  }
+
   @discardableResult
   private func wait(
     for predicate: @MainActor () -> Bool,
@@ -76,6 +88,12 @@ struct AppleSpeechLiveTranscriptionEngineLifecycleTests {
     }
     return predicate()
   }
+}
+
+@MainActor
+private struct ImmediateLiveSpeechAuthorizer: LiveSpeechAuthorizing {
+  func requestSpeechAuthorization() async -> Bool { true }
+  func requestMicrophonePermission() async -> Bool { true }
 }
 
 @MainActor

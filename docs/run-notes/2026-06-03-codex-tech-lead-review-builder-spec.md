@@ -2,7 +2,7 @@
 
 Mode: tech-lead review plus scoped Codex implementation passes. This file now tracks both the original findings and the fixes already landed by Codex.
 Reviewer: Codex.
-Repository state: `fix/review-hardening-2026-06-03`; this note records Codex fixes through the local-only ASR policy pass.
+Repository state: `fix/review-hardening-2026-06-03`; this note records Codex fixes through the recognition-locale availability pass.
 
 ## Verification evidence
 
@@ -73,6 +73,9 @@ Scope completed in this pass:
 - `AppleSpeechLiveTranscriptionEngine` now requires on-device recognition for live requests on every platform. The main Simulator app path surfaces missing on-device Speech support as a visible failure instead of using server Speech while the UI still says `LOCAL`.
 - `DspeechTests/OnDeviceSpeechRecognitionTests.swift` now separates Simulator policy/tap-lifecycle checks from physical-device transcript proof. The device-only synthesized Speech test requires a non-empty transcript, and tap/crash repro tests assert concrete events or terminal states instead of accepting `Bool(true)`.
 - `SimulatorSpeechProbe` remains the explicit debug/probe lane that may try server Speech fallback. Its JSON now records per-result `requiresOnDeviceRecognition` / `usedServerFallback` plus envelope-level `firstAttemptRequiresOnDeviceRecognition` / `allowsServerFallback`, so probe output cannot be confused with the main local-only app contract.
+- `RecognitionSettings` now has an explicit loading/available/unavailable state for on-device-capable recognition locales. The selected locale is optional, the live engine and translation config only consume `activeLocaleIdentifier` after on-device availability is loaded, and an empty capable set clears active selection instead of inventing `en-US`.
+- `SystemOnDeviceLocaleAvailability` now resolves empty `SpeechTranscriber.supportedLocales` to an empty local-capable set, not to all `SFSpeechRecognizer.supportedLocales`; BCP-47 intersection mismatch still falls back to the on-device-capable set itself.
+- Settings now renders `recognition-locale-unavailable` instead of an empty picker when no local recognition language is available, with a Debug-only UI-test launch seam for that availability state.
 
 Verification for this pass:
 - XcodeBuildMCP `test_sim` still failed before build because `xcrun` could not find `simctl` under the active CommandLineTools developer directory.
@@ -249,6 +252,28 @@ Verification for this pass:
   - result: `** TEST SUCCEEDED **`
   - xcresult: `/Users/andre/Library/Developer/Xcode/DerivedData/Dspeech-agmpzhijbukadidbkcyaauytxvwx/Logs/Test/Run-Dspeech-2026.06.03_14-53-21-+0200.xcresult`
   - UI suite ran 13 tests with 0 failures; `testStartTransitionsToListeningOrVisibleFailure` passed by observing the visible `error-banner` path while the `LOCAL` privacy badge remained visible.
+- Focused recognition-locale availability suite passed after the F31 patch:
+  - command: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project Dspeech.xcodeproj -scheme Dspeech -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4' CODE_SIGNING_ALLOWED=NO -only-testing:DspeechTests/RecognitionSettingsTests -only-testing:DspeechTests/AppleSpeechLiveTranscriptionEngineLifecycleTests -only-testing:DspeechTests/RecognitionFailureTextTests build test`
+  - result: `** TEST SUCCEEDED **`
+  - xcresult: `/Users/andre/Library/Developer/Xcode/DerivedData/Dspeech-agmpzhijbukadidbkcyaauytxvwx/Logs/Test/Run-Dspeech-2026.06.03_15-07-21-+0200.xcresult`
+- Targeted UI empty-state test passed after the F31 patch:
+  - command: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project Dspeech.xcodeproj -scheme Dspeech -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4' CODE_SIGNING_ALLOWED=NO -only-testing:DspeechUITests/DspeechUITests/testSettingsShowsNoOnDeviceRecognitionLocaleState build test`
+  - result: `** TEST SUCCEEDED **`
+  - xcresult: `/Users/andre/Library/Developer/Xcode/DerivedData/Dspeech-agmpzhijbukadidbkcyaauytxvwx/Logs/Test/Run-Dspeech-2026.06.03_15-08-04-+0200.xcresult`
+- Unit-only suite passed after the F31 patch:
+  - command: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project Dspeech.xcodeproj -scheme Dspeech -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4' CODE_SIGNING_ALLOWED=NO -only-testing:DspeechTests build test`
+  - result: `** TEST SUCCEEDED **`
+  - xcresult: `/Users/andre/Library/Developer/Xcode/DerivedData/Dspeech-agmpzhijbukadidbkcyaauytxvwx/Logs/Test/Run-Dspeech-2026.06.03_15-08-57-+0200.xcresult`
+- Full simulator build and test passed after the F31 patch:
+  - command: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project Dspeech.xcodeproj -scheme Dspeech -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4' CODE_SIGNING_ALLOWED=NO build test`
+  - result: `** TEST SUCCEEDED **`
+  - xcresult: `/Users/andre/Library/Developer/Xcode/DerivedData/Dspeech-agmpzhijbukadidbkcyaauytxvwx/Logs/Test/Run-Dspeech-2026.06.03_15-10-22-+0200.xcresult`
+  - UI suite ran 14 tests with 0 failures; the new empty-recognition-locale state test passed inside the full gate.
+- Final hygiene was repeated after the F31/spec update:
+  - `swift format lint --strict --recursive Dspeech DspeechTests DspeechUITests` passed.
+  - `git diff --check` passed.
+  - banned-marker grep over app/tests/docs/scripts returned empty.
+  - source-only stale implementation text grep over `Dspeech DspeechTests DspeechUITests` returned empty for old RED/missing-seam phrases.
 
 Findings status after this pass:
 - `F1`, `F2`, and `F12` are addressed for callsign dictation by code plus tests above.
@@ -261,6 +286,7 @@ Findings status after this pass:
 - `F21` is addressed for AirPlay route health by treating AirPlay as output-only until real capture-route evidence exists, blocking Start for output-only routes, and covering the conservative behavior with tests.
 - `F14` is addressed for test honesty by making the physical-device ASR happy path require a transcript, keeping the Simulator skip explicit, and replacing crash-only `Bool(true)` assertions with event/terminal-state assertions.
 - `F27` is addressed for the main app path by removing Simulator server Speech fallback from live ASR requests, keeping fallback only in explicit probe artifacts, and proving Simulator Start reaches a visible failure instead of silent server-backed `LOCAL`.
+- `F31` is addressed for empty on-device locale availability by making unavailable/loading explicit, clearing active recognition locale instead of fake-selecting `en-US`, blocking live ASR/translation from consuming unverified locale state, and covering empty/recovery/UI paths with tests.
 - `F9` and `F28` are addressed for the main Start lifecycle/UI contract by code plus tests above.
 - `F10` is addressed for the product contract: delete now removes local model files before clearing state, and delete failure is visible.
 - `F29` is addressed by removing stale implementation-phase comments from current green test seams.
@@ -835,7 +861,9 @@ Builder requirement:
 
 ### F31 MEDIUM: Empty on-device locale availability creates an invalid fallback selection
 
-Evidence:
+Status after Codex implementation pass: addressed. Recognition locale availability is now explicit (`loading`, `available`, `unavailable`), `activeLocaleIdentifier` is nil until a verified on-device capable set is loaded, Settings shows `recognition-locale-unavailable`, and unit/UI tests cover empty capable sets, empty on-device support, stored-value recovery, download-state recovery, and visible empty-state rendering.
+
+Pre-fix evidence:
 - `Dspeech/Core/Settings/OnDeviceLocaleAvailability.swift:17-31` can return an empty on-device-capable set only when Apple reports no on-device support at all; that is a real availability state, not a normal language list.
 - `Dspeech/Core/Settings/RecognitionSettings.swift:71-108` resolves an empty supported set to the hardcoded fallback identifier `en-US`.
 - `Dspeech/Core/Settings/RecognitionSettings.swift:166-179` can set `availableLocales = []` and `localeIdentifier = "en-US"` after `refreshCapableLocales()`.
