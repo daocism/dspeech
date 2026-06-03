@@ -58,6 +58,45 @@ struct AudioSourceControllerTests {
     #expect(routing.preferredInputCalls.contains("u-usb"))
   }
 
+  @Test func applyPersistedPreferenceSurfacesRejectedInputAndKeepsCurrentRoute() {
+    let storage = InMemoryStorage()
+    storage.uid = "u-usb"
+    storage.type = "USBAudio"
+    let routing = FakeAudioSessionRouting(
+      currentRoute: RouteSnapshot(inputs: [port(.builtInMic, "Mic", "u-mic")]),
+      availableInputs: [port(.builtInMic, "Mic", "u-mic"), port(.usbAudio, "USB", "u-usb")],
+      rejectedPreferredInputUIDs: ["u-usb"]
+    )
+    let controller = AudioSourceController(
+      routing: routing, settings: AudioSettings(storage: storage))
+
+    controller.applyPersistedPreference()
+
+    #expect(routing.preferredInputCalls == ["u-usb"])
+    #expect(controller.selectedUID == "u-mic")
+    #expect(controller.selectionError?.isEmpty == false)
+    #expect(storage.uid == "u-usb")
+  }
+
+  @Test func selectRejectedInputDoesNotPersistOrClaimSelection() {
+    let storage = InMemoryStorage()
+    let routing = FakeAudioSessionRouting(
+      currentRoute: RouteSnapshot(inputs: [port(.builtInMic, "Mic", "u-mic")]),
+      availableInputs: [port(.builtInMic, "Mic", "u-mic"), port(.usbAudio, "USB", "u-usb")],
+      rejectedPreferredInputUIDs: ["u-usb"]
+    )
+    let controller = AudioSourceController(
+      routing: routing, settings: AudioSettings(storage: storage))
+
+    controller.select(uid: "u-usb")
+
+    #expect(routing.preferredInputCalls == ["u-usb"])
+    #expect(controller.selectedUID == "u-mic")
+    #expect(controller.selectionError?.isEmpty == false)
+    #expect(storage.uid == nil)
+    #expect(storage.type == nil)
+  }
+
   @Test func selectIgnoresUnknownUID() {
     let routing = FakeAudioSessionRouting(availableInputs: [port(.builtInMic, "Mic", "u-mic")])
     let controller = AudioSourceController(
@@ -67,12 +106,17 @@ struct AudioSourceControllerTests {
   }
 
   final class FakeInputLevelMeter: InputLevelMetering, @unchecked Sendable {
-    let values: [Double]
+    let eventsToEmit: [InputLevelMeterEvent]
     private(set) var stopCount = 0
-    init(values: [Double]) { self.values = values }
-    func levels() -> AsyncStream<Double> {
+    init(_ events: [InputLevelMeterEvent]) {
+      self.eventsToEmit = events
+    }
+    convenience init(values: [Double]) {
+      self.init(values.map(InputLevelMeterEvent.level))
+    }
+    func events() -> AsyncStream<InputLevelMeterEvent> {
       AsyncStream { continuation in
-        for value in values { continuation.yield(value) }
+        for event in eventsToEmit { continuation.yield(event) }
         continuation.finish()
       }
     }
@@ -102,6 +146,20 @@ struct AudioSourceControllerTests {
     controller.startMetering()
     await waitUntil { controller.inputLevel == 0.9 }
     #expect(controller.inputLevel == 0.9)
+    #expect(controller.inputLevelError == nil)
+  }
+
+  @Test func startMeteringSurfacesFailureAndStopsMetering() async {
+    let meter = FakeInputLevelMeter([.failed("meter failed")])
+    let controller = makeController(meter: meter)
+
+    controller.startMetering()
+
+    await waitUntil { controller.inputLevelError == "meter failed" }
+    #expect(controller.inputLevel == 0)
+    #expect(controller.inputLevelError == "meter failed")
+    #expect(!controller.isMetering)
+    #expect(meter.stopCount >= 1)
   }
 
   @Test func stopMeteringStopsMeterAndResetsLevel() async {

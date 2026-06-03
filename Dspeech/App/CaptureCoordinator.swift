@@ -47,7 +47,7 @@ final class CaptureCoordinator {
   }
 
   func toggle() async {
-    if live.isListening {
+    if live.canStopCurrentSession {
       stop()
     } else {
       await start()
@@ -58,13 +58,13 @@ final class CaptureCoordinator {
   // capture covertly. Receive-only product, no UIBackgroundModes audio entitlement,
   // so this also matches what the OS would do on suspension, made explicit.
   func stopForBackground() {
-    guard live.isListening else { return }
+    guard live.canStopCurrentSession else { return }
     live.stop()
   }
 
   func handleRouteEvent(_ event: RouteChangeEvent) {
     routeMonitor.handle(event: event)
-    if routeMonitor.lastNotice?.kind == .lost, live.isListening {
+    if routeMonitor.lastNotice?.kind == .lost, live.canStopCurrentSession {
       live.stop()
     }
   }

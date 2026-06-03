@@ -18,36 +18,10 @@ import Testing
 // is flushed (fail open) in FIFO order and late classifier results are ignored
 // so no buffer is appended twice.
 //
-// These tests drive a seam that does not yet exist in production; they are RED
-// (compile failure: "cannot find type 'SpeechActivitySegmenter' in scope",
-// "cannot find 'SegmentationDecision'", "cannot find 'EnergySilenceSegmenter'",
-// and the changed `UtteranceWindowRouter` initializer) until the engineer lands
-// it. The seam is exercised through injected closures + a scripted segmenter
-// rather than a real `SFSpeechAudioBufferRecognitionRequest` or real audio:
+// The seam is exercised through injected closures + a scripted segmenter rather
+// than a real `SFSpeechAudioBufferRecognitionRequest` or real audio.
 //
-//   protocol SpeechActivitySegmenter: Sendable {
-//       func update(block: [Float], sampleRate: Double) -> SegmentationDecision
-//       func reset()
-//   }
-//
-//   enum SegmentationDecision: Equatable, Sendable {
-//       case accumulate          // not yet at an utterance edge — keep buffering
-//       case cutAfterSilence     // trailing silence closed an utterance — cut now
-//       case cutAtMaxWindow      // conservative cap hit — cut to bound latency/straddle
-//   }
-//
-//   @MainActor
-//   final class UtteranceWindowRouter<Buffer> {
-//       init(
-//           segmenter: SpeechActivitySegmenter,
-//           classify: @escaping @Sendable ([Float], Double) async throws -> PreTranscriptionRoutingDecision,
-//           append: @escaping (Buffer) -> Void
-//       )
-//       func submit(_ buffer: Buffer, samples: [Float], sampleRate: Double)
-//       func finish()
-//   }
-//
-// Contract the engineer must satisfy:
+// Contract:
 //   1. A window is classified only after the segmenter reports an utterance edge
 //      (`.cutAfterSilence`/`.cutAtMaxWindow`), never merely because some sample
 //      count was reached.

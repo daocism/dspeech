@@ -23,6 +23,7 @@ final class LiveTranscriptionViewModel {
   private var eventTask: Task<Void, Never>?
   private var translationTasks: [UUID: Task<Void, Never>] = [:]
   private var translationTaskTokens: [UUID: UUID] = [:]
+  private var startInFlight = false
   // why: a Stop-committed partial has no language of its own; reuse the last real segment's
   // language, defaulting to the device language (matches the device-language default policy).
   private var lastSourceLanguageCode = String(
@@ -57,12 +58,19 @@ final class LiveTranscriptionViewModel {
     status == .listening
   }
 
+  var canStopCurrentSession: Bool {
+    startInFlight || status == .requestingPermission || status == .listening
+  }
+
   var lastErrorMessage: String? {
     if case .failed(let message) = status { return message }
     return nil
   }
 
   func start() async {
+    guard !canStopCurrentSession else { return }
+    startInFlight = true
+    defer { startInFlight = false }
     hasEverStarted = true
     if eventTask == nil {
       startObservingEvents()
@@ -71,6 +79,7 @@ final class LiveTranscriptionViewModel {
   }
 
   func stop() {
+    startInFlight = false
     // why: pressing Stop must NOT discard what the user was watching. If a partial line is
     // still on screen (the recognizer hasn't finalized it), commit it as a segment so the
     // transcript persists instead of vanishing on teardown.

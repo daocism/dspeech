@@ -102,6 +102,27 @@ struct SpeakerModelPackInstaller: Sendable {
     }
   }
 
+  func uninstall(_ pack: InstalledModelPack) throws {
+    try Self.uninstall(pack)
+  }
+
+  static func uninstall(
+    _ pack: InstalledModelPack,
+    fileManager: FileManager = .default
+  ) throws {
+    if let localModelPath = pack.localModelPath, !localModelPath.isEmpty {
+      let modelDir = URL(fileURLWithPath: localModelPath, isDirectory: true)
+      if fileManager.fileExists(atPath: modelDir.path) {
+        try removeModelDirectory(modelDir, fileManager: fileManager)
+      }
+      return
+    }
+
+    if let modelDir = Self.locateModelDirectory(fileManager: fileManager) {
+      try removeModelDirectory(modelDir, fileManager: fileManager)
+    }
+  }
+
   static func installedPackAfterVerification() throws -> InstalledModelPack {
     guard let modelDir = Self.locateModelDirectory() else {
       throw ModelPackInstallError.filesMissingAfterDownload

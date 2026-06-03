@@ -282,8 +282,8 @@ struct ContentView: View {
         HintBubble(text: "Нажмите, чтобы начать распознавание")
       }
       StartButton(
-        isListening: liveViewModel.isListening,
-        disabled: !liveViewModel.isListening && !coordinator.canStart
+        isStopVisible: liveViewModel.canStopCurrentSession,
+        disabled: !liveViewModel.canStopCurrentSession && !coordinator.canStart
       ) {
         Task { await toggleListening() }
       }
@@ -546,6 +546,12 @@ struct SettingsView: View {
               InputLevelBar(level: audioSource.inputLevel).frame(height: 8)
             }
             .accessibilityIdentifier("audio-input-level")
+          }
+          if let inputLevelError = audioSource.inputLevelError {
+            Text(inputLevelError)
+              .font(.footnote)
+              .foregroundStyle(.orange)
+              .accessibilityIdentifier("audio-meter-error")
           }
         } header: {
           Text("Источник звука")
@@ -814,6 +820,18 @@ struct VoiceFilterSettingsSection: View {
     transition(to: .absent)
   }
 
+  private func deleteModelPack(_ pack: InstalledModelPack) async {
+    do {
+      let installer = installer
+      try await Task.detached {
+        try installer.uninstall(pack)
+      }.value
+      transition(to: .absent)
+    } catch {
+      transition(to: .failed(modelPackDeleteFailure(for: error)))
+    }
+  }
+
   private func enrollSubtitle(for slot: PilotVoiceProfile.Slot) -> String {
     if recordingSlot == slot {
       return "Идёт запись — говорите несколько секунд, затем «Остановить»."
@@ -969,7 +987,7 @@ struct VoiceFilterSettingsSection: View {
       }
 
       Button("Удалить пакет") {
-        transition(to: .absent)
+        Task { await deleteModelPack(pack) }
       }
       .buttonStyle(.bordered)
       .tint(.red)
@@ -982,7 +1000,7 @@ struct VoiceFilterSettingsSection: View {
 
   private func failedContent(_ failure: ModelPackFailure) -> some View {
     VStack(alignment: .leading, spacing: 8) {
-      Label("Не удалось установить модель", systemImage: "xmark.octagon.fill")
+      Label(modelPackFailureTitle(failure), systemImage: "xmark.octagon.fill")
         .font(.subheadline.weight(.semibold))
         .foregroundStyle(.red)
       Text(failure.userSafeReason)
@@ -1022,7 +1040,7 @@ struct VoiceFilterSettingsSection: View {
       .buttonStyle(.bordered)
       .accessibilityIdentifier("voicefilter-modelpack-enable")
       Button("Удалить пакет (\(byteString(pack.sizeBytes)))") {
-        transition(to: .absent)
+        Task { await deleteModelPack(pack) }
       }
       .buttonStyle(.bordered)
       .tint(.red)
@@ -1045,6 +1063,10 @@ struct VoiceFilterSettingsSection: View {
       return "Установка модели…"
     }
   }
+
+  private func modelPackFailureTitle(_ failure: ModelPackFailure) -> String {
+    failure.kind == .disk ? "Не удалось удалить модель" : "Не удалось установить модель"
+  }
 }
 
 func modelPackDownloadFailure(for error: Error) -> ModelPackFailure {
@@ -1065,6 +1087,15 @@ func modelPackDownloadFailure(for error: Error) -> ModelPackFailure {
   )
 }
 
+func modelPackDeleteFailure(for error: Error) -> ModelPackFailure {
+  ModelPackFailure(
+    kind: .disk,
+    userSafeReason:
+      "Не удалось удалить пакет модели с устройства. Проверьте доступ к хранилищу и попробуйте позже.",
+    isRetryable: false
+  )
+}
+
 extension Bundle {
   fileprivate var shortVersion: String {
     (infoDictionary?["CFBundleShortVersionString"] as? String) ?? "—"
@@ -1072,7 +1103,7 @@ extension Bundle {
 }
 
 private struct StartButton: View {
-  let isListening: Bool
+  let isStopVisible: Bool
   let disabled: Bool
   let action: () -> Void
   @State private var glowAngle = 0.0
@@ -1081,8 +1112,8 @@ private struct StartButton: View {
     Button(action: action) {
       ZStack {
         Circle()
-          .fill(isListening ? Color.red.opacity(0.85) : Color.gray.opacity(0.55))
-        if !isListening {
+          .fill(isStopVisible ? Color.red.opacity(0.85) : Color.gray.opacity(0.55))
+        if !isStopVisible {
           // why: a glow that travels around the rim (rotating angular gradient) plus a
           // cyan dashed border, to pull attention to the idle Start control.
           Circle()
@@ -1097,7 +1128,7 @@ private struct StartButton: View {
           Circle()
             .strokeBorder(Color.cyan, style: StrokeStyle(lineWidth: 2.5, dash: [5, 4]))
         }
-        Image(systemName: isListening ? "stop.fill" : "mic.fill")
+        Image(systemName: isStopVisible ? "stop.fill" : "mic.fill")
           .font(.system(size: 26, weight: .bold))
           .foregroundStyle(.white)
       }
@@ -1106,8 +1137,8 @@ private struct StartButton: View {
     }
     .buttonStyle(.plain)
     .disabled(disabled)
-    .accessibilityIdentifier(isListening ? "stop-button" : "start-button")
-    .accessibilityLabel(isListening ? "Стоп" : "Старт")
+    .accessibilityIdentifier(isStopVisible ? "stop-button" : "start-button")
+    .accessibilityLabel(isStopVisible ? "Стоп" : "Старт")
     .onAppear {
       withAnimation(.linear(duration: 2.4).repeatForever(autoreverses: false)) {
         glowAngle = 360

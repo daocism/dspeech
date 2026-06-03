@@ -8,11 +8,16 @@ protocol AudioSessionRouting: Sendable {
   func setPreferredInput(uid: String) throws
 }
 
+enum FakeAudioSessionRoutingError: Error, Equatable {
+  case rejectedPreferredInput(String)
+}
+
 final class FakeAudioSessionRouting: AudioSessionRouting, @unchecked Sendable {
   private let lock = NSLock()
   private var _currentRoute: RouteSnapshot
   private var _availableInputs: [PortSnapshot]
   private let _permissionGranted: Bool
+  private let _rejectedPreferredInputUIDs: Set<String>
   private var _preferredInputUIDs: [String] = []
   private var continuation: AsyncStream<RouteChangeEvent>.Continuation?
   let routeChanges: AsyncStream<RouteChangeEvent>
@@ -20,11 +25,13 @@ final class FakeAudioSessionRouting: AudioSessionRouting, @unchecked Sendable {
   init(
     currentRoute: RouteSnapshot = RouteSnapshot(),
     availableInputs: [PortSnapshot] = [],
-    permissionGranted: Bool = true
+    permissionGranted: Bool = true,
+    rejectedPreferredInputUIDs: Set<String> = []
   ) {
     self._currentRoute = currentRoute
     self._availableInputs = availableInputs
     self._permissionGranted = permissionGranted
+    self._rejectedPreferredInputUIDs = rejectedPreferredInputUIDs
     var localContinuation: AsyncStream<RouteChangeEvent>.Continuation!
     self.routeChanges = AsyncStream<RouteChangeEvent>(
       bufferingPolicy: .unbounded
@@ -54,6 +61,9 @@ final class FakeAudioSessionRouting: AudioSessionRouting, @unchecked Sendable {
     lock.lock()
     defer { lock.unlock() }
     _preferredInputUIDs.append(uid)
+    if _rejectedPreferredInputUIDs.contains(uid) {
+      throw FakeAudioSessionRoutingError.rejectedPreferredInput(uid)
+    }
   }
 
   func updateRoute(
