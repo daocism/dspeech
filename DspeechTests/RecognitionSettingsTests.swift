@@ -101,6 +101,49 @@ struct RecognitionSettingsTests {
       storage: storage, supportedLocales: supported, preferredLanguages: ["de-DE"])
     #expect(settings.localeIdentifier == deDE)
   }
+
+  // The picker must show ONLY on-device-capable languages after refresh.
+  @MainActor @Test func refreshNarrowsAvailableLocalesToCapable() async {
+    let settings = RecognitionSettings(
+      storage: InMemoryRecognitionSettingsStorage(), supportedLocales: supported,
+      preferredLanguages: ["en-US"],
+      availability: FakeAvailability(
+        capable: [Locale(identifier: "en-US"), Locale(identifier: "fr-FR")], downloaded: [enUS]))
+    await settings.refreshCapableLocales()
+    #expect(Set(settings.availableLocales.map(\.identifier)) == [enUS, frFR])
+  }
+
+  // A previously-selected language that is no longer capable is re-resolved to a capable one.
+  @MainActor @Test func refreshReResolvesSelectionWhenNoLongerCapable() async {
+    let storage = InMemoryRecognitionSettingsStorage()
+    storage.stored = deDE
+    let settings = RecognitionSettings(
+      storage: storage, supportedLocales: supported, preferredLanguages: ["de-DE", "en-US"],
+      availability: FakeAvailability(capable: [Locale(identifier: "en-US")], downloaded: [enUS]))
+    #expect(settings.localeIdentifier == deDE)
+    await settings.refreshCapableLocales()
+    #expect(settings.localeIdentifier == enUS)
+  }
+
+  // selectedNeedsDownload reflects the model's installed state for the chosen language.
+  @MainActor @Test func selectedNeedsDownloadWhenModelMissing() async {
+    let settings = RecognitionSettings(
+      storage: InMemoryRecognitionSettingsStorage(), supportedLocales: supported,
+      preferredLanguages: ["fr-FR"],
+      availability: FakeAvailability(capable: [Locale(identifier: "fr-FR")], downloaded: []))
+    await settings.refreshCapableLocales()
+    #expect(settings.localeIdentifier == frFR)
+    #expect(settings.selectedNeedsDownload)
+  }
+
+  @MainActor @Test func selectedDoesNotNeedDownloadWhenModelInstalled() async {
+    let settings = RecognitionSettings(
+      storage: InMemoryRecognitionSettingsStorage(), supportedLocales: supported,
+      preferredLanguages: ["fr-FR"],
+      availability: FakeAvailability(capable: [Locale(identifier: "fr-FR")], downloaded: [frFR]))
+    await settings.refreshSelectedDownloadState()
+    #expect(settings.selectedNeedsDownload == false)
+  }
 }
 
 private final class InMemoryRecognitionSettingsStorage: RecognitionSettingsStorage,
@@ -109,4 +152,11 @@ private final class InMemoryRecognitionSettingsStorage: RecognitionSettingsStora
   var stored: String?
   func loadLocaleIdentifier() -> String? { stored }
   func saveLocaleIdentifier(_ identifier: String) { stored = identifier }
+}
+
+private struct FakeAvailability: OnDeviceLocaleAvailability {
+  let capable: Set<Locale>
+  let downloaded: Set<String>
+  func capableLocales() async -> Set<Locale> { capable }
+  func isDownloaded(_ locale: Locale) async -> Bool { downloaded.contains(locale.identifier) }
 }

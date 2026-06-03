@@ -1,5 +1,6 @@
 import SwiftUI
 import Translation
+import UIKit
 
 struct ContentView: View {
   @State private var coordinator: CaptureCoordinator
@@ -560,6 +561,29 @@ struct SettingsView: View {
             }
           }
           .accessibilityIdentifier("recognition-locale-picker")
+          if recognition.selectedNeedsDownload {
+            VStack(alignment: .leading, spacing: 6) {
+              Text(
+                "Язык «\(recognition.selectedDisplayName)» ещё не загружен для распознавания на устройстве."
+              )
+              .font(.footnote)
+              .foregroundStyle(.orange)
+              .accessibilityIdentifier("recognition-download-hint")
+              Button {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                  UIApplication.shared.open(url)
+                }
+              } label: {
+                Label("Открыть Настройки iPhone", systemImage: "gearshape")
+              }
+              .accessibilityIdentifier("recognition-download-language")
+              Text(
+                "Затем: Основные → Клавиатура → «Языки диктовки» — включите диктовку и добавьте этот язык. Модель скачается, и распознавание заработает офлайн."
+              )
+              .font(.footnote)
+              .foregroundStyle(.secondary)
+            }
+          }
           LabeledContent("Модель ASR", value: "Apple Speech")
           LabeledContent("Режим", value: privacy.mode.displayName)
         }
@@ -612,6 +636,10 @@ struct SettingsView: View {
         }
       }
       .onAppear { audioSource.refresh() }
+      .task { await recognition.refreshCapableLocales() }
+      .onChange(of: recognition.localeIdentifier) {
+        Task { await recognition.refreshSelectedDownloadState() }
+      }
       .onDisappear { audioSource.stopMetering() }
       .navigationTitle("Настройки")
       .navigationBarTitleDisplayMode(.inline)
