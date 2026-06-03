@@ -72,8 +72,8 @@ struct OnboardingView: View {
             .font(.headline)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
-            .background(Capsule().fill(Color.cyan.opacity(0.85)))
-            .foregroundStyle(.white)
+            .background(Capsule().fill(Color.cyan))
+            .foregroundStyle(.black)
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier(isLastCard ? "onboarding-done-button" : "onboarding-next-button")
@@ -104,8 +104,9 @@ struct OnboardingView: View {
         .multilineTextAlignment(.center)
       Text(card.message)
         .font(.body.weight(.medium))
-        .foregroundStyle(.white.opacity(0.9))
+        .foregroundStyle(.white)
         .multilineTextAlignment(.center)
+        .fixedSize(horizontal: false, vertical: true)
         .padding(.horizontal, 32)
       Spacer()
     }
