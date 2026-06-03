@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import Translation
 
 @testable import Dspeech
 
@@ -95,5 +96,32 @@ struct TranslationServiceTests {
     } catch {
       #expect(error == .languagePairingUnsupported(source: en, target: ru))
     }
+  }
+
+  @Test func preparationNotInstalledMapsToLanguagePackFailure() {
+    let failure = TranslationFailure.preparation(
+      TranslationError.notInstalled, source: en, target: ru)
+    #expect(failure == .languagePackNotInstalled(source: en, target: ru))
+  }
+
+  @Test func preparationUnsupportedPairMapsToPairFailure() {
+    let failure = TranslationFailure.preparation(
+      TranslationError.unsupportedLanguagePairing, source: en, target: ru)
+    #expect(failure == .languagePairingUnsupported(source: en, target: ru))
+  }
+
+  @Test func preparationCancellationMapsToCancelled() {
+    let failure = TranslationFailure.preparation(CancellationError(), source: en, target: ru)
+    #expect(failure == .preparationCancelled)
+  }
+
+  @Test func preparationUnknownErrorMapsToPreparationFailure() {
+    let error = NSError(domain: "TranslationBackend", code: 42)
+    let failure = TranslationFailure.preparation(error, source: en, target: ru)
+    guard case .preparationFailed(let message) = failure else {
+      Issue.record("expected preparationFailed")
+      return
+    }
+    #expect(message.contains("TranslationBackend"))
   }
 }

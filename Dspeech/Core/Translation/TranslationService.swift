@@ -87,3 +87,28 @@ struct LocalTranslationService: TranslationService {
     return try await backend.translate(trimmed, from: source, into: target)
   }
 }
+
+extension TranslationFailure {
+  static func preparation(
+    _ error: any Error,
+    source: Locale.Language,
+    target: Locale.Language
+  ) -> TranslationFailure {
+    switch error {
+    case TranslationError.notInstalled:
+      return .languagePackNotInstalled(source: source, target: target)
+    case TranslationError.unsupportedSourceLanguage:
+      return .sourceLanguageUnsupported(source)
+    case TranslationError.unsupportedTargetLanguage:
+      return .targetLanguageUnsupported(target)
+    case TranslationError.unsupportedLanguagePairing:
+      return .languagePairingUnsupported(source: source, target: target)
+    case TranslationError.alreadyCancelled:
+      return .preparationCancelled
+    case is CancellationError:
+      return .preparationCancelled
+    default:
+      return .preparationFailed(String(describing: error))
+    }
+  }
+}

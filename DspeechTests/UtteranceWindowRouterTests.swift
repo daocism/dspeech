@@ -630,13 +630,8 @@ private func silentBlock(seconds: Double, sampleRate: Double) -> [Float] {
 // Behavior contract for the default `EnergySilenceSegmenter` — the pure,
 // deterministic RMS silence-gap detector the router uses in production. These
 // tests pin only formula-agnostic properties (loud > threshold > silent, and the
-// injected timing knobs), never an exact energy constant, so the engineer is
-// free to tune the noise floor. RED until `EnergySilenceSegmenter` exists.
-//
-// Pinned API:
-//   final class EnergySilenceSegmenter: SpeechActivitySegmenter {
-//       init(minSpeechSeconds: Double, minSilenceSeconds: Double, maxWindowSeconds: Double)
-//   }
+// injected timing knobs), never an exact energy constant, so the noise floor can
+// be tuned without rewriting the behavior contract.
 @MainActor
 struct EnergySilenceSegmenterTests {
   private static let sampleRate = 16_000.0
