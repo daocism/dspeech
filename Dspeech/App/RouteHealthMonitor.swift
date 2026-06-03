@@ -162,11 +162,11 @@ final class RouteHealthMonitor {
 extension RouteHealth {
   var displayLabel: String {
     switch self {
-    case .suitableExternal: return "Внешний вход"
-    case .cautionBuiltIn: return "Микрофон iPhone"
-    case .unsuitableOutputOnly: return "Только вывод — нет входа"
-    case .unknownExternal: return "Неизвестный вход"
-    case .noInput: return "Нет входа"
+    case .suitableExternal: return String(localized: "External input")
+    case .cautionBuiltIn: return String(localized: "iPhone microphone")
+    case .unsuitableOutputOnly: return String(localized: "Output only — no input")
+    case .unknownExternal: return String(localized: "Unknown input")
+    case .noInput: return String(localized: "No input")
     }
   }
 
@@ -185,22 +185,28 @@ extension RouteChangeNotice {
   var bannerText: String {
     switch kind {
     case .improved:
-      return "Источник захвата сменился: \(portName ?? "новый вход")."
+      let source = portName ?? String(localized: "new input")
+      return String(localized: "Capture source changed: \(source).")
     case .lost:
-      let name = portName ?? "встроенный микрофон"
-      return "Внешний источник пропал — переключение на \(name). Запись приостановлена."
+      let name = portName ?? String(localized: "built-in microphone")
+      return String(localized: "External source lost — switching to \(name). Recording paused.")
     case .noSuitableRoute:
-      return "Нет подходящего источника захвата."
+      return String(localized: "No suitable capture source.")
     case .interruptionBegan:
-      return "Аудиозахват прерван системой. Запись приостановлена."
+      return String(localized: "Audio capture was interrupted by the system. Recording paused.")
     case .interruptionEnded(let shouldResume):
       if shouldResume {
-        return "Аудиосессия снова доступна. Запустите захват заново после проверки входа."
+        return String(
+          localized:
+            "The audio session is available again. Restart capture after checking the input.")
       }
-      return "Аудиосессия снова доступна. Проверьте вход перед новым запуском."
+      return String(
+        localized: "The audio session is available again. Check the input before starting again.")
     case .mediaServicesReset:
       return
-        "Аудиосервис iOS перезапущен. Запись приостановлена — проверьте вход и запустите снова."
+        String(
+          localized:
+            "The iOS audio service restarted. Recording paused — check the input and start again.")
     case .silent:
       return ""
     }

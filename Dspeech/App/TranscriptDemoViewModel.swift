@@ -14,21 +14,25 @@ final class TranscriptDemoViewModel {
     TranscriptSegment(
       text: "N123AB, descend and maintain three thousand, expect ILS runway two seven approach.",
       translatedText:
-        "Борт N123AB, снижайтесь и сохраняйте три тысячи, ожидайте заход по ILS на полосу два семь.",
+        String(
+          localized:
+            "N123AB, descend and maintain three thousand, expect ILS approach runway two seven."),
       confidence: 0.93,
       sourceLanguageCode: "en",
       source: .demo
     ),
     TranscriptSegment(
       text: "Speedbird 42, contact tower one one eight decimal seven.",
-      translatedText: "Спидберд 42, работайте с вышкой на сто восемнадцать запятая семь.",
+      translatedText: String(
+        localized: "Speedbird 42, contact tower on one one eight decimal seven."),
       confidence: 0.78,
       sourceLanguageCode: "en",
       source: .demo
     ),
     TranscriptSegment(
       text: "Delta 905, hold short of runway two seven, traffic on short final.",
-      translatedText: "Дельта 905, остановиться перед полосой два семь, борт на коротком финале.",
+      translatedText: String(
+        localized: "Delta 905, hold short of runway two seven, traffic on short final."),
       confidence: 0.88,
       sourceLanguageCode: "en",
       source: .demo

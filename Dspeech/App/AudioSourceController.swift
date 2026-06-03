@@ -99,7 +99,8 @@ final class AudioSourceController {
       settings.setPreferred(uid: uid, type: port.portType.rawValue)
       selectionError = nil
     } catch {
-      selectionError = "Не удалось выбрать этот вход: \(error.localizedDescription)"
+      selectionError = String(
+        localized: "Couldn’t select this input: \(error.localizedDescription)")
       selectedUID = resolvedFallbackUID(rejectedUID: uid)
     }
   }
@@ -116,7 +117,8 @@ final class AudioSourceController {
       settings.setPreferred(uid: uid, type: port.portType.rawValue)
       selectionError = nil
     } catch {
-      selectionError = "Не удалось выбрать этот вход: \(error.localizedDescription)"
+      selectionError = String(
+        localized: "Couldn’t select this input: \(error.localizedDescription)")
       selectedUID = routing.currentRouteSnapshot.inputs.first?.uid ?? selectedUID
     }
   }

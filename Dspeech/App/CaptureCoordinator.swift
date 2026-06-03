@@ -103,11 +103,11 @@ final class CaptureCoordinator {
   static func blockedMessage(for health: RouteHealth) -> String {
     switch health {
     case .noInput:
-      return "Нет источника захвата — подключите вход и попробуйте снова."
+      return String(localized: "No capture source — connect an input and try again.")
     case .unsuitableOutputOnly:
-      return "Доступен только вывод звука — подключите вход."
+      return String(localized: "Audio output only — connect an input.")
     default:
-      return "Источник захвата недоступен — проверьте подключение входа."
+      return String(localized: "Capture source unavailable — check the input connection.")
     }
   }
 }

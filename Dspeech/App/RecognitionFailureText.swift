@@ -10,32 +10,32 @@ enum RecognitionFailureText {
   static func userFacing(_ rawCode: String) -> String {
     if rawCode == "speech-permission-denied" {
       return String(
-        localized: "Нет доступа к распознаванию речи. Разрешите его в Настройках iPhone.")
+        localized: "No speech recognition access. Allow it in iPhone Settings.")
     }
     if rawCode == "microphone-permission-denied" {
-      return String(localized: "Нет доступа к микрофону. Разрешите его в Настройках iPhone.")
+      return String(localized: "No microphone access. Allow it in iPhone Settings.")
     }
     if rawCode == "recognizer-unavailable" {
       return String(
         localized:
-          "Этот язык недоступен для распознавания. Выберите другой язык в настройках распознавания."
+          "This language isn't available for recognition. Choose another language in recognition settings."
       )
     }
     if rawCode == "recognition-locale-unavailable" {
       return String(
         localized:
-          "Нет доступного локального языка распознавания. Откройте настройки распознавания и проверьте языки диктовки."
+          "No on-device recognition language available. Open recognition settings and check your dictation languages."
       )
     }
     if rawCode.hasPrefix("on-device-model-missing") {
       return String(
         localized:
-          "Языковой пакет для распознавания не загружен. Включите диктовку и скачайте язык в Настройках → Основные → Клавиатура → Диктовка."
+          "The recognition language pack isn't downloaded. Turn on Dictation and download the language in Settings → General → Keyboard → Dictation."
       )
     }
     if rawCode.hasPrefix("start-failed") {
       return String(
-        localized: "Не удалось запустить распознавание. Проверьте микрофон и повторите попытку.")
+        localized: "Couldn't start recognition. Check the microphone and try again.")
     }
     if rawCode.hasPrefix("asr-error") {
       // why: kLSRErrorDomain#300 specifically means the on-device model could not run for
@@ -43,16 +43,16 @@ enum RecognitionFailureText {
       if rawCode.contains("kLSRErrorDomain") && rawCode.contains("300") {
         return String(
           localized:
-            "Локальная модель распознавания недоступна для этого языка. Скачайте языковой пакет для него или запустите на устройстве."
+            "No on-device recognition model is available for this language. Download its language pack or run it on-device."
         )
       }
       if rawCode.contains("kAFAssistantErrorDomain") && rawCode.contains("1110") {
-        return String(localized: "Речь не распознана — говорите ближе к микрофону.")
+        return String(localized: "No speech recognized — speak closer to the microphone.")
       }
-      return String(localized: "Ошибка распознавания речи. Повторите попытку.")
+      return String(localized: "Speech recognition error. Try again.")
     }
     // why: unknown code — still never echo the raw token to the screen.
-    return String(localized: "Не удалось распознать речь. Повторите попытку.")
+    return String(localized: "Couldn't recognize speech. Try again.")
   }
 }
 
@@ -60,39 +60,39 @@ enum TranslationFailureText {
   static func userFacing(_ failure: TranslationFailure) -> String {
     switch failure {
     case .emptyInput:
-      return String(localized: "Нечего переводить: сегмент пустой.")
+      return String(localized: "Nothing to translate: the segment is empty.")
     case .sourceLanguageUnsupported:
       return String(
         localized:
-          "Этот язык распознавания не поддерживается для локального перевода. Выберите другой язык распознавания."
+          "This recognition language isn't supported for on-device translation. Choose another recognition language."
       )
     case .targetLanguageUnsupported:
       return String(
         localized:
-          "Целевой язык не поддерживается для локального перевода. Выберите другой язык перевода."
+          "The target language isn't supported for on-device translation. Choose another translation language."
       )
     case .languagePairingUnsupported:
       return String(
         localized:
-          "Эта языковая пара не поддерживается для локального перевода. Выберите другой целевой язык."
+          "This language pair isn't supported for on-device translation. Choose another target language."
       )
     case .languagePackNotInstalled:
       return String(
         localized:
-          "Языковой пакет перевода не установлен. Выключите и снова включите перевод — iOS предложит загрузку."
+          "The translation language pack isn't installed. Turn translation off and on again — iOS will offer the download."
       )
     case .sessionCancelled, .preparationCancelled:
       return String(
         localized:
-          "Подготовка локального перевода отменена. Включите перевод снова, если он нужен."
+          "On-device translation setup was canceled. Turn translation on again if you need it."
       )
     case .preparationFailed:
       return String(
         localized:
-          "Не удалось подготовить локальный перевод. Проверьте языковой пакет и повторите попытку."
+          "Couldn't prepare on-device translation. Check the language pack and try again."
       )
     case .engineFailure:
-      return String(localized: "Системный перевод не выполнился. Повторите попытку.")
+      return String(localized: "System translation failed. Try again.")
     }
   }
 }

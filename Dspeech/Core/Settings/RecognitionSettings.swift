@@ -145,7 +145,7 @@ final class RecognitionSettings {
 
   var selectedDisplayName: String {
     guard let localeIdentifier else {
-      return String(localized: "Нет доступного языка распознавания")
+      return String(localized: "No recognition language available")
     }
     return availableLocales.first { $0.identifier == localeIdentifier }?.displayName
       ?? displayLocale.localizedString(forIdentifier: localeIdentifier) ?? localeIdentifier

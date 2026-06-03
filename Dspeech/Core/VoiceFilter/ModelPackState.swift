@@ -104,20 +104,25 @@ enum ModelPackState: Equatable, Sendable, Codable {
     switch self {
     case .absent:
       return
-        "Модель голосового фильтра не установлена. Скачайте пакет, чтобы включить распознавание пилотов."
+        String(
+          localized:
+            "The voice filter model isn't installed. Download the pack to enable pilot recognition."
+        )
     case .acquiring(let acquisition):
       switch acquisition.phase {
       case .downloading:
-        return "Идёт загрузка модели голосового фильтра…"
+        return String(localized: "Downloading the voice filter model…")
       case .importing:
-        return "Идёт установка модели голосового фильтра…"
+        return String(localized: "Installing the voice filter model…")
       }
     case .installed:
-      return "Модель установлена, но локальный распознаватель недоступен в этой сборке."
+      return String(
+        localized: "The model is installed, but the local recognizer isn't available in this build."
+      )
     case .failed(let failure):
       return failure.userSafeReason
     case .disabled:
-      return "Голосовой фильтр выключен. Модель установлена и готова к работе."
+      return String(localized: "Voice filter off. The model is installed and ready.")
     }
   }
 
@@ -175,7 +180,9 @@ struct UserDefaultsModelPackStateStorage: ModelPackStateStorage, @unchecked Send
         ModelPackFailure(
           kind: .network,
           userSafeReason:
-            "Не удалось скачать пакет модели. Проверьте подключение к сети и попробуйте снова.",
+            String(
+              localized:
+                "Couldn't download the model pack. Check your network connection and try again."),
           isRetryable: true
         ))
     case "acquiringHalf":
@@ -190,7 +197,7 @@ struct UserDefaultsModelPackStateStorage: ModelPackStateStorage, @unchecked Send
       return .failed(
         ModelPackFailure(
           kind: .unknown,
-          userSafeReason: "Проверка пакета модели не прошла.",
+          userSafeReason: String(localized: "Model pack verification failed."),
           isRetryable: false
         ))
     default:
@@ -201,7 +208,10 @@ struct UserDefaultsModelPackStateStorage: ModelPackStateStorage, @unchecked Send
   private static let corruptPersistedStateFailure = ModelPackFailure(
     kind: .corruptState,
     userSafeReason:
-      "Сохранённое состояние пакета голосовой модели повреждено. Продолжите без голосового фильтра и при необходимости скачайте пакет заново.",
+      String(
+        localized:
+          "The saved state of the voice model pack is corrupted. Continue without the voice filter and re-download the pack if needed."
+      ),
     isRetryable: false
   )
 }

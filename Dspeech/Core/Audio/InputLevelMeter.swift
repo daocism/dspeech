@@ -37,7 +37,8 @@ enum InputLevelMeterEvent: Equatable, Sendable {
         // surface this as a typed meter failure instead of a silent zero bar.
         guard format.sampleRate > 0, format.channelCount > 0 else {
           continuation.yield(
-            .failed("Не удалось проверить уровень: входной аудиоформат недоступен."))
+            .failed(
+              String(localized: "Couldn't test the level: the input audio format is unavailable.")))
           continuation.finish()
           return
         }
@@ -63,7 +64,8 @@ enum InputLevelMeterEvent: Equatable, Sendable {
         } catch {
           input.removeTap(onBus: 0)
           continuation.yield(
-            .failed("Не удалось запустить проверку уровня: \(error.localizedDescription)"))
+            .failed(
+              String(localized: "Couldn’t start the level check: \(error.localizedDescription)")))
           continuation.finish()
           return
         }

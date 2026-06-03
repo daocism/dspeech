@@ -30,7 +30,9 @@ struct UnavailableLocalSpeakerIdentifier: LocalSpeakerIdentifier {
 
   init(
     reason: String =
-      "Локальная модель распознавания голоса не установлена в этой сборке (см. ADR 0007).",
+      String(
+        localized:
+          "The on-device voice recognition model isn't installed in this build (see ADR 0007)."),
     embeddingDimension: Int = 256
   ) {
     self.reason = reason
@@ -82,20 +84,25 @@ enum LocalSpeakerIdentifierFactory {
       identifier = try backendBuilder.makeIdentifier(for: pack)
     } catch {
       return UnavailableLocalSpeakerIdentifier(
-        reason: "Не удалось инициализировать локальный распознаватель из установленного пакета.",
+        reason: String(
+          localized: "Couldn't initialize the local recognizer from the installed pack."),
         embeddingDimension: pack.embeddingDimension
       )
     }
     guard case .available = identifier.availability else {
       return UnavailableLocalSpeakerIdentifier(
-        reason: "Локальный распознаватель сообщил о недоступности после установки пакета.",
+        reason: String(
+          localized: "The local recognizer reported unavailable after the pack was installed."),
         embeddingDimension: pack.embeddingDimension
       )
     }
     guard identifier.embeddingDimension == pack.embeddingDimension else {
       return UnavailableLocalSpeakerIdentifier(
         reason:
-          "Размерность эмбеддингов распознавателя (\(identifier.embeddingDimension)) не совпадает с пакетом (\(pack.embeddingDimension)).",
+          String(
+            localized:
+              "The recognizer’s embedding dimension (\(identifier.embeddingDimension)) doesn’t match the pack (\(pack.embeddingDimension))."
+          ),
         embeddingDimension: pack.embeddingDimension
       )
     }

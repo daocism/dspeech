@@ -25,7 +25,7 @@ enum AudioRoutePreparationFailure: Equatable, Sendable {
   var userFacingMessage: String {
     switch self {
     case .recordCategoryUnavailable(let reason):
-      return "Не удалось подготовить аудиовход для записи: \(reason)"
+      return String(localized: "Couldn’t prepare the audio input for recording: \(reason)")
     }
   }
 }

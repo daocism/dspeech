@@ -16,25 +16,31 @@ struct OnboardingView: View {
     OnboardingCard(
       id: 0,
       systemImage: "antenna.radiowaves.left.and.right",
-      title: "Только приём",
+      title: String(localized: "Receive-only"),
       message:
-        "Dspeech не выходит в эфир и ничего не передаёт по радио. Приложение только слушает и показывает текст.",
+        String(
+          localized:
+            "Dspeech doesn't transmit on air or send anything over the radio. The app only listens and shows text."
+        ),
       accessibilityIdentifier: "onboarding-card-receive-only"
     ),
     OnboardingCard(
       id: 1,
       systemImage: "lock.shield",
-      title: "Локально по умолчанию",
+      title: String(localized: "Local by default"),
       message:
-        "Аудио и расшифровки остаются на этом iPhone. Ничего не покидает устройство.",
+        String(localized: "Audio and transcripts stay on this iPhone. Nothing leaves your device."),
       accessibilityIdentifier: "onboarding-card-local-first"
     ),
     OnboardingCard(
       id: 2,
       systemImage: "cable.connector",
-      title: "Подключите вход для точности",
+      title: String(localized: "Connect an input for accuracy"),
       message:
-        "Встроенный микрофон — чтобы попробовать. Для кокпита подключите проводной вход (USB-C / TRRS).",
+        String(
+          localized:
+            "Use the built-in microphone to try it out. For the cockpit, connect a wired input (USB-C / TRRS)."
+        ),
       accessibilityIdentifier: "onboarding-card-wire-for-accuracy"
     ),
   ]
@@ -60,7 +66,7 @@ struct OnboardingView: View {
         .indexViewStyle(.page(backgroundDisplayMode: .always))
 
         Button(action: advance) {
-          Text(isLastCard ? "Начать" : "Далее")
+          Text(isLastCard ? String(localized: "Get started") : String(localized: "Next"))
             .font(.headline)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)

@@ -52,7 +52,7 @@ final class VoiceEnrollmentRecorder {
     guard await authorization.requestMicrophonePermission() else {
       guard isCurrent(sessionID) else { return }
       activeSessionID = nil
-      status = .unavailable("Нет доступа к микрофону. Разрешите его в Настройках.")
+      status = .unavailable(String(localized: "No microphone access. Allow it in Settings."))
       return
     }
     guard isCurrent(sessionID) else { return }
@@ -62,10 +62,11 @@ final class VoiceEnrollmentRecorder {
       guard isCurrent(sessionID) else { return }
       status = .recording
     } catch VoiceEnrollmentCaptureError.invalidInputFormat {
-      await failAfterCapture("Микрофон недоступен.", sessionID: sessionID)
+      await failAfterCapture(
+        String(localized: "The microphone is unavailable."), sessionID: sessionID)
     } catch {
       await failAfterCapture(
-        "Не удалось запустить запись: \(error.localizedDescription)",
+        String(localized: "Couldn’t start recording: \(error.localizedDescription)"),
         sessionID: sessionID
       )
     }

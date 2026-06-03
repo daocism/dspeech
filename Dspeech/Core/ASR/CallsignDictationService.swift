@@ -63,7 +63,7 @@ final class CallsignDictationService {
 
     guard await authorization.requestSpeechAuthorization() else {
       failBeforeCapture(
-        "Нет доступа к распознаванию речи. Разрешите его в Настройках.",
+        String(localized: "No speech recognition access. Allow it in Settings."),
         sessionID: sessionID
       )
       return
@@ -71,19 +71,24 @@ final class CallsignDictationService {
     guard isCurrent(sessionID) else { return }
     guard await authorization.requestMicrophonePermission() else {
       failBeforeCapture(
-        "Нет доступа к микрофону. Разрешите его в Настройках.",
+        String(localized: "No microphone access. Allow it in Settings."),
         sessionID: sessionID
       )
       return
     }
     guard isCurrent(sessionID) else { return }
     guard let recognizer = recognizerFactory(localeIdentifier), recognizer.isAvailable else {
-      failBeforeCapture("Распознаватель речи недоступен на этом устройстве.", sessionID: sessionID)
+      failBeforeCapture(
+        String(localized: "Speech recognition isn't available on this device."),
+        sessionID: sessionID)
       return
     }
     guard recognizer.supportsOnDeviceRecognition else {
       failBeforeCapture(
-        "Офлайн-распознавание для \(localeIdentifier) не установлено. Голосовой ввод позывного требует локальной модели.",
+        String(
+          localized:
+            "Offline recognition for \(localeIdentifier) is not installed. Voice entry of the callsign requires a local model."
+        ),
         sessionID: sessionID
       )
       return
@@ -96,7 +101,8 @@ final class CallsignDictationService {
       status = .listening
     } catch {
       failAfterCapture(
-        "Не удалось запустить запись: \(error.localizedDescription)", sessionID: sessionID)
+        String(localized: "Couldn’t start recording: \(error.localizedDescription)"),
+        sessionID: sessionID)
     }
   }
 
@@ -161,7 +167,7 @@ final class CallsignDictationService {
     guard update.isFinished else { return }
     cleanup()
     if let hardError = update.hardError {
-      status = .unavailable("Не удалось распознать речь: \(hardError)")
+      status = .unavailable(String(localized: "Couldn’t recognize speech: \(hardError)"))
     } else {
       status = .idle
     }

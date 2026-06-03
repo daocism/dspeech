@@ -25,7 +25,7 @@ struct VoiceEnrollmentRecorderTests {
 
     await recorder.start()
 
-    #expect(recorder.status == .unavailable("Нет доступа к микрофону. Разрешите его в Настройках."))
+    #expect(recorder.status == .unavailable("No microphone access. Allow it in Settings."))
     #expect(authorization.callCount == 1)
     #expect(audioCapture.startCallCount == 0)
   }
@@ -38,7 +38,7 @@ struct VoiceEnrollmentRecorderTests {
 
     await recorder.start()
 
-    #expect(recorder.status == .unavailable("Микрофон недоступен."))
+    #expect(recorder.status == .unavailable("The microphone is unavailable."))
     #expect(audioCapture.startCallCount == 1)
     #expect(audioCapture.stopCallCount == 1)
   }
@@ -53,7 +53,7 @@ struct VoiceEnrollmentRecorderTests {
       Issue.record("expected unavailable status")
       return
     }
-    #expect(reason.contains("Не удалось запустить запись"))
+    #expect(reason.contains("start recording"))
     #expect(audioCapture.startCallCount == 1)
     #expect(audioCapture.stopCallCount == 1)
   }
