@@ -41,7 +41,30 @@ struct RecognitionSettingsTests {
     let onlyNonEnglish: Set<Locale> = [Locale(identifier: "fr-FR"), Locale(identifier: "de-DE")]
     let resolved = RecognitionLocaleCatalog.resolve(
       stored: nil, supported: onlyNonEnglish, preferredLanguages: ["ja-JP"])
-    #expect([frFR, deDE].contains(resolved))
+    #expect(resolved == frFR || resolved == deDE)
+  }
+
+  @Test func resolveReturnsNilWhenSupportedSetIsEmpty() {
+    let resolved = RecognitionLocaleCatalog.resolve(
+      stored: enUS, supported: [], preferredLanguages: ["en-US"])
+    #expect(resolved == nil)
+  }
+
+  @Test func onDeviceResolverDoesNotFallbackToRecognizerLocalesWhenOnDeviceSetIsEmpty() {
+    let capable = OnDeviceLocaleResolver.capableLocales(
+      recognizerSupported: supported,
+      onDeviceSupported: []
+    )
+    #expect(capable.isEmpty)
+  }
+
+  @Test func onDeviceResolverFallsBackToOnDeviceSetWhenIntersectionIsEmpty() {
+    let onDeviceOnly: Set<Locale> = [Locale(identifier: "it-IT")]
+    let capable = OnDeviceLocaleResolver.capableLocales(
+      recognizerSupported: [Locale(identifier: "en-US")],
+      onDeviceSupported: onDeviceOnly
+    )
+    #expect(capable == onDeviceOnly)
   }
 
   // The user's request: the default ALWAYS follows the device language when supported,
@@ -87,6 +110,7 @@ struct RecognitionSettingsTests {
     let settings = RecognitionSettings(
       storage: storage, supportedLocales: supported, preferredLanguages: ["en-US"])
     #expect(settings.localeIdentifier == enUS)
+    #expect(settings.activeLocaleIdentifier == nil)
     settings.localeIdentifier = frFR
     #expect(storage.stored == frFR)
     let reloaded = RecognitionSettings(
@@ -111,6 +135,8 @@ struct RecognitionSettingsTests {
         capable: [Locale(identifier: "en-US"), Locale(identifier: "fr-FR")], downloaded: [enUS]))
     await settings.refreshCapableLocales()
     #expect(Set(settings.availableLocales.map(\.identifier)) == [enUS, frFR])
+    #expect(settings.localeAvailabilityState == .available)
+    #expect(settings.activeLocaleIdentifier == enUS)
   }
 
   // A previously-selected language that is no longer capable is re-resolved to a capable one.
@@ -123,6 +149,51 @@ struct RecognitionSettingsTests {
     #expect(settings.localeIdentifier == deDE)
     await settings.refreshCapableLocales()
     #expect(settings.localeIdentifier == enUS)
+  }
+
+  @MainActor @Test func refreshEmptyCapableSetClearsActiveSelectionWithoutFakeFallback() async {
+    let storage = InMemoryRecognitionSettingsStorage()
+    storage.stored = deDE
+    let settings = RecognitionSettings(
+      storage: storage, supportedLocales: supported, preferredLanguages: ["de-DE", "en-US"],
+      availability: FakeAvailability(capable: [], downloaded: [deDE]))
+    #expect(settings.localeIdentifier == deDE)
+    #expect(settings.activeLocaleIdentifier == nil)
+
+    await settings.refreshCapableLocales()
+
+    #expect(settings.availableLocales.isEmpty)
+    #expect(settings.localeIdentifier == nil)
+    #expect(settings.activeLocaleIdentifier == nil)
+    #expect(settings.localeAvailabilityState == .unavailable)
+    #expect(settings.selectedNeedsDownload == false)
+    #expect(storage.stored == deDE)
+  }
+
+  @MainActor @Test func refreshRecoversStoredLocaleAndDownloadStateAfterEmptyCapableSet() async {
+    let storage = InMemoryRecognitionSettingsStorage()
+    storage.stored = frFR
+    let availability = MutableFakeAvailability(capable: [], downloaded: [])
+    let settings = RecognitionSettings(
+      storage: storage, supportedLocales: supported, preferredLanguages: ["en-US"],
+      availability: availability)
+
+    await settings.refreshCapableLocales()
+    #expect(settings.localeAvailabilityState == .unavailable)
+    #expect(settings.activeLocaleIdentifier == nil)
+
+    availability.capable = [Locale(identifier: "fr-FR")]
+    availability.downloaded = []
+    await settings.refreshCapableLocales()
+
+    #expect(settings.localeAvailabilityState == .available)
+    #expect(settings.localeIdentifier == frFR)
+    #expect(settings.activeLocaleIdentifier == frFR)
+    #expect(settings.selectedNeedsDownload)
+
+    availability.downloaded = [frFR]
+    await settings.refreshCapableLocales()
+    #expect(settings.selectedNeedsDownload == false)
   }
 
   // selectedNeedsDownload reflects the model's installed state for the chosen language.
@@ -157,6 +228,19 @@ private final class InMemoryRecognitionSettingsStorage: RecognitionSettingsStora
 private struct FakeAvailability: OnDeviceLocaleAvailability {
   let capable: Set<Locale>
   let downloaded: Set<String>
+  func capableLocales() async -> Set<Locale> { capable }
+  func isDownloaded(_ locale: Locale) async -> Bool { downloaded.contains(locale.identifier) }
+}
+
+private final class MutableFakeAvailability: OnDeviceLocaleAvailability, @unchecked Sendable {
+  var capable: Set<Locale>
+  var downloaded: Set<String>
+
+  init(capable: Set<Locale>, downloaded: Set<String>) {
+    self.capable = capable
+    self.downloaded = downloaded
+  }
+
   func capableLocales() async -> Set<Locale> { capable }
   func isDownloaded(_ locale: Locale) async -> Bool { downloaded.contains(locale.identifier) }
 }

@@ -377,6 +377,36 @@ final class DspeechUITests: XCTestCase {
   }
 
   @MainActor
+  func testSettingsShowsNoOnDeviceRecognitionLocaleState() throws {
+    let app = XCUIApplication()
+    app.launchArguments += [
+      "-AppleLanguages", "(ru)", "-AppleLocale", "ru_RU",
+      "-dspeech.privacy.mode.v1", "localOnly",
+      "-dspeech.privacy.voicefilter.active.v1", "true",
+      "-dspeech.onboarding.completed.v1", "true",
+      "--dspeech-recognition-no-locales",
+    ]
+    app.launch()
+
+    app.buttons["settings-button"].tap()
+
+    let unavailable = app.descendants(matching: .any)
+      .matching(identifier: "recognition-locale-unavailable").firstMatch
+    var attempts = 0
+    while !unavailable.exists && attempts < 10 {
+      app.swipeUp()
+      attempts += 1
+    }
+    XCTAssertTrue(
+      unavailable.waitForExistence(timeout: 4),
+      "settings must surface an explicit no-on-device-recognition-locale state")
+    XCTAssertFalse(
+      app.descendants(matching: .any)
+        .matching(identifier: "recognition-locale-picker").firstMatch.exists,
+      "settings must not show an empty picker with a fake selected locale")
+  }
+
+  @MainActor
   func testSettingsExposesAudioSourceSection() throws {
     let app = launchAppWithCleanPrivacyDefaults()
     app.buttons["settings-button"].tap()

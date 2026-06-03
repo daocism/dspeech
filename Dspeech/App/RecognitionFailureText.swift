@@ -21,6 +21,12 @@ enum RecognitionFailureText {
           "Этот язык недоступен для распознавания. Выберите другой язык в настройках распознавания."
       )
     }
+    if rawCode == "recognition-locale-unavailable" {
+      return String(
+        localized:
+          "Нет доступного локального языка распознавания. Откройте настройки распознавания и проверьте языки диктовки."
+      )
+    }
     if rawCode.hasPrefix("on-device-model-missing") {
       return String(
         localized:

@@ -13,6 +13,7 @@ struct RecognitionFailureTextTests {
     "speech-permission-denied",
     "microphone-permission-denied",
     "recognizer-unavailable",
+    "recognition-locale-unavailable",
     "on-device-model-missing: en-US",
     "on-device-model-missing: fr-FR",
     "start-failed: The operation couldn’t be completed.",
@@ -24,7 +25,8 @@ struct RecognitionFailureTextTests {
   // Raw machine tokens that must NEVER appear in user-facing text.
   private static let forbiddenTokens = [
     "kLSRErrorDomain", "kAFAssistantErrorDomain", "recognizer-unavailable",
-    "on-device-model-missing", "asr-error", "start-failed", "#300", "#1110", "#203",
+    "recognition-locale-unavailable", "on-device-model-missing", "asr-error",
+    "start-failed", "#300", "#1110", "#203",
   ]
 
   @Test(arguments: allEngineCodes)
