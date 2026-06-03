@@ -1,5 +1,6 @@
 @preconcurrency import AVFoundation
 import CryptoKit
+import FluidAudio
 @preconcurrency import Foundation
 import Testing
 
@@ -438,5 +439,29 @@ struct ReplayKitNetworkDenyTests {
     } catch {
       #expect(scope.attempts() == [URL(string: "https://egress.invalid/probe")!])
     }
+  }
+
+  // why: ADR 0007/0008 — the model-weight source must be redirectable to a mirror under our
+  // control. Prove the configured override doesn't just resolve in isolation but actually
+  // sets the base URL FluidAudio's DownloadUtils fetches from (the only egress path), and
+  // that the absence of a configuration leaves FluidAudio's own resolution untouched.
+  @Test func modelSourceOverrideFlowsToFluidAudioDownloadBaseURL() {
+    let original = ModelRegistry.baseURL
+    defer { ModelRegistry.baseURL = original }
+
+    let withoutOverride = SpeakerModelPackInstaller.applyConfiguredRegistryBaseURL(
+      infoDictionary: ["Other": "x"])
+    #expect(withoutOverride == original)
+    #expect(ModelRegistry.baseURL == original)
+
+    let mirror = "https://mirror.internal.example"
+    let withOverride = SpeakerModelPackInstaller.applyConfiguredRegistryBaseURL(
+      infoDictionary: [SpeakerModelPackInstaller.registryBaseURLOverrideKey: mirror])
+    #expect(withOverride == mirror)
+    #expect(ModelRegistry.baseURL == mirror)
+    // The recorded install source reflects the mirror + the pinned diarizer repo path.
+    #expect(
+      SpeakerModelPackInstaller.resolvedRegistrySource(bundle: .main).hasSuffix(
+        SpeakerModelPackInstaller.source))
   }
 }
