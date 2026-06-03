@@ -11,6 +11,8 @@ struct OnboardingCard: Identifiable {
 struct OnboardingView: View {
   let onComplete: () -> Void
   @State private var selection = 0
+  // why: the hero icon scales with the user's Dynamic Type setting instead of a fixed 64pt.
+  @ScaledMetric(relativeTo: .largeTitle) private var iconSize: CGFloat = 64
 
   static let cards: [OnboardingCard] = [
     OnboardingCard(
@@ -94,15 +96,15 @@ struct OnboardingView: View {
     VStack(spacing: 20) {
       Spacer()
       Image(systemName: card.systemImage)
-        .font(.system(size: 64, weight: .semibold))
+        .font(.system(size: iconSize, weight: .semibold))
         .foregroundStyle(.cyan)
       Text(card.title)
-        .font(.system(size: 28, weight: .bold, design: .rounded))
+        .font(.system(.title, design: .rounded).weight(.bold))
         .foregroundStyle(.white)
         .multilineTextAlignment(.center)
       Text(card.message)
-        .font(.system(size: 18, weight: .medium))
-        .foregroundStyle(.white.opacity(0.8))
+        .font(.body.weight(.medium))
+        .foregroundStyle(.white.opacity(0.9))
         .multilineTextAlignment(.center)
         .padding(.horizontal, 32)
       Spacer()

@@ -347,10 +347,11 @@ struct ContentView: View {
     HStack(alignment: .center, spacing: 10) {
       VStack(alignment: .leading, spacing: isLandscape ? 6 : 10) {
         Text("Dspeech")
-          .font(.system(size: isLandscape ? 22 : 28, weight: .bold, design: .rounded))
+          .font(.system(isLandscape ? .title3 : .title2, design: .rounded).weight(.bold))
           .foregroundStyle(.white)
           .lineLimit(1)
-          .fixedSize(horizontal: true, vertical: false)
+          .minimumScaleFactor(0.5)
+          .layoutPriority(1)
           .accessibilityIdentifier("app-title")
 
         HStack(spacing: 8) {
@@ -1000,10 +1001,25 @@ struct VoiceFilterSettingsSection: View {
       )
       .font(.footnote)
       .foregroundStyle(.secondary)
-      Button(String(localized: "Download voice filter pack (≈ 15 MB)")) {
+      Button {
         startDownload()
+      } label: {
+        Label(
+          String(localized: "Download voice filter pack (≈ 15 MB)"),
+          systemImage: "arrow.down.circle.fill"
+        )
+        .font(.subheadline.weight(.semibold))
+        .frame(maxWidth: .infinity)
+        .multilineTextAlignment(.center)
+        .lineLimit(2)
+        .minimumScaleFactor(0.8)
+        .padding(.vertical, 3)
       }
       .buttonStyle(.borderedProminent)
+      .tint(.cyan)
+      .foregroundStyle(.black)
+      .controlSize(.large)
+      .padding(.top, 2)
       .accessibilityIdentifier("voicefilter-modelpack-download-cta")
       Text(
         String(
@@ -1301,7 +1317,6 @@ private struct InputLevelBar: View {
 private struct PartialTranscriptCard: View {
   let text: String
   let isLandscape: Bool
-  @ScaledMetric(relativeTo: .title) private var baseTranscriptSize: CGFloat = 30
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
@@ -1315,14 +1330,9 @@ private struct PartialTranscriptCard: View {
         Spacer()
       }
       Text(text)
-        .font(
-          .system(
-            size: isLandscape ? baseTranscriptSize * (26.0 / 30.0) : baseTranscriptSize,
-            weight: .semibold, design: .monospaced)
-        )
+        .font(.system(isLandscape ? .title2 : .title, design: .monospaced).weight(.semibold))
         .foregroundStyle(.white)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .minimumScaleFactor(0.6)
     }
     .padding(.horizontal, 14)
     .padding(.vertical, 12)
@@ -1343,9 +1353,8 @@ private struct TranscriptSegmentCard: View {
   let segment: TranscriptSegment
   let translatedText: String?
   let isLandscape: Bool
-  // why: PRD F2 — the transcript honors Dynamic Type; @ScaledMetric scales the base
-  // size with the user's accessibility text setting (minimumScaleFactor caps growth).
-  @ScaledMetric(relativeTo: .title) private var baseTranscriptSize: CGFloat = 30
+  // why: PRD F2 — the transcript honors Dynamic Type via a semantic monospaced text style
+  // (.title / .title2) so the audit credits full Dynamic-Type support.
   @State private var expanded = false
 
   var body: some View {
@@ -1383,7 +1392,7 @@ private struct TranscriptSegmentCard: View {
       Spacer(minLength: 0)
     }
     .font(.caption.monospacedDigit())
-    .foregroundStyle(.white.opacity(0.6))
+    .foregroundStyle(.white.opacity(0.85))
     .accessibilityIdentifier("transcript-segment-details")
   }
 
@@ -1420,7 +1429,7 @@ private struct TranscriptSegmentCard: View {
       if segment.confidence > 0 {
         Text(segment.confidence.formatted(.percent.precision(.fractionLength(0))))
           .font(.caption.monospacedDigit())
-          .foregroundStyle(.white.opacity(0.6))
+          .foregroundStyle(.white.opacity(0.85))
       }
     }
   }
@@ -1428,23 +1437,18 @@ private struct TranscriptSegmentCard: View {
   @ViewBuilder
   private var transcriptText: some View {
     Text(segment.text)
-      .font(
-        .system(
-          size: isLandscape ? baseTranscriptSize * (26.0 / 30.0) : baseTranscriptSize,
-          weight: .semibold, design: .monospaced)
-      )
+      .font(.system(isLandscape ? .title2 : .title, design: .monospaced).weight(.semibold))
       .foregroundStyle(.white)
       .frame(maxWidth: .infinity, alignment: .leading)
-      .minimumScaleFactor(0.6)
   }
 
   @ViewBuilder
   private var glossLine: some View {
     if let translatedText, !translatedText.isEmpty {
       Text(translatedText)
-        .font(.system(size: isLandscape ? 18 : 20, weight: .regular, design: .rounded))
+        .font(.system(isLandscape ? .body : .title3, design: .rounded))
         .italic()
-        .foregroundStyle(.cyan.opacity(0.85))
+        .foregroundStyle(.cyan)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityIdentifier("transcript-translation")
     }
