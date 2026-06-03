@@ -2037,3 +2037,214 @@ struct SpeakerAudioPreprocessingTests {
     #expect(prepared.samples.count == 32)
   }
 }
+
+@MainActor
+struct ModelPackAcquisitionControllerTests {
+  @Test func acceptsProgressAndCompletionForCurrentAttempt() async {
+    let installer = ScriptedModelPackInstaller()
+    var persisted: [ModelPackState] = []
+    let controller = ModelPackAcquisitionController(
+      initialState: .absent,
+      installer: installer
+    ) { state in
+      persisted.append(state)
+    }
+
+    controller.startDownload()
+    #expect(await Self.waitForAttemptCount(1, installer: installer))
+
+    await installer.emitProgress(
+      ModelPackAcquisition(phase: .downloading, fractionComplete: 0.35),
+      at: 0
+    )
+    #expect(
+      await Self.wait(for: {
+        guard case .acquiring(let acquisition) = controller.state else { return false }
+        return acquisition.percentComplete == 35
+      })
+    )
+
+    await installer.complete(Self.pack("current"), at: 0)
+    #expect(
+      await Self.wait(for: {
+        guard case .installed(let pack) = controller.state else { return false }
+        return pack.checksumSHA256 == "current"
+      })
+    )
+    #expect(persisted.last == controller.state)
+  }
+
+  @Test func lateProgressAndCompletionAfterCancelCannotMutateAbsentState() async {
+    let installer = ScriptedModelPackInstaller()
+    let controller = ModelPackAcquisitionController(initialState: .absent, installer: installer)
+
+    controller.startDownload()
+    #expect(await Self.waitForAttemptCount(1, installer: installer))
+    controller.cancelDownload()
+
+    await installer.emitProgress(
+      ModelPackAcquisition(phase: .downloading, fractionComplete: 0.88),
+      at: 0
+    )
+    await Self.drainMainActorQueue()
+    #expect(controller.state == .absent)
+
+    await installer.complete(Self.pack("stale"), at: 0)
+    await Self.drainMainActorQueue()
+    #expect(controller.state == .absent)
+  }
+
+  @Test func retryIgnoresOldAttemptProgressAndCompletion() async {
+    let installer = ScriptedModelPackInstaller()
+    let controller = ModelPackAcquisitionController(initialState: .absent, installer: installer)
+
+    controller.startDownload()
+    #expect(await Self.waitForAttemptCount(1, installer: installer))
+    controller.startDownload()
+    #expect(await Self.waitForAttemptCount(2, installer: installer))
+
+    await installer.emitProgress(
+      ModelPackAcquisition(phase: .downloading, fractionComplete: 0.99),
+      at: 0
+    )
+    await Self.drainMainActorQueue()
+    guard case .acquiring(let initialRetryProgress) = controller.state else {
+      Issue.record("expected acquiring state after retry")
+      return
+    }
+    #expect(initialRetryProgress.percentComplete == 0)
+
+    await installer.emitProgress(
+      ModelPackAcquisition(phase: .importing, fractionComplete: 0.42),
+      at: 1
+    )
+    #expect(
+      await Self.wait(for: {
+        guard case .acquiring(let acquisition) = controller.state else { return false }
+        return acquisition.phase == .importing && acquisition.percentComplete == 42
+      })
+    )
+
+    await installer.complete(Self.pack("old"), at: 0)
+    await Self.drainMainActorQueue()
+    guard case .acquiring(let stillCurrentProgress) = controller.state else {
+      Issue.record("old completion should not install stale pack")
+      return
+    }
+    #expect(stillCurrentProgress.phase == .importing)
+    #expect(stillCurrentProgress.percentComplete == 42)
+
+    await installer.complete(Self.pack("new"), at: 1)
+    #expect(
+      await Self.wait(for: {
+        guard case .installed(let pack) = controller.state else { return false }
+        return pack.checksumSHA256 == "new"
+      })
+    )
+  }
+
+  @Test func lateFailureAfterRetryCannotOverwriteCurrentAttempt() async {
+    let installer = ScriptedModelPackInstaller()
+    let controller = ModelPackAcquisitionController(initialState: .absent, installer: installer)
+
+    controller.startDownload()
+    #expect(await Self.waitForAttemptCount(1, installer: installer))
+    controller.startDownload()
+    #expect(await Self.waitForAttemptCount(2, installer: installer))
+
+    await installer.fail(URLError(.notConnectedToInternet), at: 0)
+    await Self.drainMainActorQueue()
+    guard case .acquiring = controller.state else {
+      Issue.record("stale failure should leave the current retry active")
+      return
+    }
+
+    await installer.fail(URLError(.notConnectedToInternet), at: 1)
+    #expect(
+      await Self.wait(for: {
+        guard case .failed(let failure) = controller.state else { return false }
+        return failure.kind == .network && failure.isRetryable
+      })
+    )
+  }
+
+  private static func wait(
+    for predicate: @MainActor () -> Bool,
+    timeout: Duration = .seconds(5)
+  ) async -> Bool {
+    let clock = ContinuousClock()
+    let deadline = clock.now.advanced(by: timeout)
+    while clock.now < deadline {
+      if predicate() { return true }
+      try? await Task.sleep(nanoseconds: 5_000_000)
+    }
+    return predicate()
+  }
+
+  private static func waitForAttemptCount(
+    _ count: Int,
+    installer: ScriptedModelPackInstaller,
+    timeout: Duration = .seconds(5)
+  ) async -> Bool {
+    let clock = ContinuousClock()
+    let deadline = clock.now.advanced(by: timeout)
+    while clock.now < deadline {
+      if await installer.attemptCount() == count { return true }
+      try? await Task.sleep(nanoseconds: 5_000_000)
+    }
+    return await installer.attemptCount() == count
+  }
+
+  private static func drainMainActorQueue() async {
+    for _ in 0..<20 { await Task.yield() }
+  }
+
+  private static func pack(_ checksum: String) -> InstalledModelPack {
+    InstalledModelPack(
+      identifier: SpeakerModelPackInstaller.packIdentifier,
+      version: SpeakerModelPackInstaller.packVersion,
+      embeddingDimension: SpeakerModelPackInstaller.embeddingDimension,
+      checksumSHA256: checksum,
+      source: SpeakerModelPackInstaller.source,
+      sizeBytes: 1024,
+      installedAt: Date(timeIntervalSince1970: 0),
+      localModelPath: "/tmp/\(checksum)"
+    )
+  }
+}
+
+private actor ScriptedModelPackInstaller: ModelPackInstalling {
+  private struct Attempt {
+    let progress: @Sendable (ModelPackAcquisition) -> Void
+    let continuation: CheckedContinuation<InstalledModelPack, any Error>
+  }
+
+  private var attempts: [Attempt] = []
+
+  func install(
+    progress: @escaping @Sendable (ModelPackAcquisition) -> Void
+  ) async throws -> InstalledModelPack {
+    try await withCheckedThrowingContinuation { continuation in
+      attempts.append(Attempt(progress: progress, continuation: continuation))
+    }
+  }
+
+  func attemptCount() -> Int {
+    attempts.count
+  }
+
+  func emitProgress(_ acquisition: ModelPackAcquisition, at index: Int) {
+    guard attempts.indices.contains(index) else { return }
+    attempts[index].progress(acquisition)
+  }
+
+  func complete(_ pack: InstalledModelPack, at index: Int) {
+    guard attempts.indices.contains(index) else { return }
+    attempts[index].continuation.resume(returning: pack)
+  }
+
+  func fail(_ error: Error, at index: Int) {
+    guard attempts.indices.contains(index) else { return }
+    attempts[index].continuation.resume(throwing: error)
+  }
+}
