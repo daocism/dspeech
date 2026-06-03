@@ -72,24 +72,40 @@ enum RecognitionLocaleCatalog {
     supported: Set<Locale>,
     preferredLanguages: [String]
   ) -> String {
-    let identifiers = supported.map(\.identifier)
+    // why: the default recognition language ALWAYS follows the device language when Apple
+    // Speech supports it (English is only a last resort when the device language is fully
+    // unsupported). Sort for deterministic region selection. Compare via canonical Locale
+    // identifiers / codes, never raw strings — Locale canonicalizes "ru-RU" -> "ru_RU", so
+    // a string compare against BCP-47 preferredLanguages would silently miss.
+    let identifiers = supported.map(\.identifier).sorted()
     for preferred in preferredLanguages {
-      guard let preferredLanguage = Locale(identifier: preferred).language.languageCode?.identifier
-      else { continue }
-      if let match = identifiers.first(where: {
-        Locale(identifier: $0).language.languageCode?.identifier == preferredLanguage
-      }) {
-        return match
+      let preferredLocale = Locale(identifier: preferred)
+      // exact device locale (e.g. ru_RU) wins
+      if identifiers.contains(preferredLocale.identifier) { return preferredLocale.identifier }
+      guard let preferredLanguage = preferredLocale.language.languageCode?.identifier else {
+        continue
       }
+      let sameLanguage = identifiers.filter {
+        Locale(identifier: $0).language.languageCode?.identifier == preferredLanguage
+      }
+      guard !sameLanguage.isEmpty else { continue }
+      // same language code: prefer the device's region, else the first (sorted) variant
+      if let region = preferredLocale.region?.identifier,
+        let regional = sameLanguage.first(where: {
+          Locale(identifier: $0).region?.identifier == region
+        })
+      {
+        return regional
+      }
+      return sameLanguage[0]
     }
-    // why: match English by language code, not the literal "en-US" — Locale may
-    // canonicalize identifiers (en-US -> en_US), so a string compare would miss.
+    // why: English fallback only when the device language has no supported variant at all.
     if let english = identifiers.first(where: {
       Locale(identifier: $0).language.languageCode?.identifier == "en"
     }) {
       return english
     }
-    return identifiers.sorted().first ?? fallbackIdentifier
+    return identifiers.first ?? fallbackIdentifier
   }
 }
 

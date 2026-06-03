@@ -44,6 +44,35 @@ struct RecognitionSettingsTests {
     #expect([frFR, deDE].contains(resolved))
   }
 
+  // The user's request: the default ALWAYS follows the device language when supported,
+  // never silently English. Russian device + supported ru-RU -> ru-RU, not en-US.
+  @Test func defaultsToDeviceLanguageWhenSupported() {
+    let supported: Set<Locale> = [
+      Locale(identifier: "en-US"), Locale(identifier: "ru-RU"), Locale(identifier: "fr-FR"),
+    ]
+    let resolved = RecognitionLocaleCatalog.resolve(
+      stored: nil, supported: supported, preferredLanguages: ["ru-RU", "en-US"])
+    #expect(resolved == Locale(identifier: "ru-RU").identifier)
+  }
+
+  // Device-language match is deterministic and prefers the device's exact region.
+  @Test func defaultPrefersDeviceRegionAmongSameLanguageVariants() {
+    let supported: Set<Locale> = [
+      Locale(identifier: "en-US"), Locale(identifier: "en-GB"), Locale(identifier: "en-AU"),
+    ]
+    let resolved = RecognitionLocaleCatalog.defaultIdentifier(
+      supported: supported, preferredLanguages: ["en-GB"])
+    #expect(resolved == Locale(identifier: "en-GB").identifier)
+  }
+
+  // Device language with a different region still resolves to that language (not English).
+  @Test func defaultMatchesDeviceLanguageEvenWhenRegionDiffers() {
+    let supported: Set<Locale> = [Locale(identifier: "en-US"), Locale(identifier: "ru-RU")]
+    let resolved = RecognitionLocaleCatalog.defaultIdentifier(
+      supported: supported, preferredLanguages: ["ru-KZ"])
+    #expect(resolved == Locale(identifier: "ru-RU").identifier)
+  }
+
   @Test func sortedLocalesMapIdentifiersAndSortByDisplayName() {
     let locales = RecognitionLocaleCatalog.sortedLocales(
       supported: supported, displayLocale: Locale(identifier: "en-US"))
