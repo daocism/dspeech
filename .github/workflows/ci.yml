@@ -18,6 +18,7 @@ jobs:
     env:
       PROJECT: Dspeech.xcodeproj
       SCHEME: Dspeech
+      RESULT_BUNDLE: TestResults.xcresult
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -42,14 +43,22 @@ jobs:
           # the parallel real-audio unit tests. Retry recovers a transient timeout; a genuinely
           # broken test still fails ALL attempts (not a skip/xfail, so real breakage is not
           # masked). Only failed tests are retried, so passing runs add no time.
+          # why: -resultBundlePath — the next step parses it so a retry-recovered test is
+          # reported and fails the job (FLAKE_THRESHOLD=0). Retries now DETECT flakes, never hide.
+          rm -rf "$RESULT_BUNDLE"
           xcodebuild \
             -project "$PROJECT" \
             -scheme "$SCHEME" \
             -destination "$SIMULATOR_DESTINATION" \
             -test-iterations 3 \
             -retry-tests-on-failure \
+            -resultBundlePath "$RESULT_BUNDLE" \
             CODE_SIGNING_ALLOWED=NO \
             build test
+
+      - name: Report test flakes
+        if: always()
+        run: scripts/ci/report-test-flakes.sh "$RESULT_BUNDLE"
 
       # Manual mac24 parity lane:
       # DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild \
