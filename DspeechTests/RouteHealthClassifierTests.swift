@@ -115,7 +115,7 @@ struct RouteHealthClassifierTests {
     #expect(!AudioPortType.headsetMic.isOutputOnly)
     #expect(!AudioPortType.lineIn.isOutputOnly)
     #expect(!AudioPortType.carAudio.isOutputOnly)
-    #expect(!AudioPortType.airPlay.isOutputOnly)
+    #expect(AudioPortType.airPlay.isOutputOnly)
     #expect(!AudioPortType.unknown("X").isOutputOnly)
   }
 
@@ -183,12 +183,23 @@ struct RouteHealthClassifierTests {
     #expect(result.primaryInputTypeRaw == "BluetoothLE")
   }
 
-  @Test func airPlayIsSuitableExternal_pinningCurrentBehavior() {
+  @Test func airPlayDirectInputIsUnsuitableUntilProvenAsCaptureInput() {
     let result = RouteHealthClassifier.classify(
       route: RouteSnapshot(inputs: [Self.port(.airPlay, name: "AirPlay Receiver")]),
       availableInputs: [Self.port(.airPlay, name: "AirPlay Receiver")]
     )
-    #expect(result.health == .suitableExternal)
+    #expect(result.health == .unsuitableOutputOnly)
+    #expect(result.primaryInputTypeRaw == "AirPlay")
+  }
+
+  @Test func airPlayOnlyAvailableIsUnsuitableOutputOnly() {
+    let airPlay = PortSnapshot(portType: .airPlay, portName: "AirPlay Receiver")
+    let result = RouteHealthClassifier.classify(
+      route: RouteSnapshot(inputs: [], outputs: [airPlay]),
+      availableInputs: [airPlay]
+    )
+    #expect(result.health == .unsuitableOutputOnly)
+    #expect(result.primaryInputName == "AirPlay Receiver")
     #expect(result.primaryInputTypeRaw == "AirPlay")
   }
 
@@ -218,6 +229,17 @@ struct RouteHealthClassifierTests {
     let result = RouteHealthClassifier.classify(
       route: RouteSnapshot(inputs: [], outputs: [a2dp]),
       availableInputs: [a2dp, usb]
+    )
+    #expect(result.health == .suitableExternal)
+    #expect(result.primaryInputName == "USB Tap")
+  }
+
+  @Test func emptyRouteWithAirPlayAndUsbPrefersUsbCaptureInput() {
+    let airPlay = PortSnapshot(portType: .airPlay, portName: "AirPlay Receiver")
+    let usb = PortSnapshot(portType: .usbAudio, portName: "USB Tap")
+    let result = RouteHealthClassifier.classify(
+      route: RouteSnapshot(inputs: [], outputs: [airPlay]),
+      availableInputs: [airPlay, usb]
     )
     #expect(result.health == .suitableExternal)
     #expect(result.primaryInputName == "USB Tap")

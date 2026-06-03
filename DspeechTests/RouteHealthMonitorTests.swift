@@ -153,7 +153,7 @@ struct RouteHealthMonitorTests {
     }
   }
 
-  @Test func blocksStartOnlyForNoInput() {
+  @Test func blocksStartForNoInputAndOutputOnlyRoutes() {
     let cases: [(RouteSnapshot, [PortSnapshot], Bool)] = [
       (RouteSnapshot(), [], true),
       (
@@ -170,7 +170,11 @@ struct RouteHealthMonitorTests {
       ),
       (
         RouteSnapshot(inputs: [Self.port(.bluetoothA2DP)]),
-        [Self.port(.bluetoothA2DP)], false
+        [Self.port(.bluetoothA2DP)], true
+      ),
+      (
+        RouteSnapshot(inputs: [Self.port(.airPlay)]),
+        [Self.port(.airPlay)], true
       ),
     ]
     for (route, available, expectedBlocks) in cases {
@@ -209,6 +213,25 @@ struct RouteHealthMonitorTests {
     monitor.handle(event: .newDeviceAvailable)
     #expect(monitor.health == .cautionBuiltIn)
     #expect(monitor.lastNotice?.kind == .silent)
+  }
+
+  @Test func newDeviceAvailableOutputOnlyIsSilentAndStillBlocksStart() {
+    let fake = FakeAudioSessionRouting(
+      currentRoute: RouteSnapshot(),
+      availableInputs: []
+    )
+    let monitor = RouteHealthMonitor(routing: fake)
+    fake.updateRoute(
+      RouteSnapshot(inputs: [Self.port(.airPlay, name: "AirPlay Receiver")]),
+      availableInputs: [Self.port(.airPlay, name: "AirPlay Receiver")]
+    )
+
+    monitor.handle(event: .newDeviceAvailable)
+
+    #expect(monitor.health == .unsuitableOutputOnly)
+    #expect(monitor.blocksStart)
+    #expect(monitor.lastNotice?.kind == .silent)
+    #expect(monitor.lastNotice?.isUserVisible == false)
   }
 
   @Test func oldDeviceUnavailableFromBuiltInIsSilent() {
