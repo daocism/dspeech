@@ -8,6 +8,7 @@ import Foundation
   final class LiveAudioSessionRouting: AudioSessionRouting, @unchecked Sendable {
     private let session: AVAudioSession
     private let continuation: AsyncStream<RouteChangeEvent>.Continuation
+    private let _routePreparationStatus: AudioRoutePreparationStatus
     let routeChanges: AsyncStream<RouteChangeEvent>
     private var observer: NSObjectProtocol?
 
@@ -18,11 +19,18 @@ import Foundation
       // .noInput and disables Start before the engine ever activates capture.
       // Priming the category (without activating — the engine owns activation)
       // lets the OS surface the real input so Start reflects an available mic.
-      try? session.setCategory(
-        .playAndRecord,
-        mode: .measurement,
-        options: [.allowBluetoothHFP, .allowBluetoothA2DP, .defaultToSpeaker]
-      )
+      do {
+        try session.setCategory(
+          .playAndRecord,
+          mode: .measurement,
+          options: [.allowBluetoothHFP, .allowBluetoothA2DP, .defaultToSpeaker]
+        )
+        self._routePreparationStatus = .ready
+      } catch {
+        self._routePreparationStatus = .failed(
+          .recordCategoryUnavailable(error.localizedDescription)
+        )
+      }
       var localContinuation: AsyncStream<RouteChangeEvent>.Continuation!
       self.routeChanges = AsyncStream<RouteChangeEvent>(
         bufferingPolicy: .unbounded
@@ -46,6 +54,10 @@ import Foundation
         NotificationCenter.default.removeObserver(observer)
       }
       continuation.finish()
+    }
+
+    var routePreparationStatus: AudioRoutePreparationStatus {
+      _routePreparationStatus
     }
 
     var currentRouteSnapshot: RouteSnapshot {

@@ -27,6 +27,20 @@ struct RouteHealthMonitorTests {
     #expect(monitor.blocksStart)
   }
 
+  @Test func routePreparationFailureBlocksStartBeforeAvailableInputFallback() {
+    let fake = FakeAudioSessionRouting(
+      routePreparationStatus: .failed(.recordCategoryUnavailable("category denied")),
+      currentRoute: RouteSnapshot(),
+      availableInputs: [Self.port(.builtInMic, name: "iPhone Mic")]
+    )
+    let monitor = RouteHealthMonitor(routing: fake)
+
+    #expect(monitor.health == .noInput)
+    #expect(monitor.blocksStart)
+    #expect(monitor.routePreparationFailure == .recordCategoryUnavailable("category denied"))
+    #expect(monitor.primaryInputName == nil)
+  }
+
   @Test func oldDeviceUnavailableFromExternalEmitsLostNotice() {
     let fake = FakeAudioSessionRouting(
       currentRoute: RouteSnapshot(inputs: [Self.port(.usbAudio, name: "USB Tap")]),

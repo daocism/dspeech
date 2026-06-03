@@ -99,6 +99,26 @@ struct CaptureCoordinatorTests {
     #expect(coordinator.startBlockedMessage != nil)
   }
 
+  @Test func startBlockedByRoutePreparationFailureUsesTypedReason() async {
+    let engine = FakeEngine()
+    let routing = FakeAudioSessionRouting(
+      routePreparationStatus: .failed(.recordCategoryUnavailable("category denied")),
+      currentRoute: RouteSnapshot(),
+      availableInputs: [Self.port(.builtInMic, name: "iPhone Mic")]
+    )
+    let live = LiveTranscriptionViewModel(engine: engine)
+    let monitor = RouteHealthMonitor(routing: routing)
+    let coordinator = CaptureCoordinator(live: live, routeMonitor: monitor)
+
+    #expect(coordinator.canStart == false)
+    #expect(coordinator.routeBanner?.contains("category denied") == true)
+
+    await coordinator.start()
+
+    #expect(engine.startCallCount == 0)
+    #expect(coordinator.startBlockedMessage?.contains("category denied") == true)
+  }
+
   @Test func startAllowedForCautionBuiltIn() async {
     let (coordinator, engine, _) = Self.makeCoordinator(
       route: RouteSnapshot(inputs: [Self.port(.builtInMic, name: "iPhone Mic")]),

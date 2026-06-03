@@ -47,6 +47,47 @@ struct AudioSourceControllerTests {
     #expect(controller.selectedUID == "u-usb")
   }
 
+  @Test func routePreparationReadyRefreshesAvailableInputs() {
+    let routing = FakeAudioSessionRouting(
+      routePreparationStatus: .ready,
+      currentRoute: RouteSnapshot(inputs: [port(.builtInMic, "Mic", "u-mic")]),
+      availableInputs: [port(.builtInMic, "Mic", "u-mic"), port(.usbAudio, "USB", "u-usb")]
+    )
+
+    let controller = AudioSourceController(
+      routing: routing, settings: AudioSettings(storage: InMemoryStorage()))
+
+    #expect(controller.routePreparationFailure == nil)
+    #expect(controller.availableInputs.map(\.uid) == ["u-mic", "u-usb"])
+    #expect(controller.selectedUID == "u-mic")
+    #expect(controller.hasSelectableInputs)
+  }
+
+  @Test func routePreparationFailureSurfacesAndDoesNotClaimInputs() {
+    let routing = FakeAudioSessionRouting(
+      routePreparationStatus: .failed(.recordCategoryUnavailable("category denied")),
+      currentRoute: RouteSnapshot(inputs: [port(.builtInMic, "Mic", "u-mic")]),
+      availableInputs: [port(.builtInMic, "Mic", "u-mic"), port(.usbAudio, "USB", "u-usb")]
+    )
+    let storage = InMemoryStorage()
+    storage.uid = "u-usb"
+    storage.type = "USBAudio"
+
+    let controller = AudioSourceController(
+      routing: routing, settings: AudioSettings(storage: storage))
+    controller.applyPersistedPreference()
+    controller.select(uid: "u-usb")
+
+    #expect(controller.routePreparationFailure == .recordCategoryUnavailable("category denied"))
+    let message = controller.routePreparationFailure?.userFacingMessage
+    #expect(message?.contains("category denied") == true)
+    #expect(controller.availableInputs.isEmpty)
+    #expect(controller.selectedUID.isEmpty)
+    #expect(!controller.hasSelectableInputs)
+    #expect(routing.preferredInputCalls.isEmpty)
+    #expect(storage.uid == "u-usb")
+  }
+
   @Test func applyPersistedPreferenceSetsInputWhenAvailable() {
     let storage = InMemoryStorage()
     storage.uid = "u-usb"
