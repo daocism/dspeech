@@ -90,12 +90,12 @@ struct ContentView: View {
     case .idle, .stopped:
       return String(
         localized:
-          "Нажмите «Старт» и говорите — расшифровка появится здесь.\nЛокальная обработка, аудио не покидает устройство."
+          "Tap Start and speak — the transcript will appear here.\nProcessed locally; audio never leaves your device."
       )
     case .requestingPermission:
-      return String(localized: "Запрос доступа к микрофону и распознаванию речи…")
+      return String(localized: "Requesting microphone and speech recognition access…")
     case .ready, .listening:
-      return String(localized: "Слушаю…")
+      return String(localized: "Listening…")
     case .failed(let message):
       return RecognitionFailureText.userFacing(message)
     }
@@ -302,7 +302,7 @@ struct ContentView: View {
   private func startControls(isLandscape: Bool) -> some View {
     HStack(spacing: 12) {
       if showHints {
-        HintBubble(text: "Нажмите, чтобы начать распознавание")
+        HintBubble(text: "Tap to start recognition")
       }
       StartButton(
         isStopVisible: liveViewModel.canStopCurrentSession,
@@ -319,7 +319,7 @@ struct ContentView: View {
   private func bottomLeftControls(isLandscape: Bool) -> some View {
     HStack(spacing: 10) {
       if !liveViewModel.segments.isEmpty {
-        Button("Очистить") {
+        Button(String(localized: "Clear")) {
           liveViewModel.reset()
         }
         .font(.subheadline.weight(.medium))
@@ -362,7 +362,7 @@ struct ContentView: View {
       Spacer(minLength: 8)
 
       if showHints {
-        HintBubble(text: "Настройки здесь")
+        HintBubble(text: "Settings are here")
       }
       settingsButton(isLandscape: isLandscape)
     }
@@ -391,7 +391,7 @@ struct ContentView: View {
     .buttonStyle(.plain)
     .contentShape(Circle())
     .accessibilityIdentifier("settings-button")
-    .accessibilityLabel("Настройки")
+    .accessibilityLabel(String(localized: "Settings"))
   }
 }
 
@@ -411,7 +411,7 @@ struct PrivacyBadge: View {
         Capsule().stroke(tint.opacity(0.45), lineWidth: 1)
       )
       .accessibilityIdentifier("privacy-badge")
-      .accessibilityLabel("Локальная обработка")
+      .accessibilityLabel(String(localized: "On-device processing"))
   }
 }
 
@@ -453,7 +453,7 @@ struct RouteHealthChip: View {
       Capsule().stroke(tint.opacity(0.45), lineWidth: 1)
     )
     .accessibilityIdentifier("route-health-chip")
-    .accessibilityLabel("Источник захвата: \(health.displayLabel)")
+    .accessibilityLabel(String(localized: "Capture source: \(health.displayLabel)"))
   }
 }
 
@@ -491,7 +491,7 @@ struct SettingsView: View {
     (UserDefaults.standard.array(forKey: "AppleLanguages") as? [String])?.first ?? ""
 
   private static let appLanguages: [(code: String, name: String)] = [
-    ("", String(localized: "Системный")),
+    ("", String(localized: "System")),
     ("en", "English"), ("ru", "Русский"), ("uk", "Українська"),
     ("es", "Español"), ("fr", "Français"), ("de", "Deutsch"),
     ("it", "Italiano"), ("pt", "Português"), ("zh-Hans", "简体中文"), ("ja", "日本語"),
@@ -507,12 +507,17 @@ struct SettingsView: View {
         Section {
           Toggle(isOn: $privacy.voiceFilterActive) {
             VStack(alignment: .leading, spacing: 2) {
-              Text("Активный голосовой фильтр")
+              Text(String(localized: "Active voice filter"))
                 .font(.body.weight(.medium))
               Text(
                 privacy.voiceFilterActive
-                  ? "Пред-ASR фильтр может скрывать только уверенно распознанную речь пилота."
-                  : "Пред-ASR фильтр выключен; все аудиобуферы передаются в распознавание."
+                  ? String(
+                    localized:
+                      "The pre-ASR filter can only hide speech confidently recognized as the pilot's."
+                  )
+                  : String(
+                    localized: "Pre-ASR filter is off; all audio buffers are passed to recognition."
+                  )
               )
               .font(.footnote)
               .foregroundStyle(.secondary)
@@ -520,9 +525,11 @@ struct SettingsView: View {
           }
           .accessibilityIdentifier("voicefilter-active-toggle")
         } header: {
-          Text("Приватность")
+          Text(String(localized: "Privacy"))
         } footer: {
-          Text("Dspeech обрабатывает звук только локально. Аудио не покидает устройство.")
+          Text(
+            String(
+              localized: "Dspeech processes audio locally only. Audio never leaves your device."))
         }
 
         if let voiceFilter {
@@ -537,7 +544,7 @@ struct SettingsView: View {
               .accessibilityIdentifier("audio-route-preparation-error")
           }
           if audioSource.hasSelectableInputs {
-            Picker("Вход", selection: audioSourceBinding) {
+            Picker(String(localized: "Input"), selection: audioSourceBinding) {
               ForEach(audioSource.availableInputs, id: \.uid) { input in
                 Text(input.portName).tag(input.uid)
               }
@@ -545,7 +552,10 @@ struct SettingsView: View {
             .accessibilityIdentifier("audio-source-picker")
           } else if audioSource.routePreparationFailure == nil {
             Text(
-              "Источник входа не обнаружен. Подключите проводной вход (USB-C / TRRS) или используйте встроенный микрофон."
+              String(
+                localized:
+                  "No input source detected. Connect a wired input (USB-C / TRRS) or use the built-in microphone."
+              )
             )
             .font(.footnote)
             .foregroundStyle(.secondary)
@@ -564,14 +574,15 @@ struct SettingsView: View {
             }
           } label: {
             Label(
-              audioSource.isMetering ? "Остановить проверку" : "Проверить уровень входа",
+              audioSource.isMetering
+                ? String(localized: "Stop test") : String(localized: "Test input level"),
               systemImage: audioSource.isMetering ? "stop.circle" : "waveform")
           }
           .disabled(captureActive)
           .accessibilityIdentifier("audio-meter-toggle")
           if audioSource.isMetering {
             HStack(spacing: 12) {
-              Text("Уровень").font(.footnote).foregroundStyle(.secondary)
+              Text(String(localized: "Level")).font(.footnote).foregroundStyle(.secondary)
               InputLevelBar(level: audioSource.inputLevel).frame(height: 8)
             }
             .accessibilityIdentifier("audio-input-level")
@@ -583,24 +594,29 @@ struct SettingsView: View {
               .accessibilityIdentifier("audio-meter-error")
           }
         } header: {
-          Text("Источник звука")
+          Text(String(localized: "Audio source"))
         } footer: {
           Text(
-            "Выбор сохраняется для этого устройства. Встроенный микрофон — для проб; для кокпита подключите проводной вход."
+            String(
+              localized:
+                "Your choice is saved for this device. The built-in microphone is for testing; for the cockpit, connect a wired input."
+            )
           )
         }
-        Section("Распознавание") {
+        Section(String(localized: "Recognition")) {
           switch recognition.localeAvailabilityState {
           case .loading:
             HStack {
               ProgressView()
-              Text("Проверяю локальные языки распознавания…")
+              Text(String(localized: "Checking on-device recognition languages…"))
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             }
             .accessibilityIdentifier("recognition-locale-loading")
           case .available:
-            Picker("Язык распознавания", selection: $recognition.localeIdentifier) {
+            Picker(
+              String(localized: "Recognition language"), selection: $recognition.localeIdentifier
+            ) {
               ForEach(recognition.availableLocales) { locale in
                 Text(locale.displayName).tag(Optional(locale.identifier))
               }
@@ -608,11 +624,14 @@ struct SettingsView: View {
             .accessibilityIdentifier("recognition-locale-picker")
           case .unavailable:
             VStack(alignment: .leading, spacing: 6) {
-              Text("Нет доступных локальных языков распознавания.")
+              Text(String(localized: "No on-device recognition languages available."))
                 .font(.footnote)
                 .foregroundStyle(.orange)
               Text(
-                "Проверьте языки диктовки в Настройках iPhone. Dspeech не подставляет облачное распознавание вместо локального режима."
+                String(
+                  localized:
+                    "Check dictation languages in iPhone Settings. Dspeech won't fall back to cloud recognition in place of local mode."
+                )
               )
               .font(.footnote)
               .foregroundStyle(.secondary)
@@ -622,7 +641,10 @@ struct SettingsView: View {
           if recognition.selectedNeedsDownload {
             VStack(alignment: .leading, spacing: 6) {
               Text(
-                "Язык «\(recognition.selectedDisplayName)» ещё не загружен для распознавания на устройстве."
+                String(
+                  localized:
+                    "The language “\(recognition.selectedDisplayName)” has not been downloaded yet for on-device recognition."
+                )
               )
               .font(.footnote)
               .foregroundStyle(.orange)
@@ -632,23 +654,26 @@ struct SettingsView: View {
                   UIApplication.shared.open(url)
                 }
               } label: {
-                Label("Открыть Настройки iPhone", systemImage: "gearshape")
+                Label(String(localized: "Open iPhone Settings"), systemImage: "gearshape")
               }
               .accessibilityIdentifier("recognition-download-language")
               Text(
-                "Затем: Основные → Клавиатура → «Языки диктовки» — включите диктовку и добавьте этот язык. Модель скачается, и распознавание заработает офлайн."
+                String(
+                  localized:
+                    "Then: General → Keyboard → Dictation Languages — turn on Dictation and add this language. The model downloads, and recognition works offline."
+                )
               )
               .font(.footnote)
               .foregroundStyle(.secondary)
             }
           }
-          LabeledContent("Модель ASR", value: "Apple Speech")
-          LabeledContent("Режим", value: privacy.mode.displayName)
+          LabeledContent(String(localized: "ASR model"), value: "Apple Speech")
+          LabeledContent(String(localized: "Mode"), value: privacy.mode.displayName)
         }
         Section {
-          Toggle("Перевод на устройстве", isOn: $translation.enabled)
+          Toggle(String(localized: "On-device translation"), isOn: $translation.enabled)
             .accessibilityIdentifier("translation-enabled-toggle")
-          Picker("Целевой язык", selection: $translation.targetCode) {
+          Picker(String(localized: "Target language"), selection: $translation.targetCode) {
             ForEach(translation.availableTargets) { option in
               Text(option.displayName).tag(option.code)
             }
@@ -664,14 +689,17 @@ struct SettingsView: View {
             .accessibilityIdentifier("translation-failure")
           }
         } header: {
-          Text("Перевод")
+          Text(String(localized: "Translation"))
         } footer: {
           Text(
-            "Перевод выполняется на устройстве через системные языковые пакеты Apple. При первом включении iOS предложит скачать языковой пакет. Аудио и текст не покидают iPhone."
+            String(
+              localized:
+                "Translation runs on-device via Apple's system language packs. The first time you enable it, iOS offers to download a language pack. Audio and text never leave your iPhone."
+            )
           )
         }
         Section {
-          Picker("Язык приложения", selection: $appLanguage) {
+          Picker(String(localized: "App language"), selection: $appLanguage) {
             ForEach(Self.appLanguages, id: \.code) { lang in
               Text(lang.name).tag(lang.code)
             }
@@ -685,12 +713,12 @@ struct SettingsView: View {
             }
           }
         } header: {
-          Text("Язык приложения")
+          Text(String(localized: "App language"))
         } footer: {
-          Text("Перезапустите приложение, чтобы сменить язык.")
+          Text(String(localized: "Restart the app to change the language."))
         }
-        Section("О приложении") {
-          LabeledContent("Версия", value: Bundle.main.shortVersion)
+        Section(String(localized: "About")) {
+          LabeledContent(String(localized: "Version"), value: Bundle.main.shortVersion)
         }
       }
       .onAppear { audioSource.refresh() }
@@ -699,11 +727,11 @@ struct SettingsView: View {
         Task { await recognition.refreshSelectedDownloadState() }
       }
       .onDisappear { audioSource.stopMetering() }
-      .navigationTitle("Настройки")
+      .navigationTitle(String(localized: "Settings"))
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
         ToolbarItem(placement: .confirmationAction) {
-          Button("Готово") {
+          Button(String(localized: "Done")) {
             dismiss()
           }
           .accessibilityIdentifier("settings-done-button")
@@ -754,12 +782,12 @@ struct VoiceFilterSettingsSection: View {
     Section {
       Toggle(isOn: $enabled) {
         VStack(alignment: .leading, spacing: 2) {
-          Text("Фильтр диспетчер/пилот")
+          Text(String(localized: "ATC/pilot filter"))
             .font(.body.weight(.medium))
           Text(
             enabled
-              ? "Скрывать переговоры пилотов и нерелевантные обращения диспетчера."
-              : "Все сегменты ATC отображаются."
+              ? String(localized: "Hide pilot transmissions and irrelevant ATC calls.")
+              : String(localized: "All ATC segments are shown.")
           )
           .font(.footnote)
           .foregroundStyle(.secondary)
@@ -775,7 +803,7 @@ struct VoiceFilterSettingsSection: View {
       }
 
       VStack(alignment: .leading, spacing: 4) {
-        Text("Позывной воздушного судна")
+        Text(String(localized: "Aircraft callsign"))
           .font(.body.weight(.medium))
         HStack(spacing: 8) {
           TextField("N123AB / RA-89077 / SBI247", text: $callsignDraft)
@@ -799,10 +827,13 @@ struct VoiceFilterSettingsSection: View {
 
       modelPackContent
     } header: {
-      Text("Голосовой фильтр ATC")
+      Text(String(localized: "ATC voice filter"))
     } footer: {
       Text(
-        "Распознавание выполняется только на устройстве. Аудио и образцы голоса не покидают iPhone. Подробности — ADR 0007 и ADR 0008."
+        String(
+          localized:
+            "Recognition runs on-device only. Audio and voice samples never leave your iPhone. See ADR 0007 and ADR 0008 for details."
+        )
       )
     }
   }
@@ -819,7 +850,8 @@ struct VoiceFilterSettingsSection: View {
     .buttonStyle(.plain)
     .accessibilityIdentifier("voicefilter-callsign-dictate")
     .accessibilityLabel(
-      dictation.isListening ? "Остановить голосовой ввод" : "Задать позывной голосом")
+      dictation.isListening
+        ? String(localized: "Stop voice input") : String(localized: "Set callsign by voice"))
   }
 
   private var dictationHint: String {
@@ -828,22 +860,33 @@ struct VoiceFilterSettingsSection: View {
     }
     if dictation.isListening {
       return
-        "Слушаю — продиктуйте позывной по буквам (например: «november one two three alpha bravo»)."
+        String(
+          localized:
+            "Listening — spell out the callsign (for example: \"november one two three alpha bravo\")."
+        )
     }
     return callsignDraft.isEmpty
-      ? "Без позывного фильтр пропускает все сегменты не-пилотов. Нажмите микрофон, чтобы задать голосом."
-      : "Сегменты без совпадения по позывному будут скрываться, пока окно продолжения активно."
+      ? String(
+        localized:
+          "Without a callsign, the filter passes all non-pilot segments. Tap the microphone to set it by voice."
+      )
+      : String(
+        localized:
+          "Segments with no callsign match will be hidden while the continuation window is active.")
   }
 
   private var storageRecoveryContent: some View {
     VStack(alignment: .leading, spacing: 8) {
-      Label("Локальные настройки повреждены", systemImage: "exclamationmark.triangle.fill")
-        .font(.subheadline.weight(.semibold))
-        .foregroundStyle(.orange)
+      Label(
+        String(localized: "Local settings are corrupted"),
+        systemImage: "exclamationmark.triangle.fill"
+      )
+      .font(.subheadline.weight(.semibold))
+      .foregroundStyle(.orange)
       Text(VoiceFilterStorageIssue.userFacingSummary(storageIssues))
         .font(.footnote)
         .foregroundStyle(.secondary)
-      Button("Сбросить повреждённые данные") {
+      Button(String(localized: "Reset corrupted data")) {
         pipeline.clearStorageIssues()
         storageIssues = pipeline.storageIssues
         enabled = pipeline.enabled
@@ -899,15 +942,15 @@ struct VoiceFilterSettingsSection: View {
 
   private func enrollSubtitle(for slot: PilotVoiceProfile.Slot) -> String {
     if recordingSlot == slot {
-      return "Идёт запись — говорите несколько секунд, затем «Остановить»."
+      return String(localized: "Recording — speak for a few seconds, then tap Stop.")
     }
     if !identifierAvailable {
-      return "Запись станет доступна, когда распознаватель будет подключён."
+      return String(localized: "Recording becomes available once the recognizer is connected.")
     }
     if pipeline.enrolledSlots.contains(slot) {
-      return "Образец голоса записан. Запишите заново, чтобы обновить."
+      return String(localized: "Voice sample recorded. Record again to update it.")
     }
-    return "Запишите образец голоса для распознавания."
+    return String(localized: "Record a voice sample for recognition.")
   }
 
   private func toggleEnrollment(slot: PilotVoiceProfile.Slot) async {
@@ -915,7 +958,7 @@ struct VoiceFilterSettingsSection: View {
       let result = await recorder.stop()
       recordingSlot = nil
       guard let result else {
-        enrollMessage = "Запись не получилась — попробуйте снова."
+        enrollMessage = String(localized: "Recording failed — try again.")
         return
       }
       do {
@@ -925,11 +968,12 @@ struct VoiceFilterSettingsSection: View {
           samples: result.samples,
           sampleRate: result.sampleRate
         )
-        enrollMessage = "Голос сохранён для \(slot == .primary ? "Pilot 1" : "Pilot 2")."
+        enrollMessage = String(
+          localized: "Voice saved for \(slot == .primary ? "Pilot 1" : "Pilot 2").")
       } catch LocalSpeakerIdentifierError.insufficientSpeech {
-        enrollMessage = "Слишком тихо или коротко — запишите образец чётче."
+        enrollMessage = String(localized: "Too quiet or too short — record a clearer sample.")
       } catch {
-        enrollMessage = "Не удалось сохранить образец голоса. Попробуйте снова."
+        enrollMessage = String(localized: "Couldn't save the voice sample. Try again.")
       }
       return
     }
@@ -939,27 +983,33 @@ struct VoiceFilterSettingsSection: View {
     await recorder.start()
     if !recorder.isRecording {
       recordingSlot = nil
-      enrollMessage = recorder.unavailableReason ?? "Не удалось начать запись."
+      enrollMessage = recorder.unavailableReason ?? String(localized: "Couldn't start recording.")
     }
   }
 
   private var absentContent: some View {
     VStack(alignment: .leading, spacing: 8) {
-      Label("Модель не установлена", systemImage: "arrow.down.circle")
+      Label(String(localized: "Model not installed"), systemImage: "arrow.down.circle")
         .font(.subheadline.weight(.semibold))
         .foregroundStyle(.secondary)
       Text(
-        "Голосовой фильтр пилотов работает только после установки локального пакета модели. Загрузка — разовая, явная, по вашему запросу; аудио при этом не покидает устройство."
+        String(
+          localized:
+            "The pilot voice filter works only after the local model pack is installed. The download is one-time, explicit, and on your request; audio never leaves your device."
+        )
       )
       .font(.footnote)
       .foregroundStyle(.secondary)
-      Button("Скачать пакет голосового фильтра (≈ 15 МБ)") {
+      Button(String(localized: "Download voice filter pack (≈ 15 MB)")) {
         startDownload()
       }
       .buttonStyle(.borderedProminent)
       .accessibilityIdentifier("voicefilter-modelpack-download-cta")
       Text(
-        "Модель FluidAudio (\(SpeakerModelPackInstaller.source)) загружается один раз по этому запросу. С устройства уходит только запрос на скачивание модели — аудио, расшифровки и образцы голоса не передаются."
+        String(
+          localized:
+            "The FluidAudio model (\(SpeakerModelPackInstaller.source)) is downloaded once at this request. Only the model download request leaves the device — audio, transcripts and voice samples are not transmitted."
+        )
       )
       .font(.caption)
       .foregroundStyle(.tertiary)
@@ -980,11 +1030,11 @@ struct VoiceFilterSettingsSection: View {
         .foregroundStyle(.secondary)
         .accessibilityIdentifier("voicefilter-modelpack-percent")
       if let received = acquisition.bytesReceived, let total = acquisition.totalBytes {
-        Text("\(byteString(received)) из \(byteString(total))")
+        Text(String(localized: "\(byteString(received)) of \(byteString(total))"))
           .font(.caption.monospacedDigit())
           .foregroundStyle(.secondary)
       }
-      Button("Отменить") {
+      Button(String(localized: "Cancel")) {
         cancelDownload()
       }
       .buttonStyle(.bordered)
@@ -997,22 +1047,31 @@ struct VoiceFilterSettingsSection: View {
 
   private func installedContent(_ pack: InstalledModelPack) -> some View {
     VStack(alignment: .leading, spacing: 10) {
-      Label("Модель установлена и проверена", systemImage: "checkmark.seal.fill")
+      Label(String(localized: "Model installed and verified"), systemImage: "checkmark.seal.fill")
         .font(.subheadline.weight(.semibold))
         .foregroundStyle(.green)
       Text(
-        "Пакет «\(pack.identifier)» · \(pack.embeddingDimension)-мерные эмбеддинги · \(byteString(pack.sizeBytes)). Распознавание выполняется офлайн."
+        String(
+          localized:
+            "Pack “\(pack.identifier)” · \(pack.embeddingDimension)-dimensional embeddings · \(byteString(pack.sizeBytes)). Recognition runs offline."
+        )
       )
       .font(.footnote)
       .foregroundStyle(.secondary)
 
       if !identifierAvailable {
         VStack(alignment: .leading, spacing: 6) {
-          Label("Слот пилота недоступен", systemImage: "exclamationmark.triangle.fill")
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(.orange)
+          Label(
+            String(localized: "Pilot slot unavailable"),
+            systemImage: "exclamationmark.triangle.fill"
+          )
+          .font(.subheadline.weight(.semibold))
+          .foregroundStyle(.orange)
           Text(
-            "Пакет установлен, но локальный распознаватель не подключён в этой сборке, поэтому запись голоса отключена."
+            String(
+              localized:
+                "The pack is installed, but the local recognizer isn't connected in this build, so voice recording is disabled."
+            )
           )
           .font(.footnote)
           .foregroundStyle(.secondary)
@@ -1030,7 +1089,9 @@ struct VoiceFilterSettingsSection: View {
               .foregroundStyle(.secondary)
           }
           Spacer()
-          Button(recordingSlot == slot ? "Остановить" : "Записать голос") {
+          Button(
+            recordingSlot == slot ? String(localized: "Stop") : String(localized: "Record voice")
+          ) {
             Task { await toggleEnrollment(slot: slot) }
           }
           .disabled(!identifierAvailable || (recordingSlot != nil && recordingSlot != slot))
@@ -1051,7 +1112,7 @@ struct VoiceFilterSettingsSection: View {
           .accessibilityIdentifier("voicefilter-enroll-message")
       }
 
-      Button("Удалить пакет") {
+      Button(String(localized: "Delete pack")) {
         Task { await deleteModelPack(pack) }
       }
       .buttonStyle(.bordered)
@@ -1072,13 +1133,13 @@ struct VoiceFilterSettingsSection: View {
         .font(.footnote)
         .foregroundStyle(.secondary)
       if failure.isRetryable {
-        Button("Повторить загрузку") {
+        Button(String(localized: "Retry download")) {
           startDownload()
         }
         .buttonStyle(.bordered)
         .accessibilityIdentifier("voicefilter-modelpack-retry")
       }
-      Button("Продолжить без голосового фильтра") {
+      Button(String(localized: "Continue without voice filter")) {
         transition(to: .absent)
       }
       .buttonStyle(.bordered)
@@ -1091,20 +1152,23 @@ struct VoiceFilterSettingsSection: View {
 
   private func disabledContent(_ pack: InstalledModelPack) -> some View {
     VStack(alignment: .leading, spacing: 8) {
-      Label("Пакет установлен, фильтр выключен", systemImage: "pause.circle")
+      Label(String(localized: "Pack installed, filter off"), systemImage: "pause.circle")
         .font(.subheadline.weight(.semibold))
         .foregroundStyle(.secondary)
       Text(
-        "Модель «\(pack.identifier)» остаётся на устройстве. Включите фильтр выше или удалите пакет, чтобы освободить место."
+        String(
+          localized:
+            "The model “\(pack.identifier)” stays on the device. Enable the filter above or delete the pack to free up space."
+        )
       )
       .font(.footnote)
       .foregroundStyle(.secondary)
-      Button("Включить голосовой фильтр") {
+      Button(String(localized: "Enable voice filter")) {
         transition(to: .installed(pack))
       }
       .buttonStyle(.bordered)
       .accessibilityIdentifier("voicefilter-modelpack-enable")
-      Button("Удалить пакет (\(byteString(pack.sizeBytes)))") {
+      Button(String(localized: "Delete pack (\(byteString(pack.sizeBytes)))")) {
         Task { await deleteModelPack(pack) }
       }
       .buttonStyle(.bordered)
@@ -1123,20 +1187,20 @@ struct VoiceFilterSettingsSection: View {
   private func acquisitionTitle(_ phase: ModelPackAcquisition.Phase) -> String {
     switch phase {
     case .downloading:
-      return "Загрузка модели…"
+      return String(localized: "Downloading model…")
     case .importing:
-      return "Установка модели…"
+      return String(localized: "Installing model…")
     }
   }
 
   private func modelPackFailureTitle(_ failure: ModelPackFailure) -> String {
     switch failure.kind {
     case .disk:
-      return "Не удалось удалить модель"
+      return String(localized: "Couldn't delete the model")
     case .corruptState:
-      return "Повреждено состояние модели"
+      return String(localized: "Model state corrupted")
     case .network, .checksum, .dimensionMismatch, .cancelled, .unknown:
-      return "Не удалось установить модель"
+      return String(localized: "Couldn't install the model")
     }
   }
 }
@@ -1183,7 +1247,7 @@ private struct StartButton: View {
     .buttonStyle(.plain)
     .disabled(disabled)
     .accessibilityIdentifier(isStopVisible ? "stop-button" : "start-button")
-    .accessibilityLabel(isStopVisible ? "Стоп" : "Старт")
+    .accessibilityLabel(isStopVisible ? String(localized: "Stop") : String(localized: "Start"))
     .onAppear {
       withAnimation(.linear(duration: 2.4).repeatForever(autoreverses: false)) {
         glowAngle = 360

@@ -10,13 +10,20 @@ enum VoiceFilterStorageIssue: String, Equatable, Hashable, Sendable {
     let fields = Set(issues)
     if fields.contains(.profilesCorrupted) {
       return
-        "Сохранённые образцы голоса повреждены. Сбросьте повреждённые данные и запишите образцы заново."
+        String(
+          localized:
+            "The saved voice samples are corrupted. Reset the corrupted data and record the samples again."
+        )
     }
     if fields.contains(.callSignCorrupted) {
-      return "Сохранённый позывной повреждён. Сбросьте его и задайте позывной заново."
+      return String(
+        localized: "The saved callsign is corrupted. Reset it and set the callsign again.")
     }
     return
-      "Часть локальных настроек голосового фильтра повреждена. Сбросьте повреждённые данные, чтобы продолжить безопасно."
+      String(
+        localized:
+          "Some local voice filter settings are corrupted. Reset the corrupted data to continue safely."
+      )
   }
 }
 

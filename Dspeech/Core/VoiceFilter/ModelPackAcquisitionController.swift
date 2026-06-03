@@ -101,7 +101,10 @@ func modelPackDownloadFailure(for error: Error) -> ModelPackFailure {
     return ModelPackFailure(
       kind: .checksum,
       userSafeReason:
-        "Пакет модели не прошёл проверку контрольной суммы или целостности. Повторите загрузку, чтобы скачать проверенную копию.",
+        String(
+          localized:
+            "The model pack failed its checksum or integrity check. Retry the download to get a verified copy."
+        ),
       isRetryable: true
     )
   }
@@ -109,7 +112,8 @@ func modelPackDownloadFailure(for error: Error) -> ModelPackFailure {
   return ModelPackFailure(
     kind: .network,
     userSafeReason:
-      "Не удалось скачать пакет модели. Проверьте подключение к сети и попробуйте снова.",
+      String(
+        localized: "Couldn't download the model pack. Check your network connection and try again."),
     isRetryable: true
   )
 }
@@ -118,7 +122,10 @@ func modelPackDeleteFailure(for error: Error) -> ModelPackFailure {
   ModelPackFailure(
     kind: .disk,
     userSafeReason:
-      "Не удалось удалить пакет модели с устройства. Проверьте доступ к хранилищу и попробуйте позже.",
+      String(
+        localized:
+          "Couldn't delete the model pack from the device. Check storage access and try again later."
+      ),
     isRetryable: false
   )
 }

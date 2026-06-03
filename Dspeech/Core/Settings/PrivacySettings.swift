@@ -5,7 +5,7 @@ enum PrivacyMode: String, CaseIterable, Sendable, Codable {
   case localOnly
 
   var displayName: String {
-    "Локально"
+    String(localized: "Local")
   }
 
   var badgeText: String {

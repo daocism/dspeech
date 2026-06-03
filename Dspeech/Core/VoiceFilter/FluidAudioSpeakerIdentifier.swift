@@ -124,7 +124,8 @@ struct FluidAudioSpeakerIdentifier: LocalSpeakerIdentifier {
     } catch {
       throw LocalSpeakerIdentifierError.modelUnavailable(
         reason:
-          "Не удалось загрузить или применить локальную модель FluidAudio из установленного пакета."
+          String(
+            localized: "Couldn't load or apply the local FluidAudio model from the installed pack.")
       )
     }
     guard embedding.count == embeddingDimension else {
@@ -157,7 +158,7 @@ struct FluidAudioBackendBuilder: LocalSpeakerBackendBuilder {
   func makeIdentifier(for pack: InstalledModelPack) throws -> any LocalSpeakerIdentifier {
     guard let localModelPath = pack.localModelPath, !localModelPath.isEmpty else {
       throw LocalSpeakerIdentifierError.modelUnavailable(
-        reason: "Установленный пакет не содержит локального пути к модели."
+        reason: String(localized: "The installed pack contains no local model path.")
       )
     }
     let base = URL(fileURLWithPath: localModelPath, isDirectory: true)
@@ -165,7 +166,8 @@ struct FluidAudioBackendBuilder: LocalSpeakerBackendBuilder {
     let embeddingModelURL = base.appendingPathComponent(Self.embeddingModelFileName)
     guard fileExists(segmentationModelURL.path), fileExists(embeddingModelURL.path) else {
       throw LocalSpeakerIdentifierError.modelUnavailable(
-        reason: "Файлы локальной модели FluidAudio отсутствуют в установленном пакете."
+        reason: String(
+          localized: "The local FluidAudio model files are missing from the installed pack.")
       )
     }
     return FluidAudioSpeakerIdentifier(

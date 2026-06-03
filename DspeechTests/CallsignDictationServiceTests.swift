@@ -15,7 +15,7 @@ struct CallsignDictationServiceTests {
 
     #expect(
       service.status
-        == .unavailable("Нет доступа к распознаванию речи. Разрешите его в Настройках."))
+        == .unavailable("No speech recognition access. Allow it in Settings."))
     #expect(authorization.speechCallCount == 1)
     #expect(authorization.micCallCount == 0)
     #expect(recognizer.startCallCount == 0)
@@ -28,7 +28,7 @@ struct CallsignDictationServiceTests {
 
     await service.start()
 
-    #expect(service.status == .unavailable("Нет доступа к микрофону. Разрешите его в Настройках."))
+    #expect(service.status == .unavailable("No microphone access. Allow it in Settings."))
     #expect(authorization.speechCallCount == 1)
     #expect(authorization.micCallCount == 1)
     #expect(recognizer.startCallCount == 0)
@@ -39,7 +39,7 @@ struct CallsignDictationServiceTests {
 
     await service.start()
 
-    #expect(service.status == .unavailable("Распознаватель речи недоступен на этом устройстве."))
+    #expect(service.status == .unavailable("Speech recognition isn't available on this device."))
   }
 
   @Test func unavailableRecognizerSurfacesUnavailable() async {
@@ -48,7 +48,7 @@ struct CallsignDictationServiceTests {
 
     await service.start()
 
-    #expect(service.status == .unavailable("Распознаватель речи недоступен на этом устройстве."))
+    #expect(service.status == .unavailable("Speech recognition isn't available on this device."))
     #expect(recognizer.startCallCount == 0)
   }
 
@@ -61,7 +61,7 @@ struct CallsignDictationServiceTests {
     #expect(
       service.status
         == .unavailable(
-          "Офлайн-распознавание для fr-FR не установлено. Голосовой ввод позывного требует локальной модели."
+          "Offline recognition for fr-FR is not installed. Voice entry of the callsign requires a local model."
         )
     )
     #expect(recognizer.startCallCount == 0)
@@ -78,7 +78,7 @@ struct CallsignDictationServiceTests {
       Issue.record("expected unavailable status")
       return
     }
-    #expect(reason.contains("Не удалось запустить запись"))
+    #expect(reason.contains("start recording"))
     #expect(recognizer.startCallCount == 1)
     #expect(recognizer.endAudioCallCount == 1)
     #expect(recognizer.task.cancelCallCount == 1)
@@ -146,7 +146,7 @@ struct CallsignDictationServiceTests {
     #expect(
       await Self.wait(for: {
         service.status
-          == .unavailable("Не удалось распознать речь: SpeechDomain#7 scripted failure")
+          == .unavailable("Couldn’t recognize speech: SpeechDomain#7 scripted failure")
       })
     )
   }

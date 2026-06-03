@@ -1119,8 +1119,8 @@ struct ModelPackDownloadFailureTests {
       let failure = modelPackDownloadFailure(for: error)
       #expect(failure.kind == .checksum)
       #expect(failure.isRetryable)
-      #expect(failure.userSafeReason.contains("контрольной суммы"))
-      #expect(failure.userSafeReason.contains("целостности"))
+      #expect(failure.userSafeReason.contains("checksum"))
+      #expect(failure.userSafeReason.contains("integrity"))
     }
   }
 
@@ -1133,7 +1133,7 @@ struct ModelPackDownloadFailureTests {
     for failure in failures {
       #expect(failure.kind == .network)
       #expect(failure.isRetryable)
-      #expect(failure.userSafeReason.contains("сети"))
+      #expect(failure.userSafeReason.contains("network"))
     }
   }
 
@@ -1142,7 +1142,7 @@ struct ModelPackDownloadFailureTests {
 
     #expect(failure.kind == .disk)
     #expect(!failure.isRetryable)
-    #expect(failure.userSafeReason.contains("удалить"))
+    #expect(failure.userSafeReason.contains("delete"))
   }
 }
 
