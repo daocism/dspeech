@@ -11,6 +11,10 @@ final class LiveTranscriptionViewModel {
   private(set) var suppressedSegmentIDs: Set<UUID> = []
   private(set) var translations: [UUID: String] = [:]
   private(set) var translationUnavailable = false
+  // why: the demo/mockup transcript is a first-run illustration only. Once the user has
+  // started a real session it must never reappear over (or instead of) real content — the
+  // "press Stop and the transcript turns back into demo" confusion.
+  private(set) var hasEverStarted = false
 
   private let engine: any LiveTranscriptionEngine
   private let voiceFilter: VoiceFilterPipeline?
@@ -19,6 +23,10 @@ final class LiveTranscriptionViewModel {
   private var eventTask: Task<Void, Never>?
   private var translationTasks: [UUID: Task<Void, Never>] = [:]
   private var translationTaskTokens: [UUID: UUID] = [:]
+  // why: a Stop-committed partial has no language of its own; reuse the last real segment's
+  // language, defaulting to the device language (matches the device-language default policy).
+  private var lastSourceLanguageCode = String(
+    Locale.current.language.languageCode?.identifier ?? "en")
 
   init(
     engine: any LiveTranscriptionEngine,
@@ -55,6 +63,7 @@ final class LiveTranscriptionViewModel {
   }
 
   func start() async {
+    hasEverStarted = true
     if eventTask == nil {
       startObservingEvents()
     }
@@ -62,7 +71,25 @@ final class LiveTranscriptionViewModel {
   }
 
   func stop() {
+    // why: pressing Stop must NOT discard what the user was watching. If a partial line is
+    // still on screen (the recognizer hasn't finalized it), commit it as a segment so the
+    // transcript persists instead of vanishing on teardown.
+    commitPartialAsSegment()
     engine.stop()
+  }
+
+  private func commitPartialAsSegment() {
+    let text = partialText.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !text.isEmpty else { return }
+    partialText = ""
+    // why: confidence 0 = "unverified" — the recognizer never confirmed this line. The card
+    // hides the meaningless 0% and shows the VERIFY badge, which is the honest signal.
+    append(
+      segment: TranscriptSegment(
+        text: text,
+        confidence: 0,
+        sourceLanguageCode: lastSourceLanguageCode,
+        source: .liveATC))
   }
 
   func reset() {
@@ -130,6 +157,7 @@ final class LiveTranscriptionViewModel {
   }
 
   private func append(segment: TranscriptSegment) {
+    if !segment.sourceLanguageCode.isEmpty { lastSourceLanguageCode = segment.sourceLanguageCode }
     segments.append(segment)
     maybeTranslate(segment)
     guard let pipeline = voiceFilter, pipeline.enabled else { return }

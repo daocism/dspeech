@@ -194,6 +194,38 @@ struct LiveTranscriptionViewModelTests {
     #expect(vm.status == .stopped)
   }
 
+  @Test func stopCommitsInProgressPartialSoTranscriptPersists() async {
+    let engine = FakeEngine()
+    let vm = LiveTranscriptionViewModel(engine: engine)
+    await vm.start()
+    engine.push(.partial("descend and maintain three thousand"))
+    await wait(for: { vm.partialText == "descend and maintain three thousand" })
+    vm.stop()
+    await wait(for: { vm.status == .stopped })
+    #expect(vm.partialText.isEmpty)
+    // the partial is committed as a segment instead of vanishing on Stop
+    #expect(vm.segments.count == 1)
+    #expect(vm.segments.first?.text == "descend and maintain three thousand")
+    #expect(vm.visibleSegments.count == 1)
+  }
+
+  @Test func stopWithNoPartialCommitsNothing() async {
+    let engine = FakeEngine()
+    let vm = LiveTranscriptionViewModel(engine: engine)
+    await vm.start()
+    vm.stop()
+    await wait(for: { vm.status == .stopped })
+    #expect(vm.segments.isEmpty)
+  }
+
+  @Test func hasEverStartedFlipsOnFirstStart() async {
+    let engine = FakeEngine()
+    let vm = LiveTranscriptionViewModel(engine: engine)
+    #expect(vm.hasEverStarted == false)
+    await vm.start()
+    #expect(vm.hasEverStarted)
+  }
+
   @Test func resetClearsSegmentsAndPartial() async {
     let engine = FakeEngine()
     let vm = LiveTranscriptionViewModel(engine: engine)

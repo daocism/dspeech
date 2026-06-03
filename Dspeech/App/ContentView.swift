@@ -69,9 +69,12 @@ struct ContentView: View {
 
   private var transcriptSegmentsForDisplay: [TranscriptSegment] {
     let liveSegments = liveViewModel.visibleSegments
+    // why: the demo transcript is a first-run illustration ONLY — show it solely before the
+    // first Start, never over real content and never again after a real session (the
+    // "press Stop and my transcript turns back into demo" bug).
     guard liveSegments.isEmpty,
       liveViewModel.partialText.isEmpty,
-      liveViewModel.status == .idle || liveViewModel.status == .stopped
+      !liveViewModel.hasEverStarted
     else {
       return liveSegments
     }
@@ -1123,37 +1126,46 @@ private struct InputLevelBar: View {
   }
 }
 
+// why: the in-progress (partial) line must read as the SAME transcript, just live — not a
+// visually foreign cyan italic block. It mirrors TranscriptSegmentCard's layout and
+// typography (white card, same large monospaced text) with only a small "LIVE" badge +
+// cyan border to signal it is still being recognized.
 private struct PartialTranscriptCard: View {
   let text: String
   let isLandscape: Bool
-  @ScaledMetric(relativeTo: .title2) private var basePartialSize: CGFloat = 26
+  @ScaledMetric(relativeTo: .title) private var baseTranscriptSize: CGFloat = 30
 
   var body: some View {
-    HStack(alignment: .top, spacing: 10) {
-      Image(systemName: "waveform")
-        .font(.system(size: isLandscape ? 16 : 18, weight: .semibold))
-        .foregroundStyle(.cyan.opacity(0.9))
-        .padding(.top, 4)
+    VStack(alignment: .leading, spacing: 8) {
+      HStack(spacing: 8) {
+        Label("LIVE", systemImage: "waveform")
+          .font(.caption.monospaced().weight(.bold))
+          .foregroundStyle(.cyan)
+          .padding(.horizontal, 7)
+          .padding(.vertical, 3)
+          .background(.cyan.opacity(0.16), in: Capsule())
+        Spacer()
+      }
       Text(text)
         .font(
           .system(
-            size: isLandscape ? basePartialSize * (22.0 / 26.0) : basePartialSize,
-            weight: .medium, design: .monospaced)
+            size: isLandscape ? baseTranscriptSize * (26.0 / 30.0) : baseTranscriptSize,
+            weight: .semibold, design: .monospaced)
         )
-        .foregroundStyle(.white.opacity(0.85))
-        .italic()
+        .foregroundStyle(.white)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .minimumScaleFactor(0.6)
     }
     .padding(.horizontal, 14)
     .padding(.vertical, 12)
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(
-      Color.cyan.opacity(0.08),
+      .white.opacity(0.08),
       in: RoundedRectangle(cornerRadius: 18, style: .continuous)
     )
     .overlay {
       RoundedRectangle(cornerRadius: 18, style: .continuous)
-        .stroke(.cyan.opacity(0.30), lineWidth: 1)
+        .stroke(.cyan.opacity(0.35), lineWidth: 1)
     }
     .accessibilityIdentifier("partial-transcript")
   }
@@ -1197,7 +1209,9 @@ private struct TranscriptSegmentCard: View {
       Label(
         segment.startedAt.formatted(date: .omitted, time: .standard),
         systemImage: "clock")
-      Text("conf \(segment.confidence.formatted(.percent.precision(.fractionLength(0))))")
+      if segment.confidence > 0 {
+        Text("conf \(segment.confidence.formatted(.percent.precision(.fractionLength(0))))")
+      }
       Spacer(minLength: 0)
     }
     .font(.caption.monospacedDigit())
@@ -1233,9 +1247,13 @@ private struct TranscriptSegmentCard: View {
 
       Spacer()
 
-      Text(segment.confidence.formatted(.percent.precision(.fractionLength(0))))
-        .font(.caption.monospacedDigit())
-        .foregroundStyle(.white.opacity(0.6))
+      // why: confidence 0 = unverified (e.g. a Stop-committed partial) — hide the
+      // meaningless "0%"; the VERIFY badge already carries the "unconfirmed" signal.
+      if segment.confidence > 0 {
+        Text(segment.confidence.formatted(.percent.precision(.fractionLength(0))))
+          .font(.caption.monospacedDigit())
+          .foregroundStyle(.white.opacity(0.6))
+      }
     }
   }
 
