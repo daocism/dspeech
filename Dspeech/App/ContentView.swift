@@ -14,6 +14,7 @@ struct ContentView: View {
   @State private var translationConfig: TranslationSession.Configuration?
   @State private var translationPreparationToken = UUID()
   @Environment(\.scenePhase) private var scenePhase
+  @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
   init(
     engine: (any LiveTranscriptionEngine)? = nil,
@@ -297,7 +298,11 @@ struct ContentView: View {
 
   // why: launch-time hints show only in the pristine idle state (before the first
   // Start), so they grab attention once and never nag after the user has used the app.
-  private var showHints: Bool { liveViewModel.status == .idle }
+  // why: the coachmark hint bubbles are first-run nice-to-haves; at accessibility text sizes
+  // they can't fit beside the floating controls without clipping, so suppress them there.
+  private var showHints: Bool {
+    liveViewModel.status == .idle && !dynamicTypeSize.isAccessibilitySize
+  }
 
   private func startControls(isLandscape: Bool) -> some View {
     HStack(spacing: 12) {
@@ -329,10 +334,17 @@ struct ContentView: View {
       if let error = liveViewModel.lastErrorMessage {
         Text(RecognitionFailureText.userFacing(error))
           .font(.caption)
-          .foregroundStyle(.orange)
-          .lineLimit(3)
+          .foregroundStyle(Color(red: 1.0, green: 0.72, blue: 0.3))
+          .fixedSize(horizontal: false, vertical: true)
+          .padding(.horizontal, 9)
+          .padding(.vertical, 5)
+          .background(.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 9))
           .accessibilityIdentifier("error-banner")
       }
+      // why: reserve the bottom-trailing column so the error text never wraps under the
+      // floating mic button (the obscured/unreadable banner the audit's elementDetection
+      // catches); the banner stays left of the button and grows upward.
+      Spacer(minLength: 84)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
     .padding(.leading, isLandscape ? 16 : 18)
@@ -603,6 +615,7 @@ struct SettingsView: View {
                 "Your choice is saved for this device. The built-in microphone is for testing; for the cockpit, connect a wired input."
             )
           )
+          .fixedSize(horizontal: false, vertical: true)
         }
         Section(String(localized: "Recognition")) {
           switch recognition.localeAvailabilityState {
@@ -698,6 +711,7 @@ struct SettingsView: View {
                 "Translation runs on-device via Apple's system language packs. The first time you enable it, iOS offers to download a language pack. Audio and text never leave your iPhone."
             )
           )
+          .fixedSize(horizontal: false, vertical: true)
         }
         Section {
           Picker(String(localized: "App language"), selection: $appLanguage) {
@@ -781,23 +795,24 @@ struct VoiceFilterSettingsSection: View {
 
   var body: some View {
     Section {
+      // why: the description is its own row, not the Toggle's label — a Toggle reserves room
+      // for the switch and clips a long localized subtitle (e.g. German) beside it.
       Toggle(isOn: $enabled) {
-        VStack(alignment: .leading, spacing: 2) {
-          Text(String(localized: "ATC/pilot filter"))
-            .font(.body.weight(.medium))
-          Text(
-            enabled
-              ? String(localized: "Hide pilot transmissions and irrelevant ATC calls.")
-              : String(localized: "All ATC segments are shown.")
-          )
-          .font(.footnote)
-          .foregroundStyle(.secondary)
-        }
+        Text(String(localized: "ATC/pilot filter"))
+          .font(.body.weight(.medium))
       }
       .accessibilityIdentifier("voicefilter-enabled-toggle")
       .onChange(of: enabled) { _, newValue in
         pipeline.setEnabled(newValue)
       }
+      Text(
+        enabled
+          ? String(localized: "Hide pilot transmissions and irrelevant ATC calls.")
+          : String(localized: "All ATC segments are shown.")
+      )
+      .font(.footnote)
+      .foregroundStyle(.secondary)
+      .fixedSize(horizontal: false, vertical: true)
 
       if !storageIssues.isEmpty {
         storageRecoveryContent
@@ -807,7 +822,7 @@ struct VoiceFilterSettingsSection: View {
         Text(String(localized: "Aircraft callsign"))
           .font(.body.weight(.medium))
         HStack(spacing: 8) {
-          TextField("N123AB / RA-89077 / SBI247", text: $callsignDraft)
+          TextField("N123AB", text: $callsignDraft)
             .textInputAutocapitalization(.characters)
             .autocorrectionDisabled(true)
             .accessibilityIdentifier("voicefilter-callsign-field")
@@ -816,6 +831,7 @@ struct VoiceFilterSettingsSection: View {
         Text(dictationHint)
           .font(.footnote)
           .foregroundStyle(dictation.unavailableReason == nil ? Color.secondary : Color.orange)
+          .fixedSize(horizontal: false, vertical: true)
       }
       .onChange(of: callsignDraft) { _, newValue in
         pipeline.setCallSign(newValue.isEmpty ? nil : newValue)
@@ -990,9 +1006,13 @@ struct VoiceFilterSettingsSection: View {
 
   private var absentContent: some View {
     VStack(alignment: .leading, spacing: 8) {
-      Label(String(localized: "Model not installed"), systemImage: "arrow.down.circle")
-        .font(.subheadline.weight(.semibold))
-        .foregroundStyle(.secondary)
+      HStack(alignment: .firstTextBaseline, spacing: 6) {
+        Image(systemName: "arrow.down.circle")
+        Text(String(localized: "Model not installed"))
+          .fixedSize(horizontal: false, vertical: true)
+      }
+      .font(.subheadline.weight(.semibold))
+      .foregroundStyle(.secondary)
       Text(
         String(
           localized:
@@ -1001,18 +1021,18 @@ struct VoiceFilterSettingsSection: View {
       )
       .font(.footnote)
       .foregroundStyle(.secondary)
+      .fixedSize(horizontal: false, vertical: true)
       Button {
         startDownload()
       } label: {
-        Label(
-          String(localized: "Download voice filter pack (≈ 15 MB)"),
-          systemImage: "arrow.down.circle.fill"
-        )
+        HStack(spacing: 6) {
+          Image(systemName: "arrow.down.circle.fill")
+          Text(String(localized: "Download voice filter pack (≈ 15 MB)"))
+            .fixedSize(horizontal: false, vertical: true)
+        }
         .font(.subheadline.weight(.semibold))
         .frame(maxWidth: .infinity)
         .multilineTextAlignment(.center)
-        .lineLimit(2)
-        .minimumScaleFactor(0.8)
         .padding(.vertical, 3)
       }
       .buttonStyle(.borderedProminent)
@@ -1028,7 +1048,8 @@ struct VoiceFilterSettingsSection: View {
         )
       )
       .font(.caption)
-      .foregroundStyle(.tertiary)
+      .foregroundStyle(.secondary)
+      .fixedSize(horizontal: false, vertical: true)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .accessibilityElement(children: .contain)
@@ -1282,6 +1303,7 @@ private struct HintBubble: View {
         .foregroundStyle(.black)
         .multilineTextAlignment(.trailing)
         .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: 230, alignment: .trailing)
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .background(.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -1338,7 +1360,7 @@ private struct PartialTranscriptCard: View {
     .padding(.vertical, 12)
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(
-      .white.opacity(0.08),
+      Color(red: 0.07, green: 0.08, blue: 0.10),
       in: RoundedRectangle(cornerRadius: 18, style: .continuous)
     )
     .overlay {
@@ -1368,7 +1390,7 @@ private struct TranscriptSegmentCard: View {
     .padding(.vertical, 12)
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(
-      .white.opacity(0.08),
+      Color(red: 0.07, green: 0.08, blue: 0.10),
       in: RoundedRectangle(cornerRadius: 18, style: .continuous)
     )
     .overlay {
