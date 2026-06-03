@@ -679,6 +679,7 @@ struct VoiceFilterSettingsSection: View {
   @State private var enabled: Bool
   @State private var callsignDraft: String
   @State private var modelPackState: ModelPackState
+  @State private var storageIssues: [VoiceFilterStorageIssue]
   @State private var dictation = CallsignDictationService()
   @State private var downloadTask: Task<Void, Never>?
   @State private var recorder = VoiceEnrollmentRecorder()
@@ -691,6 +692,7 @@ struct VoiceFilterSettingsSection: View {
     _enabled = State(initialValue: pipeline.enabled)
     _callsignDraft = State(initialValue: pipeline.callSign?.raw ?? "")
     _modelPackState = State(initialValue: pipeline.modelPackState)
+    _storageIssues = State(initialValue: pipeline.storageIssues)
   }
 
   private var identifierAvailable: Bool {
@@ -716,6 +718,10 @@ struct VoiceFilterSettingsSection: View {
       .accessibilityIdentifier("voicefilter-enabled-toggle")
       .onChange(of: enabled) { _, newValue in
         pipeline.setEnabled(newValue)
+      }
+
+      if !storageIssues.isEmpty {
+        storageRecoveryContent
       }
 
       VStack(alignment: .leading, spacing: 4) {
@@ -777,6 +783,28 @@ struct VoiceFilterSettingsSection: View {
     return callsignDraft.isEmpty
       ? "Без позывного фильтр пропускает все сегменты не-пилотов. Нажмите микрофон, чтобы задать голосом."
       : "Сегменты без совпадения по позывному будут скрываться, пока окно продолжения активно."
+  }
+
+  private var storageRecoveryContent: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Label("Локальные настройки повреждены", systemImage: "exclamationmark.triangle.fill")
+        .font(.subheadline.weight(.semibold))
+        .foregroundStyle(.orange)
+      Text(VoiceFilterStorageIssue.userFacingSummary(storageIssues))
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+      Button("Сбросить повреждённые данные") {
+        pipeline.clearStorageIssues()
+        storageIssues = pipeline.storageIssues
+        enabled = pipeline.enabled
+        callsignDraft = pipeline.callSign?.raw ?? ""
+      }
+      .buttonStyle(.bordered)
+      .accessibilityIdentifier("voicefilter-storage-recovery")
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier("voicefilter-storage-corrupt")
   }
 
   @ViewBuilder
@@ -1075,7 +1103,14 @@ struct VoiceFilterSettingsSection: View {
   }
 
   private func modelPackFailureTitle(_ failure: ModelPackFailure) -> String {
-    failure.kind == .disk ? "Не удалось удалить модель" : "Не удалось установить модель"
+    switch failure.kind {
+    case .disk:
+      return "Не удалось удалить модель"
+    case .corruptState:
+      return "Повреждено состояние модели"
+    case .network, .checksum, .dimensionMismatch, .cancelled, .unknown:
+      return "Не удалось установить модель"
+    }
   }
 }
 

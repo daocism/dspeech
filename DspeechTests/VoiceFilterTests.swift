@@ -371,6 +371,7 @@ struct VoiceFilterStorageTests {
     #expect(store.loadCallSign() == nil)
     #expect(store.loadEnabled() == false)
     #expect(store.loadGateConfig() == .default)
+    #expect(store.loadSnapshot().issues.isEmpty)
   }
 
   @Test func profilesRoundTrip() {
@@ -398,6 +399,49 @@ struct VoiceFilterStorageTests {
     #expect(store.loadCallSign() == cs)
     store.saveCallSign(nil)
     #expect(store.loadCallSign() == nil)
+  }
+
+  @Test func corruptStoredValuesAreDistinguishableFromAbsence() {
+    let suiteName = "dspeech.tests.voicefilter.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    defaults.set(Data([0x00, 0x01]), forKey: UserDefaultsVoiceFilterStorage.profilesKey)
+    defaults.set(Data([0x02, 0x03]), forKey: UserDefaultsVoiceFilterStorage.callSignKey)
+    defaults.set(Data([0x04, 0x05]), forKey: UserDefaultsVoiceFilterStorage.configKey)
+    defaults.set("not-a-bool", forKey: UserDefaultsVoiceFilterStorage.enabledKey)
+
+    let snapshot = UserDefaultsVoiceFilterStorage(defaults: defaults).loadSnapshot()
+
+    #expect(snapshot.profiles.isEmpty)
+    #expect(snapshot.callSign == nil)
+    #expect(snapshot.gateConfig == .default)
+    #expect(snapshot.enabled == false)
+    #expect(
+      Set(snapshot.issues)
+        == [
+          .profilesCorrupted,
+          .callSignCorrupted,
+          .gateConfigCorrupted,
+          .enabledFlagCorrupted,
+        ])
+  }
+
+  @Test func clearingCorruptValuesRemovesOnlyCorruptKeys() {
+    let suiteName = "dspeech.tests.voicefilter.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let store = UserDefaultsVoiceFilterStorage(defaults: defaults)
+    let validCallSign = CallSign(raw: "N123AB")!
+    store.saveCallSign(validCallSign)
+    defaults.set(Data([0x00, 0x01]), forKey: UserDefaultsVoiceFilterStorage.profilesKey)
+    defaults.set(Data([0x04, 0x05]), forKey: UserDefaultsVoiceFilterStorage.configKey)
+
+    store.clearCorruptValues([.profilesCorrupted, .gateConfigCorrupted])
+
+    #expect(defaults.data(forKey: UserDefaultsVoiceFilterStorage.profilesKey) == nil)
+    #expect(defaults.data(forKey: UserDefaultsVoiceFilterStorage.configKey) == nil)
+    #expect(store.loadCallSign() == validCallSign)
+    #expect(store.loadSnapshot().issues.isEmpty)
   }
 }
 
@@ -746,6 +790,51 @@ struct VoiceFilterPipelineTests {
     #expect(pipeline.capability == .ready)
   }
 
+  @Test func corruptVoiceFilterStorageIssuesSurfaceInPipeline() {
+    let suiteName = "dspeech.tests.voicefilter.pipeline.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    defaults.set(Data([0x00, 0x01]), forKey: UserDefaultsVoiceFilterStorage.profilesKey)
+    defaults.set(Data([0x02, 0x03]), forKey: UserDefaultsVoiceFilterStorage.callSignKey)
+    defaults.set("not-a-bool", forKey: UserDefaultsVoiceFilterStorage.enabledKey)
+    let storage = UserDefaultsVoiceFilterStorage(defaults: defaults)
+
+    let pipeline = VoiceFilterPipeline(
+      identifier: FakeIdentifier(vector: VoicePrintVector(values: [1, 0, 0, 0], quality: 0.92)),
+      storage: storage,
+      modelPackStorage: InMemoryModelPackStorage(.installed(Self.installedPack()))
+    )
+
+    #expect(
+      Set(pipeline.storageIssues)
+        == [.profilesCorrupted, .callSignCorrupted, .enabledFlagCorrupted])
+    #expect(pipeline.profiles.isEmpty)
+    #expect(pipeline.callSign == nil)
+    #expect(pipeline.enabled == false)
+  }
+
+  @Test func clearingPipelineStorageIssuesResetsOnlyCorruptState() {
+    let suiteName = "dspeech.tests.voicefilter.pipeline.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    defaults.set(Data([0x00, 0x01]), forKey: UserDefaultsVoiceFilterStorage.profilesKey)
+    defaults.set(Data([0x02, 0x03]), forKey: UserDefaultsVoiceFilterStorage.callSignKey)
+    let storage = UserDefaultsVoiceFilterStorage(defaults: defaults)
+
+    let pipeline = VoiceFilterPipeline(
+      identifier: FakeIdentifier(vector: VoicePrintVector(values: [1, 0, 0, 0], quality: 0.92)),
+      storage: storage,
+      modelPackStorage: InMemoryModelPackStorage(.installed(Self.installedPack()))
+    )
+
+    pipeline.clearStorageIssues()
+
+    #expect(pipeline.storageIssues.isEmpty)
+    #expect(storage.loadSnapshot().issues.isEmpty)
+    #expect(defaults.data(forKey: UserDefaultsVoiceFilterStorage.profilesKey) == nil)
+    #expect(defaults.data(forKey: UserDefaultsVoiceFilterStorage.callSignKey) == nil)
+  }
+
   @Test func installedPackClassifyDelegatesToIdentifier() async throws {
     let store = InMemoryStorage()
     store.enabled = true
@@ -926,14 +1015,33 @@ struct ModelPackStateStorageTests {
     #expect(store.loadState() == .absent)
   }
 
-  @Test func corruptDataLoadsAbsent() {
+  @Test func corruptDataLoadsFailedState() {
     let suiteName = "dspeech.tests.modelpack.\(UUID().uuidString)"
     let defaults = UserDefaults(suiteName: suiteName)!
     defer { defaults.removePersistentDomain(forName: suiteName) }
     defaults.set(
       Data([0x00, 0x01, 0x02, 0x03]), forKey: UserDefaultsModelPackStateStorage.stateKey)
     let store = UserDefaultsModelPackStateStorage(defaults: defaults)
-    #expect(store.loadState() == .absent)
+    guard case .failed(let failure) = store.loadState() else {
+      Issue.record("expected corrupt persisted model-pack state to load as failed")
+      return
+    }
+    #expect(failure.kind == .corruptState)
+    #expect(failure.isRetryable == false)
+    #expect(!failure.userSafeReason.isEmpty)
+  }
+
+  @Test func unknownLaunchArgumentStringLoadsFailedState() {
+    let suiteName = "dspeech.tests.modelpack.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    defaults.set("not-a-model-pack-state", forKey: UserDefaultsModelPackStateStorage.stateKey)
+    let store = UserDefaultsModelPackStateStorage(defaults: defaults)
+    guard case .failed(let failure) = store.loadState() else {
+      Issue.record("expected unknown persisted string to load as failed")
+      return
+    }
+    #expect(failure.kind == .corruptState)
   }
 
   @Test func launchArgumentFailedRetryableLoadsFailedState() {

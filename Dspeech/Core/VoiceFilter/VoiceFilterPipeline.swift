@@ -27,6 +27,7 @@ final class VoiceFilterPipeline {
   private(set) var callSign: CallSign?
   private(set) var enabled: Bool
   private(set) var modelPackState: ModelPackState
+  private(set) var storageIssues: [VoiceFilterStorageIssue]
 
   init(
     identifier: any LocalSpeakerIdentifier,
@@ -42,13 +43,15 @@ final class VoiceFilterPipeline {
     self.modelPackStorage = modelPackStorage
     self.matchConfig = matchConfig
     self.voiceFilterActive = voiceFilterActive
-    self.profiles = storage.loadProfiles()
-    self.callSign = storage.loadCallSign()
-    self.enabled = storage.loadEnabled()
+    let snapshot = storage.loadSnapshot()
+    self.profiles = snapshot.profiles
+    self.callSign = snapshot.callSign
+    self.enabled = snapshot.enabled
+    self.storageIssues = snapshot.issues
     self.modelPackState = modelPackStorage.loadState()
     self.gate = ATCTranscriptGate(
-      config: storage.loadGateConfig(),
-      configuredCallSign: storage.loadCallSign()
+      config: snapshot.gateConfig,
+      configuredCallSign: snapshot.callSign
     )
   }
 
@@ -90,6 +93,25 @@ final class VoiceFilterPipeline {
   func setEnabled(_ flag: Bool) {
     enabled = flag
     storage.saveEnabled(flag)
+  }
+
+  func clearStorageIssues() {
+    let issues = Set(storageIssues)
+    storage.clearCorruptValues(issues)
+    if issues.contains(.profilesCorrupted) {
+      profiles = []
+    }
+    if issues.contains(.callSignCorrupted) {
+      callSign = nil
+      gate.configuredCallSign = nil
+    }
+    if issues.contains(.gateConfigCorrupted) {
+      gate.config = .default
+    }
+    if issues.contains(.enabledFlagCorrupted) {
+      enabled = false
+    }
+    storageIssues = []
   }
 
   func setCallSign(_ raw: String?) {
