@@ -7,6 +7,7 @@ import Observation
 final class VoiceEnrollmentRecorder {
   enum Status: Equatable {
     case idle
+    case starting
     case recording
     case unavailable(String)
   }
@@ -17,9 +18,24 @@ final class VoiceEnrollmentRecorder {
   private(set) var collected: [Float] = []
   private(set) var captureSampleRate: Double = 16_000
 
-  private let audioEngine = AVAudioEngine()
+  private let authorization: any VoiceEnrollmentMicrophoneAuthorizing
+  private let audioCapture: any VoiceEnrollmentAudioCapturing
+  private var activeSessionID: UUID?
+  private var captureContinuation: AsyncStream<VoiceEnrollmentCapturedSamples>.Continuation?
+  private var consumeTask: Task<Void, Never>?
+  private var captureStarted = false
+
+  init(
+    authorization: any VoiceEnrollmentMicrophoneAuthorizing =
+      SystemVoiceEnrollmentMicrophoneAuthorization(),
+    audioCapture: any VoiceEnrollmentAudioCapturing = AVAudioEngineVoiceEnrollmentCapture()
+  ) {
+    self.authorization = authorization
+    self.audioCapture = audioCapture
+  }
 
   var isRecording: Bool { status == .recording }
+  private var isActive: Bool { status == .starting || status == .recording }
 
   var unavailableReason: String? {
     if case .unavailable(let reason) = status { return reason }
@@ -27,75 +43,126 @@ final class VoiceEnrollmentRecorder {
   }
 
   func start() async {
-    guard !isRecording else { return }
+    guard !isActive else { return }
+    let sessionID = UUID()
+    activeSessionID = sessionID
+    status = .starting
     collected = []
 
-    guard await Self.requestMicrophonePermission() else {
+    guard await authorization.requestMicrophonePermission() else {
+      guard isCurrent(sessionID) else { return }
+      activeSessionID = nil
       status = .unavailable("Нет доступа к микрофону. Разрешите его в Настройках.")
       return
     }
+    guard isCurrent(sessionID) else { return }
 
     do {
-      let session = AVAudioSession.sharedInstance()
-      try session.setCategory(.record, mode: .measurement, options: [.duckOthers])
-      try session.setActive(true, options: .notifyOthersOnDeactivation)
-
-      let inputNode = audioEngine.inputNode
-      let format = inputNode.outputFormat(forBus: 0)
-      // why: a 0 Hz / 0-channel input (Simulator, mic-denied, mid route-change) makes
-      // installTap hard-crash deep in CoreAudio; bail to .unavailable instead.
-      guard format.channelCount > 0, format.sampleRate > 0 else {
-        status = .unavailable("Микрофон недоступен.")
-        teardown()
-        return
-      }
-      captureSampleRate = format.sampleRate
-      inputNode.removeTap(onBus: 0)
-      // why: format:nil — the tap uses the input bus's OWN current format. A separately-read
-      // AVAudioFormat trips an NSException abort in AUGraphNodeBaseV3::CreateRecordingTap
-      // ("required condition is false: format.sampleRate == hwFormat.sampleRate") when it
-      // doesn't match the live hardware rate (.measurement mode reconfigures it).
-      //
-      // why: the `@Sendable` is LOAD-BEARING. This type is @MainActor, so a bare closure
-      // here inherits @MainActor isolation; AVFAudio invokes the tap on its realtime
-      // thread → swift_task_isCurrentExecutor(MainActor) false → dispatch_assert_queue_fail
-      // (EXC_BREAKPOINT) on the first captured buffer. @Sendable makes it nonisolated so it
-      // legally runs off-MainActor; it only hops to @MainActor via the Task below.
-      inputNode.installTap(onBus: 0, bufferSize: 2048, format: nil) {
-        @Sendable [weak self] buffer, _ in
-        let mono = AppleSpeechLiveTranscriptionEngine.monoFloatSamples(from: buffer)
-        Task { @MainActor [weak self] in
-          guard let self, let mono else { return }
-          self.collected.append(contentsOf: mono)
-        }
-      }
-      audioEngine.prepare()
-      try audioEngine.start()
+      try beginCapture(sessionID: sessionID)
+      guard isCurrent(sessionID) else { return }
       status = .recording
+    } catch VoiceEnrollmentCaptureError.invalidInputFormat {
+      await failAfterCapture("Микрофон недоступен.", sessionID: sessionID)
     } catch {
-      status = .unavailable("Не удалось запустить запись: \(error.localizedDescription)")
-      teardown()
+      await failAfterCapture(
+        "Не удалось запустить запись: \(error.localizedDescription)",
+        sessionID: sessionID
+      )
     }
   }
 
   @discardableResult
-  func stop() -> (samples: [Float], sampleRate: Double)? {
-    guard isRecording else { return nil }
-    teardown()
+  func stop() async -> (samples: [Float], sampleRate: Double)? {
+    guard isRecording else {
+      if isActive {
+        await cleanup(drainQueuedSamples: false)
+        status = .idle
+      }
+      return nil
+    }
+    await cleanup(drainQueuedSamples: true)
     status = .idle
     guard !collected.isEmpty else { return nil }
     return (collected, captureSampleRate)
   }
 
-  private func teardown() {
-    if audioEngine.isRunning {
-      audioEngine.stop()
+  private func beginCapture(sessionID: UUID) throws {
+    let (captureStream, audioContinuation) = AsyncStream<VoiceEnrollmentCapturedSamples>.makeStream(
+      bufferingPolicy: .unbounded
+    )
+    captureContinuation = audioContinuation
+    consumeTask = Task { @MainActor [weak self] in
+      for await captured in captureStream {
+        guard let self, self.isCurrent(captured.sessionID) else { continue }
+        self.collected.append(contentsOf: captured.samples)
+      }
     }
-    audioEngine.inputNode.removeTap(onBus: 0)
-    try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+
+    do {
+      captureSampleRate = try audioCapture.start { buffer in
+        guard let copy = buffer.dspeechDeepCopy(),
+          let samples = AppleSpeechLiveTranscriptionEngine.monoFloatSamples(from: copy)
+        else {
+          return
+        }
+        audioContinuation.yield(
+          VoiceEnrollmentCapturedSamples(sessionID: sessionID, samples: samples)
+        )
+      }
+      captureStarted = true
+    } catch {
+      captureContinuation?.finish()
+      captureContinuation = nil
+      consumeTask?.cancel()
+      consumeTask = nil
+      audioCapture.stop()
+      throw error
+    }
   }
 
-  private nonisolated static func requestMicrophonePermission() async -> Bool {
+  private func cleanup(drainQueuedSamples: Bool) async {
+    let sessionID = activeSessionID
+    let continuation = captureContinuation
+    captureContinuation = nil
+    continuation?.finish()
+    if captureStarted {
+      audioCapture.stop()
+      captureStarted = false
+    }
+    if drainQueuedSamples {
+      await consumeTask?.value
+    } else {
+      consumeTask?.cancel()
+    }
+    consumeTask = nil
+    if activeSessionID == sessionID {
+      activeSessionID = nil
+    }
+  }
+
+  private func failAfterCapture(_ reason: String, sessionID: UUID) async {
+    guard isCurrent(sessionID) else { return }
+    await cleanup(drainQueuedSamples: false)
+    status = .unavailable(reason)
+  }
+
+  private func isCurrent(_ sessionID: UUID) -> Bool {
+    activeSessionID == sessionID
+  }
+}
+
+private struct VoiceEnrollmentCapturedSamples: Sendable {
+  let sessionID: UUID
+  let samples: [Float]
+}
+
+@MainActor
+protocol VoiceEnrollmentMicrophoneAuthorizing {
+  func requestMicrophonePermission() async -> Bool
+}
+
+struct SystemVoiceEnrollmentMicrophoneAuthorization: VoiceEnrollmentMicrophoneAuthorizing {
+  func requestMicrophonePermission() async -> Bool {
     if #available(iOS 17.0, *) {
       return await AVAudioApplication.requestRecordPermission()
     } else {
@@ -105,5 +172,52 @@ final class VoiceEnrollmentRecorder {
         }
       }
     }
+  }
+}
+
+@MainActor
+protocol VoiceEnrollmentAudioCapturing {
+  func start(onBuffer: @escaping @Sendable (AVAudioPCMBuffer) -> Void) throws -> Double
+  func stop()
+}
+
+enum VoiceEnrollmentCaptureError: Error {
+  case invalidInputFormat
+}
+
+@MainActor
+private final class AVAudioEngineVoiceEnrollmentCapture: VoiceEnrollmentAudioCapturing {
+  private let audioEngine = AVAudioEngine()
+
+  func start(onBuffer: @escaping @Sendable (AVAudioPCMBuffer) -> Void) throws -> Double {
+    do {
+      let session = AVAudioSession.sharedInstance()
+      try session.setCategory(.record, mode: .measurement, options: [.duckOthers])
+      try session.setActive(true, options: .notifyOthersOnDeactivation)
+
+      let inputNode = audioEngine.inputNode
+      let format = inputNode.outputFormat(forBus: 0)
+      guard format.channelCount > 0, format.sampleRate > 0 else {
+        throw VoiceEnrollmentCaptureError.invalidInputFormat
+      }
+      inputNode.removeTap(onBus: 0)
+      inputNode.installTap(onBus: 0, bufferSize: 2048, format: nil) { @Sendable buffer, _ in
+        onBuffer(buffer)
+      }
+      audioEngine.prepare()
+      try audioEngine.start()
+      return format.sampleRate
+    } catch {
+      stop()
+      throw error
+    }
+  }
+
+  func stop() {
+    if audioEngine.isRunning {
+      audioEngine.stop()
+    }
+    audioEngine.inputNode.removeTap(onBus: 0)
+    try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
   }
 }
