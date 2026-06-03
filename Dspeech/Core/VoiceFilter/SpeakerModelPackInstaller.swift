@@ -40,6 +40,27 @@ struct SpeakerModelPackInstaller: Sendable {
   static let packVersion = "0.14.7"
   static let embeddingDimension = FluidAudioSpeakerIdentifier.weSpeakerEmbeddingDimension
   static let source = "FluidInference/speaker-diarization-coreml"
+  static let registryBaseURLOverrideKey = "DspeechModelRegistryBaseURL"
+
+  // why: ADR 0007/0008 — the model-weight source must be overridable to a mirror under our
+  // own control without a Swift change. An Info.plist override (DspeechModelRegistryBaseURL)
+  // wins; when absent we set nothing, so FluidAudio's own resolution
+  // (REGISTRY_URL / MODEL_REGISTRY_URL env → HuggingFace) applies untouched.
+  static func registryBaseURLOverride(infoDictionary: [String: Any]?) -> String? {
+    guard let raw = infoDictionary?[registryBaseURLOverrideKey] as? String else { return nil }
+    let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty ? nil : trimmed
+  }
+
+  static func registryBaseURLOverride(bundle: Bundle = .main) -> String? {
+    registryBaseURLOverride(infoDictionary: bundle.infoDictionary)
+  }
+
+  // The source actually used for this install (resolved override, else FluidAudio's default),
+  // recorded for the eval doc / download UX per ADR 0007/0008.
+  static func resolvedRegistrySource(bundle: Bundle = .main) -> String {
+    "\(registryBaseURLOverride(bundle: bundle) ?? ModelRegistry.baseURL)/\(source)"
+  }
   static let segmentationFile = FluidAudioBackendBuilder.segmentationModelFileName
   static let embeddingFile = FluidAudioBackendBuilder.embeddingModelFileName
   static let expectedModelFileManifest: [ExpectedModelFile] = [
@@ -255,6 +276,9 @@ struct SpeakerModelPackInstaller: Sendable {
     to cacheRoot: URL,
     progress: @escaping @Sendable (ModelPackAcquisition) -> Void
   ) async throws {
+    if let override = registryBaseURLOverride() {
+      ModelRegistry.baseURL = override
+    }
     try await DownloadUtils.downloadRepo(
       .diarizer, to: cacheRoot,
       progressHandler: { snapshot in

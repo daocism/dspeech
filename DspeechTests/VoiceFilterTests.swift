@@ -356,6 +356,37 @@ private struct DeterministicSpeakerMatcherRandom {
   }
 }
 
+struct SpeakerModelPackSourceTests {
+  @Test func overrideAbsentWhenInfoDictionaryNil() {
+    #expect(SpeakerModelPackInstaller.registryBaseURLOverride(infoDictionary: nil) == nil)
+  }
+
+  @Test func overrideAbsentWhenKeyMissing() {
+    #expect(
+      SpeakerModelPackInstaller.registryBaseURLOverride(infoDictionary: ["other": "x"]) == nil)
+  }
+
+  @Test func overrideAbsentWhenEmptyOrWhitespace() {
+    let key = SpeakerModelPackInstaller.registryBaseURLOverrideKey
+    #expect(SpeakerModelPackInstaller.registryBaseURLOverride(infoDictionary: [key: ""]) == nil)
+    #expect(
+      SpeakerModelPackInstaller.registryBaseURLOverride(infoDictionary: [key: "   "]) == nil)
+  }
+
+  @Test func overrideAbsentWhenNotAString() {
+    let key = SpeakerModelPackInstaller.registryBaseURLOverrideKey
+    #expect(SpeakerModelPackInstaller.registryBaseURLOverride(infoDictionary: [key: 42]) == nil)
+  }
+
+  @Test func overrideUsedWhenPresent() {
+    let key = SpeakerModelPackInstaller.registryBaseURLOverrideKey
+    #expect(
+      SpeakerModelPackInstaller.registryBaseURLOverride(
+        infoDictionary: [key: " https://mirror.example/internal "])
+        == "https://mirror.example/internal")
+  }
+}
+
 struct VoiceFilterStorageTests {
   private func makeStore() -> (UserDefaultsVoiceFilterStorage, () -> Void) {
     let suiteName = "dspeech.tests.voicefilter.\(UUID().uuidString)"

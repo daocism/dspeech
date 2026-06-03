@@ -241,7 +241,7 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		A00000000000000000000200 /* XCRemoteSwiftPackageReference "FluidAudio" */ = {isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/FluidInference/FluidAudio.git"; requirement = {kind = upToNextMajorVersion; minimumVersion = 0.14.7; }; };
+		A00000000000000000000200 /* XCRemoteSwiftPackageReference "FluidAudio" */ = {isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/FluidInference/FluidAudio.git"; requirement = {kind = revision; revision = 8048812869b0c7c6fa393e564a4fb6f95126ba23; }; };
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
