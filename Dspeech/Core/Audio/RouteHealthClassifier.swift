@@ -30,7 +30,7 @@ enum RouteHealthClassifier {
     let typeRaw = port.portType.rawValue
 
     switch port.portType {
-    case .lineIn, .usbAudio, .headsetMic, .carAudio, .bluetoothHFP, .bluetoothLE, .airPlay:
+    case .lineIn, .usbAudio, .headsetMic, .carAudio, .bluetoothHFP, .bluetoothLE:
       return RouteHealthAssessment(
         health: .suitableExternal,
         primaryInputName: name,
@@ -42,7 +42,7 @@ enum RouteHealthClassifier {
         primaryInputName: name,
         primaryInputTypeRaw: typeRaw
       )
-    case .bluetoothA2DP, .builtInSpeaker, .headphones, .hdmi:
+    case .airPlay, .bluetoothA2DP, .builtInSpeaker, .headphones, .hdmi:
       return RouteHealthAssessment(
         health: .unsuitableOutputOnly,
         primaryInputName: name,

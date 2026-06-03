@@ -2,7 +2,7 @@
 
 Mode: tech-lead review plus scoped Codex implementation passes. This file now tracks both the original findings and the fixes already landed by Codex.
 Reviewer: Codex.
-Repository state: `fix/review-hardening-2026-06-03`; this note records Codex fixes through the audio-route preparation failure pass.
+Repository state: `fix/review-hardening-2026-06-03`; this note records Codex fixes through the AirPlay route-health pass.
 
 ## Verification evidence
 
@@ -67,6 +67,9 @@ Scope completed in this pass:
 - `Dspeech/App/AudioSourceController.swift`, `RouteHealthMonitor`, and `CaptureCoordinator` now consult route preparation before deriving inputs or Start availability, so a category failure blocks Start and surfaces a typed reason instead of pretending the microphone is simply absent.
 - `Dspeech/App/ContentView.swift` surfaces route-preparation failure in Settings with accessibility id `audio-route-preparation-error` and suppresses the generic "no input" fallback while the typed failure is present.
 - `DspeechTests/AudioSourceControllerTests.swift`, `RouteHealthMonitorTests.swift`, and `CaptureCoordinatorTests.swift` now cover route-preparation success, category failure before route refresh, no fake input claim, persisted-preference suppression, and typed Start blocking.
+- `AudioPortType.airPlay` is now treated as output-only. `RouteHealthClassifier` maps AirPlay direct/available-only routes to `.unsuitableOutputOnly`, and mixed AirPlay plus USB available inputs prefer the USB capture input.
+- `RouteHealthMonitor` now blocks Start for `.unsuitableOutputOnly` as well as `.noInput` and route-preparation failures, and no longer treats output-only route arrival as an improved capture source.
+- `DspeechTests/RouteHealthClassifierTests.swift`, `RouteHealthMonitorTests.swift`, and `CaptureCoordinatorTests.swift` cover AirPlay output-only classification, USB capture preference, output-only Start blocking, and silent output-only route-change handling.
 
 Verification for this pass:
 - XcodeBuildMCP `test_sim` still failed before build because `xcrun` could not find `simctl` under the active CommandLineTools developer directory.
@@ -217,6 +220,19 @@ Verification for this pass:
   - `git diff --check` passed.
   - banned-marker grep over app/tests/docs/scripts returned empty.
   - source-only stale implementation text grep over `Dspeech DspeechTests DspeechUITests` returned empty for old RED/missing-seam phrases.
+- Focused AirPlay/output-only route-health suite passed after the F21 patch:
+  - command: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project Dspeech.xcodeproj -scheme Dspeech -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4' CODE_SIGNING_ALLOWED=NO -only-testing:DspeechTests/RouteHealthClassifierTests -only-testing:DspeechTests/RouteHealthMonitorTests -only-testing:DspeechTests/CaptureCoordinatorTests build test`
+  - result: `** TEST SUCCEEDED **`
+  - xcresult: `/Users/andre/Library/Developer/Xcode/DerivedData/Dspeech-agmpzhijbukadidbkcyaauytxvwx/Logs/Test/Run-Dspeech-2026.06.03_14-35-25-+0200.xcresult`
+- Unit-only suite passed after the F21 patch:
+  - command: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project Dspeech.xcodeproj -scheme Dspeech -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4' CODE_SIGNING_ALLOWED=NO -only-testing:DspeechTests build test`
+  - result: `** TEST SUCCEEDED **`
+  - xcresult: `/Users/andre/Library/Developer/Xcode/DerivedData/Dspeech-agmpzhijbukadidbkcyaauytxvwx/Logs/Test/Run-Dspeech-2026.06.03_14-37-05-+0200.xcresult`
+- Full simulator build and test passed after the F21 patch:
+  - command: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project Dspeech.xcodeproj -scheme Dspeech -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4' CODE_SIGNING_ALLOWED=NO build test`
+  - result: `** TEST SUCCEEDED **`
+  - xcresult: `/Users/andre/Library/Developer/Xcode/DerivedData/Dspeech-agmpzhijbukadidbkcyaauytxvwx/Logs/Test/Run-Dspeech-2026.06.03_14-37-48-+0200.xcresult`
+  - UI suite ran 13 tests with 0 failures; unit suite passed with the existing synthesized-speech device capability test skipped on simulator.
 
 Findings status after this pass:
 - `F1`, `F2`, and `F12` are addressed for callsign dictation by code plus tests above.
@@ -226,6 +242,7 @@ Findings status after this pass:
 - `F6` is addressed for corrupt local voice/model state by typed persistence issues, visible recovery UI, non-retryable corrupt model-pack failure state, and tests above.
 - `F19` is addressed for voice enrollment recorder lifecycle by injected seams, session-owned stream ingestion, async drain-on-stop semantics, late/stale buffer rejection, and direct recorder unit tests.
 - `F20` is addressed for audio-route category priming by typed route-preparation status, visible Settings/Main Start failure copy, Start blocking before snapshot fallback, and fake-routing tests.
+- `F21` is addressed for AirPlay route health by treating AirPlay as output-only until real capture-route evidence exists, blocking Start for output-only routes, and covering the conservative behavior with tests.
 - `F9` and `F28` are addressed for the main Start lifecycle/UI contract by code plus tests above.
 - `F10` is addressed for the product contract: delete now removes local model files before clearing state, and delete failure is visible.
 - `F29` is addressed by removing stale implementation-phase comments from current green test seams.
@@ -607,11 +624,13 @@ Builder requirement:
 
 ### F21 MEDIUM: AirPlay is pinned as a suitable capture input without device evidence
 
+Status after Codex implementation pass: addressed. Apple Developer documentation lists `AVAudioSession.Port.airPlay` under output ports as an output to an AirPlay device (`https://developer.apple.com/documentation/avfaudio/avaudiosession/port/airplay`), so the code now treats AirPlay as output-only unless real capture-route evidence appears.
+
 Evidence:
 - `docs/research/2026-05-23-audio-route-health.md:63-69` says `airPlay` as input is rare and should be treated as `unknownExternal` until a real-world example exists.
 - `docs/run-notes/2026-05-23-route-health-ux.md:191-194` records the AirPlay-as-suitable-external decision as an unchanged open product question.
-- Current code contradicts that safer posture: `Dspeech/Core/Audio/RouteHealthTypes.swift:54-58` does not treat `.airPlay` as output-only, and `Dspeech/Core/Audio/RouteHealthClassifier.swift:32-38` classifies `.airPlay` as `.suitableExternal`.
-- `DspeechTests/RouteHealthClassifierTests.swift:106-119` asserts AirPlay is not output-only, and `DspeechTests/RouteHealthClassifierTests.swift:186-193` pins `.airPlay` as suitable external with a synthetic fixture.
+- Pre-fix code contradicted that safer posture: `Dspeech/Core/Audio/RouteHealthTypes.swift:54-58` did not treat `.airPlay` as output-only, and `Dspeech/Core/Audio/RouteHealthClassifier.swift:32-38` classified `.airPlay` as `.suitableExternal`.
+- Pre-fix tests also locked the behavior in: `DspeechTests/RouteHealthClassifierTests.swift:106-119` asserted AirPlay was not output-only, and `DspeechTests/RouteHealthClassifierTests.swift:186-193` pinned `.airPlay` as suitable external with a synthetic fixture.
 
 Risk:
 - The route banner can show green `EXT` and Start can remain enabled for an output-oriented transport that may not provide cockpit audio capture.

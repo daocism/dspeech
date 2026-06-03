@@ -119,6 +119,20 @@ struct CaptureCoordinatorTests {
     #expect(coordinator.startBlockedMessage?.contains("category denied") == true)
   }
 
+  @Test func startBlockedWhenRouteIsOutputOnly() async {
+    let (coordinator, engine, _) = Self.makeCoordinator(
+      route: RouteSnapshot(inputs: [Self.port(.airPlay, name: "AirPlay Receiver")]),
+      availableInputs: [Self.port(.airPlay, name: "AirPlay Receiver")]
+    )
+    #expect(coordinator.routeMonitor.health == .unsuitableOutputOnly)
+    #expect(coordinator.canStart == false)
+
+    await coordinator.start()
+
+    #expect(engine.startCallCount == 0)
+    #expect(coordinator.startBlockedMessage != nil)
+  }
+
   @Test func startAllowedForCautionBuiltIn() async {
     let (coordinator, engine, _) = Self.makeCoordinator(
       route: RouteSnapshot(inputs: [Self.port(.builtInMic, name: "iPhone Mic")]),

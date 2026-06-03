@@ -28,7 +28,9 @@ final class RouteHealthMonitor {
   var primaryInputTypeRaw: String? { assessment.primaryInputTypeRaw }
 
   var blocksStart: Bool {
-    routePreparationFailure != nil || assessment.health == .noInput
+    routePreparationFailure != nil
+      || assessment.health == .noInput
+      || assessment.health == .unsuitableOutputOnly
   }
 
   func start() {
@@ -124,7 +126,7 @@ final class RouteHealthMonitor {
   private static func rank(_ h: RouteHealth) -> Int {
     switch h {
     case .noInput: return 0
-    case .unsuitableOutputOnly: return 1
+    case .unsuitableOutputOnly: return 0
     case .unknownExternal: return 2
     case .cautionBuiltIn: return 3
     case .suitableExternal: return 4

@@ -53,7 +53,7 @@ enum AudioPortType: Equatable, Sendable {
 
   var isOutputOnly: Bool {
     switch self {
-    case .bluetoothA2DP, .builtInSpeaker, .headphones, .hdmi: return true
+    case .airPlay, .bluetoothA2DP, .builtInSpeaker, .headphones, .hdmi: return true
     default: return false
     }
   }
