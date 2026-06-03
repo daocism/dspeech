@@ -2,7 +2,7 @@
 
 Mode: tech-lead review plus scoped Codex implementation passes. This file now tracks both the original findings and the fixes already landed by Codex.
 Reviewer: Codex.
-Repository state: `fix/review-hardening-2026-06-03`; this note records Codex fixes through the recognition-locale availability pass.
+Repository state: `fix/review-hardening-2026-06-03`; this note records Codex fixes through the audio-session interruption/reset pass.
 
 ## Verification evidence
 
@@ -76,6 +76,9 @@ Scope completed in this pass:
 - `RecognitionSettings` now has an explicit loading/available/unavailable state for on-device-capable recognition locales. The selected locale is optional, the live engine and translation config only consume `activeLocaleIdentifier` after on-device availability is loaded, and an empty capable set clears active selection instead of inventing `en-US`.
 - `SystemOnDeviceLocaleAvailability` now resolves empty `SpeechTranscriber.supportedLocales` to an empty local-capable set, not to all `SFSpeechRecognizer.supportedLocales`; BCP-47 intersection mismatch still falls back to the on-device-capable set itself.
 - Settings now renders `recognition-locale-unavailable` instead of an empty picker when no local recognition language is available, with a Debug-only UI-test launch seam for that availability state.
+- `LiveAudioSessionRouting` now emits route events for `AVAudioSession.interruptionNotification` and `AVAudioSession.mediaServicesWereResetNotification`; media-services reset also re-primes the record-capable audio category before downstream route health recomputes.
+- `RouteHealthMonitor` now tracks active audio-session interruption, blocks Start while interrupted, emits user-visible interruption-ended and media-services-reset notices, and recomputes route health after reset.
+- `CaptureCoordinator` now deterministically stops current or starting capture on audio-session interruption begin and media-services reset, while interruption-ended and reset-while-idle paths remain visible without auto-restarting capture.
 
 Verification for this pass:
 - XcodeBuildMCP `test_sim` still failed before build because `xcrun` could not find `simctl` under the active CommandLineTools developer directory.
@@ -274,6 +277,24 @@ Verification for this pass:
   - `git diff --check` passed.
   - banned-marker grep over app/tests/docs/scripts returned empty.
   - source-only stale implementation text grep over `Dspeech DspeechTests DspeechUITests` returned empty for old RED/missing-seam phrases.
+- Focused audio-session interruption/reset suite passed after the F11 patch and notification parser correction:
+  - command: `swift format lint --strict --recursive Dspeech DspeechTests DspeechUITests && DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project Dspeech.xcodeproj -scheme Dspeech -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4' CODE_SIGNING_ALLOWED=NO -only-testing:DspeechTests/RouteHealthMonitorTests -only-testing:DspeechTests/CaptureCoordinatorTests build test`
+  - result: `** TEST SUCCEEDED **`
+  - xcresult: `/Users/andre/Library/Developer/Xcode/DerivedData/Dspeech-agmpzhijbukadidbkcyaauytxvwx/Logs/Test/Run-Dspeech-2026.06.03_15-26-35-+0200.xcresult`
+- Unit-only suite passed after the F11 patch and notification parser correction:
+  - command: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project Dspeech.xcodeproj -scheme Dspeech -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4' CODE_SIGNING_ALLOWED=NO -only-testing:DspeechTests build test`
+  - result: `** TEST SUCCEEDED **`
+  - xcresult: `/Users/andre/Library/Developer/Xcode/DerivedData/Dspeech-agmpzhijbukadidbkcyaauytxvwx/Logs/Test/Run-Dspeech-2026.06.03_15-27-20-+0200.xcresult`
+- Full simulator build and test passed after the F11 patch and notification parser correction:
+  - command: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project Dspeech.xcodeproj -scheme Dspeech -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4' CODE_SIGNING_ALLOWED=NO build test`
+  - result: `** TEST SUCCEEDED **`
+  - xcresult: `/Users/andre/Library/Developer/Xcode/DerivedData/Dspeech-agmpzhijbukadidbkcyaauytxvwx/Logs/Test/Run-Dspeech-2026.06.03_15-28-01-+0200.xcresult`
+  - UI suite ran 14 tests with 0 failures; unit suite passed with the existing synthesized-speech device capability test skipped on simulator.
+- Final hygiene was repeated after the F11/spec update:
+  - `swift format lint --strict --recursive Dspeech DspeechTests DspeechUITests` passed.
+  - `git diff --check` passed.
+  - banned-marker grep over app/tests/docs/scripts returned empty.
+  - source-only stale implementation text grep over `Dspeech DspeechTests DspeechUITests` returned empty for old RED/missing-seam phrases.
 
 Findings status after this pass:
 - `F1`, `F2`, and `F12` are addressed for callsign dictation by code plus tests above.
@@ -289,6 +310,7 @@ Findings status after this pass:
 - `F31` is addressed for empty on-device locale availability by making unavailable/loading explicit, clearing active recognition locale instead of fake-selecting `en-US`, blocking live ASR/translation from consuming unverified locale state, and covering empty/recovery/UI paths with tests.
 - `F9` and `F28` are addressed for the main Start lifecycle/UI contract by code plus tests above.
 - `F10` is addressed for the product contract: delete now removes local model files before clearing state, and delete failure is visible.
+- `F11` is addressed for audio-session interruptions and media-services reset by routing those system notifications into app route events, parsing `NSNumber`-backed `AVAudioSession` notification values, blocking Start while interrupted, stopping current/startup capture on interruption/reset, re-priming audio route category after reset, and covering listening/idle/startup cases with fake-routing tests.
 - `F29` is addressed by removing stale implementation-phase comments from current green test seams.
 - Broad product goal remains open. Other findings in this file still need builder work and review.
 
@@ -478,6 +500,8 @@ Builder requirement:
 - Add tests for installed -> delete success, delete failure, disabled -> delete success, and state/cache consistency after relaunch.
 
 ### F11 MEDIUM: AVAudioSession interruptions and media-service resets are not handled
+
+Status after Codex implementation pass: addressed. `LiveAudioSessionRouting` now maps interruption begin/end and media-services reset notifications into route events, including `NSNumber`-backed notification user-info values, `RouteHealthMonitor` makes interruption/reset visible and blocks Start while interrupted, and `CaptureCoordinator` stops current/startup capture on interruption begin or reset without auto-restarting on interruption end.
 
 Evidence:
 - `Dspeech/Core/Audio/LiveAudioSessionRouting.swift:33-41` observes `AVAudioSession.routeChangeNotification`.

@@ -69,8 +69,20 @@ final class CaptureCoordinator {
 
   func handleRouteEvent(_ event: RouteChangeEvent) {
     routeMonitor.handle(event: event)
-    if routeMonitor.lastNotice?.kind == .lost, live.canStopCurrentSession {
+    if shouldStopCurrentCapture(after: event), live.canStopCurrentSession {
       live.stop()
+    }
+  }
+
+  private func shouldStopCurrentCapture(after event: RouteChangeEvent) -> Bool {
+    switch event {
+    case .oldDeviceUnavailable:
+      return routeMonitor.lastNotice?.kind == .lost
+    case .interruptionBegan, .mediaServicesWereReset:
+      return true
+    case .newDeviceAvailable, .categoryChange, .override, .wakeFromSleep,
+      .noSuitableRouteForCategory, .routeConfigurationChange, .interruptionEnded, .unknown:
+      return false
     }
   }
 

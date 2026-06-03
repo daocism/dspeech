@@ -8,9 +8,10 @@ import Foundation
   final class LiveAudioSessionRouting: AudioSessionRouting, @unchecked Sendable {
     private let session: AVAudioSession
     private let continuation: AsyncStream<RouteChangeEvent>.Continuation
-    private let _routePreparationStatus: AudioRoutePreparationStatus
+    private let lock = NSLock()
+    private var _routePreparationStatus: AudioRoutePreparationStatus
     let routeChanges: AsyncStream<RouteChangeEvent>
-    private var observer: NSObjectProtocol?
+    private var observers: [NSObjectProtocol] = []
 
     init(session: AVAudioSession = .sharedInstance()) {
       self.session = session
@@ -19,18 +20,7 @@ import Foundation
       // .noInput and disables Start before the engine ever activates capture.
       // Priming the category (without activating — the engine owns activation)
       // lets the OS surface the real input so Start reflects an available mic.
-      do {
-        try session.setCategory(
-          .playAndRecord,
-          mode: .measurement,
-          options: [.allowBluetoothHFP, .allowBluetoothA2DP, .defaultToSpeaker]
-        )
-        self._routePreparationStatus = .ready
-      } catch {
-        self._routePreparationStatus = .failed(
-          .recordCategoryUnavailable(error.localizedDescription)
-        )
-      }
+      self._routePreparationStatus = Self.prepareRecordCategory(session)
       var localContinuation: AsyncStream<RouteChangeEvent>.Continuation!
       self.routeChanges = AsyncStream<RouteChangeEvent>(
         bufferingPolicy: .unbounded
@@ -38,26 +28,94 @@ import Foundation
         localContinuation = continuation
       }
       self.continuation = localContinuation
-      self.observer = NotificationCenter.default.addObserver(
-        forName: AVAudioSession.routeChangeNotification,
-        object: session,
-        queue: nil
-      ) { [continuation = localContinuation!] note in
-        let rawReason = (note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt) ?? 0
-        let event = LiveAudioSessionRouting.event(forRawReason: rawReason)
-        continuation.yield(event)
-      }
+      self.observers = [
+        NotificationCenter.default.addObserver(
+          forName: AVAudioSession.routeChangeNotification,
+          object: session,
+          queue: nil
+        ) { [continuation = localContinuation!] note in
+          let rawReason = (note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt) ?? 0
+          let event = LiveAudioSessionRouting.event(forRawReason: rawReason)
+          continuation.yield(event)
+        },
+        NotificationCenter.default.addObserver(
+          forName: AVAudioSession.interruptionNotification,
+          object: session,
+          queue: nil
+        ) { [continuation = localContinuation!] note in
+          let event = LiveAudioSessionRouting.event(forInterruptionUserInfo: note.userInfo)
+          continuation.yield(event)
+        },
+        NotificationCenter.default.addObserver(
+          forName: AVAudioSession.mediaServicesWereResetNotification,
+          object: session,
+          queue: nil
+        ) { [weak self, continuation = localContinuation!] _ in
+          self?.refreshRoutePreparationStatus()
+          continuation.yield(.mediaServicesWereReset)
+        },
+      ]
     }
 
     deinit {
-      if let observer {
+      for observer in observers {
         NotificationCenter.default.removeObserver(observer)
       }
       continuation.finish()
     }
 
     var routePreparationStatus: AudioRoutePreparationStatus {
-      _routePreparationStatus
+      lock.lock()
+      defer { lock.unlock() }
+      return _routePreparationStatus
+    }
+
+    private func refreshRoutePreparationStatus() {
+      let status = Self.prepareRecordCategory(session)
+      lock.lock()
+      _routePreparationStatus = status
+      lock.unlock()
+    }
+
+    private static func prepareRecordCategory(
+      _ session: AVAudioSession
+    ) -> AudioRoutePreparationStatus {
+      do {
+        try session.setCategory(
+          .playAndRecord,
+          mode: .measurement,
+          options: [.allowBluetoothHFP, .allowBluetoothA2DP, .defaultToSpeaker]
+        )
+        return .ready
+      } catch {
+        return .failed(.recordCategoryUnavailable(error.localizedDescription))
+      }
+    }
+
+    static func event(
+      forInterruptionUserInfo userInfo: [AnyHashable: Any]?
+    ) -> RouteChangeEvent {
+      let rawType = unsignedValue(userInfo?[AVAudioSessionInterruptionTypeKey]) ?? 0
+      guard let type = AVAudioSession.InterruptionType(rawValue: rawType) else {
+        return .unknown(Int(rawType))
+      }
+      switch type {
+      case .began:
+        return .interruptionBegan
+      case .ended:
+        let rawOptions = unsignedValue(userInfo?[AVAudioSessionInterruptionOptionKey]) ?? 0
+        let options = AVAudioSession.InterruptionOptions(rawValue: rawOptions)
+        return .interruptionEnded(shouldResume: options.contains(.shouldResume))
+      @unknown default:
+        return .unknown(Int(rawType))
+      }
+    }
+
+    private static func unsignedValue(_ raw: Any?) -> UInt? {
+      if let value = raw as? UInt { return value }
+      if let value = raw as? NSNumber { return value.uintValue }
+      if let value = raw as? Int { return UInt(exactly: value) }
+      return nil
     }
 
     var currentRouteSnapshot: RouteSnapshot {

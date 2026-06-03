@@ -8,6 +8,7 @@ final class RouteHealthMonitor {
   private(set) var lastNotice: RouteChangeNotice?
   private(set) var lastEvent: RouteChangeEvent?
   private(set) var routePreparationFailure: AudioRoutePreparationFailure?
+  private(set) var isAudioSessionInterrupted = false
 
   private let routing: AudioSessionRouting
   private let now: @Sendable () -> Date
@@ -28,7 +29,8 @@ final class RouteHealthMonitor {
   var primaryInputTypeRaw: String? { assessment.primaryInputTypeRaw }
 
   var blocksStart: Bool {
-    routePreparationFailure != nil
+    isAudioSessionInterrupted
+      || routePreparationFailure != nil
       || assessment.health == .noInput
       || assessment.health == .unsuitableOutputOnly
   }
@@ -94,6 +96,29 @@ final class RouteHealthMonitor {
       lastNotice = RouteChangeNotice(
         kind: .noSuitableRoute,
         portName: nil,
+        timestamp: now()
+      )
+    case .interruptionBegan:
+      isAudioSessionInterrupted = true
+      lastNotice = RouteChangeNotice(
+        kind: .interruptionBegan,
+        portName: recomputed.primaryInputName,
+        timestamp: now()
+      )
+    case .interruptionEnded(let shouldResume):
+      isAudioSessionInterrupted = false
+      lastNotice = RouteChangeNotice(
+        kind: .interruptionEnded(shouldResume: shouldResume),
+        portName: recomputed.primaryInputName,
+        timestamp: now()
+      )
+    case .mediaServicesWereReset:
+      isAudioSessionInterrupted = false
+      routePreparationFailure = routing.routePreparationStatus.failure
+      assessment = Self.assessment(for: routing)
+      lastNotice = RouteChangeNotice(
+        kind: .mediaServicesReset,
+        portName: assessment.primaryInputName,
         timestamp: now()
       )
     case .categoryChange, .override, .wakeFromSleep, .routeConfigurationChange, .unknown:
@@ -166,6 +191,16 @@ extension RouteChangeNotice {
       return "Внешний источник пропал — переключение на \(name). Запись приостановлена."
     case .noSuitableRoute:
       return "Нет подходящего источника захвата."
+    case .interruptionBegan:
+      return "Аудиозахват прерван системой. Запись приостановлена."
+    case .interruptionEnded(let shouldResume):
+      if shouldResume {
+        return "Аудиосессия снова доступна. Запустите захват заново после проверки входа."
+      }
+      return "Аудиосессия снова доступна. Проверьте вход перед новым запуском."
+    case .mediaServicesReset:
+      return
+        "Аудиосервис iOS перезапущен. Запись приостановлена — проверьте вход и запустите снова."
     case .silent:
       return ""
     }
@@ -173,7 +208,9 @@ extension RouteChangeNotice {
 
   var isUserVisible: Bool {
     switch kind {
-    case .improved, .lost, .noSuitableRoute: return true
+    case .improved, .lost, .noSuitableRoute, .interruptionBegan, .interruptionEnded,
+      .mediaServicesReset:
+      return true
     case .silent: return false
     }
   }

@@ -210,6 +210,73 @@ struct CaptureCoordinatorTests {
     #expect(coordinator.routeBanner == nil)
   }
 
+  @Test func interruptionBeganWhileListeningStopsAndShowsNotice() async {
+    let (coordinator, engine, _) = Self.makeCoordinator(
+      route: RouteSnapshot(inputs: [Self.port(.usbAudio, name: "USB Tap")]),
+      availableInputs: [Self.port(.usbAudio, name: "USB Tap")]
+    )
+    await coordinator.start()
+    await Self.wait(for: { coordinator.live.isListening })
+
+    coordinator.handleRouteEvent(.interruptionBegan)
+
+    await Self.wait(for: { engine.stopCallCount == 1 })
+    #expect(engine.stopCallCount == 1)
+    #expect(coordinator.routeMonitor.isAudioSessionInterrupted)
+    #expect(coordinator.canStart == false)
+    #expect(coordinator.routeMonitor.lastNotice?.kind == .interruptionBegan)
+    #expect(coordinator.routeBanner != nil)
+  }
+
+  @Test func interruptionEndedWhileIdleShowsNoticeWithoutRestartingCapture() {
+    let (coordinator, engine, _) = Self.makeCoordinator(
+      route: RouteSnapshot(inputs: [Self.port(.usbAudio, name: "USB Tap")]),
+      availableInputs: [Self.port(.usbAudio, name: "USB Tap")]
+    )
+
+    coordinator.handleRouteEvent(.interruptionEnded(shouldResume: true))
+
+    #expect(engine.startCallCount == 0)
+    #expect(engine.stopCallCount == 0)
+    #expect(coordinator.canStart)
+    #expect(coordinator.routeMonitor.lastNotice?.kind == .interruptionEnded(shouldResume: true))
+    #expect(coordinator.routeBanner != nil)
+  }
+
+  @Test func mediaServicesResetWhileListeningStopsAndShowsNotice() async {
+    let (coordinator, engine, routing) = Self.makeCoordinator(
+      route: RouteSnapshot(inputs: [Self.port(.usbAudio, name: "USB Tap")]),
+      availableInputs: [Self.port(.usbAudio, name: "USB Tap")]
+    )
+    await coordinator.start()
+    await Self.wait(for: { coordinator.live.isListening })
+    routing.updateRoute(
+      RouteSnapshot(inputs: [Self.port(.builtInMic, name: "iPhone Mic")]),
+      availableInputs: [Self.port(.builtInMic, name: "iPhone Mic")]
+    )
+
+    coordinator.handleRouteEvent(.mediaServicesWereReset)
+
+    await Self.wait(for: { engine.stopCallCount == 1 })
+    #expect(engine.stopCallCount == 1)
+    #expect(coordinator.routeMonitor.health == .cautionBuiltIn)
+    #expect(coordinator.routeMonitor.lastNotice?.kind == .mediaServicesReset)
+    #expect(coordinator.routeBanner != nil)
+  }
+
+  @Test func mediaServicesResetWhileStoppedShowsNoticeWithoutStopCall() {
+    let (coordinator, engine, _) = Self.makeCoordinator(
+      route: RouteSnapshot(inputs: [Self.port(.usbAudio, name: "USB Tap")]),
+      availableInputs: [Self.port(.usbAudio, name: "USB Tap")]
+    )
+
+    coordinator.handleRouteEvent(.mediaServicesWereReset)
+
+    #expect(engine.stopCallCount == 0)
+    #expect(coordinator.routeMonitor.lastNotice?.kind == .mediaServicesReset)
+    #expect(coordinator.routeBanner != nil)
+  }
+
   @Test func toggleStopsWhenListening() async {
     let (coordinator, engine, _) = Self.makeCoordinator(
       route: RouteSnapshot(inputs: [Self.port(.usbAudio)]),
@@ -308,6 +375,26 @@ struct CaptureCoordinatorTests {
     #expect(engine.stopCallCount == 1)
     #expect(coordinator.routeMonitor.lastNotice?.kind == .lost)
     #expect(coordinator.live.status == .stopped)
+
+    engine.completeStart()
+    await startTask.value
+    #expect(coordinator.live.status == .stopped)
+  }
+
+  @Test func interruptionBeganStopsStartupInProgress() async {
+    let (coordinator, engine, _) = Self.makeCoordinator(
+      route: RouteSnapshot(inputs: [Self.port(.usbAudio)]),
+      availableInputs: [Self.port(.usbAudio)],
+      startSuspends: true
+    )
+    let startTask = Task { @MainActor in await coordinator.start() }
+    await Self.wait(for: { engine.startCallCount == 1 && coordinator.live.canStopCurrentSession })
+
+    coordinator.handleRouteEvent(.interruptionBegan)
+
+    await Self.wait(for: { coordinator.live.status == .stopped })
+    #expect(engine.stopCallCount == 1)
+    #expect(coordinator.routeMonitor.isAudioSessionInterrupted)
 
     engine.completeStart()
     await startTask.value
