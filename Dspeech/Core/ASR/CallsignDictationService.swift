@@ -8,6 +8,7 @@ import Observation
 final class CallsignDictationService {
   enum Status: Equatable {
     case idle
+    case starting
     case listening
     case unavailable(String)
   }
@@ -16,16 +17,33 @@ final class CallsignDictationService {
   private(set) var liveTranscript: String = ""
 
   private let localeIdentifier: String
-  private let audioEngine = AVAudioEngine()
-  private var recognizer: SFSpeechRecognizer?
-  private var request: SFSpeechAudioBufferRecognitionRequest?
-  private var task: SFSpeechRecognitionTask?
+  private let authorization: any CallsignSpeechAuthorization
+  private let recognizerFactory: @MainActor (String) -> (any CallsignSpeechRecognizing)?
+  private let audioCapture: any CallsignAudioCapturing
+  private var recognizer: (any CallsignSpeechRecognizing)?
+  private var task: (any CallsignRecognitionTasking)?
+  private var activeSessionID: UUID?
+  private var captureStarted = false
+  private var captureContinuation: AsyncStream<CallsignCapturedBuffer>.Continuation?
+  private var consumeTask: Task<Void, Never>?
 
-  init(localeIdentifier: String = "en-US") {
+  init(
+    localeIdentifier: String = "en-US",
+    authorization: any CallsignSpeechAuthorization = SystemCallsignSpeechAuthorization(),
+    recognizerFactory: @escaping @MainActor (String) -> (any CallsignSpeechRecognizing)? = {
+      AppleCallsignSpeechRecognizer(localeIdentifier: $0)
+    },
+    audioCapture: any CallsignAudioCapturing = AVAudioEngineCallsignAudioCapture()
+  ) {
     self.localeIdentifier = localeIdentifier
+    self.authorization = authorization
+    self.recognizerFactory = recognizerFactory
+    self.audioCapture = audioCapture
   }
 
   var isListening: Bool { status == .listening }
+  private var isStarting: Bool { status == .starting }
+  private var isActive: Bool { isStarting || isListening }
 
   var unavailableReason: String? {
     if case .unavailable(let reason) = status { return reason }
@@ -33,111 +51,153 @@ final class CallsignDictationService {
   }
 
   func toggle() async {
-    if isListening { stop() } else { await start() }
+    if isActive { stop() } else { await start() }
   }
 
   func start() async {
-    guard !isListening else { return }
+    guard !isActive else { return }
+    let sessionID = UUID()
+    activeSessionID = sessionID
+    status = .starting
     liveTranscript = ""
 
-    guard await Self.requestSpeechAuthorization() else {
-      status = .unavailable("Нет доступа к распознаванию речи. Разрешите его в Настройках.")
+    guard await authorization.requestSpeechAuthorization() else {
+      failBeforeCapture(
+        "Нет доступа к распознаванию речи. Разрешите его в Настройках.",
+        sessionID: sessionID
+      )
       return
     }
-    guard await Self.requestMicrophonePermission() else {
-      status = .unavailable("Нет доступа к микрофону. Разрешите его в Настройках.")
+    guard isCurrent(sessionID) else { return }
+    guard await authorization.requestMicrophonePermission() else {
+      failBeforeCapture(
+        "Нет доступа к микрофону. Разрешите его в Настройках.",
+        sessionID: sessionID
+      )
       return
     }
-    guard let recognizer = SFSpeechRecognizer(locale: Locale(identifier: localeIdentifier)),
-      recognizer.isAvailable
-    else {
-      status = .unavailable("Распознаватель речи недоступен на этом устройстве.")
+    guard isCurrent(sessionID) else { return }
+    guard let recognizer = recognizerFactory(localeIdentifier), recognizer.isAvailable else {
+      failBeforeCapture("Распознаватель речи недоступен на этом устройстве.", sessionID: sessionID)
       return
     }
     guard recognizer.supportsOnDeviceRecognition else {
-      status = .unavailable(
-        "Офлайн-распознавание для \(localeIdentifier) не установлено. Голосовой ввод позывного требует локальной модели."
+      failBeforeCapture(
+        "Офлайн-распознавание для \(localeIdentifier) не установлено. Голосовой ввод позывного требует локальной модели.",
+        sessionID: sessionID
       )
       return
     }
     self.recognizer = recognizer
 
     do {
-      try begin(recognizer: recognizer)
+      try begin(recognizer: recognizer, sessionID: sessionID)
+      guard isCurrent(sessionID) else { return }
       status = .listening
     } catch {
-      status = .unavailable("Не удалось запустить запись: \(error.localizedDescription)")
-      cleanup()
+      failAfterCapture(
+        "Не удалось запустить запись: \(error.localizedDescription)", sessionID: sessionID)
     }
   }
 
   func stop() {
-    guard isListening else { return }
+    guard isActive else { return }
     cleanup()
     status = .idle
   }
 
-  private func begin(recognizer: SFSpeechRecognizer) throws {
-    let session = AVAudioSession.sharedInstance()
-    try session.setCategory(.record, mode: .measurement, options: [.duckOthers])
-    try session.setActive(true, options: .notifyOthersOnDeactivation)
-
-    let request = SFSpeechAudioBufferRecognitionRequest()
-    request.shouldReportPartialResults = true
-    request.requiresOnDeviceRecognition = true
-    request.taskHint = .dictation
-    self.request = request
-
-    let inputNode = audioEngine.inputNode
-    let recordingFormat = inputNode.outputFormat(forBus: 0)
-    inputNode.removeTap(onBus: 0)
-    let tapRequest = request
-    inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) {
-      @Sendable buffer, _ in
-      tapRequest.append(buffer)
+  private func begin(recognizer: any CallsignSpeechRecognizing, sessionID: UUID) throws {
+    let (captureStream, audioContinuation) = AsyncStream<CallsignCapturedBuffer>.makeStream(
+      bufferingPolicy: .unbounded
+    )
+    captureContinuation = audioContinuation
+    consumeTask = Task { @MainActor [weak self] in
+      for await captured in captureStream {
+        guard let self, self.isCurrent(sessionID), let recognizer = self.recognizer else { break }
+        recognizer.append(captured.buffer)
+      }
     }
-    audioEngine.prepare()
-    try audioEngine.start()
 
-    task = recognizer.recognitionTask(with: request) { @Sendable [weak self] result, error in
-      let text = result?.bestTranscription.formattedString
-      let finished = (result?.isFinal ?? false) || error != nil
-      // why: surface a real recognition fault instead of silently returning to .idle
-      // (which looks identical to "never started"); a "no speech" timeout (1110) is a
-      // clean end, not a fault.
-      let hardError: String?
-      if let ns = error as NSError?, !(ns.domain == "kAFAssistantErrorDomain" && ns.code == 1110) {
-        hardError = "\(ns.domain)#\(ns.code) \(ns.localizedDescription)"
-      } else {
-        hardError = nil
-      }
+    task = recognizer.startRecognition { [weak self] update in
       Task { @MainActor [weak self] in
-        guard let self, self.isListening else { return }
-        if let text { self.liveTranscript = text }
-        guard finished else { return }
-        self.cleanup()
-        if let hardError {
-          self.status = .unavailable("Не удалось распознать речь: \(hardError)")
-        } else {
-          self.status = .idle
-        }
+        self?.handle(update: update, sessionID: sessionID)
       }
+    }
+
+    do {
+      try audioCapture.start { buffer in
+        guard let copy = buffer.dspeechDeepCopy() else { return }
+        audioContinuation.yield(CallsignCapturedBuffer(buffer: copy))
+      }
+      captureStarted = true
+    } catch {
+      captureContinuation?.finish()
+      captureContinuation = nil
+      consumeTask?.cancel()
+      consumeTask = nil
+      throw error
     }
   }
 
   private func cleanup() {
-    if audioEngine.isRunning {
-      audioEngine.stop()
+    activeSessionID = nil
+    if captureStarted {
+      audioCapture.stop()
+      captureStarted = false
     }
-    audioEngine.inputNode.removeTap(onBus: 0)
-    request?.endAudio()
+    captureContinuation?.finish()
+    captureContinuation = nil
+    consumeTask?.cancel()
+    consumeTask = nil
+    recognizer?.endAudio()
     task?.cancel()
     task = nil
-    request = nil
-    try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    recognizer = nil
   }
 
-  private nonisolated static func requestSpeechAuthorization() async -> Bool {
+  private func handle(update: CallsignRecognitionUpdate, sessionID: UUID) {
+    guard isCurrent(sessionID), isActive else { return }
+    if let text = update.text { liveTranscript = text }
+    guard update.isFinished else { return }
+    cleanup()
+    if let hardError = update.hardError {
+      status = .unavailable("Не удалось распознать речь: \(hardError)")
+    } else {
+      status = .idle
+    }
+  }
+
+  private func isCurrent(_ sessionID: UUID) -> Bool {
+    activeSessionID == sessionID
+  }
+
+  private func failBeforeCapture(_ reason: String, sessionID: UUID) {
+    guard isCurrent(sessionID) else { return }
+    activeSessionID = nil
+    status = .unavailable(reason)
+  }
+
+  private func failAfterCapture(_ reason: String, sessionID: UUID) {
+    guard isCurrent(sessionID) else { return }
+    cleanup()
+    status = .unavailable(reason)
+  }
+}
+
+private struct CallsignCapturedBuffer: @unchecked Sendable {
+  // why: every buffer is deep-copied inside the realtime tap before it enters the stream, and
+  // only the MainActor consumer reads/appends it before cleanup finishes the stream.
+  let buffer: AVAudioPCMBuffer
+}
+
+@MainActor
+protocol CallsignSpeechAuthorization {
+  func requestSpeechAuthorization() async -> Bool
+  func requestMicrophonePermission() async -> Bool
+}
+
+struct SystemCallsignSpeechAuthorization: CallsignSpeechAuthorization {
+  func requestSpeechAuthorization() async -> Bool {
     await withCheckedContinuation { continuation in
       SFSpeechRecognizer.requestAuthorization { status in
         continuation.resume(returning: status == .authorized)
@@ -145,7 +205,7 @@ final class CallsignDictationService {
     }
   }
 
-  private nonisolated static func requestMicrophonePermission() async -> Bool {
+  func requestMicrophonePermission() async -> Bool {
     if #available(iOS 17.0, *) {
       return await AVAudioApplication.requestRecordPermission()
     } else {
@@ -156,4 +216,134 @@ final class CallsignDictationService {
       }
     }
   }
+}
+
+struct CallsignRecognitionUpdate: Sendable {
+  let text: String?
+  let isFinished: Bool
+  let hardError: String?
+}
+
+@MainActor
+protocol CallsignRecognitionTasking {
+  func cancel()
+}
+
+@MainActor
+protocol CallsignSpeechRecognizing: AnyObject {
+  var isAvailable: Bool { get }
+  var supportsOnDeviceRecognition: Bool { get }
+  func startRecognition(onUpdate: @escaping @Sendable (CallsignRecognitionUpdate) -> Void)
+    -> any CallsignRecognitionTasking
+  func append(_ buffer: AVAudioPCMBuffer)
+  func endAudio()
+}
+
+@MainActor
+protocol CallsignAudioCapturing {
+  func start(onBuffer: @escaping @Sendable (AVAudioPCMBuffer) -> Void) throws
+  func stop()
+}
+
+@MainActor
+private final class AppleCallsignSpeechRecognizer: CallsignSpeechRecognizing {
+  private let recognizer: SFSpeechRecognizer
+  private var request: SFSpeechAudioBufferRecognitionRequest?
+
+  init?(localeIdentifier: String) {
+    guard let recognizer = SFSpeechRecognizer(locale: Locale(identifier: localeIdentifier)) else {
+      return nil
+    }
+    self.recognizer = recognizer
+  }
+
+  var isAvailable: Bool { recognizer.isAvailable }
+  var supportsOnDeviceRecognition: Bool { recognizer.supportsOnDeviceRecognition }
+
+  func startRecognition(onUpdate: @escaping @Sendable (CallsignRecognitionUpdate) -> Void)
+    -> any CallsignRecognitionTasking
+  {
+    let request = SFSpeechAudioBufferRecognitionRequest()
+    request.shouldReportPartialResults = true
+    request.requiresOnDeviceRecognition = true
+    request.taskHint = .dictation
+    self.request = request
+
+    let task = recognizer.recognitionTask(with: request) { result, error in
+      let text = result?.bestTranscription.formattedString
+      let hardError = Self.hardError(from: error)
+      onUpdate(
+        CallsignRecognitionUpdate(
+          text: text,
+          isFinished: (result?.isFinal ?? false) || error != nil,
+          hardError: hardError
+        )
+      )
+    }
+    return AppleCallsignRecognitionTask(task: task)
+  }
+
+  func append(_ buffer: AVAudioPCMBuffer) {
+    request?.append(buffer)
+  }
+
+  func endAudio() {
+    request?.endAudio()
+    request = nil
+  }
+
+  private nonisolated static func hardError(from error: Error?) -> String? {
+    guard let ns = error as NSError? else { return nil }
+    if ns.domain == "kAFAssistantErrorDomain", ns.code == 1110 {
+      return nil
+    }
+    return "\(ns.domain)#\(ns.code) \(ns.localizedDescription)"
+  }
+}
+
+@MainActor
+private struct AppleCallsignRecognitionTask: CallsignRecognitionTasking {
+  let task: SFSpeechRecognitionTask
+  func cancel() { task.cancel() }
+}
+
+@MainActor
+private final class AVAudioEngineCallsignAudioCapture: CallsignAudioCapturing {
+  private let audioEngine = AVAudioEngine()
+
+  func start(onBuffer: @escaping @Sendable (AVAudioPCMBuffer) -> Void) throws {
+    do {
+      let session = AVAudioSession.sharedInstance()
+      try session.setCategory(.record, mode: .measurement, options: [.duckOthers])
+      try session.setActive(true, options: .notifyOthersOnDeactivation)
+
+      let inputNode = audioEngine.inputNode
+      let recordingFormat = inputNode.outputFormat(forBus: 0)
+      guard recordingFormat.channelCount > 0, recordingFormat.sampleRate > 0 else {
+        throw CallsignAudioCaptureError.invalidInputFormat
+      }
+
+      inputNode.removeTap(onBus: 0)
+      inputNode.installTap(onBus: 0, bufferSize: 1024, format: nil) { @Sendable buffer, _ in
+        onBuffer(buffer)
+      }
+      audioEngine.prepare()
+      try audioEngine.start()
+    } catch {
+      stop()
+      throw error
+    }
+  }
+
+  func stop() {
+    if audioEngine.isRunning {
+      audioEngine.stop()
+    }
+    audioEngine.inputNode.removeTap(onBus: 0)
+    try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+  }
+}
+
+enum CallsignAudioCaptureError: Error {
+  case invalidInputFormat
 }

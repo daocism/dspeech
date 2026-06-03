@@ -108,7 +108,7 @@ struct OnDeviceSpeechRecognitionTests {
   // tap with no permission gate; reaching the end without aborting is the pass condition.
   @Test func inputLevelMeterInstallsTapWithoutCrashing() async throws {
     let meter = AVAudioEngineInputLevelMeter()
-    let drain = Task { for await _ in meter.levels() { break } }
+    let drain = Task { for await _ in meter.events() { break } }
     try await Task.sleep(nanoseconds: 800_000_000)
     meter.stop()
     drain.cancel()

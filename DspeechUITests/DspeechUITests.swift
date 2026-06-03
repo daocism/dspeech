@@ -51,34 +51,96 @@ final class DspeechUITests: XCTestCase {
   }
 
   @MainActor
-  func testStartButtonDoesNotCrashAppWithPermissionsPreGranted() throws {
+  func testStartTransitionsToListeningOrVisibleFailure() throws {
     let app = launchAppWithCleanPrivacyDefaults()
+    addUIInterruptionMonitor(withDescription: "Speech and microphone permissions") { alert in
+      Self.tapPermissionButton(in: alert)
+    }
 
     let startButton = app.buttons["start-button"]
     XCTAssertTrue(
       startButton.waitForExistence(timeout: 8),
       "main start-button must be reachable on launch")
     startButton.tap()
+    app.tap()
 
-    let permissionAlertButton = app.alerts.element.buttons.matching(
-      NSPredicate(
-        format: "label CONTAINS[c] %@ OR label CONTAINS[c] %@",
-        "Разреш", "Allow")
-    ).firstMatch
-    if permissionAlertButton.waitForExistence(timeout: 3) {
-      permissionAlertButton.tap()
-    }
+    acceptPermissionAlertsIfPresent(in: app)
 
-    let stopButton = app.buttons["stop-button"]
-    let stopAppeared = stopButton.waitForExistence(timeout: 8)
+    let reachedStartOutcome = waitForStartOutcome(in: app)
 
     XCTAssertTrue(
       app.state == .runningForeground,
       "app must still be running (not crashed) after tapping start")
     XCTAssertTrue(
-      stopAppeared || startButton.exists,
-      "either listening started (stop-button) or engine reported failure (start-button stayed) — app must not crash"
-    )
+      reachedStartOutcome,
+      "tapping Start must reach listening UI or a visible typed failure")
+
+    if app.buttons["stop-button"].exists {
+      app.buttons["stop-button"].tap()
+      XCTAssertTrue(app.buttons["start-button"].waitForExistence(timeout: 4))
+    } else {
+      let errorBanner = app.staticTexts["error-banner"]
+      XCTAssertTrue(errorBanner.exists)
+      XCTAssertFalse(errorBanner.label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+    }
+    assertLocalOnlyBadgeIsVisible(in: app)
+  }
+
+  @MainActor
+  private func acceptPermissionAlertsIfPresent(in app: XCUIApplication) {
+    let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+    for _ in 0..<3 {
+      if app.alerts.element.waitForExistence(timeout: 1),
+        Self.tapPermissionButton(in: app.alerts.element)
+      {
+        continue
+      }
+      if springboard.alerts.element.waitForExistence(timeout: 1),
+        Self.tapPermissionButton(in: springboard.alerts.element)
+      {
+        continue
+      }
+      return
+    }
+  }
+
+  @MainActor
+  private static func tapPermissionButton(in alert: XCUIElement) -> Bool {
+    let preferred = alert.buttons.matching(
+      NSPredicate(
+        format: "label CONTAINS[c] %@ OR label CONTAINS[c] %@",
+        "Разреш", "Allow")
+    ).firstMatch
+    if preferred.exists {
+      preferred.tap()
+      return true
+    }
+    let count = alert.buttons.count
+    guard count > 0 else { return false }
+    alert.buttons.element(boundBy: count - 1).tap()
+    return true
+  }
+
+  @MainActor
+  private func waitForStartOutcome(in app: XCUIApplication) -> Bool {
+    let emptyState = app.staticTexts["transcript-empty-state"]
+    let errorBanner = app.staticTexts["error-banner"]
+    let deadline = Date().addingTimeInterval(8)
+    while Date() < deadline {
+      acceptPermissionAlertsIfPresent(in: app)
+      if app.buttons["stop-button"].exists && emptyState.exists
+        && emptyState.label.localizedCaseInsensitiveContains("Слушаю")
+      {
+        return true
+      }
+      if errorBanner.exists
+        && !errorBanner.label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      {
+        return true
+      }
+      RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+    }
+    return false
   }
 
   @MainActor

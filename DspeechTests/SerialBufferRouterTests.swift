@@ -11,22 +11,10 @@ import Testing
 // that is still classifying. Classifier errors fail open (append) without
 // disturbing order, and once the request is ended no further buffers append.
 //
-// These tests drive a `SerialBufferRouter<Buffer>` seam that does not yet exist
-// in production; they are RED (compile failure: "cannot find 'SerialBufferRouter'
-// in scope") until the engineer lands it. The seam is exercised through injected
-// closures rather than a real `SFSpeechAudioBufferRecognitionRequest`:
+// The seam is exercised through injected closures rather than a real
+// `SFSpeechAudioBufferRecognitionRequest`.
 //
-//   @MainActor
-//   final class SerialBufferRouter<Buffer> {
-//       init(
-//           classify: @escaping @Sendable ([Float], Double) async throws -> PreTranscriptionRoutingDecision,
-//           append: @escaping (Buffer) -> Void
-//       )
-//       func submit(_ buffer: Buffer, samples: [Float], sampleRate: Double)
-//       func finish()
-//   }
-//
-// Contract the engineer must satisfy:
+// Contract:
 //   1. Buffers are processed serially in submit order; `append` is invoked only
 //      for `.transcribe` decisions, in submit order, regardless of how long any
 //      individual classification takes.

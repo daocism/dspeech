@@ -14,6 +14,7 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
   private var recognizer: SFSpeechRecognizer?
   private var request: SFSpeechAudioBufferRecognitionRequest?
   private var task: SFSpeechRecognitionTask?
+  private var lifecycleGeneration = 0
   // why: monotonically bumped on every (re)install and on cleanup; a recognitionTask
   // callback only acts if its captured generation still matches, so a superseded or
   // cancelled task can never flip the live session's state.
@@ -52,17 +53,20 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
   // why: test seam — lets a Simulator test drive the audio-capture path without the
   // permission prompt (which would hang a non-UI test). Production always requests.
   private let skipPermissionRequests: Bool
+  private let authorizer: any LiveSpeechAuthorizing
 
   init(
     localeProvider: @escaping @MainActor () -> String = { "en-US" },
     bufferGate: (any SpeechAudioBufferGate)? = nil,
     requireOnDeviceModel: Bool = true,
-    skipPermissionRequests: Bool = false
+    skipPermissionRequests: Bool = false,
+    authorizer: any LiveSpeechAuthorizing = AppleLiveSpeechAuthorizer()
   ) {
     self.localeProvider = localeProvider
     self.bufferGate = bufferGate
     self.requireOnDeviceModel = requireOnDeviceModel
     self.skipPermissionRequests = skipPermissionRequests
+    self.authorizer = authorizer
   }
 
   func events() -> AsyncStream<LiveTranscriptionEvent> {
@@ -78,17 +82,21 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
   }
 
   func start() async {
-    guard status != .listening else { return }
+    guard !isStartupOrListening else { return }
+    lifecycleGeneration += 1
+    let generation = lifecycleGeneration
     status = .requestingPermission
 
     if !skipPermissionRequests {
-      let speechAuthorized = await Self.requestSpeechAuthorization()
+      let speechAuthorized = await authorizer.requestSpeechAuthorization()
+      guard isCurrentStartup(generation) else { return }
       guard speechAuthorized else {
         status = .failed("speech-permission-denied")
         return
       }
 
-      let micAllowed = await Self.requestMicrophonePermission()
+      let micAllowed = await authorizer.requestMicrophonePermission()
+      guard isCurrentStartup(generation) else { return }
       guard micAllowed else {
         status = .failed("microphone-permission-denied")
         return
@@ -103,6 +111,7 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     let recognizer = SFSpeechRecognizer(locale: locale)
     if !skipPermissionRequests {
       guard let recognizer, recognizer.isAvailable else {
+        guard isCurrentStartup(generation) else { return }
         status = .failed("recognizer-unavailable")
         return
       }
@@ -127,9 +136,14 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     self.recognizer = recognizer
 
     do {
+      guard isCurrentStartup(generation) else { return }
       try beginAudioSession()
       // why: bring up AVAudioEngine before attaching the recognition task.
       try startEngine()
+      guard isCurrentStartup(generation) else {
+        cleanup()
+        return
+      }
       if let recognizer { installRecognition(recognizer: recognizer) }
       status = .listening
     } catch {
@@ -144,6 +158,14 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     }
     cleanup()
     status = .stopped
+  }
+
+  private var isStartupOrListening: Bool {
+    status == .requestingPermission || status == .listening
+  }
+
+  private func isCurrentStartup(_ generation: Int) -> Bool {
+    lifecycleGeneration == generation && status == .requestingPermission
   }
 
   private func beginAudioSession() throws {
@@ -386,6 +408,7 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
   }
 
   private func cleanup() {
+    lifecycleGeneration += 1
     taskGeneration += 1
     if audioEngine.isRunning {
       audioEngine.stop()
@@ -412,7 +435,7 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     continuation?.yield(event)
   }
 
-  private nonisolated static func requestSpeechAuthorization() async -> Bool {
+  fileprivate nonisolated static func requestSpeechAuthorization() async -> Bool {
     await withCheckedContinuation { continuation in
       SFSpeechRecognizer.requestAuthorization { status in
         continuation.resume(returning: status == .authorized)
@@ -420,7 +443,7 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     }
   }
 
-  private nonisolated static func requestMicrophonePermission() async -> Bool {
+  fileprivate nonisolated static func requestMicrophonePermission() async -> Bool {
     if #available(iOS 17.0, *) {
       return await AVAudioApplication.requestRecordPermission()
     } else {
@@ -430,6 +453,23 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
         }
       }
     }
+  }
+}
+
+@MainActor
+protocol LiveSpeechAuthorizing {
+  func requestSpeechAuthorization() async -> Bool
+  func requestMicrophonePermission() async -> Bool
+}
+
+@MainActor
+private struct AppleLiveSpeechAuthorizer: LiveSpeechAuthorizing {
+  func requestSpeechAuthorization() async -> Bool {
+    await AppleSpeechLiveTranscriptionEngine.requestSpeechAuthorization()
+  }
+
+  func requestMicrophonePermission() async -> Bool {
+    await AppleSpeechLiveTranscriptionEngine.requestMicrophonePermission()
   }
 }
 

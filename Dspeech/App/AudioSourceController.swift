@@ -13,6 +13,7 @@ final class AudioSourceController {
   private(set) var inputLevel: Double = 0
   private(set) var isMetering = false
   private(set) var selectionError: String?
+  private(set) var inputLevelError: String?
   private var meterTask: Task<Void, Never>?
 
   init(
@@ -32,10 +33,22 @@ final class AudioSourceController {
   func startMetering() {
     stopMetering()
     isMetering = true
+    inputLevelError = nil
     meterTask = Task { @MainActor [weak self] in
       guard let self else { return }
-      for await level in self.meter.levels() {
-        self.inputLevel = level
+      for await event in self.meter.events() {
+        switch event {
+        case .level(let level):
+          self.inputLevel = level
+          self.inputLevelError = nil
+        case .failed(let message):
+          self.inputLevel = 0
+          self.inputLevelError = message
+          self.isMetering = false
+          self.meter.stop()
+          self.meterTask = nil
+          return
+        }
       }
     }
   }
@@ -65,12 +78,21 @@ final class AudioSourceController {
   }
 
   // why: re-assert the saved input on launch so a wired interface is selected
-  // before the user opens settings. A vanished device is simply skipped.
+  // before the user opens settings. A vanished device is simply skipped; an OS
+  // rejection is visible because otherwise Settings would claim an inactive source.
   func applyPersistedPreference() {
     guard let uid = settings.preferredInputUID,
-      availableInputs.contains(where: { $0.uid == uid })
+      let port = availableInputs.first(where: { $0.uid == uid })
     else { return }
-    try? routing.setPreferredInput(uid: uid)
+    do {
+      try routing.setPreferredInput(uid: uid)
+      selectedUID = uid
+      settings.setPreferred(uid: uid, type: port.portType.rawValue)
+      selectionError = nil
+    } catch {
+      selectionError = "Не удалось выбрать этот вход: \(error.localizedDescription)"
+      selectedUID = resolvedFallbackUID(rejectedUID: uid)
+    }
   }
 
   func select(uid: String) {
@@ -87,5 +109,11 @@ final class AudioSourceController {
       selectionError = "Не удалось выбрать этот вход: \(error.localizedDescription)"
       selectedUID = routing.currentRouteSnapshot.inputs.first?.uid ?? selectedUID
     }
+  }
+
+  private func resolvedFallbackUID(rejectedUID: String) -> String {
+    routing.currentRouteSnapshot.inputs.first?.uid
+      ?? availableInputs.first(where: { $0.uid != rejectedUID })?.uid
+      ?? ""
   }
 }

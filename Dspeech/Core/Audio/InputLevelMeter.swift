@@ -13,8 +13,13 @@ enum AudioLevel {
 }
 
 protocol InputLevelMetering: Sendable {
-  func levels() -> AsyncStream<Double>
+  func events() -> AsyncStream<InputLevelMeterEvent>
   func stop()
+}
+
+enum InputLevelMeterEvent: Equatable, Sendable {
+  case level(Double)
+  case failed(String)
 }
 
 #if canImport(AVFAudio)
@@ -23,14 +28,16 @@ protocol InputLevelMetering: Sendable {
   final class AVAudioEngineInputLevelMeter: InputLevelMetering, @unchecked Sendable {
     private let engine = AVAudioEngine()
 
-    func levels() -> AsyncStream<Double> {
-      AsyncStream<Double> { continuation in
+    func events() -> AsyncStream<InputLevelMeterEvent> {
+      AsyncStream<InputLevelMeterEvent> { continuation in
         let input = engine.inputNode
         let format = input.outputFormat(forBus: 0)
         // why: installTap with an invalid (0 Hz / 0-channel) format — which the
         // Simulator and a mic-denied device report — hard-crashes AVAudioEngine;
-        // bail safely so the meter just reads nothing instead of taking down the app.
+        // surface this as a typed meter failure instead of a silent zero bar.
         guard format.sampleRate > 0, format.channelCount > 0 else {
+          continuation.yield(
+            .failed("Не удалось проверить уровень: входной аудиоформат недоступен."))
           continuation.finish()
           return
         }
@@ -48,13 +55,15 @@ protocol InputLevelMetering: Sendable {
         // so there is no actor-isolation hazard under Swift 6 complete concurrency.
         input.installTap(onBus: 0, bufferSize: 1024, format: nil) { buffer, _ in
           continuation.yield(
-            AudioLevel.normalized(rms: AVAudioEngineInputLevelMeter.rms(of: buffer)))
+            .level(AudioLevel.normalized(rms: AVAudioEngineInputLevelMeter.rms(of: buffer))))
         }
         engine.prepare()
         do {
           try engine.start()
         } catch {
           input.removeTap(onBus: 0)
+          continuation.yield(
+            .failed("Не удалось запустить проверку уровня: \(error.localizedDescription)"))
           continuation.finish()
           return
         }

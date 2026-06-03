@@ -997,6 +997,14 @@ struct ModelPackDownloadFailureTests {
       #expect(failure.userSafeReason.contains("сети"))
     }
   }
+
+  @Test func deleteErrorsProduceDiskFailure() {
+    let failure = modelPackDeleteFailure(for: CocoaError(.fileWriteNoPermission))
+
+    #expect(failure.kind == .disk)
+    #expect(!failure.isRetryable)
+    #expect(failure.userSafeReason.contains("удалить"))
+  }
 }
 
 struct SpeakerModelPackInstallerTests {
@@ -1157,6 +1165,26 @@ struct SpeakerModelPackInstallerTests {
     }
   }
 
+  @Test func uninstallRemovesLocalModelDirectory() throws {
+    let root = try Self.makeFixture(Self.validFixtureContents())
+    defer { Self.removeFixture(root) }
+    let pack = Self.installedPack(localModelPath: root.path)
+
+    try SpeakerModelPackInstaller.uninstall(pack)
+
+    #expect(!FileManager.default.fileExists(atPath: root.path))
+  }
+
+  @Test func uninstallMissingLocalModelDirectoryIsIdempotent() throws {
+    let missing = FileManager.default.temporaryDirectory
+      .appendingPathComponent("dspeech-missing-modelpack-\(UUID().uuidString)", isDirectory: true)
+    let pack = Self.installedPack(localModelPath: missing.path)
+
+    try SpeakerModelPackInstaller.uninstall(pack)
+
+    #expect(!FileManager.default.fileExists(atPath: missing.path))
+  }
+
   private static func validFixtureContents() -> [String: Data] {
     [
       Self.segmentationFixturePath: Self.bytes("segm"),
@@ -1198,6 +1226,19 @@ struct SpeakerModelPackInstallerTests {
     } catch {
       Issue.record("failed to remove fixture \(root.path): \(error)")
     }
+  }
+
+  private static func installedPack(localModelPath: String) -> InstalledModelPack {
+    InstalledModelPack(
+      identifier: SpeakerModelPackInstaller.packIdentifier,
+      version: SpeakerModelPackInstaller.packVersion,
+      embeddingDimension: SpeakerModelPackInstaller.embeddingDimension,
+      checksumSHA256: "fixture",
+      source: SpeakerModelPackInstaller.source,
+      sizeBytes: 1,
+      installedAt: Date(timeIntervalSince1970: 0),
+      localModelPath: localModelPath
+    )
   }
 
   private static func bytes(_ string: String) -> Data {

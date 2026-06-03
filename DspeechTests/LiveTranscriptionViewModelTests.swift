@@ -11,7 +11,13 @@ struct LiveTranscriptionViewModelTests {
     var status: LiveTranscriptionStatus = .idle
     var startCallCount = 0
     var stopCallCount = 0
+    var startSuspends = false
     private var continuation: AsyncStream<LiveTranscriptionEvent>.Continuation?
+    private var pendingStartContinuation: CheckedContinuation<Void, Never>?
+
+    init(startSuspends: Bool = false) {
+      self.startSuspends = startSuspends
+    }
 
     func events() -> AsyncStream<LiveTranscriptionEvent> {
       AsyncStream<LiveTranscriptionEvent> { continuation in
@@ -22,6 +28,14 @@ struct LiveTranscriptionViewModelTests {
 
     func start() async {
       startCallCount += 1
+      status = .requestingPermission
+      continuation?.yield(.status(.requestingPermission))
+      if startSuspends {
+        await withCheckedContinuation { continuation in
+          pendingStartContinuation = continuation
+        }
+        guard status != .stopped else { return }
+      }
       status = .listening
       continuation?.yield(.status(.listening))
     }
@@ -34,6 +48,12 @@ struct LiveTranscriptionViewModelTests {
 
     func push(_ event: LiveTranscriptionEvent) {
       continuation?.yield(event)
+    }
+
+    func completeStart() {
+      let continuation = pendingStartContinuation
+      pendingStartContinuation = nil
+      continuation?.resume()
     }
   }
 
@@ -226,6 +246,43 @@ struct LiveTranscriptionViewModelTests {
     #expect(vm.hasEverStarted)
   }
 
+  @Test func duplicateStartWhileStartInFlightDoesNotCallEngineTwice() async {
+    let engine = FakeEngine(startSuspends: true)
+    let vm = LiveTranscriptionViewModel(engine: engine)
+    let firstStart = Task { @MainActor in await vm.start() }
+
+    #expect(await wait(for: { engine.startCallCount == 1 && vm.canStopCurrentSession }))
+
+    await vm.start()
+
+    #expect(engine.startCallCount == 1)
+
+    engine.completeStart()
+    await firstStart.value
+    #expect(await wait(for: { vm.isListening && vm.canStopCurrentSession }))
+    #expect(vm.isListening)
+    #expect(vm.canStopCurrentSession)
+  }
+
+  @Test func stopDuringStartInFlightCancelsCurrentSession() async {
+    let engine = FakeEngine(startSuspends: true)
+    let vm = LiveTranscriptionViewModel(engine: engine)
+    let firstStart = Task { @MainActor in await vm.start() }
+
+    #expect(await wait(for: { engine.startCallCount == 1 && vm.canStopCurrentSession }))
+
+    vm.stop()
+
+    #expect(engine.stopCallCount == 1)
+    #expect(await wait(for: { vm.status == .stopped && !vm.canStopCurrentSession }))
+
+    engine.completeStart()
+    await firstStart.value
+    #expect(engine.startCallCount == 1)
+    #expect(vm.status == .stopped)
+    #expect(!vm.canStopCurrentSession)
+  }
+
   @Test func resetClearsSegmentsAndPartial() async {
     let engine = FakeEngine()
     let vm = LiveTranscriptionViewModel(engine: engine)
@@ -326,11 +383,12 @@ struct LiveTranscriptionViewModelTests {
     await vm.start()
     let seg = makeSegment("Descend")
     engine.push(.segment(seg))
-    await wait(for: { vm.translations[seg.id] == "перевод" })
+    #expect(await wait(for: { vm.translations[seg.id] == "перевод" }))
     let firstCount = backend.translateCallCount
+    backend.translationResult = "новый перевод"
     vm.retranslateAll()
-    #expect(await wait(for: { backend.translateCallCount > firstCount }))
-    #expect(vm.translations[seg.id] == "перевод")
+    #expect(await wait(for: { vm.translations[seg.id] == "новый перевод" }))
+    #expect(backend.translateCallCount > firstCount)
   }
 
   @Test func taskSupersededByResetDoesNotWriteStaleGloss() async {
