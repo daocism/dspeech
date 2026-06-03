@@ -720,20 +720,28 @@ struct VoiceFilterSettingsSection: View {
 
   @State private var enabled: Bool
   @State private var callsignDraft: String
-  @State private var modelPackState: ModelPackState
+  @State private var modelPackAcquisition: ModelPackAcquisitionController
   @State private var storageIssues: [VoiceFilterStorageIssue]
   @State private var dictation = CallsignDictationService()
-  @State private var downloadTask: Task<Void, Never>?
   @State private var recorder = VoiceEnrollmentRecorder()
   @State private var recordingSlot: PilotVoiceProfile.Slot?
   @State private var enrollMessage: String?
-  private let installer = SpeakerModelPackInstaller()
+  private let installer: SpeakerModelPackInstaller
 
   init(pipeline: VoiceFilterPipeline) {
     self.pipeline = pipeline
+    let installer = SpeakerModelPackInstaller()
+    self.installer = installer
     _enabled = State(initialValue: pipeline.enabled)
     _callsignDraft = State(initialValue: pipeline.callSign?.raw ?? "")
-    _modelPackState = State(initialValue: pipeline.modelPackState)
+    _modelPackAcquisition = State(
+      initialValue: ModelPackAcquisitionController(
+        initialState: pipeline.modelPackState,
+        installer: installer
+      ) { state in
+        pipeline.setModelPackState(state)
+      }
+    )
     _storageIssues = State(initialValue: pipeline.storageIssues)
   }
 
@@ -851,7 +859,7 @@ struct VoiceFilterSettingsSection: View {
 
   @ViewBuilder
   private var modelPackContent: some View {
-    switch modelPackState {
+    switch modelPackAcquisition.state {
     case .absent:
       absentContent
     case .acquiring(let acquisition):
@@ -866,38 +874,15 @@ struct VoiceFilterSettingsSection: View {
   }
 
   private func transition(to state: ModelPackState) {
-    pipeline.setModelPackState(state)
-    modelPackState = state
+    modelPackAcquisition.setState(state)
   }
 
   private func startDownload() {
-    downloadTask?.cancel()
-    transition(to: .acquiring(ModelPackAcquisition(phase: .downloading, fractionComplete: 0)))
-    downloadTask = Task {
-      do {
-        let pack = try await installer.install { acquisition in
-          Task { @MainActor in
-            if case .acquiring = modelPackState {
-              modelPackState = .acquiring(acquisition)
-            }
-          }
-        }
-        if Task.isCancelled { return }
-        transition(to: .installed(pack))
-      } catch is CancellationError {
-        return
-      } catch {
-        if Task.isCancelled { return }
-        transition(to: .failed(modelPackDownloadFailure(for: error)))
-      }
-      downloadTask = nil
-    }
+    modelPackAcquisition.startDownload()
   }
 
   private func cancelDownload() {
-    downloadTask?.cancel()
-    downloadTask = nil
-    transition(to: .absent)
+    modelPackAcquisition.cancelDownload()
   }
 
   private func deleteModelPack(_ pack: InstalledModelPack) async {
@@ -1154,33 +1139,6 @@ struct VoiceFilterSettingsSection: View {
       return "Не удалось установить модель"
     }
   }
-}
-
-func modelPackDownloadFailure(for error: Error) -> ModelPackFailure {
-  if let installError = error as? ModelPackInstallError, installError.isIntegrityFailure {
-    return ModelPackFailure(
-      kind: .checksum,
-      userSafeReason:
-        "Пакет модели не прошёл проверку контрольной суммы или целостности. Повторите загрузку, чтобы скачать проверенную копию.",
-      isRetryable: true
-    )
-  }
-
-  return ModelPackFailure(
-    kind: .network,
-    userSafeReason:
-      "Не удалось скачать пакет модели. Проверьте подключение к сети и попробуйте снова.",
-    isRetryable: true
-  )
-}
-
-func modelPackDeleteFailure(for error: Error) -> ModelPackFailure {
-  ModelPackFailure(
-    kind: .disk,
-    userSafeReason:
-      "Не удалось удалить пакет модели с устройства. Проверьте доступ к хранилищу и попробуйте позже.",
-    isRetryable: false
-  )
 }
 
 extension Bundle {
