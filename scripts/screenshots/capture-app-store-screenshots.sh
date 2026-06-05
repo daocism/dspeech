@@ -12,6 +12,24 @@ DERIVED_DATA="${DSPEECH_SCREENSHOT_DERIVED_DATA:-${ROOT_DIR}/tmp/app-store-scree
 APP_PATH="${DERIVED_DATA}/Build/Products/${CONFIGURATION}-iphonesimulator/Dspeech.app"
 PACKAGE_RESOLVED="${ROOT_DIR}/Dspeech.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"
 
+# xcodebuild and simctl both require a full Xcode; when the active developer dir
+# has drifted to the Command Line Tools instance (common after an OS/CLT update)
+# they abort with "requires Xcode". Resolve a full Xcode via DEVELOPER_DIR without
+# sudo so screenshot regeneration is self-healing. Mirrors build-unsigned-archive.sh.
+if command -v xcodebuild >/dev/null 2>&1 && ! xcodebuild -version >/dev/null 2>&1; then
+  for candidate in \
+    "${DEVELOPER_DIR:-}" \
+    /Applications/Xcode.app/Contents/Developer \
+    /Applications/Xcode-beta.app/Contents/Developer; do
+    [ -n "$candidate" ] || continue
+    if DEVELOPER_DIR="$candidate" xcodebuild -version >/dev/null 2>&1; then
+      export DEVELOPER_DIR="$candidate"
+      echo "DEVELOPER_DIR=$DEVELOPER_DIR (auto-resolved; active xcode-select dir lacks a full Xcode)"
+      break
+    fi
+  done
+fi
+
 require_tool() {
   if ! command -v "$1" >/dev/null 2>&1; then
     echo "Missing required tool: $1" >&2
