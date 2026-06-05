@@ -64,6 +64,24 @@ validation skipped (op CLI unavailable / Apple-credential-gated).
 | TestFlight | BLOCKED on Apple-side | Apple Developer Program active + signing certs/provisioning + ASC API key in 1Password; signed archive + upload (manual, no CI automation per runbook); physical-device evidence for live Speech/audio (Developer Mode) |
 | App Store | BLOCKED on Apple-side + evidence | All TestFlight items + real ATC/WER ground-truth evidence; FluidAudio SDK production claim (ADR 0008 exists, confirm binary/privacy/allowlist); screenshots uploaded to ASC; export-compliance answers |
 
+## Newly-surfaced gap — pre-existing flaky CI (not caused by this work)
+Post-push CI verification (`gh run list`) showed the Xcode "Build and test" job
+failing on a FLAKE (FLAKE_THRESHOLD=0): `AccessibilityAuditUITests
+.testMainFailureState_errorBannerNotObscured` throws `performAccessibilityAudit`
+error **-56 "Audit failed to complete in time"** on a COLD first iteration (74s),
+then PASSES on retry (17.7s). All other CI jobs (privacy manifest, swift-format,
+secret scan, offline ATC eval) pass.
+- Not introduced here: this work touched only shell scripts + this doc; the same
+  branch CI alternates success/failure on identical code (runs 26905407883 ✓ /
+  26889782001 ✓ interleaved with failures) — classic pre-existing flake.
+- Root cause (hypothesis): the recognition-failure surface keeps an element
+  animating/unsettled, so the audit traversal can't complete within its internal
+  deadline on a cold/slow runner; warm runs settle and pass.
+- Fix direction (follow-up tester/engineer pass, must be verifiable in CI's cold
+  mode — NOT a threshold raise/skip): make the failure state fully settle before
+  the audit (stop the listening/recording animation once the error banner is
+  shown, or gate the audit on an explicit idle condition). Do not suppress.
+
 ## User actions required (cannot be automated within guardrails)
 1. Activate Apple Developer Program / App Store Connect; provision signing cert +
    profile + ASC API key, store in 1Password (`op://MyInfra-Active/dspeech-*`).
