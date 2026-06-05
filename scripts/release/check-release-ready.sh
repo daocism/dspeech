@@ -96,7 +96,12 @@ else
   # `nm` misses Swift symbols; scan for the probe's unique DEBUG-only string literals instead
   # — they survive stripping and only appear if SimulatorSpeechProbe.swift compiled in. Guard
   # against a false pass by first asserting `strings` can see a literal that is ALWAYS present.
-  if ! strings -a "$app_binary" 2>/dev/null | grep -qF "FluidInference/speaker-diarization-coreml"; then
+  # grep -cF (not -qF): grep -q closes the pipe on first match, strings then dies with
+  # SIGPIPE, and `set -o pipefail` propagates that as a non-zero pipeline status — turning a
+  # PRESENT sentinel into a false "absent". Counting reads the whole stream so strings exits
+  # cleanly; `|| true` keeps a legitimate zero-match (grep -c exit 1) from tripping set -e.
+  sentinel_hits="$(strings -a "$app_binary" 2>/dev/null | grep -cF "FluidInference/speaker-diarization-coreml" || true)"
+  if [ "${sentinel_hits:-0}" -eq 0 ]; then
     failures+=("release binary string scan unreliable (sentinel literal absent) — cannot verify probe exclusion")
   else
     probe_markers="$(strings -a "$app_binary" 2>/dev/null \
