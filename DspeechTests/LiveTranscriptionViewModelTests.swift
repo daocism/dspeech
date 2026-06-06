@@ -3,6 +3,11 @@ import Testing
 
 @testable import Dspeech
 
+// why: this suite drives a MainActor view model with unstructured observation and translation
+// tasks. Swift Testing may otherwise overlap cases on the cold hosted runner, starving the
+// MainActor long enough that first attempts pass only after retry. Keep it serialized so a
+// retry is never required to get deterministic event delivery.
+@Suite(.serialized)
 @MainActor
 struct LiveTranscriptionViewModelTests {
 
@@ -86,7 +91,7 @@ struct LiveTranscriptionViewModelTests {
   @discardableResult
   private func wait(
     for predicate: @MainActor () -> Bool,
-    timeout: Duration = .seconds(5)
+    timeout: Duration = .seconds(10)
   ) async -> Bool {
     let clock = ContinuousClock()
     let deadline = clock.now.advanced(by: timeout)

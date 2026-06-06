@@ -793,6 +793,13 @@ struct VoiceFilterSettingsSection: View {
     return false
   }
 
+  private var modelSourceLabel: String {
+    // why: the raw model repository slug is too long for localized Settings form copy and
+    // triggers real text-clipping in German. The detailed repository is documented in the
+    // installer/ADR; the UI needs a short, readable package label.
+    "Core ML"
+  }
+
   var body: some View {
     Section {
       // why: the description is its own row, not the Toggle's label — a Toggle reserves room
@@ -1044,7 +1051,7 @@ struct VoiceFilterSettingsSection: View {
       Text(
         String(
           localized:
-            "The FluidAudio model (\(SpeakerModelPackInstaller.source)) is downloaded once at this request. Only the model download request leaves the device — audio, transcripts and voice samples are not transmitted."
+            "The FluidAudio model (\(modelSourceLabel)) is downloaded once at this request. Only the model download request leaves the device — audio, transcripts and voice samples are not transmitted."
         )
       )
       .font(.caption)

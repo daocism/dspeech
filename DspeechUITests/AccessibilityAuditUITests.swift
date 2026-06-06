@@ -31,6 +31,50 @@ final class AccessibilityAuditUITests: XCTestCase {
   private static let largeType = "UICTContentSizeCategoryAccessibilityExtraLarge"
 
   @MainActor
+  private static func tapPermissionButton(in alert: XCUIElement) -> Bool {
+    let preferredLabels = [
+      "Allow While Using App", "While Using the App", "Allow", "OK", "Erlauben",
+    ]
+    for label in preferredLabels {
+      let button = alert.buttons[label]
+      if button.exists {
+        button.tap()
+        return true
+      }
+    }
+
+    // why: do not let a broad contains-allow matcher accidentally tap a deny action;
+    // fall back only to a non-deny button if the OS localizes the positive action differently.
+    for button in alert.buttons.allElementsBoundByIndex {
+      let label = button.label.lowercased()
+      let isDeny = label.contains("don") || label.contains("deny") || label.contains("nicht")
+      if !isDeny {
+        button.tap()
+        return true
+      }
+    }
+    return false
+  }
+
+  @MainActor
+  private func acceptPermissionAlertsIfPresent(in app: XCUIApplication) {
+    let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+    for _ in 0..<4 {
+      if app.alerts.element.waitForExistence(timeout: 1),
+        Self.tapPermissionButton(in: app.alerts.element)
+      {
+        continue
+      }
+      if springboard.alerts.element.waitForExistence(timeout: 1),
+        Self.tapPermissionButton(in: springboard.alerts.element)
+      {
+        continue
+      }
+      return
+    }
+  }
+
+  @MainActor
   private func launch(
     locale: String,
     contentSize: String? = nil,
@@ -123,13 +167,14 @@ final class AccessibilityAuditUITests: XCTestCase {
     defer { removeUIInterruptionMonitor(monitor) }
     start.tap()
     app.tap()
+    acceptPermissionAlertsIfPresent(in: app)
     // why: the audit must run against the SETTLED failure state, not a transient frame mid-launch
     // of the recognizer. Assert the error banner actually appeared with non-empty copy, and that
     // the surface settled back to idle (Start visible, Stop gone) before measuring layout — an
     // ignored `waitForExistence` previously let the audit fire before the banner rendered.
     let errorBanner = app.staticTexts["error-banner"]
     XCTAssertTrue(
-      errorBanner.waitForExistence(timeout: 10),
+      errorBanner.waitForExistence(timeout: 20),
       "recognition failure must surface a visible error banner")
     XCTAssertFalse(
       errorBanner.label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
