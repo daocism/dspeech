@@ -91,7 +91,7 @@ struct LiveTranscriptionViewModelTests {
   @discardableResult
   private func wait(
     for predicate: @MainActor () -> Bool,
-    timeout: Duration = .seconds(10)
+    timeout: Duration = .seconds(30)
   ) async -> Bool {
     let clock = ContinuousClock()
     let deadline = clock.now.advanced(by: timeout)

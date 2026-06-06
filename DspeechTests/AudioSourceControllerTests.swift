@@ -172,12 +172,14 @@ struct AudioSourceControllerTests {
   }
 
   // why: hosted macOS runners can delay a new MainActor metering task while the rest of
-  // DspeechTests are running in parallel. Two seconds was a test-harness timeout, not a
-  // product invariant, and caused retry-only flakes even though the fake meter eventually
-  // delivered its deterministic events. Keep the assertion strict, but give CI enough
-  // scheduler headroom so retries are not used as a timing crutch.
+  // DspeechTests are running in parallel. The timeout is a test-harness budget, not a
+  // product invariant; shorter budgets caused retry-only flakes even though the fake meter
+  // eventually delivered its deterministic events. Keep the assertion strict, but give CI enough
+  // scheduler headroom so retries are not used as a timing crutch. The hosted Xcode 26.5
+  // runner can cold-start many Swift Testing cases together, so keep this above the observed
+  // 20s first-attempt stall while preserving strict final-state assertions.
   private func waitUntil(
-    _ predicate: @MainActor () -> Bool, timeout: Duration = .seconds(10)
+    _ predicate: @MainActor () -> Bool, timeout: Duration = .seconds(30)
   ) async {
     let deadline = ContinuousClock().now.advanced(by: timeout)
     while ContinuousClock().now < deadline {
