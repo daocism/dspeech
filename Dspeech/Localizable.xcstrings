@@ -8098,7 +8098,7 @@
         "de": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Das FluidAudio-Modell (%@) wird bei dieser Anfrage einmalig heruntergeladen. Vom Gerät geht nur die Anfrage zum Herunterladen des Modells aus — Audio, Transkripte und Stimmproben werden nicht übertragen."
+            "value": "%@ wird nur auf Anfrage geladen. Audio, Transkripte und Stimmproben werden nicht übertragen."
           }
         },
         "it": {

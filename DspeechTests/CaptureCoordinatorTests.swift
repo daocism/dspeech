@@ -3,6 +3,10 @@ import Testing
 
 @testable import Dspeech
 
+// why: this suite shares the same MainActor fake live-engine contract as
+// LiveTranscriptionViewModelTests; serialize it to avoid first-attempt hosted-CI scheduler
+// starvation that only retries recover.
+@Suite(.serialized)
 @MainActor
 struct CaptureCoordinatorTests {
 
@@ -59,7 +63,7 @@ struct CaptureCoordinatorTests {
 
   private static func wait(
     for predicate: @MainActor () -> Bool,
-    timeoutNs: UInt64 = 5_000_000_000
+    timeoutNs: UInt64 = 10_000_000_000
   ) async {
     let deadline = Date().addingTimeInterval(Double(timeoutNs) / 1_000_000_000.0)
     while Date() < deadline {

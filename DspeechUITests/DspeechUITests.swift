@@ -242,16 +242,13 @@ final class DspeechUITests: XCTestCase {
     ]
     app.launch()
 
-    app.buttons["settings-button"].tap()
+    openSettings(in: app)
 
     let banner = app.descendants(matching: .any)
       .matching(identifier: "voicefilter-storage-corrupt").firstMatch
-    var attempts = 0
-    while !banner.exists && attempts < 8 {
-      app.swipeUp()
-      attempts += 1
-    }
-    XCTAssertTrue(banner.waitForExistence(timeout: 4))
+    XCTAssertTrue(
+      scrollToHittable(banner, in: app),
+      "corrupt-storage recovery banner must become visible in settings")
     XCTAssertTrue(app.buttons["voicefilter-storage-recovery"].exists)
   }
 
