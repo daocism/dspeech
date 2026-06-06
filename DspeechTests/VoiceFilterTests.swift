@@ -1,5 +1,6 @@
 import AVFoundation
 import CryptoKit
+import FluidAudio
 import Foundation
 import Testing
 
@@ -356,7 +357,12 @@ private struct DeterministicSpeakerMatcherRandom {
   }
 }
 
+@Suite(.serialized)
 struct SpeakerModelPackSourceTests {
+  enum FixtureError: Error {
+    case failure
+  }
+
   @Test func overrideAbsentWhenInfoDictionaryNil() {
     #expect(SpeakerModelPackInstaller.registryBaseURLOverride(infoDictionary: nil) == nil)
   }
@@ -384,6 +390,79 @@ struct SpeakerModelPackSourceTests {
       SpeakerModelPackInstaller.registryBaseURLOverride(
         infoDictionary: [key: " https://mirror.example/internal "])
         == "https://mirror.example/internal")
+  }
+
+  @Test func resolvedRegistrySourceIncludesConfiguredMirrorAndPinnedRepo() {
+    let key = SpeakerModelPackInstaller.registryBaseURLOverrideKey
+    let mirror = "https://mirror.example/internal"
+
+    #expect(
+      SpeakerModelPackInstaller.resolvedRegistrySource(infoDictionary: [key: mirror])
+        == "\(mirror)/\(SpeakerModelPackInstaller.source)")
+  }
+
+  @Test func scopedRegistryOverrideRestoresOriginalAfterOperation() async throws {
+    let original = ModelRegistry.baseURL
+    defer { ModelRegistry.baseURL = original }
+    let key = SpeakerModelPackInstaller.registryBaseURLOverrideKey
+    let mirror = "https://mirror.example/internal"
+
+    let observed = try await SpeakerModelPackInstaller.withConfiguredRegistryBaseURL(
+      infoDictionary: [key: mirror]
+    ) {
+      #expect(ModelRegistry.baseURL == mirror)
+      return ModelRegistry.baseURL
+    }
+
+    #expect(observed == mirror)
+    #expect(ModelRegistry.baseURL == original)
+  }
+
+  @Test func scopedRegistryOverrideRestoresOriginalAfterThrownOperation() async throws {
+    let original = ModelRegistry.baseURL
+    defer { ModelRegistry.baseURL = original }
+    let key = SpeakerModelPackInstaller.registryBaseURLOverrideKey
+    let mirror = "https://mirror.example/internal"
+
+    do {
+      _ = try await SpeakerModelPackInstaller.withConfiguredRegistryBaseURL(
+        infoDictionary: [key: mirror]
+      ) {
+        #expect(ModelRegistry.baseURL == mirror)
+        throw FixtureError.failure
+      }
+      Issue.record("expected scoped operation to throw")
+    } catch FixtureError.failure {
+      #expect(ModelRegistry.baseURL == original)
+    } catch {
+      Issue.record("expected FixtureError.failure, got \(error)")
+    }
+  }
+
+  @Test func scopedRegistryOverrideSerializesConcurrentOperations() async throws {
+    let original = ModelRegistry.baseURL
+    defer { ModelRegistry.baseURL = original }
+    let key = SpeakerModelPackInstaller.registryBaseURLOverrideKey
+    let firstMirror = "https://mirror-one.example/internal"
+    let secondMirror = "https://mirror-two.example/internal"
+
+    async let first = SpeakerModelPackInstaller.withConfiguredRegistryBaseURL(
+      infoDictionary: [key: firstMirror]
+    ) {
+      try await Task.sleep(nanoseconds: 100_000_000)
+      #expect(ModelRegistry.baseURL == firstMirror)
+      return ModelRegistry.baseURL
+    }
+    async let second = SpeakerModelPackInstaller.withConfiguredRegistryBaseURL(
+      infoDictionary: [key: secondMirror]
+    ) {
+      #expect(ModelRegistry.baseURL == secondMirror)
+      return ModelRegistry.baseURL
+    }
+
+    let observed = try await [first, second]
+    #expect(Set(observed) == [firstMirror, secondMirror])
+    #expect(ModelRegistry.baseURL == original)
   }
 }
 

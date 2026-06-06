@@ -58,25 +58,76 @@ struct SpeakerModelPackInstaller: Sendable {
 
   // The source actually used for this install (resolved override, else FluidAudio's default),
   // recorded for the eval doc / download UX per ADR 0007/0008.
+  static func resolvedRegistrySource(infoDictionary: [String: Any]?) -> String {
+    "\(registryBaseURLOverride(infoDictionary: infoDictionary) ?? ModelRegistry.baseURL)/\(source)"
+  }
+
   static func resolvedRegistrySource(bundle: Bundle = .main) -> String {
-    "\(registryBaseURLOverride(bundle: bundle) ?? ModelRegistry.baseURL)/\(source)"
+    resolvedRegistrySource(infoDictionary: bundle.infoDictionary)
   }
 
   // Applies the configured override to the FluidAudio download base URL that DownloadUtils
   // actually fetches from, and returns the effective value. The download path calls this so
   // the override is proven to flow all the way to FluidAudio, not just resolved in isolation.
+  private final class RegistryBaseURLGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var isLocked = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func acquire() async {
+      await withCheckedContinuation { continuation in
+        lock.lock()
+        if isLocked {
+          waiters.append(continuation)
+          lock.unlock()
+        } else {
+          isLocked = true
+          lock.unlock()
+          continuation.resume()
+        }
+      }
+    }
+
+    func release() {
+      lock.lock()
+      if waiters.isEmpty {
+        isLocked = false
+        lock.unlock()
+      } else {
+        let continuation = waiters.removeFirst()
+        lock.unlock()
+        continuation.resume()
+      }
+    }
+  }
+
+  private static let registryBaseURLGate = RegistryBaseURLGate()
+
   @discardableResult
-  static func applyConfiguredRegistryBaseURL(infoDictionary: [String: Any]?) -> String {
+  private static func applyConfiguredRegistryBaseURL(infoDictionary: [String: Any]?) -> String {
     if let override = registryBaseURLOverride(infoDictionary: infoDictionary) {
       ModelRegistry.baseURL = override
     }
     return ModelRegistry.baseURL
   }
 
-  @discardableResult
-  static func applyConfiguredRegistryBaseURL(bundle: Bundle = .main) -> String {
-    applyConfiguredRegistryBaseURL(infoDictionary: bundle.infoDictionary)
+  static func withConfiguredRegistryBaseURL<T>(
+    infoDictionary: [String: Any]? = Bundle.main.infoDictionary,
+    operation: @Sendable () async throws -> T
+  ) async rethrows -> T {
+    await registryBaseURLGate.acquire()
+    let original = ModelRegistry.baseURL
+    let hasOverride = registryBaseURLOverride(infoDictionary: infoDictionary) != nil
+    _ = applyConfiguredRegistryBaseURL(infoDictionary: infoDictionary)
+    defer {
+      if hasOverride {
+        ModelRegistry.baseURL = original
+      }
+      registryBaseURLGate.release()
+    }
+    return try await operation()
   }
+
   static let segmentationFile = FluidAudioBackendBuilder.segmentationModelFileName
   static let embeddingFile = FluidAudioBackendBuilder.embeddingModelFileName
   static let expectedModelFileManifest: [ExpectedModelFile] = [
@@ -126,16 +177,17 @@ struct SpeakerModelPackInstaller: Sendable {
     progress: @escaping @Sendable (ModelPackAcquisition) -> Void
   ) async throws -> InstalledModelPack {
     let cacheRoot = Self.modelCacheRoot()
+    let installSource = Self.resolvedRegistrySource()
     try await Self.downloadModelPack(to: cacheRoot, progress: progress)
     do {
-      return try Self.installedPackAfterVerification()
+      return try Self.installedPackAfterVerification(source: installSource)
     } catch let error as ModelPackInstallError {
       guard error.isIntegrityFailure else { throw error }
       if let modelDir = Self.locateModelDirectory() {
         try Self.removeModelDirectory(modelDir)
       }
       try await Self.downloadModelPack(to: cacheRoot, progress: progress)
-      return try Self.installedPackAfterVerification()
+      return try Self.installedPackAfterVerification(source: installSource)
     }
   }
 
@@ -160,7 +212,9 @@ struct SpeakerModelPackInstaller: Sendable {
     }
   }
 
-  static func installedPackAfterVerification() throws -> InstalledModelPack {
+  static func installedPackAfterVerification(
+    source: String = Self.resolvedRegistrySource()
+  ) throws -> InstalledModelPack {
     guard let modelDir = Self.locateModelDirectory() else {
       throw ModelPackInstallError.filesMissingAfterDownload
     }
@@ -171,7 +225,7 @@ struct SpeakerModelPackInstaller: Sendable {
       version: Self.packVersion,
       embeddingDimension: Self.embeddingDimension,
       checksumSHA256: verified.checksumSHA256,
-      source: Self.source,
+      source: source,
       sizeBytes: verified.sizeBytes,
       installedAt: Date(),
       localModelPath: modelDir.path
@@ -292,12 +346,13 @@ struct SpeakerModelPackInstaller: Sendable {
     to cacheRoot: URL,
     progress: @escaping @Sendable (ModelPackAcquisition) -> Void
   ) async throws {
-    applyConfiguredRegistryBaseURL()
-    try await DownloadUtils.downloadRepo(
-      .diarizer, to: cacheRoot,
-      progressHandler: { snapshot in
-        progress(Self.acquisition(from: snapshot))
-      })
+    try await withConfiguredRegistryBaseURL {
+      try await DownloadUtils.downloadRepo(
+        .diarizer, to: cacheRoot,
+        progressHandler: { snapshot in
+          progress(Self.acquisition(from: snapshot))
+        })
+    }
   }
 
   private static func removeModelDirectory(_ modelDir: URL, fileManager: FileManager = .default)
