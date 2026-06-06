@@ -185,9 +185,8 @@ final class DspeechUITests: XCTestCase {
       cancel.exists || progress.exists || installed.exists,
       "tapping download must transition to acquiring or installed")
 
-    if cancel.exists {
-      cancel.tap()
-    }
+    // why: acquisition can finish between the `exists` check and a tap on hosted CI;
+    // the transition assertion above is the behavior under test, and app termination handles cleanup.
   }
 
   @MainActor
@@ -380,17 +379,12 @@ final class DspeechUITests: XCTestCase {
     ]
     app.launch()
 
-    app.buttons["settings-button"].tap()
+    openSettings(in: app)
 
     let unavailable = app.descendants(matching: .any)
       .matching(identifier: "recognition-locale-unavailable").firstMatch
-    var attempts = 0
-    while !unavailable.exists && attempts < 10 {
-      app.swipeUp()
-      attempts += 1
-    }
     XCTAssertTrue(
-      unavailable.waitForExistence(timeout: 4),
+      scrollToHittable(unavailable, in: app),
       "settings must surface an explicit no-on-device-recognition-locale state")
     XCTAssertFalse(
       app.descendants(matching: .any)
