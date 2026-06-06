@@ -1248,11 +1248,27 @@ extension Bundle {
   }
 }
 
+// why: XCUITest's `performAccessibilityAudit` and element queries require the app to reach an
+// idle state; an infinite `repeatForever` decorative animation keeps the run loop perpetually
+// "busy" and intermittently destabilizes audits and hit-testing on the hosted CI simulator.
+// Honoring reduce-motion is also a genuine accessibility win (continuous motion is exactly what
+// that setting asks us to suppress); the launch flag lets UI/audit tests force the same stable
+// state without depending on a device-level setting XCUITest cannot toggle.
+enum DecorativeMotion {
+  static let isDisabledForUITests: Bool =
+    CommandLine.arguments.contains("-dspeech.uitest.reduce-animations")
+}
+
 private struct StartButton: View {
   let isStopVisible: Bool
   let disabled: Bool
   let action: () -> Void
   @State private var glowAngle = 0.0
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+  private var animatesGlow: Bool {
+    !reduceMotion && !DecorativeMotion.isDisabledForUITests
+  }
 
   var body: some View {
     Button(action: action) {
@@ -1286,6 +1302,7 @@ private struct StartButton: View {
     .accessibilityIdentifier(isStopVisible ? "stop-button" : "start-button")
     .accessibilityLabel(isStopVisible ? String(localized: "Stop") : String(localized: "Start"))
     .onAppear {
+      guard animatesGlow else { return }
       withAnimation(.linear(duration: 2.4).repeatForever(autoreverses: false)) {
         glowAngle = 360
       }

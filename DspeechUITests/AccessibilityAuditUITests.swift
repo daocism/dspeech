@@ -42,6 +42,12 @@ final class AccessibilityAuditUITests: XCTestCase {
       "-AppleLanguages", "(\(locale))",
       "-dspeech.privacy.mode.v1", "localOnly",
       "-dspeech.onboarding.completed.v1", skipOnboarding ? "true" : "false",
+      // why: suppress the decorative infinite Start-button glow so the run loop reaches idle —
+      // `performAccessibilityAudit` and element queries are otherwise intermittently destabilized
+      // by a perpetual `repeatForever` animation on the hosted CI simulator. The audit measures
+      // static layout (contrast/overlap/clipping/hit-region), so removing decorative motion does
+      // not weaken it.
+      "-dspeech.uitest.reduce-animations",
     ]
     if let contentSize {
       app.launchArguments += ["-UIPreferredContentSizeCategoryName", contentSize]
@@ -117,7 +123,23 @@ final class AccessibilityAuditUITests: XCTestCase {
     defer { removeUIInterruptionMonitor(monitor) }
     start.tap()
     app.tap()
-    _ = app.staticTexts["error-banner"].waitForExistence(timeout: 8)
+    // why: the audit must run against the SETTLED failure state, not a transient frame mid-launch
+    // of the recognizer. Assert the error banner actually appeared with non-empty copy, and that
+    // the surface settled back to idle (Start visible, Stop gone) before measuring layout — an
+    // ignored `waitForExistence` previously let the audit fire before the banner rendered.
+    let errorBanner = app.staticTexts["error-banner"]
+    XCTAssertTrue(
+      errorBanner.waitForExistence(timeout: 10),
+      "recognition failure must surface a visible error banner")
+    XCTAssertFalse(
+      errorBanner.label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+      "error banner must carry a non-empty, user-readable message")
+    XCTAssertTrue(
+      app.buttons["start-button"].waitForExistence(timeout: 8),
+      "failure must return the surface to an idle Start state before auditing")
+    XCTAssertFalse(
+      app.buttons["stop-button"].exists,
+      "listening must have stopped (Stop button gone) before auditing the failure state")
     audit(app, "main · recognition-failure (error banner vs mic button)")
   }
 
