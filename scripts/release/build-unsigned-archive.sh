@@ -8,9 +8,17 @@ archive_path="$repo_root/tmp/release/Dspeech.xcarchive"
 project="Dspeech.xcodeproj"
 scheme="Dspeech"
 
+# Keep release archives hermetic: never resolve or update SwiftPM dependencies outside
+# Package.resolved during the release-readiness path.
+package_flags=(
+  -disableAutomaticPackageResolution
+  -onlyUsePackageVersionsFromResolvedFile
+  -skipPackageUpdates
+)
+
 read_build_setting() {
   local key="$1"
-  xcodebuild -project "$project" -scheme "$scheme" -showBuildSettings 2>/dev/null \
+  xcodebuild -project "$project" -scheme "$scheme" "${package_flags[@]}" -showBuildSettings 2>/dev/null \
     | awk -F'= ' -v key="$key" '$1 ~ key" *$" { value=$2 } END { if (value != "") print value }'
 }
 
@@ -57,16 +65,23 @@ echo "MARKETING_VERSION=$marketing_version"
 echo "CURRENT_PROJECT_VERSION=$build_number"
 
 rm -rf "$archive_path"
+rm -f "$archive_path.dspeech-build-stamp.json"
 mkdir -p "$(dirname "$archive_path")"
 
 xcodebuild archive \
   -project "$project" \
   -scheme "$scheme" \
+  "${package_flags[@]}" \
   -configuration Release \
   -destination generic/platform=iOS \
   -archivePath "$archive_path" \
   CODE_SIGNING_ALLOWED=NO \
   CODE_SIGNING_REQUIRED=NO \
   CODE_SIGN_IDENTITY=""
+
+
+python3 scripts/release/check-release-policy.py --write-stamp \
+  "$archive_path" \
+  "$archive_path.dspeech-build-stamp.json"
 
 echo "Unsigned archive created at $archive_path"

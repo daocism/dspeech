@@ -37,6 +37,7 @@ require_file ".githooks/pre-commit"
 require_file ".githooks/commit-msg"
 require_file "scripts/install-githooks.sh"
 require_file "scripts/release/build-unsigned-archive.sh"
+require_file "scripts/release/check-release-policy.py"
 require_file "docs/release/signed-build-runbook.md"
 require_file "docs/release/release-checklist.md"
 require_file "Dspeech/PrivacyInfo.xcprivacy"
@@ -68,6 +69,9 @@ require_grep "PrivacyInfo\\.xcprivacy in Resources" "Dspeech.xcodeproj/project.p
 require_grep "INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO" "Dspeech.xcodeproj/project.pbxproj" "Export compliance Info.plist key must be set to NO"
 require_grep "^#if DEBUG" "Dspeech/App/SimulatorSpeechProbe.swift" "Simulator speech probe (incl. server-fallback path) must be DEBUG-gated out of release builds"
 require_grep "CODE_SIGNING_ALLOWED=NO" "scripts/release/build-unsigned-archive.sh" "Unsigned archive script must disable code signing"
+if ! python3 scripts/release/check-release-policy.py --source-only; then
+  failures+=("release source policy failed")
+fi
 require_grep "tmp/release/Dspeech\\.xcarchive" "scripts/release/build-unsigned-archive.sh" "Unsigned archive output path must be tmp/release/Dspeech.xcarchive"
 # why: BUILD a fresh unsigned archive and validate IT — never a stale tmp/ artifact. A
 # stale archive previously let "release ready" pass while the source tree had moved on.
@@ -75,6 +79,7 @@ require_grep "tmp/release/Dspeech\\.xcarchive" "scripts/release/build-unsigned-a
 # build can never be mistaken for a verified one.
 archive_path="tmp/release/Dspeech.xcarchive"
 app_binary="$archive_path/Products/Applications/Dspeech.app/Dspeech"
+release_policy_stamp="$archive_path.dspeech-build-stamp.json"
 if [ "${DSPEECH_SKIP_ARCHIVE:-0}" = "1" ]; then
   warnings+=("archive build SKIPPED (DSPEECH_SKIP_ARCHIVE=1) — unsigned readiness NOT freshly verified")
 elif [ "$(uname -s)" = "Darwin" ] && command -v xcodebuild >/dev/null 2>&1; then
@@ -109,6 +114,12 @@ else
     if [ -n "$probe_markers" ]; then
       failures+=("speech-probe string literals present in the RELEASE binary — probe leaked past #if DEBUG")
     fi
+  fi
+fi
+
+if [ -d "$archive_path" ]; then
+  if ! python3 scripts/release/check-release-policy.py --archive "$archive_path" --stamp "$release_policy_stamp"; then
+    failures+=("release archive policy failed")
   fi
 fi
 signing_refs=(
