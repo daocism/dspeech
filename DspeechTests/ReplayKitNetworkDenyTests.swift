@@ -445,23 +445,32 @@ struct ReplayKitNetworkDenyTests {
   // control. Prove the configured override doesn't just resolve in isolation but actually
   // sets the base URL FluidAudio's DownloadUtils fetches from (the only egress path), and
   // that the absence of a configuration leaves FluidAudio's own resolution untouched.
-  @Test func modelSourceOverrideFlowsToFluidAudioDownloadBaseURL() {
+  @Test func modelSourceOverrideFlowsToFluidAudioDownloadBaseURL() async throws {
     let original = ModelRegistry.baseURL
     defer { ModelRegistry.baseURL = original }
 
-    let withoutOverride = SpeakerModelPackInstaller.applyConfiguredRegistryBaseURL(
-      infoDictionary: ["Other": "x"])
+    let withoutOverride = try await SpeakerModelPackInstaller.withConfiguredRegistryBaseURL(
+      infoDictionary: ["Other": "x"]
+    ) {
+      #expect(ModelRegistry.baseURL == original)
+      return ModelRegistry.baseURL
+    }
     #expect(withoutOverride == original)
     #expect(ModelRegistry.baseURL == original)
 
     let mirror = "https://mirror.internal.example"
-    let withOverride = SpeakerModelPackInstaller.applyConfiguredRegistryBaseURL(
-      infoDictionary: [SpeakerModelPackInstaller.registryBaseURLOverrideKey: mirror])
+    let withOverride = try await SpeakerModelPackInstaller.withConfiguredRegistryBaseURL(
+      infoDictionary: [SpeakerModelPackInstaller.registryBaseURLOverrideKey: mirror]
+    ) {
+      #expect(ModelRegistry.baseURL == mirror)
+      return ModelRegistry.baseURL
+    }
     #expect(withOverride == mirror)
-    #expect(ModelRegistry.baseURL == mirror)
+    #expect(ModelRegistry.baseURL == original)
     // The recorded install source reflects the mirror + the pinned diarizer repo path.
     #expect(
-      SpeakerModelPackInstaller.resolvedRegistrySource(bundle: .main).hasSuffix(
-        SpeakerModelPackInstaller.source))
+      SpeakerModelPackInstaller.resolvedRegistrySource(
+        infoDictionary: [SpeakerModelPackInstaller.registryBaseURLOverrideKey: mirror])
+        == "\(mirror)/\(SpeakerModelPackInstaller.source)")
   }
 }
