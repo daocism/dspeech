@@ -155,7 +155,7 @@ final class DspeechUITests: XCTestCase {
     ]
     app.launch()
 
-    app.buttons["settings-button"].tap()
+    openSettings(in: app)
 
     let enabledToggle = app.switches["voicefilter-enabled-toggle"]
     XCTAssertTrue(
@@ -163,14 +163,9 @@ final class DspeechUITests: XCTestCase {
       "voice-filter section must render")
 
     let downloadCTA = app.buttons["voicefilter-modelpack-download-cta"]
-    var attempts = 0
-    while !downloadCTA.exists && attempts < 8 {
-      app.swipeUp()
-      attempts += 1
-    }
     XCTAssertTrue(
-      downloadCTA.waitForExistence(timeout: 4),
-      "download CTA must be present in the voice-filter section")
+      scrollToHittable(downloadCTA, in: app),
+      "download CTA must become hittable in the voice-filter section")
     XCTAssertTrue(
       downloadCTA.isEnabled,
       "download CTA must be enabled (no longer a disabled placeholder)")
@@ -272,7 +267,7 @@ final class DspeechUITests: XCTestCase {
     ]
     app.launch()
 
-    app.buttons["settings-button"].tap()
+    openSettings(in: app)
 
     let failed = app.descendants(matching: .any)
       .matching(identifier: "voicefilter-modelpack-failed").firstMatch
@@ -420,6 +415,50 @@ final class DspeechUITests: XCTestCase {
     XCTAssertTrue(
       header.waitForExistence(timeout: 4),
       "settings must expose an audio source section")
+  }
+
+  // why: the recurring UI-test flake is interacting with a control before it is actually
+  // hittable — the settings button tapped at launch before the toolbar settles, or a CTA tapped
+  // while still off-screen. `.exists` becomes true before a control is laid out and hit-testable,
+  // so existence-gated scrolls/taps race the render. These helpers gate on `.isHittable` and on
+  // the settings sheet finishing presentation, removing the need for a retry to paper over it.
+  @MainActor
+  @discardableResult
+  private func waitUntilHittable(_ element: XCUIElement, timeout: TimeInterval = 8) -> Bool {
+    let predicate = NSPredicate(format: "isHittable == true")
+    let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
+    return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
+  }
+
+  @MainActor
+  private func openSettings(
+    in app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line
+  ) {
+    let settingsButton = app.buttons["settings-button"]
+    XCTAssertTrue(
+      settingsButton.waitForExistence(timeout: 8),
+      "settings button must be reachable on the main surface", file: file, line: line)
+    XCTAssertTrue(
+      waitUntilHittable(settingsButton),
+      "settings button must become hittable before tap", file: file, line: line)
+    settingsButton.tap()
+    XCTAssertTrue(
+      app.buttons["settings-done-button"].waitForExistence(timeout: 8),
+      "settings sheet must finish presenting before interacting", file: file, line: line)
+  }
+
+  @MainActor
+  @discardableResult
+  private func scrollToHittable(
+    _ element: XCUIElement, in app: XCUIApplication, maxSwipes: Int = 10
+  ) -> Bool {
+    var swipes = 0
+    while swipes < maxSwipes {
+      if element.exists && element.isHittable { return true }
+      app.swipeUp()
+      swipes += 1
+    }
+    return element.exists && element.isHittable
   }
 
   @MainActor
