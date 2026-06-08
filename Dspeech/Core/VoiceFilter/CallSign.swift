@@ -38,30 +38,50 @@ struct CallSign: Equatable, Hashable, Sendable, Codable {
     normalized.compactMap { icaoAlphabet[$0] }
   }
 
+  // why: reverse of icaoAlphabet (phonetic word -> its letter/digit) plus the everyday English
+  // digit words the recognizer actually emits. The on-device recognizer runs with addsPunctuation,
+  // so it renders spoken digits as numerals ("123"), not as "ONE TWO THREE" or the ICAO "NINER".
+  private static let phoneticDecode: [String: String] = {
+    var map: [String: String] = [:]
+    for (character, word) in icaoAlphabet {
+      map[word] = String(character)
+    }
+    map["NINE"] = "9"
+    return map
+  }()
+
+  private static func decode(token: String) -> String? {
+    if let mapped = phoneticDecode[token] { return mapped }
+    if !token.isEmpty, token.allSatisfy({ $0.isNumber }) { return token }
+    return nil
+  }
+
   func matches(in text: String) -> Bool {
+    guard !normalized.isEmpty else { return false }
     let upper = text.uppercased()
-    let alnum = Self.normalize(upper)
-    if !normalized.isEmpty && alnum.contains(normalized) {
+    // fast path: the compact alphanumeric form appears verbatim ("N123AB", "N-123-AB").
+    if Self.normalize(upper).contains(normalized) {
       return true
     }
+    // why: the recognizer renders a spoken callsign as a MIX of phonetic words and numerals —
+    // "November 123 Alpha Bravo" for N123AB — so decode each token back to its letter/digit and
+    // test the compact callsign against each contiguous decodable RUN. A non-decodable word
+    // (airline name, instruction) breaks the run, so unrelated text can't bridge two fragments
+    // into a false match, and a wrong-order spelling still fails (the prior ordered-window
+    // behavior is preserved by run-local containment).
     let words =
       upper
       .components(separatedBy: CharacterSet.alphanumerics.inverted)
       .filter { !$0.isEmpty }
-    guard !phoneticTokens.isEmpty else { return false }
-    if words.count >= phoneticTokens.count {
-      let n = phoneticTokens.count
-      for start in 0...(words.count - n) {
-        var ok = true
-        for i in 0..<n where words[start + i] != phoneticTokens[i] {
-          ok = false
-          break
-        }
-        if ok { return true }
+    var run = ""
+    for word in words {
+      if let decoded = Self.decode(token: word) {
+        run += decoded
+        if run.contains(normalized) { return true }
+      } else {
+        run = ""
       }
     }
-    let joined = words.joined()
-    let compact = phoneticTokens.joined()
-    return !compact.isEmpty && joined.contains(compact)
+    return false
   }
 }
