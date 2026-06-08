@@ -9,6 +9,11 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
   }
 
   private let localeProvider: @MainActor () -> String?
+  // why: the configured aircraft callsign is the single highest-value contextual hint for the
+  // on-device LM (a proper noun it has never seen). Read at each (re)install so a callsign the
+  // user sets mid-session biases recognition without an app relaunch. Local-only, no privacy
+  // impact (contextualStrings never leave the device).
+  private let contextualCallSignProvider: @MainActor () -> String?
   private var activeLocaleIdentifier = "en-US"
   private let bufferGate: (any SpeechAudioBufferGate)?
   private var recognizer: SFSpeechRecognizer?
@@ -60,12 +65,14 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
   init(
     localeProvider: @escaping @MainActor () -> String? = { "en-US" },
     bufferGate: (any SpeechAudioBufferGate)? = nil,
+    contextualCallSignProvider: @escaping @MainActor () -> String? = { nil },
     requireOnDeviceModel: Bool = true,
     skipPermissionRequests: Bool = false,
     authorizer: any LiveSpeechAuthorizing = AppleLiveSpeechAuthorizer()
   ) {
     self.localeProvider = localeProvider
     self.bufferGate = bufferGate
+    self.contextualCallSignProvider = contextualCallSignProvider
     self.requireOnDeviceModel = requireOnDeviceModel
     self.skipPermissionRequests = skipPermissionRequests
     self.authorizer = authorizer
@@ -256,8 +263,10 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     request.requiresOnDeviceRecognition = Self.liveRequestsRequireOnDeviceRecognition
     request.taskHint = .dictation
     // why: bias the on-device LM toward ICAO phonetics + ATC phraseology it would
-    // otherwise under-weight; local-only, no privacy/network impact.
-    request.contextualStrings = ATCContextualVocabulary.strings()
+    // otherwise under-weight, plus the configured aircraft callsign (the highest-value
+    // proper-noun hint); local-only, no privacy/network impact.
+    request.contextualStrings = ATCContextualVocabulary.strings(
+      callSign: contextualCallSignProvider())
     request.addsPunctuation = true
     self.request = request
 
@@ -310,15 +319,38 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
   }
 
   private func handleTermination(failure: ASRFailure?) {
-    guard status == .listening, let recognizer else { return }
-    if let failure, !failure.isBenignNoSpeech {
+    switch Self.terminationDecision(
+      isListening: status == .listening,
+      hasRecognizer: recognizer != nil,
+      failure: failure
+    ) {
+    case .ignore:
+      return
+    case .fail(let message):
       // why: surface the real recognition error instead of swallowing it into a benign
       // .stopped — the #1 silent-failure that hid the F1 break from the user.
       cleanup()
-      status = .failed("asr-error: \(failure.domain)#\(failure.code) \(failure.message)")
-      return
+      status = .failed(message)
+    case .restart:
+      guard let recognizer else { return }
+      restartRecognition(recognizer: recognizer)
     }
-    restartRecognition(recognizer: recognizer)
+  }
+
+  // why: the restart-vs-surface decision is the most important business logic in the engine
+  // (the F1 silent-failure fix). Extracted as a pure, synchronous function so it is unit-tested
+  // directly with synthesized failures — the live recognitionTask callback that produces those
+  // failures can't be driven deterministically in a test.
+  static func terminationDecision(
+    isListening: Bool,
+    hasRecognizer: Bool,
+    failure: ASRFailure?
+  ) -> RecognitionTerminationDecision {
+    guard isListening, hasRecognizer else { return .ignore }
+    if let failure, !failure.isBenignNoSpeech {
+      return .fail("asr-error: \(failure.domain)#\(failure.code) \(failure.message)")
+    }
+    return .restart
   }
 
   private func restartRecognition(recognizer: SFSpeechRecognizer) {
@@ -504,7 +536,17 @@ private enum LiveEngineError: Error {
   case invalidInputFormat
 }
 
-private struct ASRFailure: Sendable {
+// why: the outcome of a recognition-task termination. `restart` keeps the mic+tap live and
+// recycles the recognition request (normal final or a benign no-speech timeout); `fail` surfaces
+// a real recognition fault; `ignore` is for callbacks that arrive when the session is no longer
+// listening. Made a first-class type so the decision is testable in isolation.
+enum RecognitionTerminationDecision: Equatable, Sendable {
+  case ignore
+  case restart
+  case fail(String)
+}
+
+struct ASRFailure: Equatable, Sendable {
   let domain: String
   let code: Int
   let message: String
