@@ -1,0 +1,138 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "NSMicrophoneUsageDescription" : {
+      "comment" : "Permission prompt shown when the app requests microphone access.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dspeech verwendet das Mikrofon, um Sprache auf dem Gerät zu erkennen. Audio verlässt niemals dein iPhone."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dspeech uses the microphone to recognize speech on-device. Audio never leaves your iPhone."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dspeech usa el micrófono para reconocer voz en el dispositivo. El audio nunca sale de tu iPhone."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dspeech utilise le microphone pour reconnaître la parole sur l'appareil. L'audio ne quitte jamais votre iPhone."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dspeech usa il microfono per riconoscere il parlato sul dispositivo. L'audio non lascia mai il tuo iPhone."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dspeech はデバイス上で音声を認識するためにマイクを使用します。音声が iPhone の外部に送信されることはありません。"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Dspeech usa o microfone para reconhecer a fala no dispositivo. O áudio nunca sai do seu iPhone."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dspeech использует микрофон для распознавания речи на устройстве. Аудио не покидает iPhone."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dspeech використовує мікрофон для розпізнавання мовлення на пристрої. Аудіо не залишає ваш iPhone."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dspeech 使用麦克风在设备上识别语音。音频绝不会离开您的 iPhone。"
+          }
+        }
+      }
+    },
+    "NSSpeechRecognitionUsageDescription" : {
+      "comment" : "Permission prompt shown when the app requests speech recognition access.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dspeech erkennt Sprache auf dem Gerät, um das Transkript anzuzeigen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dspeech recognizes speech on-device to display the transcript."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dspeech reconoce la voz en el dispositivo para mostrar la transcripción."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dspeech reconnaît la parole sur l'appareil pour afficher la transcription."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dspeech riconosce il parlato sul dispositivo per mostrare la trascrizione."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dspeech はデバイス上で音声を認識し、文字起こしを表示します。"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Dspeech reconhece a fala no dispositivo para exibir a transcrição."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dspeech распознаёт речь на устройстве для отображения транскрипта."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dspeech розпізнає мовлення на пристрої для відображення транскрипту."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dspeech 在设备上识别语音以显示转录文本。"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}
