@@ -204,6 +204,48 @@ struct CaptureCoordinatorTests {
     #expect(coordinator.routeMonitor.lastNotice?.kind == .lost)
   }
 
+  // why: regression — clearNotice() previously had no production call site, so an alarming
+  // "External source lost — Recording paused" banner lingered over a healthy session forever.
+  // A user-initiated (re)start must clear the stale notice.
+  @Test func successfulStartClearsStaleRouteNotice() async {
+    let (coordinator, engine, routing) = Self.makeCoordinator(
+      route: RouteSnapshot(inputs: [Self.port(.usbAudio, name: "USB Tap")]),
+      availableInputs: [Self.port(.usbAudio, name: "USB Tap")]
+    )
+    routing.updateRoute(
+      RouteSnapshot(inputs: [Self.port(.builtInMic, name: "iPhone Mic")]),
+      availableInputs: [Self.port(.builtInMic, name: "iPhone Mic")]
+    )
+    coordinator.handleRouteEvent(.oldDeviceUnavailable)
+    #expect(coordinator.routeMonitor.lastNotice?.kind == .lost)
+    #expect(coordinator.routeBanner != nil)
+    #expect(coordinator.canStart)
+
+    await coordinator.start()
+    await Self.wait(for: { coordinator.live.isListening })
+
+    #expect(engine.startCallCount == 1)
+    #expect(coordinator.routeMonitor.lastNotice == nil)
+    #expect(coordinator.routeBanner == nil)
+  }
+
+  @Test func blockedStartDoesNotClearNotice() async {
+    let (coordinator, engine, _) = Self.makeCoordinator(
+      route: RouteSnapshot(),
+      availableInputs: []
+    )
+    coordinator.handleRouteEvent(.noSuitableRouteForCategory)
+    #expect(coordinator.routeMonitor.lastNotice?.kind == .noSuitableRoute)
+    #expect(coordinator.canStart == false)
+
+    await coordinator.start()
+
+    // why: a blocked start returns early without capturing — the notice must remain so the
+    // user still sees why capture can't begin.
+    #expect(engine.startCallCount == 0)
+    #expect(coordinator.routeMonitor.lastNotice?.kind == .noSuitableRoute)
+  }
+
   @Test func routeBannerNilForSilentNotice() {
     let (coordinator, _, _) = Self.makeCoordinator(
       route: RouteSnapshot(inputs: [Self.port(.usbAudio)]),

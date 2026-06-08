@@ -44,6 +44,11 @@ final class CaptureCoordinator {
       return
     }
     startBlockedMessage = nil
+    // why: the user explicitly (re)started capture, acknowledging the current source. Clear any
+    // stale route notice (e.g. "External source lost — Recording paused" after a reconnect) so an
+    // alarming banner can't linger over a now-live session and contradict the route-health chip.
+    // A genuinely new route problem during this session emits a fresh notice.
+    routeMonitor.clearNotice()
     await live.start()
   }
 
