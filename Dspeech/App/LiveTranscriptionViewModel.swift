@@ -187,8 +187,25 @@ final class LiveTranscriptionViewModel {
 
   private func append(segment: TranscriptSegment) {
     if !segment.sourceLanguageCode.isEmpty { lastSourceLanguageCode = segment.sourceLanguageCode }
-    segments.append(segment)
+    // why: the recognizer can emit a real final for the SAME utterance a beat AFTER Stop already
+    // committed it as a confidence-0 placeholder (commitPartialAsSegment). Replace the placeholder
+    // in place rather than showing the line twice — one VERIFY card and one identical confirmed
+    // card. A confidence-0 .liveATC segment is only ever a Stop placeholder, so this can't collide
+    // with a legitimately repeated utterance mid-session.
+    if segment.confidence > 0, segment.source == .liveATC,
+      let last = segments.last, last.source == .liveATC, last.confidence == 0,
+      last.text.caseInsensitiveCompare(segment.text) == .orderedSame
+    {
+      clearDerivedState(for: last.id)
+      segments[segments.count - 1] = segment
+    } else {
+      segments.append(segment)
+    }
     maybeTranslate(segment)
+    applyVoiceFilter(to: segment)
+  }
+
+  private func applyVoiceFilter(to segment: TranscriptSegment) {
     guard let pipeline = voiceFilter, pipeline.enabled else { return }
     // Phase 1 (ADR 0007): no real speaker classifier — treat every segment as
     // non-pilot so the callsign-relevance gate (ATCTranscriptGate) can decide.
@@ -202,6 +219,15 @@ final class LiveTranscriptionViewModel {
     if case .suppress = decision.relevance {
       suppressedSegmentIDs.insert(segment.id)
     }
+  }
+
+  private func clearDerivedState(for id: UUID) {
+    filterIndicators[id] = nil
+    suppressedSegmentIDs.remove(id)
+    translations[id] = nil
+    translationTasks[id]?.cancel()
+    translationTasks[id] = nil
+    translationTaskTokens[id] = nil
   }
 
   private func startObservingEvents() {
