@@ -75,6 +75,44 @@ struct AppleSpeechLiveTranscriptionEngineLifecycleTests {
     #expect(engine.status == .failed("recognition-locale-unavailable"))
   }
 
+  // why: the restart-vs-surface decision is the F1 silent-failure fix and was previously
+  // shipped with zero behavioral coverage. These pin the exact branches: a benign no-speech
+  // timeout (1110) keeps listening; a real fault surfaces as a visible .failed; a normal final
+  // (no failure) restarts; and a callback that arrives when not listening / without a recognizer
+  // is ignored so a superseded task can't flip a torn-down session.
+  @Test func benignNoSpeechTimeoutRestarts() {
+    let failure = ASRFailure(domain: "kAFAssistantErrorDomain", code: 1110, message: "No speech")
+    #expect(
+      AppleSpeechLiveTranscriptionEngine.terminationDecision(
+        isListening: true, hasRecognizer: true, failure: failure) == .restart)
+  }
+
+  @Test func realRecognitionFaultSurfacesAsFailure() {
+    let failure = ASRFailure(domain: "kAFAssistantErrorDomain", code: 203, message: "Retry")
+    let decision = AppleSpeechLiveTranscriptionEngine.terminationDecision(
+      isListening: true, hasRecognizer: true, failure: failure)
+    #expect(decision == .fail("asr-error: kAFAssistantErrorDomain#203 Retry"))
+  }
+
+  @Test func normalFinalWithNoFailureRestarts() {
+    #expect(
+      AppleSpeechLiveTranscriptionEngine.terminationDecision(
+        isListening: true, hasRecognizer: true, failure: nil) == .restart)
+  }
+
+  @Test func terminationIgnoredWhenNotListening() {
+    let failure = ASRFailure(domain: "kAFAssistantErrorDomain", code: 203, message: "Retry")
+    #expect(
+      AppleSpeechLiveTranscriptionEngine.terminationDecision(
+        isListening: false, hasRecognizer: true, failure: failure) == .ignore)
+  }
+
+  @Test func terminationIgnoredWhenRecognizerGone() {
+    #expect(
+      AppleSpeechLiveTranscriptionEngine.terminationDecision(
+        isListening: true, hasRecognizer: false, failure: nil) == .ignore)
+  }
+
   @discardableResult
   private func wait(
     for predicate: @MainActor () -> Bool,
