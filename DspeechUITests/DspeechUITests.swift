@@ -151,6 +151,7 @@ final class DspeechUITests: XCTestCase {
       "-dspeech.privacy.mode.v1", "localOnly",
       "-dspeech.privacy.voicefilter.active.v1", "true",
       "-dspeech.onboarding.completed.v1", "true",
+      "-dspeech.voicefilter.diarization.enable",
       "-dspeech.voicefilter.modelpack.v1", "absent",
     ]
     app.launch()
@@ -213,6 +214,7 @@ final class DspeechUITests: XCTestCase {
       "-dspeech.privacy.mode.v1", "localOnly",
       "-dspeech.privacy.voicefilter.active.v1", "true",
       "-dspeech.onboarding.completed.v1", "true",
+      "-dspeech.voicefilter.diarization.enable",
       "-dspeech.voicefilter.modelpack.v1", "failedRetryable",
     ]
     app.launch()
@@ -259,6 +261,7 @@ final class DspeechUITests: XCTestCase {
       "-dspeech.privacy.mode.v1", "localOnly",
       "-dspeech.privacy.voicefilter.active.v1", "true",
       "-dspeech.onboarding.completed.v1", "true",
+      "-dspeech.voicefilter.diarization.enable",
       "-dspeech.voicefilter.modelpack.v1", "not-a-model-pack-state",
     ]
     app.launch()
@@ -285,6 +288,7 @@ final class DspeechUITests: XCTestCase {
       "-dspeech.privacy.mode.v1", "localOnly",
       "-dspeech.privacy.voicefilter.active.v1", "true",
       "-dspeech.onboarding.completed.v1", "true",
+      "-dspeech.voicefilter.diarization.enable",
       "-dspeech.voicefilter.modelpack.v1", "acquiringHalf",
     ]
     app.launch()
