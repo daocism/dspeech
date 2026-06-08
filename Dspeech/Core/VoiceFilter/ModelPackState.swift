@@ -1,5 +1,22 @@
 import Foundation
 
+// why: FluidAudio speaker diarization (ADR 0008) is a PRD MVP non-goal/stretch, and ADR 0008
+// requires its offline + simulator eval lanes green and thresholds calibrated before it ships
+// behind the user toggle. Until then the production build hides the model-pack download +
+// pilot-voice enrollment so the shipped default is the validated phase-1 callsign filter
+// (ADR 0007). DEBUG builds and a launch arg opt in so the feature stays fully testable. Gating
+// the UI is sufficient: without an installed pack and an enrolled pilot profile, the pre-ASR
+// speaker path (VoiceFilterPipeline.routeBeforeTranscription / classify) fails open to .nonPilot,
+// so the uncalibrated thresholds are never exercised in production.
+enum VoiceFilterFeatureFlag {
+  // why: gated by an explicit launch argument in ALL build configurations (not auto-on in DEBUG)
+  // so the accessibility audit and every default launch exercise the SAME production surface that
+  // ships — the phase-1 callsign filter without the model-pack download/enrollment. The model-pack
+  // feature tests opt in with `-dspeech.voicefilter.diarization.enable`; Release never passes it.
+  static let speakerDiarizationEnabled: Bool =
+    CommandLine.arguments.contains("-dspeech.voicefilter.diarization.enable")
+}
+
 struct ModelPackAcquisition: Equatable, Sendable, Codable {
   enum Phase: String, Equatable, Sendable, Codable {
     case downloading
@@ -150,9 +167,14 @@ struct UserDefaultsModelPackStateStorage: ModelPackStateStorage, @unchecked Send
 
   func loadState() -> ModelPackState {
     if let raw = defaults.string(forKey: Self.stateKey) {
-      if let launchState = Self.launchArgumentState(raw) {
-        return launchState
-      }
+      // why: a string at this key is only ever a UI-test launch-argument seam (production
+      // persists JSON Data). Honor it in DEBUG/test builds only; in Release a string value is
+      // treated as corrupt so the seam can never influence the shipped app.
+      #if DEBUG
+        if let launchState = Self.launchArgumentState(raw) {
+          return launchState
+        }
+      #endif
       return .failed(Self.corruptPersistedStateFailure)
     }
     guard let data = defaults.data(forKey: Self.stateKey) else {
@@ -171,39 +193,41 @@ struct UserDefaultsModelPackStateStorage: ModelPackStateStorage, @unchecked Send
     defaults.set(data, forKey: Self.stateKey)
   }
 
-  private static func launchArgumentState(_ raw: String) -> ModelPackState? {
-    switch raw {
-    case "absent":
-      return .absent
-    case "failedRetryable":
-      return .failed(
-        ModelPackFailure(
-          kind: .network,
-          userSafeReason:
-            String(
-              localized:
-                "Couldn't download the model pack. Check your network connection and try again."),
-          isRetryable: true
-        ))
-    case "acquiringHalf":
-      return .acquiring(
-        ModelPackAcquisition(
-          phase: .downloading,
-          fractionComplete: 0.42,
-          bytesReceived: 6_300_000,
-          totalBytes: 15_000_000
-        ))
-    case "failedPermanent":
-      return .failed(
-        ModelPackFailure(
-          kind: .unknown,
-          userSafeReason: String(localized: "Model pack verification failed."),
-          isRetryable: false
-        ))
-    default:
-      return nil
+  #if DEBUG
+    private static func launchArgumentState(_ raw: String) -> ModelPackState? {
+      switch raw {
+      case "absent":
+        return .absent
+      case "failedRetryable":
+        return .failed(
+          ModelPackFailure(
+            kind: .network,
+            userSafeReason:
+              String(
+                localized:
+                  "Couldn't download the model pack. Check your network connection and try again."),
+            isRetryable: true
+          ))
+      case "acquiringHalf":
+        return .acquiring(
+          ModelPackAcquisition(
+            phase: .downloading,
+            fractionComplete: 0.42,
+            bytesReceived: 6_300_000,
+            totalBytes: 15_000_000
+          ))
+      case "failedPermanent":
+        return .failed(
+          ModelPackFailure(
+            kind: .unknown,
+            userSafeReason: String(localized: "Model pack verification failed."),
+            isRetryable: false
+          ))
+      default:
+        return nil
+      }
     }
-  }
+  #endif
 
   private static let corruptPersistedStateFailure = ModelPackFailure(
     kind: .corruptState,
