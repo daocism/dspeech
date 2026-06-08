@@ -152,6 +152,33 @@ jobs:
           python3 -m py_compile scripts/release/check-release-policy.py
           python3 scripts/release/check-release-policy.py --source-only
 
+  release-archive:
+    name: Release archive binary gate
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Select latest Xcode 26
+        run: scripts/ci/select-xcode26.sh
+
+      # why: builds the actual shipping (unsigned) Release archive and runs the BINARY-level gate
+      # — the DEBUG speech-probe leak scan, Info.plist export-compliance key, and the
+      # privacy-manifest-in-artifact check. These ran only on a developer's mac before; a
+      # regression that leaked the probe or broke the encryption key passed CI green. Now it is
+      # an automated gate. build-unsigned-archive.sh writes the build stamp the validator verifies.
+      - name: Build unsigned Release archive
+        run: scripts/release/build-unsigned-archive.sh
+
+      - name: Validate archive supply-chain/privacy policy
+        run: |
+          set -euo pipefail
+          python3 scripts/release/check-release-policy.py \
+            --archive tmp/release/Dspeech.xcarchive \
+            --stamp tmp/release/Dspeech.xcarchive.dspeech-build-stamp.json
+
   privacy-manifest:
     name: Privacy manifest validation
     runs-on: macos-26
