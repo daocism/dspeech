@@ -46,7 +46,8 @@ struct ContentView: View {
       engine
       ?? AppleSpeechLiveTranscriptionEngine(
         localeProvider: { recognitionSettings.activeLocaleIdentifier },
-        bufferGate: VoiceFilterSpeechAudioBufferGate(pipeline: filter)
+        bufferGate: VoiceFilterSpeechAudioBufferGate(pipeline: filter),
+        contextualCallSignProvider: { filter.callSign?.raw }
       )
     let translationSettings = TranslationSettings()
     let live = LiveTranscriptionViewModel(
@@ -86,19 +87,33 @@ struct ContentView: View {
     return TranscriptDemoViewModel.demo.segments
   }
 
+  // why: the localized first-run invitation, reused for the idle state and the failure state so
+  // the specific failure message is shown ONCE (in the bottom error banner) instead of twice.
+  private var idleInviteText: String {
+    String(
+      localized:
+        "Tap Start and speak — the transcript will appear here.\nProcessed locally; audio never leaves your device."
+    )
+  }
+
   private var emptyStateText: String {
     switch liveViewModel.status {
-    case .idle, .stopped:
-      return String(
-        localized:
-          "Tap Start and speak — the transcript will appear here.\nProcessed locally; audio never leaves your device."
-      )
+    case .idle, .stopped, .failed:
+      // why: before the first Start, reflect whether on-device recognition is actually ready —
+      // tapping Start while locales are still loading otherwise fails with a misleading
+      // "no language" error. The specific failure detail renders in the bottom error banner.
+      switch recognition.localeAvailabilityState {
+      case .loading:
+        return String(localized: "Checking on-device recognition languages…")
+      case .unavailable:
+        return String(localized: "No on-device recognition languages available.")
+      case .available:
+        return idleInviteText
+      }
     case .requestingPermission:
       return String(localized: "Requesting microphone and speech recognition access…")
     case .ready, .listening:
       return String(localized: "Listening…")
-    case .failed(let message):
-      return RecognitionFailureText.userFacing(message)
     }
   }
 
@@ -116,7 +131,7 @@ struct ContentView: View {
 
         VStack(spacing: isLandscape ? 8 : 12) {
           controlBar(isLandscape: isLandscape)
-          routeBanner(isLandscape: isLandscape)
+          routeBanner()
           transcriptArea(isLandscape: isLandscape)
         }
         .padding(.horizontal, isLandscape ? 16 : 18)
@@ -233,13 +248,13 @@ struct ContentView: View {
   }
 
   @ViewBuilder
-  private func routeBanner(isLandscape: Bool) -> some View {
+  private func routeBanner() -> some View {
     if let message = coordinator.routeBanner ?? coordinator.startBlockedMessage {
       HStack(spacing: 8) {
         Image(systemName: coordinator.canStart ? "exclamationmark.triangle.fill" : "mic.slash.fill")
-          .font(.system(size: isLandscape ? 13 : 14, weight: .semibold))
+          .font(.footnote.weight(.semibold))
         Text(message)
-          .font(.system(size: isLandscape ? 13 : 14, weight: .medium))
+          .font(.footnote.weight(.medium))
           .lineLimit(2)
         Spacer(minLength: 0)
       }
@@ -266,7 +281,9 @@ struct ContentView: View {
       VStack {
         Spacer()
         Text(emptyStateText)
-          .font(.system(size: isLandscape ? 18 : 20, weight: .medium, design: .rounded))
+          // why: PRD F2 — primary guidance text honors Dynamic Type via a semantic style
+          // (scales with the user's accessibility text size) instead of a fixed point size.
+          .font(.system(isLandscape ? .body : .title3, design: .rounded).weight(.medium))
           .foregroundStyle(.white.opacity(0.7))
           .multilineTextAlignment(.center)
           .padding(.horizontal, 24)
@@ -352,6 +369,15 @@ struct ContentView: View {
   }
 
   private func toggleListening() async {
+    // why: if the on-device locale check is still in flight, let it settle before starting so the
+    // first cold-launch tap uses a resolved locale instead of racing into a misleading
+    // "recognition-locale-unavailable" failure. No-op when stopping or already settled, and a tap
+    // is never silently dropped (the control stays enabled).
+    if !liveViewModel.canStopCurrentSession,
+      recognition.localeAvailabilityState == .loading
+    {
+      await recognition.refreshCapableLocales()
+    }
     await coordinator.toggle()
   }
 
@@ -367,8 +393,8 @@ struct ContentView: View {
           .accessibilityIdentifier("app-title")
 
         HStack(spacing: 8) {
-          PrivacyBadge(mode: privacy.mode, isLandscape: isLandscape)
-          RouteHealthChip(health: coordinator.routeMonitor.health, isLandscape: isLandscape)
+          PrivacyBadge(mode: privacy.mode)
+          RouteHealthChip(health: coordinator.routeMonitor.health)
         }
       }
 
@@ -410,12 +436,11 @@ struct ContentView: View {
 
 struct PrivacyBadge: View {
   let mode: PrivacyMode
-  let isLandscape: Bool
 
   var body: some View {
     let tint: Color = .green
     Text(mode.badgeText)
-      .font(.system(size: isLandscape ? 10 : 11, weight: .bold, design: .monospaced))
+      .font(.caption2.weight(.bold).monospaced())
       .foregroundStyle(tint)
       .padding(.horizontal, 7)
       .padding(.vertical, 3)
@@ -430,7 +455,6 @@ struct PrivacyBadge: View {
 
 struct RouteHealthChip: View {
   let health: RouteHealth
-  let isLandscape: Bool
 
   private var tint: Color {
     switch health {
@@ -454,9 +478,9 @@ struct RouteHealthChip: View {
   var body: some View {
     HStack(spacing: 4) {
       Image(systemName: icon)
-        .font(.system(size: isLandscape ? 9 : 10, weight: .bold))
+        .font(.caption2.weight(.bold))
       Text(health.shortLabel)
-        .font(.system(size: isLandscape ? 10 : 11, weight: .bold, design: .monospaced))
+        .font(.caption2.weight(.bold).monospaced())
     }
     .foregroundStyle(tint)
     .padding(.horizontal, 7)
@@ -849,7 +873,12 @@ struct VoiceFilterSettingsSection: View {
         if !parsed.isEmpty { callsignDraft = parsed }
       }
 
-      modelPackContent
+      // why: the FluidAudio speaker-diarization pack download + pilot enrollment ship only when
+      // ADR 0008's eval lanes are green (gated off by default in Release). The phase-1 callsign
+      // filter above (ADR 0007) is always available.
+      if VoiceFilterFeatureFlag.speakerDiarizationEnabled {
+        modelPackContent
+      }
     } header: {
       Text(String(localized: "ATC voice filter"))
     } footer: {
