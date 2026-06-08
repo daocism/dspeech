@@ -234,6 +234,37 @@ struct LiveTranscriptionViewModelTests {
     #expect(vm.visibleSegments.count == 1)
   }
 
+  @Test func lateFinalAfterStopReplacesPlaceholderInsteadOfDuplicating() async {
+    let engine = FakeEngine()
+    let vm = LiveTranscriptionViewModel(engine: engine)
+    await vm.start()
+    engine.push(.partial("November one two three alpha bravo"))
+    await wait(for: { vm.partialText == "November one two three alpha bravo" })
+    // Stop commits the in-flight partial as a confidence-0 placeholder…
+    vm.stop()
+    await wait(for: { vm.segments.count == 1 })
+    #expect(vm.segments.first?.confidence == 0)
+    // …then the recognizer's real final for the SAME utterance arrives a beat later.
+    engine.push(.segment(makeSegment("November one two three alpha bravo", confidence: 0.91)))
+    await wait(for: { (vm.segments.first?.confidence ?? 0) > 0 })
+    #expect(vm.segments.count == 1)
+    #expect(vm.segments.first?.confidence == 0.91)
+  }
+
+  @Test func distinctFinalAfterStopIsNotMergedIntoPlaceholder() async {
+    let engine = FakeEngine()
+    let vm = LiveTranscriptionViewModel(engine: engine)
+    await vm.start()
+    engine.push(.partial("hold short runway two seven"))
+    await wait(for: { vm.partialText == "hold short runway two seven" })
+    vm.stop()
+    await wait(for: { vm.segments.count == 1 })
+    // a DIFFERENT final must not overwrite the placeholder
+    engine.push(.segment(makeSegment("cleared for takeoff runway two seven", confidence: 0.9)))
+    await wait(for: { vm.segments.count == 2 })
+    #expect(vm.segments.count == 2)
+  }
+
   @Test func stopWithNoPartialCommitsNothing() async {
     let engine = FakeEngine()
     let vm = LiveTranscriptionViewModel(engine: engine)
