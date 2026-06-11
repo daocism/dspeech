@@ -21,6 +21,32 @@ struct CallsignDictationServiceTests {
     #expect(recognizer.startCallCount == 0)
   }
 
+  @Test func busyCaptureSurfacesUnavailableWithoutStartingRecognitionOrCapture() async {
+    let arbiter = AudioCaptureArbiter()
+    #expect(arbiter.acquire(.liveTranscription))
+    let authorization = FakeAuthorization()
+    let recognizer = FakeCallsignRecognizer()
+    let audioCapture = FakeCallsignAudioCapture()
+    let service = makeService(
+      authorization: authorization,
+      recognizer: recognizer,
+      audioCapture: audioCapture,
+      arbiter: arbiter
+    )
+
+    await service.start()
+
+    #expect(
+      service.status
+        == .unavailable(
+          "Audio capture is already in use. Stop transcription before using voice entry."))
+    #expect(authorization.speechCallCount == 0)
+    #expect(authorization.micCallCount == 0)
+    #expect(recognizer.startCallCount == 0)
+    #expect(audioCapture.startCallCount == 0)
+    #expect(arbiter.activeClient == .liveTranscription)
+  }
+
   @Test func microphonePermissionDeniedSurfacesUnavailable() async {
     let authorization = FakeAuthorization(microphoneAllowed: false)
     let recognizer = FakeCallsignRecognizer()
@@ -165,6 +191,32 @@ struct CallsignDictationServiceTests {
     #expect(recognizer.task.cancelCallCount == 1)
   }
 
+  @Test func stopReleasesCaptureArbiter() async {
+    let arbiter = AudioCaptureArbiter()
+    let service = makeService(arbiter: arbiter)
+
+    await service.start()
+    #expect(arbiter.activeClient == .callsignDictation)
+
+    service.stop()
+
+    #expect(arbiter.activeClient == nil)
+  }
+
+  @Test func stopWhenNoLongerArbiterHolderDoesNotDeactivateSession() async {
+    let arbiter = AudioCaptureArbiter()
+    let audioCapture = FakeCallsignAudioCapture()
+    let service = makeService(audioCapture: audioCapture, arbiter: arbiter)
+
+    await service.start()
+    #expect(arbiter.release(.callsignDictation))
+
+    service.stop()
+
+    #expect(audioCapture.deactivationRequests == [false])
+    #expect(arbiter.activeClient == nil)
+  }
+
   @Test func duplicateStartWhileAuthorizationPendingUsesOneSession() async {
     let authorization = FakeAuthorization(suspendSpeech: true)
     let recognizer = FakeCallsignRecognizer()
@@ -239,13 +291,15 @@ struct CallsignDictationServiceTests {
     localeIdentifier: String = "en-US",
     authorization: FakeAuthorization = FakeAuthorization(),
     recognizer: FakeCallsignRecognizer?,
-    audioCapture: FakeCallsignAudioCapture = FakeCallsignAudioCapture()
+    audioCapture: FakeCallsignAudioCapture = FakeCallsignAudioCapture(),
+    arbiter: AudioCaptureArbiter = AudioCaptureArbiter()
   ) -> CallsignDictationService {
     CallsignDictationService(
       localeIdentifier: localeIdentifier,
       authorization: authorization,
       recognizerFactory: { _ in recognizer },
-      audioCapture: audioCapture
+      audioCapture: audioCapture,
+      arbiter: arbiter
     )
   }
 
@@ -253,13 +307,15 @@ struct CallsignDictationServiceTests {
     localeIdentifier: String = "en-US",
     authorization: FakeAuthorization = FakeAuthorization(),
     recognizer: FakeCallsignRecognizer = FakeCallsignRecognizer(),
-    audioCapture: FakeCallsignAudioCapture = FakeCallsignAudioCapture()
+    audioCapture: FakeCallsignAudioCapture = FakeCallsignAudioCapture(),
+    arbiter: AudioCaptureArbiter = AudioCaptureArbiter()
   ) -> CallsignDictationService {
     makeService(
       localeIdentifier: localeIdentifier,
       authorization: authorization,
       recognizer: Optional(recognizer),
-      audioCapture: audioCapture
+      audioCapture: audioCapture,
+      arbiter: arbiter
     )
   }
 
@@ -395,6 +451,7 @@ private final class FakeCallsignAudioCapture: CallsignAudioCapturing {
   private var onBuffer: (@Sendable (AVAudioPCMBuffer) -> Void)?
   private(set) var startCallCount = 0
   private(set) var stopCallCount = 0
+  private(set) var deactivationRequests: [Bool] = []
 
   init(
     startError: Error? = nil,
@@ -416,8 +473,9 @@ private final class FakeCallsignAudioCapture: CallsignAudioCapturing {
     }
   }
 
-  func stop() {
+  func stop(deactivateSession: Bool) {
     stopCallCount += 1
+    deactivationRequests.append(deactivateSession)
   }
 
   func emit(_ buffer: AVAudioPCMBuffer) {

@@ -18,6 +18,28 @@ struct VoiceEnrollmentRecorderTests {
     #expect(audioCapture.startCallCount == 1)
   }
 
+  @Test func busyCaptureSurfacesUnavailableWithoutRequestingPermissionOrStartingCapture() async {
+    let arbiter = AudioCaptureArbiter()
+    #expect(arbiter.acquire(.liveTranscription))
+    let authorization = FakeEnrollmentAuthorization()
+    let audioCapture = FakeEnrollmentAudioCapture()
+    let recorder = makeRecorder(
+      authorization: authorization,
+      audioCapture: audioCapture,
+      arbiter: arbiter
+    )
+
+    await recorder.start()
+
+    #expect(
+      recorder.status
+        == .unavailable(
+          "Audio capture is already in use. Stop transcription before recording an enrollment."))
+    #expect(authorization.callCount == 0)
+    #expect(audioCapture.startCallCount == 0)
+    #expect(arbiter.activeClient == .liveTranscription)
+  }
+
   @Test func microphoneDeniedSurfacesUnavailable() async {
     let authorization = FakeEnrollmentAuthorization(microphoneAllowed: false)
     let audioCapture = FakeEnrollmentAudioCapture()
@@ -91,6 +113,18 @@ struct VoiceEnrollmentRecorderTests {
     #expect(audioCapture.stopCallCount == 1)
   }
 
+  @Test func stopReturnsDeliveredBufferSampleRate() async {
+    let audioCapture = FakeEnrollmentAudioCapture(sampleRate: 44_100)
+    let recorder = makeRecorder(audioCapture: audioCapture)
+    await recorder.start()
+
+    audioCapture.emit(Self.makeBuffer(values: [1, 2, 3], sampleRate: 22_050))
+    let result = await recorder.stop()
+
+    #expect(result?.samples == [1, 2, 3])
+    #expect(result?.sampleRate == 22_050)
+  }
+
   @Test func stopWithNoSamplesReturnsNilAndStopsCapture() async {
     let audioCapture = FakeEnrollmentAudioCapture()
     let recorder = makeRecorder(audioCapture: audioCapture)
@@ -142,11 +176,39 @@ struct VoiceEnrollmentRecorderTests {
     _ = await recorder.stop()
   }
 
+  @Test func stopReleasesCaptureArbiter() async {
+    let arbiter = AudioCaptureArbiter()
+    let recorder = makeRecorder(arbiter: arbiter)
+
+    await recorder.start()
+    #expect(arbiter.activeClient == .voiceEnrollment)
+
+    _ = await recorder.stop()
+
+    #expect(arbiter.activeClient == nil)
+  }
+
+  @Test func stopWhenNoLongerArbiterHolderDoesNotDeactivateSession() async {
+    let arbiter = AudioCaptureArbiter()
+    let audioCapture = FakeEnrollmentAudioCapture()
+    let recorder = makeRecorder(audioCapture: audioCapture, arbiter: arbiter)
+
+    await recorder.start()
+    #expect(arbiter.release(.voiceEnrollment))
+
+    _ = await recorder.stop()
+
+    #expect(audioCapture.deactivationRequests == [false])
+    #expect(arbiter.activeClient == nil)
+  }
+
   private func makeRecorder(
     authorization: FakeEnrollmentAuthorization = FakeEnrollmentAuthorization(),
-    audioCapture: FakeEnrollmentAudioCapture = FakeEnrollmentAudioCapture()
+    audioCapture: FakeEnrollmentAudioCapture = FakeEnrollmentAudioCapture(),
+    arbiter: AudioCaptureArbiter = AudioCaptureArbiter()
   ) -> VoiceEnrollmentRecorder {
-    VoiceEnrollmentRecorder(authorization: authorization, audioCapture: audioCapture)
+    VoiceEnrollmentRecorder(
+      authorization: authorization, audioCapture: audioCapture, arbiter: arbiter)
   }
 
   private static func wait(
@@ -162,8 +224,8 @@ struct VoiceEnrollmentRecorderTests {
     return predicate()
   }
 
-  private static func makeBuffer(values: [Float]) -> AVAudioPCMBuffer {
-    let format = AVAudioFormat(standardFormatWithSampleRate: 16_000, channels: 1)!
+  private static func makeBuffer(values: [Float], sampleRate: Double = 16_000) -> AVAudioPCMBuffer {
+    let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1)!
     let buffer = AVAudioPCMBuffer(
       pcmFormat: format,
       frameCapacity: AVAudioFrameCount(values.count)
@@ -211,6 +273,7 @@ private final class FakeEnrollmentAudioCapture: VoiceEnrollmentAudioCapturing {
   private var callbacks: [@Sendable (AVAudioPCMBuffer) -> Void] = []
   private(set) var startCallCount = 0
   private(set) var stopCallCount = 0
+  private(set) var deactivationRequests: [Bool] = []
 
   init(sampleRate: Double = 16_000, startError: Error? = nil) {
     self.sampleRate = sampleRate
@@ -224,8 +287,9 @@ private final class FakeEnrollmentAudioCapture: VoiceEnrollmentAudioCapturing {
     return sampleRate
   }
 
-  func stop() {
+  func stop(deactivateSession: Bool) {
     stopCallCount += 1
+    deactivationRequests.append(deactivateSession)
   }
 
   func emit(_ buffer: AVAudioPCMBuffer, sessionIndex: Int? = nil) {

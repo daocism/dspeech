@@ -148,27 +148,37 @@ struct AudioSourceControllerTests {
 
   final class FakeInputLevelMeter: InputLevelMetering, @unchecked Sendable {
     let eventsToEmit: [InputLevelMeterEvent]
+    private let finishImmediately: Bool
+    private(set) var eventsCallCount = 0
     private(set) var stopCount = 0
-    init(_ events: [InputLevelMeterEvent]) {
+    init(_ events: [InputLevelMeterEvent], finishImmediately: Bool = true) {
       self.eventsToEmit = events
+      self.finishImmediately = finishImmediately
     }
     convenience init(values: [Double]) {
       self.init(values.map(InputLevelMeterEvent.level))
     }
     func events() -> AsyncStream<InputLevelMeterEvent> {
-      AsyncStream { continuation in
+      eventsCallCount += 1
+      return AsyncStream { continuation in
         for event in eventsToEmit { continuation.yield(event) }
-        continuation.finish()
+        if finishImmediately {
+          continuation.finish()
+        }
       }
     }
     func stop() { stopCount += 1 }
   }
 
-  private func makeController(meter: FakeInputLevelMeter) -> AudioSourceController {
+  private func makeController(
+    meter: FakeInputLevelMeter,
+    arbiter: AudioCaptureArbiter = AudioCaptureArbiter()
+  ) -> AudioSourceController {
     AudioSourceController(
       routing: FakeAudioSessionRouting(availableInputs: [port(.builtInMic, "Mic", "u-mic")]),
       settings: AudioSettings(storage: InMemoryStorage()),
-      meter: meter)
+      meter: meter,
+      arbiter: arbiter)
   }
 
   // why: hosted macOS runners can delay a new MainActor metering task while the rest of
@@ -195,6 +205,38 @@ struct AudioSourceControllerTests {
     await waitUntil { controller.inputLevel == 0.9 }
     #expect(controller.inputLevel == 0.9)
     #expect(controller.inputLevelError == nil)
+  }
+
+  @Test func startMeteringWhenCaptureBusySurfacesFailureWithoutStartingMeter() {
+    let arbiter = AudioCaptureArbiter()
+    #expect(arbiter.acquire(.liveTranscription))
+    let meter = FakeInputLevelMeter(values: [0.5])
+    let controller = makeController(meter: meter, arbiter: arbiter)
+
+    controller.startMetering()
+
+    #expect(!controller.isMetering)
+    #expect(controller.inputLevel == 0)
+    #expect(
+      controller.inputLevelError
+        == "Audio capture is already in use. Stop transcription before testing the input level.")
+    #expect(meter.eventsCallCount == 0)
+    #expect(arbiter.activeClient == .liveTranscription)
+  }
+
+  @Test func stopMeteringAfterLivePreemptionLeavesLiveCaptureHolder() {
+    let arbiter = AudioCaptureArbiter()
+    let meter = FakeInputLevelMeter([], finishImmediately: false)
+    let controller = makeController(meter: meter, arbiter: arbiter)
+
+    controller.startMetering()
+    #expect(arbiter.activeClient == .inputLevelMeter)
+    #expect(arbiter.acquire(.liveTranscription))
+
+    controller.stopMetering()
+
+    #expect(arbiter.activeClient == .liveTranscription)
+    #expect(meter.stopCount >= 1)
   }
 
   @Test func startMeteringSurfacesFailureAndStopsMetering() async {

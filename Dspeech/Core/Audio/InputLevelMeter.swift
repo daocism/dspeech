@@ -80,19 +80,17 @@ enum InputLevelMeterEvent: Equatable, Sendable {
       engine.inputNode.removeTap(onBus: 0)
     }
 
-    private nonisolated static func rms(of buffer: AVAudioPCMBuffer) -> Float {
-      guard buffer.format.commonFormat == .pcmFormatFloat32,
-        let channelData = buffer.floatChannelData
-      else { return 0 }
-      let frames = Int(buffer.frameLength)
-      guard frames > 0 else { return 0 }
-      let samples = channelData[0]
+    nonisolated static func rms(of buffer: AVAudioPCMBuffer) -> Float {
+      guard let samples = AppleSpeechLiveTranscriptionEngine.monoFloatSamples(from: buffer),
+        !samples.isEmpty
+      else {
+        return 0
+      }
       var sumOfSquares: Float = 0
-      for index in 0..<frames {
-        let sample = samples[index]
+      for sample in samples {
         sumOfSquares += sample * sample
       }
-      return (sumOfSquares / Float(frames)).squareRoot()
+      return (sumOfSquares / Float(samples.count)).squareRoot()
     }
   }
 #endif
