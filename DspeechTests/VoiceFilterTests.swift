@@ -323,6 +323,57 @@ struct SpeakerMatcherTests {
   }
 }
 
+struct VoicePrintVectorCodableTests {
+  @Test func decodeRejectsNaNEmbeddingValue() throws {
+    let json = #"{"values":[0.1,"NaN",0.3],"quality":0.9}"#.data(using: .utf8)!
+    let decoder = JSONDecoder()
+    decoder.nonConformingFloatDecodingStrategy = .convertFromString(
+      positiveInfinity: "Infinity",
+      negativeInfinity: "-Infinity",
+      nan: "NaN"
+    )
+
+    do {
+      _ = try decoder.decode(VoicePrintVector.self, from: json)
+      Issue.record("expected non-finite embedding decode to throw")
+    } catch let error as VoicePrintVectorError {
+      #expect(error == .nonFiniteValue(index: 1))
+    } catch {
+      Issue.record("expected VoicePrintVectorError, got \(error)")
+    }
+  }
+
+  @Test func decodeRejectsInfiniteQuality() throws {
+    let json = #"{"values":[0.1,0.2,0.3],"quality":"Infinity"}"#.data(using: .utf8)!
+    let decoder = JSONDecoder()
+    decoder.nonConformingFloatDecodingStrategy = .convertFromString(
+      positiveInfinity: "Infinity",
+      negativeInfinity: "-Infinity",
+      nan: "NaN"
+    )
+
+    do {
+      _ = try decoder.decode(VoicePrintVector.self, from: json)
+      Issue.record("expected non-finite quality decode to throw")
+    } catch let error as VoicePrintVectorError {
+      #expect(error == .nonFiniteQuality)
+    } catch {
+      Issue.record("expected VoicePrintVectorError, got \(error)")
+    }
+  }
+
+  @Test func validatingInitializerRejectsInfiniteEmbeddingValue() throws {
+    do {
+      _ = try VoicePrintVector(validatingValues: [0.1, .infinity], quality: 0.9)
+      Issue.record("expected non-finite embedding init to throw")
+    } catch let error as VoicePrintVectorError {
+      #expect(error == .nonFiniteValue(index: 1))
+    } catch {
+      Issue.record("expected VoicePrintVectorError, got \(error)")
+    }
+  }
+}
+
 private struct DeterministicSpeakerMatcherRandom {
   private var state: UInt64
 
@@ -392,13 +443,30 @@ struct SpeakerModelPackSourceTests {
         == "https://mirror.example/internal")
   }
 
-  @Test func resolvedRegistrySourceIncludesConfiguredMirrorAndPinnedRepo() {
+  @Test func resolvedRegistrySourceIncludesConfiguredMirrorPinnedRepoAndRevision() {
     let key = SpeakerModelPackInstaller.registryBaseURLOverrideKey
     let mirror = "https://mirror.example/internal"
 
     #expect(
       SpeakerModelPackInstaller.resolvedRegistrySource(infoDictionary: [key: mirror])
-        == "\(mirror)/\(SpeakerModelPackInstaller.source)")
+        == "\(mirror)/\(SpeakerModelPackInstaller.source)/resolve/\(SpeakerModelPackInstaller.sourceRevision)"
+    )
+  }
+
+  @Test func pinnedDownloadURLUsesImmutableRevisionInsteadOfMain() throws {
+    let key = SpeakerModelPackInstaller.registryBaseURLOverrideKey
+    let mirror = "https://mirror.example/internal"
+
+    let url = try SpeakerModelPackInstaller.pinnedDownloadURL(
+      relativePath: "pyannote_segmentation.mlmodelc/model.mil",
+      infoDictionary: [key: mirror]
+    )
+
+    #expect(
+      url.absoluteString
+        == "\(mirror)/\(SpeakerModelPackInstaller.source)/resolve/\(SpeakerModelPackInstaller.sourceRevision)/pyannote_segmentation.mlmodelc/model.mil"
+    )
+    #expect(!url.absoluteString.contains("/resolve/main/"))
   }
 
   @Test func scopedRegistryOverrideRestoresOriginalAfterOperation() async throws {
@@ -407,7 +475,7 @@ struct SpeakerModelPackSourceTests {
     let key = SpeakerModelPackInstaller.registryBaseURLOverrideKey
     let mirror = "https://mirror.example/internal"
 
-    let observed = await SpeakerModelPackInstaller.withConfiguredRegistryBaseURL(
+    let observed = try await SpeakerModelPackInstaller.withConfiguredRegistryBaseURL(
       infoDictionary: [key: mirror]
     ) {
       #expect(ModelRegistry.baseURL == mirror)
@@ -464,14 +532,111 @@ struct SpeakerModelPackSourceTests {
     #expect(Set(observed) == [firstMirror, secondMirror])
     #expect(ModelRegistry.baseURL == original)
   }
+
+  @Test func scopedRegistryOverrideCancelledWaiterDoesNotEnterOrHoldGate() async throws {
+    let original = ModelRegistry.baseURL
+    defer { ModelRegistry.baseURL = original }
+    let key = SpeakerModelPackInstaller.registryBaseURLOverrideKey
+    let firstMirror = "https://mirror-one.example/internal"
+    let secondMirror = "https://mirror-two.example/internal"
+    let thirdMirror = "https://mirror-three.example/internal"
+    let hold = RegistryGateHold()
+
+    let first = Task {
+      try await SpeakerModelPackInstaller.withConfiguredRegistryBaseURL(
+        infoDictionary: [key: firstMirror]
+      ) {
+        await hold.markEntered()
+        await hold.waitForRelease()
+        return ModelRegistry.baseURL
+      }
+    }
+    #expect(await hold.waitUntilEntered())
+
+    let second = Task {
+      try await SpeakerModelPackInstaller.withConfiguredRegistryBaseURL(
+        infoDictionary: [key: secondMirror]
+      ) {
+        Issue.record("cancelled waiter must not enter the scoped registry override")
+        return ModelRegistry.baseURL
+      }
+    }
+    for _ in 0..<50 { await Task.yield() }
+    second.cancel()
+    await hold.release()
+
+    #expect(try await first.value == firstMirror)
+    do {
+      _ = try await second.value
+      Issue.record("expected cancelled waiter to throw CancellationError")
+    } catch is CancellationError {
+      #expect(ModelRegistry.baseURL == original)
+    } catch {
+      Issue.record("expected CancellationError, got \(error)")
+    }
+
+    let third = try await SpeakerModelPackInstaller.withConfiguredRegistryBaseURL(
+      infoDictionary: [key: thirdMirror]
+    ) {
+      #expect(ModelRegistry.baseURL == thirdMirror)
+      return ModelRegistry.baseURL
+    }
+    #expect(third == thirdMirror)
+    #expect(ModelRegistry.baseURL == original)
+  }
+}
+
+private actor RegistryGateHold {
+  private var entered = false
+  private var released = false
+  private var enteredWaiters: [CheckedContinuation<Bool, Never>] = []
+  private var releaseWaiters: [CheckedContinuation<Void, Never>] = []
+
+  func markEntered() {
+    entered = true
+    let waiters = enteredWaiters
+    enteredWaiters.removeAll()
+    for waiter in waiters { waiter.resume(returning: true) }
+  }
+
+  func waitUntilEntered() async -> Bool {
+    if entered { return true }
+    return await withCheckedContinuation { continuation in
+      enteredWaiters.append(continuation)
+    }
+  }
+
+  func waitForRelease() async {
+    if released { return }
+    await withCheckedContinuation { continuation in
+      releaseWaiters.append(continuation)
+    }
+  }
+
+  func release() {
+    released = true
+    let waiters = releaseWaiters
+    releaseWaiters.removeAll()
+    for waiter in waiters { waiter.resume() }
+  }
 }
 
 struct VoiceFilterStorageTests {
   private func makeStore() -> (UserDefaultsVoiceFilterStorage, () -> Void) {
     let suiteName = "dspeech.tests.voicefilter.\(UUID().uuidString)"
     let defaults = UserDefaults(suiteName: suiteName)!
-    let cleanup = { defaults.removePersistentDomain(forName: suiteName) }
-    return (UserDefaultsVoiceFilterStorage(defaults: defaults), cleanup)
+    let profileStoreURL = FileManager.default.temporaryDirectory
+      .appendingPathComponent("dspeech-voice-profiles-\(UUID().uuidString)", isDirectory: false)
+    let cleanup = {
+      defaults.removePersistentDomain(forName: suiteName)
+      if FileManager.default.fileExists(atPath: profileStoreURL.path) {
+        try? FileManager.default.removeItem(at: profileStoreURL)
+      }
+    }
+    return (
+      UserDefaultsVoiceFilterStorage(defaults: defaults, profileStoreURL: profileStoreURL),
+      cleanup
+    )
   }
 
   @Test func emptyDefaults() {
@@ -499,6 +664,101 @@ struct VoiceFilterStorageTests {
     #expect(loaded.first?.slot == .primary)
     #expect(loaded.first?.label == "Captain")
     #expect(loaded.first?.voicePrint.values == [0.1, 0.2, 0.3, 0.4])
+  }
+
+  @Test func profilesPersistToProtectedFileNotUserDefaults() throws {
+    let suiteName = "dspeech.tests.voicefilter.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    let profileStoreURL = FileManager.default.temporaryDirectory
+      .appendingPathComponent("dspeech-voice-profiles-\(UUID().uuidString)", isDirectory: false)
+    defer {
+      defaults.removePersistentDomain(forName: suiteName)
+      if FileManager.default.fileExists(atPath: profileStoreURL.path) {
+        try? FileManager.default.removeItem(at: profileStoreURL)
+      }
+    }
+    let store = UserDefaultsVoiceFilterStorage(defaults: defaults, profileStoreURL: profileStoreURL)
+    let profile = PilotVoiceProfile(
+      slot: .primary,
+      label: "Captain",
+      voicePrint: VoicePrintVector(values: [0.1, 0.2, 0.3, 0.4], quality: 0.83),
+      enrolledAt: Date(timeIntervalSince1970: 748_137_600)
+    )
+
+    store.saveProfiles([profile])
+
+    #expect(defaults.data(forKey: UserDefaultsVoiceFilterStorage.profilesKey) == nil)
+    #expect(FileManager.default.fileExists(atPath: profileStoreURL.path))
+    let resourceValues = try profileStoreURL.resourceValues(forKeys: [
+      .isExcludedFromBackupKey,
+      .fileProtectionKey,
+    ])
+    #expect(resourceValues.isExcludedFromBackup == true)
+    // why: the Simulator does not implement Data Protection — the protection class is
+    // stored but resourceValues reports it unreliably there. The equality assertion is
+    // meaningful (and enforced) only on a physical device.
+    #if os(iOS) && !targetEnvironment(simulator)
+      #expect(resourceValues.fileProtection == .complete)
+    #endif
+  }
+
+  @Test func legacyUserDefaultsProfilesMigrateToFileAndAreRemovedFromDefaults() throws {
+    let suiteName = "dspeech.tests.voicefilter.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    let profileStoreURL = FileManager.default.temporaryDirectory
+      .appendingPathComponent("dspeech-voice-profiles-\(UUID().uuidString)", isDirectory: false)
+    defer {
+      defaults.removePersistentDomain(forName: suiteName)
+      if FileManager.default.fileExists(atPath: profileStoreURL.path) {
+        try? FileManager.default.removeItem(at: profileStoreURL)
+      }
+    }
+    let profile = PilotVoiceProfile(
+      slot: .primary,
+      label: "Captain",
+      voicePrint: VoicePrintVector(values: [0.1, 0.2, 0.3, 0.4], quality: 0.83),
+      enrolledAt: Date(timeIntervalSince1970: 748_137_600)
+    )
+    let legacyData = try JSONEncoder().encode([profile])
+    defaults.set(legacyData, forKey: UserDefaultsVoiceFilterStorage.profilesKey)
+    let store = UserDefaultsVoiceFilterStorage(defaults: defaults, profileStoreURL: profileStoreURL)
+
+    let loaded = store.loadProfiles()
+
+    #expect(loaded == [profile])
+    #expect(defaults.data(forKey: UserDefaultsVoiceFilterStorage.profilesKey) == nil)
+    #expect(FileManager.default.fileExists(atPath: profileStoreURL.path))
+  }
+
+  @Test func deleteAllProfilesWipesFileStoreAndLegacyDefaults() throws {
+    let suiteName = "dspeech.tests.voicefilter.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    let profileStoreURL = FileManager.default.temporaryDirectory
+      .appendingPathComponent("dspeech-voice-profiles-\(UUID().uuidString)", isDirectory: false)
+    defer {
+      defaults.removePersistentDomain(forName: suiteName)
+      if FileManager.default.fileExists(atPath: profileStoreURL.path) {
+        try? FileManager.default.removeItem(at: profileStoreURL)
+      }
+    }
+    let store = UserDefaultsVoiceFilterStorage(defaults: defaults, profileStoreURL: profileStoreURL)
+    let profile = PilotVoiceProfile(
+      slot: .primary,
+      label: "Captain",
+      voicePrint: VoicePrintVector(values: [0.1, 0.2, 0.3, 0.4], quality: 0.83),
+      enrolledAt: Date(timeIntervalSince1970: 748_137_600)
+    )
+    store.saveProfiles([profile])
+    defaults.set(
+      try JSONEncoder().encode([profile]),
+      forKey: UserDefaultsVoiceFilterStorage.profilesKey
+    )
+
+    store.deleteAllProfiles()
+
+    #expect(store.loadProfiles().isEmpty)
+    #expect(defaults.data(forKey: UserDefaultsVoiceFilterStorage.profilesKey) == nil)
+    #expect(!FileManager.default.fileExists(atPath: profileStoreURL.path))
   }
 
   @Test func callSignRoundTripAndClear() {
@@ -1156,11 +1416,24 @@ struct ModelPackStateStorageTests {
   private func makeStore() -> (UserDefaultsModelPackStateStorage, () -> Void) {
     let suiteName = "dspeech.tests.modelpack.\(UUID().uuidString)"
     let defaults = UserDefaults(suiteName: suiteName)!
-    let cleanup = { defaults.removePersistentDomain(forName: suiteName) }
-    return (UserDefaultsModelPackStateStorage(defaults: defaults), cleanup)
+    let applicationSupportDirectory = FileManager.default.temporaryDirectory
+      .appendingPathComponent("dspeech-app-support-\(UUID().uuidString)", isDirectory: true)
+    let cleanup = {
+      defaults.removePersistentDomain(forName: suiteName)
+      if FileManager.default.fileExists(atPath: applicationSupportDirectory.path) {
+        try? FileManager.default.removeItem(at: applicationSupportDirectory)
+      }
+    }
+    return (
+      UserDefaultsModelPackStateStorage(
+        defaults: defaults,
+        applicationSupportDirectory: applicationSupportDirectory
+      ),
+      cleanup
+    )
   }
 
-  private static func pack() -> InstalledModelPack {
+  private static func pack(localModelPath: String? = nil) -> InstalledModelPack {
     InstalledModelPack(
       identifier: "fluidaudio-speaker-256",
       version: "1.0.0",
@@ -1168,7 +1441,8 @@ struct ModelPackStateStorageTests {
       checksumSHA256: String(repeating: "a", count: 64),
       source: "https://mirror.invalid/voice-filter",
       sizeBytes: 12_345_678,
-      installedAt: Date(timeIntervalSince1970: 748_137_600)
+      installedAt: Date(timeIntervalSince1970: 748_137_600),
+      localModelPath: localModelPath
     )
   }
 
@@ -1184,6 +1458,95 @@ struct ModelPackStateStorageTests {
     defer { cleanup() }
     store.saveState(.installed(Self.pack()))
     #expect(store.loadState() == .installed(Self.pack()))
+  }
+
+  @Test func savePersistsModelPathRelativeToApplicationSupportAndLoadResolvesIt() throws {
+    let suiteName = "dspeech.tests.modelpack.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    let applicationSupportDirectory = FileManager.default.temporaryDirectory
+      .appendingPathComponent("dspeech-app-support-\(UUID().uuidString)", isDirectory: true)
+    defer {
+      defaults.removePersistentDomain(forName: suiteName)
+      if FileManager.default.fileExists(atPath: applicationSupportDirectory.path) {
+        try? FileManager.default.removeItem(at: applicationSupportDirectory)
+      }
+    }
+    let store = UserDefaultsModelPackStateStorage(
+      defaults: defaults,
+      applicationSupportDirectory: applicationSupportDirectory
+    )
+    let relativePath = "FluidAudio/Models/speaker-diarization-coreml"
+    let absolutePath =
+      applicationSupportDirectory
+      .appendingPathComponent(relativePath, isDirectory: true)
+      .path
+    let pack = Self.pack(localModelPath: absolutePath)
+
+    store.saveState(.installed(pack))
+
+    let data = try #require(defaults.data(forKey: UserDefaultsModelPackStateStorage.stateKey))
+    guard
+      case .installed(let persistedPack) = try JSONDecoder().decode(ModelPackState.self, from: data)
+    else {
+      Issue.record("expected raw persisted installed state")
+      return
+    }
+    #expect(persistedPack.localModelPath == relativePath)
+    #expect(store.loadState() == .installed(pack))
+  }
+
+  @Test func legacyAbsoluteModelPathMigratesToCurrentApplicationSupportContainer() throws {
+    let suiteName = "dspeech.tests.modelpack.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    let oldApplicationSupport = FileManager.default.temporaryDirectory
+      .appendingPathComponent(
+        "old-container-\(UUID().uuidString)/Application Support",
+        isDirectory: true
+      )
+    let newApplicationSupport = FileManager.default.temporaryDirectory
+      .appendingPathComponent(
+        "new-container-\(UUID().uuidString)/Application Support",
+        isDirectory: true
+      )
+    defer {
+      defaults.removePersistentDomain(forName: suiteName)
+      for url in [oldApplicationSupport, newApplicationSupport] {
+        let container = url.deletingLastPathComponent()
+        if FileManager.default.fileExists(atPath: container.path) {
+          try? FileManager.default.removeItem(at: container)
+        }
+      }
+    }
+    let relativePath = "FluidAudio/Models/speaker-diarization-coreml"
+    let legacyAbsolutePath =
+      oldApplicationSupport
+      .appendingPathComponent(relativePath, isDirectory: true)
+      .path
+    let legacyState = ModelPackState.installed(Self.pack(localModelPath: legacyAbsolutePath))
+    defaults.set(
+      try JSONEncoder().encode(legacyState),
+      forKey: UserDefaultsModelPackStateStorage.stateKey
+    )
+    let store = UserDefaultsModelPackStateStorage(
+      defaults: defaults,
+      applicationSupportDirectory: newApplicationSupport
+    )
+
+    let loaded = store.loadState()
+
+    let expectedResolvedPath =
+      newApplicationSupport
+      .appendingPathComponent(relativePath, isDirectory: true)
+      .path
+    #expect(loaded.installedPack?.localModelPath == expectedResolvedPath)
+    let data = try #require(defaults.data(forKey: UserDefaultsModelPackStateStorage.stateKey))
+    guard
+      case .installed(let migratedPack) = try JSONDecoder().decode(ModelPackState.self, from: data)
+    else {
+      Issue.record("expected migrated raw installed state")
+      return
+    }
+    #expect(migratedPack.localModelPath == relativePath)
   }
 
   @Test func roundTripFailed() {
@@ -1290,23 +1653,41 @@ struct ModelPackDownloadFailureTests {
     for error in errors {
       let failure = modelPackDownloadFailure(for: error)
       #expect(failure.kind == .checksum)
-      #expect(failure.isRetryable)
-      #expect(failure.userSafeReason.contains("checksum"))
-      #expect(failure.userSafeReason.contains("integrity"))
+      #expect(!failure.isRetryable)
+      #expect(failure.userSafeReason.contains("changed upstream"))
+      #expect(!failure.userSafeReason.contains("network"))
     }
   }
 
-  @Test func otherDownloadErrorsProduceNetworkFailure() {
+  @Test func networkDownloadErrorsProduceNetworkFailure() {
+    let failure = modelPackDownloadFailure(for: URLError(.notConnectedToInternet))
+
+    #expect(failure.kind == .network)
+    #expect(failure.isRetryable)
+    #expect(failure.userSafeReason.contains("network"))
+  }
+
+  @Test func diskFullInstallErrorsProduceDiskFailure() {
     let failures = [
-      modelPackDownloadFailure(for: ModelPackInstallError.filesMissingAfterDownload),
-      modelPackDownloadFailure(for: URLError(.notConnectedToInternet)),
+      modelPackDownloadFailure(
+        for: ModelPackInstallError.insufficientDiskSpace(requiredBytes: 200, availableBytes: 99)),
+      modelPackDownloadFailure(for: CocoaError(.fileWriteOutOfSpace)),
+      modelPackDownloadFailure(for: POSIXError(.ENOSPC)),
     ]
 
     for failure in failures {
-      #expect(failure.kind == .network)
+      #expect(failure.kind == .disk)
       #expect(failure.isRetryable)
-      #expect(failure.userSafeReason.contains("network"))
+      #expect(failure.userSafeReason.contains("storage"))
     }
+  }
+
+  @Test func nonIntegrityNonNetworkInstallErrorsProduceUnknownFailure() {
+    let failure = modelPackDownloadFailure(for: ModelPackInstallError.filesMissingAfterDownload)
+
+    #expect(failure.kind == .unknown)
+    #expect(!failure.isRetryable)
+    #expect(!failure.userSafeReason.contains("network"))
   }
 
   @Test func deleteErrorsProduceDiskFailure() {
@@ -1368,6 +1749,40 @@ struct SpeakerModelPackInstallerTests {
     #expect(
       manifest["wespeaker_v2.mlmodelc/weights/weight.bin"]
         == "34004f6798d35cad7071e2fdc67e63faaa782f53697e1cb49bcb452cf81ae151"
+    )
+  }
+
+  @Test func productionManifestPinsSourceRevisionAndExpectedPackSize() {
+    #expect(
+      SpeakerModelPackInstaller.sourceRevision == "1ed7a662fdc7109e36d822db793ee6eebdaf8594"
+    )
+    #expect(SpeakerModelPackInstaller.expectedPackSizeBytes == 13_720_676)
+  }
+
+  @Test func freeSpacePreflightRequiresTwiceThePinnedPackSize() throws {
+    do {
+      try SpeakerModelPackInstaller.preflightSufficientFreeSpace(
+        availableBytes: SpeakerModelPackInstaller.expectedPackSizeBytes * 2 - 1,
+        expectedPackSizeBytes: SpeakerModelPackInstaller.expectedPackSizeBytes
+      )
+      Issue.record("expected insufficient disk space")
+    } catch let error as ModelPackInstallError {
+      #expect(
+        error
+          == .insufficientDiskSpace(
+            requiredBytes: SpeakerModelPackInstaller.expectedPackSizeBytes * 2,
+            availableBytes: SpeakerModelPackInstaller.expectedPackSizeBytes * 2 - 1
+          )
+      )
+    } catch {
+      Issue.record("expected ModelPackInstallError, got \(error)")
+    }
+  }
+
+  @Test func freeSpacePreflightAcceptsAtLeastTwiceThePinnedPackSize() throws {
+    try SpeakerModelPackInstaller.preflightSufficientFreeSpace(
+      availableBytes: SpeakerModelPackInstaller.expectedPackSizeBytes * 2,
+      expectedPackSizeBytes: SpeakerModelPackInstaller.expectedPackSizeBytes
     )
   }
 
@@ -1483,6 +1898,40 @@ struct SpeakerModelPackInstallerTests {
 
     try SpeakerModelPackInstaller.uninstall(pack)
 
+    #expect(!FileManager.default.fileExists(atPath: root.path))
+  }
+
+  @Test func instanceUninstallDeletesPersistedPilotProfiles() throws {
+    let root = try Self.makeFixture(Self.validFixtureContents())
+    defer { Self.removeFixture(root) }
+    let suiteName = "dspeech.tests.modelpack.uninstall.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    let profileStoreURL = FileManager.default.temporaryDirectory
+      .appendingPathComponent("dspeech-voice-profiles-\(UUID().uuidString)", isDirectory: false)
+    defer {
+      defaults.removePersistentDomain(forName: suiteName)
+      if FileManager.default.fileExists(atPath: profileStoreURL.path) {
+        try? FileManager.default.removeItem(at: profileStoreURL)
+      }
+    }
+    let storage = UserDefaultsVoiceFilterStorage(
+      defaults: defaults,
+      profileStoreURL: profileStoreURL
+    )
+    storage.saveProfiles([
+      PilotVoiceProfile(
+        slot: .primary,
+        label: "Captain",
+        voicePrint: VoicePrintVector(values: [1, 0, 0, 0], quality: 0.9),
+        enrolledAt: Date(timeIntervalSince1970: 0)
+      )
+    ])
+    let installer = SpeakerModelPackInstaller(voiceFilterStorage: storage)
+    let pack = Self.installedPack(localModelPath: root.path)
+
+    try installer.uninstall(pack)
+
+    #expect(storage.loadProfiles().isEmpty)
     #expect(!FileManager.default.fileExists(atPath: root.path))
   }
 

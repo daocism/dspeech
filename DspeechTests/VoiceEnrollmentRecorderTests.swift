@@ -137,6 +137,52 @@ struct VoiceEnrollmentRecorderTests {
     #expect(audioCapture.stopCallCount == 1)
   }
 
+  @Test func stopRejectsSilenceShortOfMinimumVoicedDuration() async {
+    let audioCapture = FakeEnrollmentAudioCapture()
+    let recorder = makeRecorder(audioCapture: audioCapture, targetSeconds: 0.1)
+    await recorder.start()
+
+    audioCapture.emit(Self.makeBuffer(values: Self.silence(seconds: 0.2)))
+    let result = await recorder.stop()
+
+    #expect(result == nil)
+    guard case .unavailable(let reason) = recorder.status else {
+      Issue.record("expected unavailable status for insufficient voiced duration")
+      return
+    }
+    #expect(reason.contains("voiced speech"))
+  }
+
+  @Test func stopRejectsLowEnergyConstantNoiseShortOfMinimumVoicedDuration() async {
+    let audioCapture = FakeEnrollmentAudioCapture()
+    let recorder = makeRecorder(audioCapture: audioCapture, targetSeconds: 0.1)
+    await recorder.start()
+
+    audioCapture.emit(Self.makeBuffer(values: Self.constantNoise(seconds: 0.2, amplitude: 0.002)))
+    let result = await recorder.stop()
+
+    #expect(result == nil)
+    guard case .unavailable(let reason) = recorder.status else {
+      Issue.record("expected unavailable status for low-energy constant noise")
+      return
+    }
+    #expect(reason.contains("voiced speech"))
+  }
+
+  @Test func stopAcceptsSpeechLikeEnergyMeetingMinimumVoicedDuration() async {
+    let audioCapture = FakeEnrollmentAudioCapture()
+    let recorder = makeRecorder(audioCapture: audioCapture, targetSeconds: 0.1)
+    await recorder.start()
+
+    let samples = Self.speechLikeSamples(seconds: 0.12)
+    audioCapture.emit(Self.makeBuffer(values: samples))
+    let result = await recorder.stop()
+
+    #expect(result?.samples == samples)
+    #expect(result?.sampleRate == 16_000)
+    #expect(recorder.status == .idle)
+  }
+
   @Test func lateBufferAfterStopIsIgnored() async {
     let audioCapture = FakeEnrollmentAudioCapture()
     let recorder = makeRecorder(audioCapture: audioCapture)
@@ -205,10 +251,15 @@ struct VoiceEnrollmentRecorderTests {
   private func makeRecorder(
     authorization: FakeEnrollmentAuthorization = FakeEnrollmentAuthorization(),
     audioCapture: FakeEnrollmentAudioCapture = FakeEnrollmentAudioCapture(),
-    arbiter: AudioCaptureArbiter = AudioCaptureArbiter()
+    arbiter: AudioCaptureArbiter = AudioCaptureArbiter(),
+    targetSeconds: Double = 0.0001
   ) -> VoiceEnrollmentRecorder {
     VoiceEnrollmentRecorder(
-      authorization: authorization, audioCapture: audioCapture, arbiter: arbiter)
+      authorization: authorization,
+      audioCapture: audioCapture,
+      arbiter: arbiter,
+      targetSeconds: targetSeconds
+    )
   }
 
   private static func wait(
@@ -236,6 +287,29 @@ struct VoiceEnrollmentRecorderTests {
       samples[index] = value
     }
     return buffer
+  }
+
+  private static func speechLikeSamples(
+    seconds: Double,
+    sampleRate: Double = 16_000
+  ) -> [Float] {
+    let count = Int((seconds * sampleRate).rounded())
+    return (0..<count).map { index in
+      let phase = Double(index % 64) / 64
+      return Float(sin(phase * 2 * .pi) * 0.08)
+    }
+  }
+
+  private static func silence(seconds: Double, sampleRate: Double = 16_000) -> [Float] {
+    Array(repeating: 0, count: Int((seconds * sampleRate).rounded()))
+  }
+
+  private static func constantNoise(
+    seconds: Double,
+    amplitude: Float,
+    sampleRate: Double = 16_000
+  ) -> [Float] {
+    Array(repeating: amplitude, count: Int((seconds * sampleRate).rounded()))
   }
 }
 

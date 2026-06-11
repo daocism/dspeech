@@ -34,6 +34,7 @@ final class VoiceEnrollmentRecorder {
   private let authorization: any VoiceEnrollmentMicrophoneAuthorizing
   private let audioCapture: any VoiceEnrollmentAudioCapturing
   private let arbiter: AudioCaptureArbiter
+  private let targetSeconds: Double
   private var activeSessionID: UUID?
   private var captureContinuation: AsyncStream<VoiceEnrollmentCapturedSamples>.Continuation?
   private var consumeTask: Task<Void, Never>?
@@ -45,11 +46,13 @@ final class VoiceEnrollmentRecorder {
     authorization: any VoiceEnrollmentMicrophoneAuthorizing =
       SystemVoiceEnrollmentMicrophoneAuthorization(),
     audioCapture: any VoiceEnrollmentAudioCapturing = AVAudioEngineVoiceEnrollmentCapture(),
-    arbiter: AudioCaptureArbiter = .shared
+    arbiter: AudioCaptureArbiter = .shared,
+    targetSeconds: Double = VoiceEnrollmentRecorder.targetSeconds
   ) {
     self.authorization = authorization
     self.audioCapture = audioCapture
     self.arbiter = arbiter
+    self.targetSeconds = max(targetSeconds, 0)
   }
 
   var isRecording: Bool { status == .recording }
@@ -130,10 +133,53 @@ final class VoiceEnrollmentRecorder {
       DspeechLog.voiceFilter.error("voice enrollment stopped with no samples")
       return nil
     }
+    guard hasMinimumVoicedDuration(samples: collected, sampleRate: captureSampleRate) else {
+      DspeechLog.voiceFilter.error("voice enrollment stopped reason=insufficient-voiced-duration")
+      status = .unavailable(insufficientVoicedDurationReason())
+      return nil
+    }
     DspeechLog.voiceFilter.info(
       "voice enrollment captured samples=\(self.collected.count, privacy: .public) sampleRate=\(self.captureSampleRate, privacy: .public)"
     )
     return (collected, captureSampleRate)
+  }
+
+  private func hasMinimumVoicedDuration(samples: [Float], sampleRate: Double) -> Bool {
+    guard targetSeconds > 0 else { return true }
+    guard sampleRate > 0, !samples.isEmpty else { return false }
+    let frameSampleCount = max(1, Int((sampleRate * 0.02).rounded()))
+    let segmenter = EnergySilenceSegmenter(
+      minSpeechSeconds: targetSeconds,
+      minSilenceSeconds: 0,
+      maxWindowSeconds: .greatestFiniteMagnitude
+    )
+    var index = 0
+    while index < samples.count {
+      let endIndex = min(index + frameSampleCount, samples.count)
+      let decision = segmenter.update(
+        block: Array(samples[index..<endIndex]),
+        sampleRate: sampleRate
+      )
+      if decision == .cutAfterSilence {
+        return true
+      }
+      index = endIndex
+    }
+    return false
+  }
+
+  private func insufficientVoicedDurationReason() -> String {
+    let seconds = Self.formattedSeconds(targetSeconds)
+    return String(
+      localized:
+        "Not enough voiced speech. Speak clearly for at least \(seconds) seconds and try again.")
+  }
+
+  private static func formattedSeconds(_ value: Double) -> String {
+    if value.rounded() == value {
+      return String(Int(value))
+    }
+    return String(format: "%.1f", value)
   }
 
   private func beginCapture(sessionID: UUID) throws {
