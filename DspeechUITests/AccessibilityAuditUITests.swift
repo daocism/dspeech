@@ -32,6 +32,7 @@ final class AccessibilityAuditUITests: XCTestCase {
   // A large size users actually use, not the absolute extreme (which is dominated by
   // framework layout noise). Catches real truncation/overlap when text grows.
   private static let largeType = "UICTContentSizeCategoryAccessibilityExtraLarge"
+  private static let xxxLargeType = "UICTContentSizeCategoryAccessibilityExtraExtraExtraLarge"
 
   @MainActor
   private static func tapPermissionButton(in alert: XCUIElement) -> Bool {
@@ -219,5 +220,11 @@ final class AccessibilityAuditUITests: XCTestCase {
     let app = launch(locale: "de", contentSize: Self.largeType, skipOnboarding: false)
     XCTAssertTrue(app.staticTexts.firstMatch.waitForExistence(timeout: 8))
     audit(app, "onboarding · de · AX-XL")
+  }
+
+  @MainActor func testOnboarding_en_xxxLarge() {
+    let app = launch(locale: "en", contentSize: Self.xxxLargeType, skipOnboarding: false)
+    XCTAssertTrue(app.staticTexts.firstMatch.waitForExistence(timeout: 8))
+    audit(app, "onboarding · en · AX-XXXL")
   }
 }

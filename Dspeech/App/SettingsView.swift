@@ -1,1 +1,305 @@
 import SwiftUI
+import UIKit
+
+struct SettingsView: View {
+  @Bindable var privacy: PrivacySettings
+  @Bindable var recognition: RecognitionSettings
+  @Bindable var translation: TranslationSettings
+  var audioSource: AudioSourceController
+  var translationFailure: TranslationFailure?
+  var captureActive: Bool
+  var voiceFilter: VoiceFilterPipeline?
+  var onVoiceFilterDisabled: () -> Void
+  @Environment(\.dismiss) private var dismiss
+
+  init(
+    privacy: PrivacySettings, recognition: RecognitionSettings,
+    translation: TranslationSettings,
+    audioSource: AudioSourceController,
+    translationFailure: TranslationFailure? = nil,
+    captureActive: Bool = false,
+    voiceFilter: VoiceFilterPipeline? = nil,
+    onVoiceFilterDisabled: @escaping () -> Void = {}
+  ) {
+    self.privacy = privacy
+    self.recognition = recognition
+    self.translation = translation
+    self.audioSource = audioSource
+    self.translationFailure = translationFailure
+    self.captureActive = captureActive
+    self.voiceFilter = voiceFilter
+    self.onVoiceFilterDisabled = onVoiceFilterDisabled
+  }
+
+  // why: "" = follow the device language (default). A non-empty code writes the
+  // standard AppleLanguages override, which iOS applies on the next launch -- the clean
+  // in-app language switch, no bundle swizzling.
+  @State private var appLanguage: String =
+    (UserDefaults.standard.array(forKey: "AppleLanguages") as? [String])?.first ?? ""
+
+  private static let appLanguages: [(code: String, name: String)] = [
+    ("", String(localized: "System")),
+    ("en", "English"), ("ru", "Русский"), ("uk", "Українська"),
+    ("es", "Español"), ("fr", "Français"), ("de", "Deutsch"),
+    ("it", "Italiano"), ("pt", "Português"), ("zh-Hans", "简体中文"), ("ja", "日本語"),
+  ]
+
+  private var audioSourceBinding: Binding<String> {
+    Binding(get: { audioSource.selectedUID }, set: { audioSource.select(uid: $0) })
+  }
+
+  var body: some View {
+    NavigationStack {
+      Form {
+        Section {
+          Toggle(isOn: $privacy.voiceFilterActive) {
+            VStack(alignment: .leading, spacing: 2) {
+              Text(String(localized: "Pilot speaker classification"))
+                .font(.body.weight(.medium))
+              Text(
+                privacy.voiceFilterActive
+                  ? String(
+                    localized:
+                      "Confident pilot speech can be stopped before recognition. Callsign relevance filtering stays active separately."
+                  )
+                  : String(
+                    localized:
+                      "Speaker classification is off; all audio buffers pass to recognition. Callsign relevance filtering can still hide irrelevant ATC."
+                  )
+              )
+              .font(.footnote)
+              .foregroundStyle(.secondary)
+            }
+          }
+          .accessibilityIdentifier("voicefilter-active-toggle")
+          .onChange(of: privacy.voiceFilterActive) { _, active in
+            if !active { onVoiceFilterDisabled() }
+          }
+        } header: {
+          Text(String(localized: "Privacy"))
+        } footer: {
+          Text(
+            String(
+              localized: "Dspeech processes audio locally only. Audio never leaves your device."))
+        }
+
+        if let voiceFilter {
+          VoiceFilterSettingsSection(
+            pipeline: voiceFilter,
+            onDisabled: onVoiceFilterDisabled)
+        }
+
+        Section {
+          if let routeFailure = audioSource.routePreparationFailure {
+            Text(routeFailure.userFacingMessage)
+              .font(.footnote)
+              .foregroundStyle(.red)
+              .accessibilityIdentifier("audio-route-preparation-error")
+          }
+          if audioSource.hasSelectableInputs {
+            Picker(String(localized: "Input"), selection: audioSourceBinding) {
+              ForEach(audioSource.availableInputs, id: \.uid) { input in
+                Text(input.portName).tag(input.uid)
+              }
+            }
+            .accessibilityIdentifier("audio-source-picker")
+          } else if audioSource.routePreparationFailure == nil {
+            Text(
+              String(
+                localized:
+                  "No input source detected. Connect a wired input (USB-C / TRRS) or use the built-in microphone."
+              )
+            )
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+          }
+          if let selectionError = audioSource.selectionError {
+            Text(selectionError)
+              .font(.footnote)
+              .foregroundStyle(.orange)
+              .accessibilityIdentifier("audio-source-error")
+          }
+          Button {
+            if audioSource.isMetering {
+              audioSource.stopMetering()
+            } else {
+              audioSource.startMetering()
+            }
+          } label: {
+            Label(
+              audioSource.isMetering
+                ? String(localized: "Stop test") : String(localized: "Test input level"),
+              systemImage: audioSource.isMetering ? "stop.circle" : "waveform")
+          }
+          .disabled(captureActive)
+          .accessibilityIdentifier("audio-meter-toggle")
+          if audioSource.isMetering {
+            HStack(spacing: 12) {
+              Text(String(localized: "Level")).font(.footnote).foregroundStyle(.secondary)
+              InputLevelBar(level: audioSource.inputLevel).frame(height: 8)
+            }
+            .accessibilityIdentifier("audio-input-level")
+          }
+          if let inputLevelError = audioSource.inputLevelError {
+            Text(inputLevelError)
+              .font(.footnote)
+              .foregroundStyle(.orange)
+              .accessibilityIdentifier("audio-meter-error")
+          }
+        } header: {
+          Text(String(localized: "Audio source"))
+        } footer: {
+          Text(
+            String(
+              localized:
+                "Your choice is saved for this device. The built-in microphone is for testing; for the cockpit, connect a wired input."
+            )
+          )
+          .fixedSize(horizontal: false, vertical: true)
+        }
+        Section(String(localized: "Recognition")) {
+          switch recognition.localeAvailabilityState {
+          case .loading:
+            HStack {
+              ProgressView()
+              Text(String(localized: "Checking on-device recognition languages…"))
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            }
+            .accessibilityIdentifier("recognition-locale-loading")
+          case .available:
+            Picker(
+              String(localized: "Recognition language"), selection: $recognition.localeIdentifier
+            ) {
+              ForEach(recognition.availableLocales) { locale in
+                Text(locale.displayName).tag(Optional(locale.identifier))
+              }
+            }
+            .accessibilityIdentifier("recognition-locale-picker")
+          case .unavailable:
+            VStack(alignment: .leading, spacing: 6) {
+              Text(String(localized: "No on-device recognition languages available."))
+                .font(.footnote)
+                .foregroundStyle(.orange)
+              Text(
+                String(
+                  localized:
+                    "Check dictation languages in device Settings. Dspeech won't fall back to cloud recognition in place of local mode."
+                )
+              )
+              .font(.footnote)
+              .foregroundStyle(.secondary)
+            }
+            .accessibilityIdentifier("recognition-locale-unavailable")
+          }
+          if recognition.selectedNeedsDownload {
+            VStack(alignment: .leading, spacing: 6) {
+              Text(
+                String(
+                  localized:
+                    "The language “\(recognition.selectedDisplayName)” has not been downloaded yet for on-device recognition."
+                )
+              )
+              .font(.footnote)
+              .foregroundStyle(.orange)
+              .accessibilityIdentifier("recognition-download-hint")
+              Button {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                  UIApplication.shared.open(url)
+                }
+              } label: {
+                Label(String(localized: "Open Device Settings"), systemImage: "gearshape")
+              }
+              .accessibilityIdentifier("recognition-download-language")
+              Text(
+                String(
+                  localized:
+                    "Then: General -> Keyboard -> Dictation Languages -- turn on Dictation and add this language. The model downloads, and recognition works offline."
+                )
+              )
+              .font(.footnote)
+              .foregroundStyle(.secondary)
+            }
+          }
+          LabeledContent(String(localized: "ASR model"), value: String(localized: "Apple Speech"))
+          LabeledContent(String(localized: "Mode"), value: privacy.mode.displayName)
+        }
+        Section {
+          Toggle(String(localized: "On-device translation"), isOn: $translation.enabled)
+            .accessibilityIdentifier("translation-enabled-toggle")
+          Picker(String(localized: "Target language"), selection: $translation.targetCode) {
+            ForEach(translation.availableTargets) { option in
+              Text(option.displayName).tag(option.code)
+            }
+          }
+          .accessibilityIdentifier("translation-target-picker")
+          if translation.enabled, let translationFailure {
+            Label(
+              TranslationFailureText.userFacing(translationFailure),
+              systemImage: "exclamationmark.triangle.fill"
+            )
+            .font(.footnote)
+            .foregroundStyle(.orange)
+            .accessibilityIdentifier("translation-failure")
+          }
+        } header: {
+          Text(String(localized: "Translation"))
+        } footer: {
+          Text(
+            String(
+              localized:
+                "Translation runs on-device via Apple's system language packs. The first time you enable it, iOS offers to download a language pack. Audio and text never leave your device."
+            )
+          )
+          .fixedSize(horizontal: false, vertical: true)
+        }
+        Section {
+          Picker(String(localized: "App language"), selection: $appLanguage) {
+            ForEach(Self.appLanguages, id: \.code) { lang in
+              Text(lang.name).tag(lang.code)
+            }
+          }
+          .accessibilityIdentifier("app-language-picker")
+          .onChange(of: appLanguage) { _, code in
+            if code.isEmpty {
+              UserDefaults.standard.removeObject(forKey: "AppleLanguages")
+            } else {
+              UserDefaults.standard.set([code], forKey: "AppleLanguages")
+            }
+          }
+        } header: {
+          Text(String(localized: "App language"))
+        } footer: {
+          Text(String(localized: "Restart the app to change the language."))
+        }
+        Section(String(localized: "About")) {
+          LabeledContent(String(localized: "Version"), value: Bundle.main.shortVersion)
+        }
+      }
+      .onAppear { audioSource.refresh() }
+      .task { await recognition.refreshCapableLocales() }
+      .onChange(of: recognition.localeIdentifier) {
+        Task { await recognition.refreshSelectedDownloadState() }
+      }
+      .onDisappear { audioSource.stopMetering() }
+      .navigationTitle(String(localized: "Settings"))
+      .navigationBarTitleDisplayMode(.inline)
+      .toolbar {
+        ToolbarItem(placement: .confirmationAction) {
+          Button(String(localized: "Done")) {
+            dismiss()
+          }
+          .accessibilityIdentifier("settings-done-button")
+        }
+      }
+    }
+    .accessibilityIdentifier("settings-sheet")
+    .preferredColorScheme(.dark)
+  }
+}
+
+extension Bundle {
+  fileprivate var shortVersion: String {
+    (infoDictionary?["CFBundleShortVersionString"] as? String) ?? "-"
+  }
+}

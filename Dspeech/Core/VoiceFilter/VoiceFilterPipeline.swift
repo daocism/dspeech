@@ -241,7 +241,7 @@ final class VoiceFilterPipeline {
     if ATCTranscriptGate.containsUrgencyBroadcast(in: text) {
       relevance = gate.evaluate(text: text, speaker: speaker, timestamp: timestamp)
       indicator = Self.indicator(for: speaker, relevance: relevance)
-    } else if enabled, voiceFilterActive() {
+    } else if enabled {
       relevance = gate.evaluate(text: text, speaker: speaker, timestamp: timestamp)
       indicator = Self.indicator(for: speaker, relevance: relevance)
     } else {

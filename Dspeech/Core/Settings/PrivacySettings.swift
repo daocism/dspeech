@@ -9,7 +9,7 @@ enum PrivacyMode: String, CaseIterable, Sendable, Codable {
   }
 
   var badgeText: String {
-    "LOCAL"
+    String(localized: "LOCAL")
   }
 
   var sendsAudioOffDevice: Bool {

@@ -64,6 +64,16 @@ struct PrivacySettingsTests {
     #expect(settings.storageIssue == nil)
   }
 
+  @Test func voiceFilterActiveDoesNotChangeLocalOnlyPrivacyMode() {
+    let storage = InMemoryStorage()
+    let settings = PrivacySettings(storage: storage)
+
+    settings.voiceFilterActive = false
+
+    #expect(settings.mode == .localOnly)
+    #expect(PrivacyMode.localOnly.sendsAudioOffDevice == false)
+  }
+
   @Test func voiceFilterSaveFailureSurfacesStaleSettingsIssue() {
     let storage = InMemoryStorage()
     storage.failSaves = true

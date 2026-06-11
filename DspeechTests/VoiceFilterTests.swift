@@ -1321,7 +1321,7 @@ struct VoiceFilterPipelineTests {
     }
   }
 
-  @Test func voiceFilterActiveKillSwitchDisablesTextAndPreASRFiltering() async throws {
+  @Test func voiceFilterActiveOffDisablesSpeakerClassificationButKeepsRelevanceGate() async throws {
     let store = InMemoryStorage()
     store.enabled = true
     store.callSign = CallSign(raw: "N123AB")
@@ -1341,11 +1341,11 @@ struct VoiceFilterPipelineTests {
 
     let textDecision = pipeline.decide(
       text: "United 247 cleared",
-      speaker: .pilot(slot: .primary, score: 0.99),
+      speaker: .nonPilot(bestPilotScore: 0),
       timestamp: Date(timeIntervalSince1970: 0)
     )
-    #expect(textDecision.relevance == .display(reason: .noCallSignConfigured))
-    #expect(textDecision.indicator == .filterOff)
+    #expect(textDecision.relevance == .suppress(reason: .nonRelevant))
+    #expect(textDecision.indicator == .otherTrafficSuppressed)
 
     let speaker = try await pipeline.classify(samples: [0.1, 0.2], sampleRate: 16_000)
     #expect(speaker == .nonPilot(bestPilotScore: 0))
@@ -1353,6 +1353,26 @@ struct VoiceFilterPipelineTests {
       pipeline.routeBeforeTranscription(speaker: .pilot(slot: .primary, score: 0.99))
         == .transcribe(reason: .filterDisabled)
     )
+  }
+
+  @Test func disabledFilterStillDisablesRelevanceGateWhenPrivacySpeakerToggleIsOn() {
+    let store = InMemoryStorage()
+    store.enabled = false
+    store.callSign = CallSign(raw: "N123AB")
+    let pipeline = VoiceFilterPipeline(
+      identifier: FakeIdentifier(vector: VoicePrintVector(values: [1, 0, 0, 0], quality: 0.92)),
+      storage: store,
+      modelPackStorage: InMemoryModelPackStorage(.installed(Self.installedPack())),
+      voiceFilterActive: { true }
+    )
+
+    let textDecision = pipeline.decide(
+      text: "United 247 cleared",
+      speaker: .nonPilot(bestPilotScore: 0),
+      timestamp: Date(timeIntervalSince1970: 0)
+    )
+    #expect(textDecision.relevance == .display(reason: .noCallSignConfigured))
+    #expect(textDecision.indicator == .filterOff)
   }
 
   @Test func disabledPackEnrollThrowsDespitePackMetadata() async {
