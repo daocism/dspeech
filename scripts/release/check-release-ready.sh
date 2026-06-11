@@ -6,6 +6,26 @@ cd "$repo_root"
 
 failures=()
 warnings=()
+screenshot_max_age_seconds=""
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --max-age)
+      shift
+      if [ -z "${1:-}" ] || ! [[ "$1" =~ ^[0-9]+$ ]]; then
+        echo "Usage: scripts/release/check-release-ready.sh [--max-age seconds]" >&2
+        exit 2
+      fi
+      screenshot_max_age_seconds="$1"
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      echo "Usage: scripts/release/check-release-ready.sh [--max-age seconds]" >&2
+      exit 2
+      ;;
+  esac
+  shift
+done
 
 require_file() {
   local path="$1"
@@ -29,6 +49,66 @@ require_no_grep() {
   local description="$3"
   if [ -f "$path" ] && grep -Eiq "$pattern" "$path"; then
     failures+=("$description")
+  fi
+}
+
+unix_time_for_file() {
+  local path="$1"
+  if [ "$(uname -s)" = "Darwin" ]; then
+    stat -f %m "$path"
+  else
+    stat -c %Y "$path"
+  fi
+}
+
+format_unix_time() {
+  local timestamp="$1"
+  if date -r "$timestamp" "+%Y-%m-%d %H:%M:%S %z" >/dev/null 2>&1; then
+    date -r "$timestamp" "+%Y-%m-%d %H:%M:%S %z"
+  elif date -d "@$timestamp" "+%Y-%m-%d %H:%M:%S %z" >/dev/null 2>&1; then
+    date -d "@$timestamp" "+%Y-%m-%d %H:%M:%S %z"
+  else
+    printf '@%s' "$timestamp"
+  fi
+}
+
+require_fresh_screenshots() {
+  local screenshot_root="tmp/app-store-screenshots"
+  local reference_timestamp
+  local reference_description
+
+  if [ -n "$screenshot_max_age_seconds" ]; then
+    reference_timestamp="$(($(date +%s) - screenshot_max_age_seconds))"
+    reference_description="max age ${screenshot_max_age_seconds}s"
+  else
+    if ! reference_timestamp="$(git log -1 --format=%ct HEAD 2>/dev/null)"; then
+      failures+=("cannot determine HEAD timestamp for screenshot freshness check")
+      return
+    fi
+    reference_description="HEAD commit timestamp $(format_unix_time "$reference_timestamp")"
+  fi
+
+  if [ ! -d "$screenshot_root" ]; then
+    failures+=("missing captured App Store screenshots under ${screenshot_root}/")
+    return
+  fi
+
+  local found=0
+  local stale=()
+  local screenshot_path
+  local screenshot_timestamp
+  while IFS= read -r -d '' screenshot_path; do
+    found=1
+    screenshot_timestamp="$(unix_time_for_file "$screenshot_path")"
+    if [ "$screenshot_timestamp" -le "$reference_timestamp" ]; then
+      stale+=("${screenshot_path} ($(format_unix_time "$screenshot_timestamp"))")
+    fi
+  done < <(find "$screenshot_root" -type f \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' \) -print0)
+
+  if [ "$found" -eq 0 ]; then
+    failures+=("missing captured App Store screenshots under ${screenshot_root}/")
+  elif [ "${#stale[@]}" -gt 0 ]; then
+    failures+=("stale App Store screenshots: regenerate with scripts/screenshots/capture-app-store-screenshots.sh after ${reference_description}; stale files: ${stale[*]}")
   fi
 }
 
@@ -80,12 +160,14 @@ require_grep "tmp/release/Dspeech\\.xcarchive" "scripts/release/build-unsigned-a
 archive_path="tmp/release/Dspeech.xcarchive"
 app_binary="$archive_path/Products/Applications/Dspeech.app/Dspeech"
 release_policy_stamp="$archive_path.dspeech-build-stamp.json"
+release_archive_log="tmp/release-archive-build.log"
 if [ "${DSPEECH_SKIP_ARCHIVE:-0}" = "1" ]; then
   warnings+=("archive build SKIPPED (DSPEECH_SKIP_ARCHIVE=1) — unsigned readiness NOT freshly verified")
 elif [ "$(uname -s)" = "Darwin" ] && command -v xcodebuild >/dev/null 2>&1; then
   echo "Building fresh unsigned archive for release readiness check..."
-  if ! scripts/release/build-unsigned-archive.sh >tmp/release-archive-build.log 2>&1; then
-    failures+=("fresh unsigned archive build failed (see tmp/release-archive-build.log)")
+  mkdir -p "$(dirname "$release_archive_log")"
+  if ! scripts/release/build-unsigned-archive.sh >"$release_archive_log" 2>&1; then
+    failures+=("fresh unsigned archive build failed (see $release_archive_log)")
   fi
 else
   failures+=("cannot build unsigned archive: xcodebuild unavailable on this host")
@@ -181,9 +263,7 @@ for listing in docs/product/app-store/listing-*.md; do
   require_no_grep "country availability|regional availability|market availability" "$listing" "App Store listing must not override canonical availability allowlist: $listing"
 done
 
-if ! find tmp/app-store-screenshots -type f \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' \) -print -quit 2>/dev/null | grep -q .; then
-  failures+=("missing captured App Store screenshots under tmp/app-store-screenshots/")
-fi
+require_fresh_screenshots
 
 if [ "$(uname -s)" = "Darwin" ] && command -v plutil >/dev/null 2>&1; then
   plutil -lint Dspeech/PrivacyInfo.xcprivacy >/dev/null || failures+=("privacy manifest plutil lint failed")
