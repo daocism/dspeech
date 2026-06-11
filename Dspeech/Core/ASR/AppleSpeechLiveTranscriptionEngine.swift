@@ -5,7 +5,25 @@ import Foundation
 @MainActor
 final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
   private(set) var status: LiveTranscriptionStatus = .idle {
-    didSet { emit(.status(status)) }
+    didSet {
+      emit(.status(status))
+      switch status {
+      case .idle:
+        DspeechLog.engine.info("live transcription status=idle")
+      case .requestingPermission:
+        DspeechLog.engine.info("live transcription status=requesting-permission")
+      case .ready:
+        DspeechLog.engine.info("live transcription status=ready")
+      case .listening:
+        DspeechLog.engine.info("live transcription status=listening")
+      case .stopped:
+        DspeechLog.engine.info("live transcription status=stopped")
+      case .failed(let slug):
+        DspeechLog.engine.error(
+          "live transcription status=failed slug=\(slug, privacy: .public)"
+        )
+      }
+    }
   }
 
   private let localeProvider: @MainActor () -> String?
@@ -98,7 +116,15 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
   }
 
   func start() async {
-    guard !isStartupOrListening else { return }
+    guard !isStartupOrListening else {
+      DspeechLog.engine.debug(
+        "live transcription start ignored reason=already-starting-or-listening"
+      )
+      return
+    }
+    DspeechLog.engine.info(
+      "live transcription start requested onDeviceRequired=\(Self.liveRequestsRequireOnDeviceRecognition, privacy: .public)"
+    )
     lifecycleGeneration += 1
     let generation = lifecycleGeneration
     status = .requestingPermission
@@ -107,6 +133,7 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
       let speechAuthorized = await authorizer.requestSpeechAuthorization()
       guard isCurrentStartup(generation) else { return }
       guard speechAuthorized else {
+        DspeechLog.engine.error("live transcription start failed slug=speech-permission-denied")
         status = .failed("speech-permission-denied")
         return
       }
@@ -114,23 +141,31 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
       let micAllowed = await authorizer.requestMicrophonePermission()
       guard isCurrentStartup(generation) else { return }
       guard micAllowed else {
+        DspeechLog.engine.error("live transcription start failed slug=microphone-permission-denied")
         status = .failed("microphone-permission-denied")
         return
       }
     }
 
     guard let localeID = localeProvider() else {
+      DspeechLog.engine.error("live transcription start failed slug=recognition-locale-unavailable")
       status = .failed("recognition-locale-unavailable")
       return
     }
     activeLocaleIdentifier = localeID
     let locale = Locale(identifier: localeID)
+    DspeechLog.engine.info(
+      "live transcription configuring recognizer locale=\(localeID, privacy: .public) requireOnDeviceModel=\(self.requireOnDeviceModel, privacy: .public)"
+    )
     // why: under the skip-permission test seam, tolerate a nil/unavailable recognizer so
     // the audio-capture path is still exercised (a Simulator may report it unavailable).
     let recognizer = SFSpeechRecognizer(locale: locale)
     if !skipPermissionRequests {
       guard let recognizer, recognizer.isAvailable else {
         guard isCurrentStartup(generation) else { return }
+        DspeechLog.engine.error(
+          "live transcription start failed slug=recognizer-unavailable locale=\(localeID, privacy: .public)"
+        )
         status = .failed("recognizer-unavailable")
         return
       }
@@ -141,6 +176,9 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     // back to Apple's server Speech path.
     if requireOnDeviceModel {
       guard let recognizer, recognizer.supportsOnDeviceRecognition else {
+        DspeechLog.engine.error(
+          "live transcription start failed slug=on-device-model-missing locale=\(localeID, privacy: .public)"
+        )
         status = .failed("on-device-model-missing: \(localeID)")
         return
       }
@@ -148,6 +186,7 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     recognizer?.defaultTaskHint = .dictation
     self.recognizer = recognizer
     guard arbiter.acquire(.liveTranscription) else {
+      DspeechLog.engine.error("live transcription start failed slug=capture-session-busy")
       status = .failed("capture-session-busy")
       return
     }
@@ -168,14 +207,19 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
       status = .listening
     } catch {
       _ = cleanup()
+      DspeechLog.engine.error(
+        "live transcription start failed slug=start-failed error=\(error.localizedDescription)"
+      )
       status = .failed("start-failed: \(error.localizedDescription)")
     }
   }
 
   func stop() {
     guard status == .listening || status == .ready || status == .requestingPermission else {
+      DspeechLog.engine.debug("live transcription stop ignored reason=not-active")
       return
     }
+    DspeechLog.engine.info("live transcription stop requested")
     let cleanupResult = cleanup()
     if let deactivationFailureSlug = cleanupResult.deactivationFailureSlug {
       status = .failed(deactivationFailureSlug)
@@ -193,19 +237,41 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
   }
 
   private func beginAudioSession() throws {
-    try audioSession.configureForLiveRecording()
-    try audioSession.setActive(true, options: [])
+    DspeechLog.engine.info("live audio session configure requested")
+    do {
+      try audioSession.configureForLiveRecording()
+      DspeechLog.engine.info("live audio session configure succeeded")
+    } catch {
+      DspeechLog.engine.error(
+        "live audio session configure failed error=\(error.localizedDescription)"
+      )
+      throw error
+    }
+
+    DspeechLog.engine.info("live audio session activation requested")
+    do {
+      try audioSession.setActive(true, options: [])
+      DspeechLog.engine.info("live audio session activation succeeded")
+    } catch {
+      DspeechLog.engine.error(
+        "live audio session activation failed error=\(error.localizedDescription)"
+      )
+      throw error
+    }
   }
 
   private func startEngine() throws {
+    DspeechLog.engine.info("live audio engine start requested")
     audioEngine = AVAudioEngine()
     configureCapturePipeline()
     try startCurrentAudioEngine()
     installEngineConfigurationObserver()
+    DspeechLog.engine.info("live audio engine started")
   }
 
   private func configureCapturePipeline() {
     if bufferGate != nil {
+      DspeechLog.engine.info("live capture pipeline configured gate=voice-filter")
       // why: the gate routes through the nonisolated identifier, so the heavy
       // classifier work runs off @MainActor; the router groups buffers into a
       // decision window, classifies the whole window once, and serializes the
@@ -226,6 +292,7 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
       )
     } else {
       router = nil
+      DspeechLog.engine.info("live capture pipeline configured gate=none")
     }
 
     let (captureStream, audioContinuation) = AsyncStream<CapturedAudioBuffer>.makeStream(
@@ -247,10 +314,14 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     // external interfaces) the input format reports 0 Hz / 0 channels; installing a
     // tap with it throws deep inside CoreAudio. Surface it as an explicit failure.
     guard recordingFormat.channelCount > 0, recordingFormat.sampleRate > 0 else {
+      DspeechLog.engine.error(
+        "live audio tap install failed slug=invalid-input-format sampleRate=\(recordingFormat.sampleRate, privacy: .public) channels=\(recordingFormat.channelCount, privacy: .public)"
+      )
       throw LiveEngineError.invalidInputFormat
     }
 
     guard let audioContinuation = captureContinuation else {
+      DspeechLog.engine.error("live audio tap install failed slug=capture-pipeline-unavailable")
       throw LiveEngineError.capturePipelineUnavailable
     }
 
@@ -278,9 +349,13 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
         CapturedAudioBuffer(buffer: copy, samples: samples, sampleRate: copy.format.sampleRate)
       )
     }
+    DspeechLog.engine.info(
+      "live audio tap installed sampleRate=\(recordingFormat.sampleRate, privacy: .public) channels=\(recordingFormat.channelCount, privacy: .public)"
+    )
 
     audioEngine.prepare()
     try audioEngine.start()
+    DspeechLog.engine.info("live audio engine run loop started")
   }
 
   private func installEngineConfigurationObserver() {
@@ -305,6 +380,7 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
 
   private func handleEngineConfigurationChange() {
     guard status == .listening else { return }
+    DspeechLog.engine.info("live audio engine configuration-change rebuild requested")
     do {
       audioEngine.inputNode.removeTap(onBus: 0)
       try startCurrentAudioEngine()
@@ -320,8 +396,12 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
       guard audioEngine.isRunning else {
         throw LiveEngineError.audioEngineNotRunningAfterConfigurationChange
       }
+      DspeechLog.engine.info("live audio engine configuration-change rebuild succeeded")
     } catch {
       _ = cleanup()
+      DspeechLog.engine.error(
+        "live audio engine configuration-change rebuild failed error=\(error.localizedDescription)"
+      )
       status = .failed("engine-configuration-change-failed: \(error.localizedDescription)")
     }
   }
@@ -342,6 +422,9 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
       callSign: contextualCallSignProvider())
     request.addsPunctuation = true
     self.request = request
+    DspeechLog.engine.info(
+      "recognition task installing locale=\(self.activeLocaleIdentifier, privacy: .public) onDevice=\(request.requiresOnDeviceRecognition, privacy: .public) contextualStringCount=\(request.contextualStrings.count, privacy: .public)"
+    )
 
     taskGeneration += 1
     let generation = taskGeneration
@@ -350,6 +433,11 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     task = recognizer.recognitionTask(with: request) { @Sendable [weak self] result, error in
       let failure: ASRFailure? = (error as NSError?).map {
         ASRFailure(domain: $0.domain, code: $0.code, message: $0.localizedDescription)
+      }
+      if let failure {
+        DspeechLog.engine.error(
+          "recognition task callback failure domain=\(failure.domain, privacy: .public) code=\(failure.code, privacy: .public)"
+        )
       }
       let event: LiveTranscriptionEvent?
       let isFinal: Bool
@@ -371,6 +459,7 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
             event = .segment(segment)
           }
           isFinal = true
+          DspeechLog.engine.info("recognition task callback final=true")
         } else {
           event = .partial(raw)
           isFinal = false
@@ -398,13 +487,18 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
       failure: failure
     ) {
     case .ignore:
+      DspeechLog.engine.info("recognition task termination decision=ignore")
       return
     case .fail(let message):
+      DspeechLog.engine.error(
+        "recognition task termination decision=fail slug=\(message, privacy: .public)"
+      )
       // why: surface the real recognition error instead of swallowing it into a benign
       // .stopped — the #1 silent-failure that hid the F1 break from the user.
       cleanup()
       status = .failed(message)
     case .restart:
+      DspeechLog.engine.info("recognition task termination decision=restart")
       guard let recognizer else { return }
       restartRecognition(recognizer: recognizer)
     }
@@ -440,12 +534,17 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
       isListening: status == .listening, isAudioEngineRunning: audioEngine.isRunning)
     {
     case .ignore:
+      DspeechLog.engine.info("recognition task restart decision=ignore")
       return
     case .fail(let message):
+      DspeechLog.engine.error(
+        "recognition task restart decision=fail slug=\(message, privacy: .public)"
+      )
       _ = cleanup()
       status = .failed(message)
       return
     case .restart:
+      DspeechLog.engine.info("recognition task restart decision=restart")
       break
     }
     request?.endAudio()
@@ -453,13 +552,25 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     task = nil
     request = nil
     installRecognition(recognizer: recognizer)
+    DspeechLog.engine.info("recognition task restarted")
   }
 
   private func routeSamples(_ samples: [Float], sampleRate: Double) async throws
     -> PreTranscriptionRoutingDecision
   {
     guard let bufferGate else { return .transcribe(reason: .classifierUnavailable) }
-    return try await bufferGate.route(samples: samples, sampleRate: sampleRate)
+    let decision = try await bufferGate.route(samples: samples, sampleRate: sampleRate)
+    switch decision {
+    case .transcribe(let reason):
+      DspeechLog.engine.debug(
+        "pre-asr routing decision=transcribe reason=\(String(describing: reason), privacy: .public)"
+      )
+    case .discard(let reason):
+      DspeechLog.engine.debug(
+        "pre-asr routing decision=discard reason=\(String(describing: reason), privacy: .public)"
+      )
+    }
+    return decision
   }
 
   private func routeCaptured(_ captured: CapturedAudioBuffer) {
@@ -524,6 +635,7 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
 
   @discardableResult
   private func cleanup() -> LiveEngineCleanupResult {
+    DspeechLog.engine.info("live transcription cleanup started")
     lifecycleGeneration += 1
     taskGeneration += 1
     removeEngineConfigurationObserver()
@@ -547,12 +659,18 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     request = nil
     var deactivationFailure: String?
     if arbiter.release(.liveTranscription) {
+      DspeechLog.engine.info("live audio session deactivation requested")
       do {
         try audioSession.setActive(false, options: .notifyOthersOnDeactivation)
+        DspeechLog.engine.info("live audio session deactivation succeeded")
       } catch {
         deactivationFailure = "audio-session-deactivation-failed: \(error.localizedDescription)"
+        DspeechLog.engine.error(
+          "live audio session deactivation failed error=\(error.localizedDescription)"
+        )
       }
     }
+    DspeechLog.engine.info("live transcription cleanup finished")
     return LiveEngineCleanupResult(deactivationFailureSlug: deactivationFailure)
   }
 

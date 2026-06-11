@@ -13,7 +13,20 @@ final class CallsignDictationService {
     case unavailable(String)
   }
 
-  private(set) var status: Status = .idle
+  private(set) var status: Status = .idle {
+    didSet {
+      switch status {
+      case .idle:
+        DspeechLog.engine.info("callsign dictation status=idle")
+      case .starting:
+        DspeechLog.engine.info("callsign dictation status=starting")
+      case .listening:
+        DspeechLog.engine.info("callsign dictation status=listening")
+      case .unavailable(let reason):
+        DspeechLog.engine.error("callsign dictation status=unavailable reason=\(reason)")
+      }
+    }
+  }
   private(set) var liveTranscript: String = ""
 
   private let localeIdentifier: String
@@ -60,8 +73,15 @@ final class CallsignDictationService {
   }
 
   func start() async {
-    guard !isActive else { return }
+    guard !isActive else {
+      DspeechLog.engine.debug("callsign dictation start ignored reason=already-active")
+      return
+    }
+    DspeechLog.engine.info(
+      "callsign dictation start requested locale=\(self.localeIdentifier, privacy: .public)"
+    )
     guard arbiter.acquire(.callsignDictation) else {
+      DspeechLog.engine.error("callsign dictation start failed reason=capture-session-busy")
       status = .unavailable(
         String(
           localized:
@@ -75,6 +95,7 @@ final class CallsignDictationService {
     liveTranscript = ""
 
     guard await authorization.requestSpeechAuthorization() else {
+      DspeechLog.engine.error("callsign dictation start failed reason=speech-permission-denied")
       failBeforeCapture(
         String(localized: "No speech recognition access. Allow it in Settings."),
         sessionID: sessionID
@@ -83,6 +104,7 @@ final class CallsignDictationService {
     }
     guard isCurrent(sessionID) else { return }
     guard await authorization.requestMicrophonePermission() else {
+      DspeechLog.engine.error("callsign dictation start failed reason=microphone-permission-denied")
       failBeforeCapture(
         String(localized: "No microphone access. Allow it in Settings."),
         sessionID: sessionID
@@ -91,12 +113,16 @@ final class CallsignDictationService {
     }
     guard isCurrent(sessionID) else { return }
     guard let recognizer = recognizerFactory(localeIdentifier), recognizer.isAvailable else {
+      DspeechLog.engine.error("callsign dictation start failed reason=recognizer-unavailable")
       failBeforeCapture(
         String(localized: "Speech recognition isn't available on this device."),
         sessionID: sessionID)
       return
     }
     guard recognizer.supportsOnDeviceRecognition else {
+      DspeechLog.engine.error(
+        "callsign dictation start failed reason=on-device-model-missing locale=\(self.localeIdentifier, privacy: .public)"
+      )
       failBeforeCapture(
         String(
           localized:
@@ -113,7 +139,11 @@ final class CallsignDictationService {
       try begin(recognizer: recognizer, sessionID: sessionID)
       guard isCurrent(sessionID) else { return }
       status = .listening
+      DspeechLog.engine.info("callsign dictation listening")
     } catch {
+      DspeechLog.engine.error(
+        "callsign dictation start failed reason=capture-start-failed error=\(error.localizedDescription)"
+      )
       failAfterCapture(
         String(localized: "Couldn’t start recording: \(error.localizedDescription)"),
         sessionID: sessionID)
@@ -121,7 +151,11 @@ final class CallsignDictationService {
   }
 
   func stop() {
-    guard isActive else { return }
+    guard isActive else {
+      DspeechLog.engine.debug("callsign dictation stop ignored reason=not-active")
+      return
+    }
+    DspeechLog.engine.info("callsign dictation stop requested")
     cleanup()
     status = .idle
   }
@@ -143,6 +177,7 @@ final class CallsignDictationService {
         self?.handle(update: update, sessionID: sessionID)
       }
     }
+    DspeechLog.engine.info("callsign recognition task installed")
 
     do {
       try audioCapture.start { buffer in
@@ -150,7 +185,11 @@ final class CallsignDictationService {
         audioContinuation.yield(CallsignCapturedBuffer(buffer: copy))
       }
       captureStarted = true
+      DspeechLog.engine.info("callsign dictation capture started")
     } catch {
+      DspeechLog.engine.error(
+        "callsign dictation capture failed error=\(error.localizedDescription)"
+      )
       captureContinuation?.finish()
       captureContinuation = nil
       consumeTask?.cancel()
@@ -160,6 +199,7 @@ final class CallsignDictationService {
   }
 
   private func cleanup() {
+    DspeechLog.engine.info("callsign dictation cleanup started")
     activeSessionID = nil
     let deactivateSession = releaseCaptureLease()
     if captureStarted {
@@ -177,6 +217,7 @@ final class CallsignDictationService {
     task?.cancel()
     task = nil
     recognizer = nil
+    DspeechLog.engine.info("callsign dictation cleanup finished")
   }
 
   private func releaseCaptureLease() -> Bool {
@@ -189,6 +230,11 @@ final class CallsignDictationService {
     guard isCurrent(sessionID), isActive else { return }
     if let text = update.text { liveTranscript = text }
     guard update.isFinished else { return }
+    if let hardError = update.hardError {
+      DspeechLog.engine.error("callsign recognition task finished hardError=\(hardError)")
+    } else {
+      DspeechLog.engine.info("callsign recognition task finished")
+    }
     cleanup()
     if let hardError = update.hardError {
       status = .unavailable(String(localized: "Couldn’t recognize speech: \(hardError)"))
@@ -346,12 +392,17 @@ private final class AVAudioEngineCallsignAudioCapture: CallsignAudioCapturing {
   func start(onBuffer: @escaping @Sendable (AVAudioPCMBuffer) -> Void) throws {
     do {
       let session = AVAudioSession.sharedInstance()
+      DspeechLog.engine.info("callsign audio session activation requested")
       try session.setActive(true)
       sessionActivated = true
+      DspeechLog.engine.info("callsign audio session activation succeeded")
 
       let inputNode = audioEngine.inputNode
       let recordingFormat = inputNode.outputFormat(forBus: 0)
       guard recordingFormat.channelCount > 0, recordingFormat.sampleRate > 0 else {
+        DspeechLog.engine.error(
+          "callsign audio tap install failed reason=invalid-input-format sampleRate=\(recordingFormat.sampleRate, privacy: .public) channels=\(recordingFormat.channelCount, privacy: .public)"
+        )
         throw CallsignAudioCaptureError.invalidInputFormat
       }
 
@@ -359,9 +410,16 @@ private final class AVAudioEngineCallsignAudioCapture: CallsignAudioCapturing {
       inputNode.installTap(onBus: 0, bufferSize: 1024, format: nil) { @Sendable buffer, _ in
         onBuffer(buffer)
       }
+      DspeechLog.engine.info(
+        "callsign audio tap installed sampleRate=\(recordingFormat.sampleRate, privacy: .public) channels=\(recordingFormat.channelCount, privacy: .public)"
+      )
       audioEngine.prepare()
       try audioEngine.start()
+      DspeechLog.engine.info("callsign audio engine started")
     } catch {
+      DspeechLog.engine.error(
+        "callsign audio capture start failed error=\(error.localizedDescription)"
+      )
       stop(deactivateSession: false)
       throw error
     }
@@ -373,7 +431,15 @@ private final class AVAudioEngineCallsignAudioCapture: CallsignAudioCapturing {
     }
     audioEngine.inputNode.removeTap(onBus: 0)
     if deactivateSession, sessionActivated {
-      try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+      DspeechLog.engine.info("callsign audio session deactivation requested")
+      do {
+        try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        DspeechLog.engine.info("callsign audio session deactivation succeeded")
+      } catch {
+        DspeechLog.engine.error(
+          "callsign audio session deactivation failed error=\(error.localizedDescription)"
+        )
+      }
       sessionActivated = false
     }
   }

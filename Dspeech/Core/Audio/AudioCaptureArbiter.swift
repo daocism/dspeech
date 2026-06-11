@@ -27,13 +27,25 @@ final class AudioCaptureArbiter {
     switch activeClient {
     case .none:
       activeClient = client
+      DspeechLog.audioSession.info(
+        "audio capture acquired client=\(client.rawValue, privacy: .public)"
+      )
       return true
     case .some(let current) where current == client:
+      DspeechLog.audioSession.info(
+        "audio capture acquire reused client=\(client.rawValue, privacy: .public)"
+      )
       return true
     case .some(.inputLevelMeter) where client == .liveTranscription:
+      DspeechLog.audioSession.info(
+        "audio capture preempted previous=\(Client.inputLevelMeter.rawValue, privacy: .public) client=\(client.rawValue, privacy: .public)"
+      )
       activeClient = client
       return true
-    case .some:
+    case .some(let current):
+      DspeechLog.audioSession.info(
+        "audio capture acquire refused client=\(client.rawValue, privacy: .public) active=\(current.rawValue, privacy: .public)"
+      )
       return false
     }
   }
@@ -42,8 +54,17 @@ final class AudioCaptureArbiter {
   // already-stopped client must not free (or deactivate the session under) the new holder.
   @discardableResult
   func release(_ client: Client) -> Bool {
-    guard activeClient == client else { return false }
+    guard activeClient == client else {
+      let active = activeClient?.rawValue ?? "none"
+      DspeechLog.audioSession.info(
+        "audio capture release refused client=\(client.rawValue, privacy: .public) active=\(active, privacy: .public)"
+      )
+      return false
+    }
     activeClient = nil
+    DspeechLog.audioSession.info(
+      "audio capture released client=\(client.rawValue, privacy: .public)"
+    )
     return true
   }
 

@@ -20,6 +20,14 @@ import Foundation
       // Priming the category (without activating — the engine owns activation)
       // lets the OS surface the real input so Start reflects an available mic.
       self._routePreparationStatus = Self.prepareRecordCategory(session)
+      switch _routePreparationStatus {
+      case .ready:
+        DspeechLog.audioSession.info("route monitor prepared record category")
+      case .failed(let failure):
+        DspeechLog.audioSession.error(
+          "route monitor record-category preparation failed failure=\(String(describing: failure), privacy: .public)"
+        )
+      }
       self.observers = [
         NotificationCenter.default.addObserver(
           forName: AVAudioSession.routeChangeNotification,
@@ -28,6 +36,9 @@ import Foundation
         ) { [weak self] note in
           let rawReason = (note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt) ?? 0
           let event = LiveAudioSessionRouting.event(forRawReason: rawReason)
+          DspeechLog.audioSession.info(
+            "audio route notification rawReason=\(rawReason, privacy: .public) event=\(String(describing: event), privacy: .public)"
+          )
           self?.yield(event)
         },
         NotificationCenter.default.addObserver(
@@ -36,6 +47,9 @@ import Foundation
           queue: nil
         ) { [weak self] note in
           let event = LiveAudioSessionRouting.event(forInterruptionUserInfo: note.userInfo)
+          DspeechLog.audioSession.info(
+            "audio interruption notification event=\(String(describing: event), privacy: .public)"
+          )
           self?.yield(event)
         },
         NotificationCenter.default.addObserver(
@@ -43,6 +57,7 @@ import Foundation
           object: session,
           queue: nil
         ) { [weak self] _ in
+          DspeechLog.audioSession.error("audio media services reset notification")
           self?.refreshRoutePreparationStatus()
           self?.yield(.mediaServicesWereReset)
         },
@@ -67,16 +82,33 @@ import Foundation
       lock.lock()
       _routePreparationStatus = status
       lock.unlock()
+      switch status {
+      case .ready:
+        DspeechLog.audioSession.info("route preparation refreshed status=ready")
+      case .failed(let failure):
+        DspeechLog.audioSession.error(
+          "route preparation refreshed status=failed failure=\(String(describing: failure), privacy: .public)"
+        )
+      }
     }
 
     static func configureRecordCategory(
       _ session: AVAudioSession
     ) throws {
-      try session.setCategory(
-        .playAndRecord,
-        mode: .measurement,
-        options: [.allowBluetoothHFP, .allowBluetoothA2DP, .defaultToSpeaker]
-      )
+      DspeechLog.audioSession.info("audio session configure record category requested")
+      do {
+        try session.setCategory(
+          .playAndRecord,
+          mode: .measurement,
+          options: [.allowBluetoothHFP, .allowBluetoothA2DP, .defaultToSpeaker]
+        )
+        DspeechLog.audioSession.info("audio session configure record category succeeded")
+      } catch {
+        DspeechLog.audioSession.error(
+          "audio session configure record category failed error=\(error.localizedDescription)"
+        )
+        throw error
+      }
     }
 
     private static func prepareRecordCategory(
@@ -96,11 +128,13 @@ import Foundation
         lock.lock()
         routeContinuations[id] = continuation
         lock.unlock()
+        DspeechLog.audioSession.debug("route change stream subscribed")
         continuation.onTermination = { [weak self] _ in
           guard let self else { return }
           lock.lock()
           routeContinuations[id] = nil
           lock.unlock()
+          DspeechLog.audioSession.debug("route change stream terminated")
         }
       }
     }
@@ -109,6 +143,9 @@ import Foundation
       lock.lock()
       let continuations = Array(routeContinuations.values)
       lock.unlock()
+      DspeechLog.audioSession.info(
+        "audio route event yielded event=\(String(describing: event), privacy: .public) listeners=\(continuations.count, privacy: .public)"
+      )
       for continuation in continuations {
         continuation.yield(event)
       }
@@ -172,8 +209,19 @@ import Foundation
 
     func setPreferredInput(uid: String) throws {
       let inputs = session.availableInputs ?? []
-      guard let port = inputs.first(where: { $0.uid == uid }) else { return }
-      try session.setPreferredInput(port)
+      guard let port = inputs.first(where: { $0.uid == uid }) else {
+        DspeechLog.audioSession.info("preferred input skipped reason=input-not-found")
+        return
+      }
+      do {
+        try session.setPreferredInput(port)
+        DspeechLog.audioSession.info("preferred input set")
+      } catch {
+        DspeechLog.audioSession.error(
+          "preferred input set failed error=\(error.localizedDescription)"
+        )
+        throw error
+      }
     }
 
     private static func snapshot(from port: AVAudioSessionPortDescription) -> PortSnapshot {

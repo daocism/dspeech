@@ -176,23 +176,50 @@ struct SpeakerModelPackInstaller: Sendable {
   func install(
     progress: @escaping @Sendable (ModelPackAcquisition) -> Void
   ) async throws -> InstalledModelPack {
+    DspeechLog.modelPack.info(
+      "model pack install started identifier=\(Self.packIdentifier, privacy: .public) version=\(Self.packVersion, privacy: .public)"
+    )
     let cacheRoot = Self.modelCacheRoot()
     let installSource = Self.resolvedRegistrySource()
-    try await Self.downloadModelPack(to: cacheRoot, progress: progress)
     do {
-      return try Self.installedPackAfterVerification(source: installSource)
-    } catch let error as ModelPackInstallError {
-      guard error.isIntegrityFailure else { throw error }
-      if let modelDir = Self.locateModelDirectory() {
-        try Self.removeModelDirectory(modelDir)
-      }
       try await Self.downloadModelPack(to: cacheRoot, progress: progress)
-      return try Self.installedPackAfterVerification(source: installSource)
+      do {
+        let pack = try Self.installedPackAfterVerification(source: installSource)
+        DspeechLog.modelPack.info(
+          "model pack install succeeded identifier=\(pack.identifier, privacy: .public) version=\(pack.version, privacy: .public) bytes=\(pack.sizeBytes, privacy: .public)"
+        )
+        return pack
+      } catch let error as ModelPackInstallError {
+        guard error.isIntegrityFailure else { throw error }
+        DspeechLog.modelPack.error(
+          "model pack verification failed integrity=true error=\(String(describing: error), privacy: .public)"
+        )
+        if let modelDir = Self.locateModelDirectory() {
+          DspeechLog.modelPack.info("model pack removing failed integrity directory")
+          try Self.removeModelDirectory(modelDir)
+        }
+        DspeechLog.modelPack.info("model pack retrying download after integrity failure")
+        try await Self.downloadModelPack(to: cacheRoot, progress: progress)
+        let pack = try Self.installedPackAfterVerification(source: installSource)
+        DspeechLog.modelPack.info(
+          "model pack install succeeded after retry identifier=\(pack.identifier, privacy: .public) version=\(pack.version, privacy: .public) bytes=\(pack.sizeBytes, privacy: .public)"
+        )
+        return pack
+      }
+    } catch {
+      DspeechLog.modelPack.error("model pack install failed error=\(error.localizedDescription)")
+      throw error
     }
   }
 
   func uninstall(_ pack: InstalledModelPack) throws {
+    DspeechLog.modelPack.info(
+      "model pack uninstall requested identifier=\(pack.identifier, privacy: .public) version=\(pack.version, privacy: .public)"
+    )
     try Self.uninstall(pack)
+    DspeechLog.modelPack.info(
+      "model pack uninstall succeeded identifier=\(pack.identifier, privacy: .public) version=\(pack.version, privacy: .public)"
+    )
   }
 
   static func uninstall(
@@ -202,12 +229,14 @@ struct SpeakerModelPackInstaller: Sendable {
     if let localModelPath = pack.localModelPath, !localModelPath.isEmpty {
       let modelDir = URL(fileURLWithPath: localModelPath, isDirectory: true)
       if fileManager.fileExists(atPath: modelDir.path) {
+        DspeechLog.modelPack.info("model pack uninstall removing installed directory")
         try removeModelDirectory(modelDir, fileManager: fileManager)
       }
       return
     }
 
     if let modelDir = Self.locateModelDirectory(fileManager: fileManager) {
+      DspeechLog.modelPack.info("model pack uninstall removing located directory")
       try removeModelDirectory(modelDir, fileManager: fileManager)
     }
   }
@@ -215,10 +244,15 @@ struct SpeakerModelPackInstaller: Sendable {
   static func installedPackAfterVerification(
     source: String = Self.resolvedRegistrySource()
   ) throws -> InstalledModelPack {
+    DspeechLog.modelPack.info("model pack verification started")
     guard let modelDir = Self.locateModelDirectory() else {
+      DspeechLog.modelPack.error("model pack verification failed reason=files-missing")
       throw ModelPackInstallError.filesMissingAfterDownload
     }
     let verified = try Self.verifyModelPack(at: modelDir)
+    DspeechLog.modelPack.info(
+      "model pack verification succeeded bytes=\(verified.sizeBytes, privacy: .public)"
+    )
 
     return InstalledModelPack(
       identifier: Self.packIdentifier,
@@ -242,6 +276,7 @@ struct SpeakerModelPackInstaller: Sendable {
       cacheRoot.appendingPathComponent("speaker-diarization-coreml", isDirectory: true),
     ]
     for direct in directCandidates where hasBothModels(at: direct, fileManager: fileManager) {
+      DspeechLog.modelPack.debug("model pack directory located strategy=direct")
       return direct
     }
 
@@ -261,7 +296,10 @@ struct SpeakerModelPackInstaller: Sendable {
         continue
       }
       guard isDirectory else { continue }
-      if hasBothModels(at: url, fileManager: fileManager) { return url }
+      if hasBothModels(at: url, fileManager: fileManager) {
+        DspeechLog.modelPack.debug("model pack directory located strategy=enumerated")
+        return url
+      }
     }
     return nil
   }
@@ -275,7 +313,11 @@ struct SpeakerModelPackInstaller: Sendable {
     manifest: [ExpectedModelFile] = expectedModelFileManifest,
     fileManager: FileManager = .default
   ) throws -> VerifiedModelPack {
+    DspeechLog.modelPack.info(
+      "model pack integrity verification started manifestFiles=\(manifest.count, privacy: .public)"
+    )
     guard !manifest.isEmpty else {
+      DspeechLog.modelPack.error("model pack integrity verification failed reason=empty-manifest")
       throw ModelPackInstallError.integrityManifestEmpty
     }
     let normalizedManifest = manifest.sorted { $0.relativePath < $1.relativePath }
@@ -283,9 +325,13 @@ struct SpeakerModelPackInstaller: Sendable {
     let actualPaths = try regularModelFiles(at: modelDirectory, fileManager: fileManager)
 
     for relativePath in expectedPaths.subtracting(actualPaths).sorted() {
+      DspeechLog.modelPack.error(
+        "model pack integrity verification failed reason=expected-file-missing"
+      )
       throw ModelPackInstallError.integrityExpectedFileMissing(relativePath)
     }
     for relativePath in actualPaths.subtracting(expectedPaths).sorted() {
+      DspeechLog.modelPack.error("model pack integrity verification failed reason=unexpected-file")
       throw ModelPackInstallError.integrityUnexpectedFile(relativePath)
     }
 
@@ -297,12 +343,18 @@ struct SpeakerModelPackInstaller: Sendable {
       do {
         data = try Data(contentsOf: fileURL)
       } catch {
+        DspeechLog.modelPack.error(
+          "model pack integrity verification failed reason=file-unreadable"
+        )
         throw ModelPackInstallError.integrityFileUnreadable(entry.relativePath)
       }
 
       let digest = SHA256.hash(data: data)
       let actualSHA256 = hexDigest(digest)
       guard actualSHA256 == entry.sha256 else {
+        DspeechLog.modelPack.error(
+          "model pack integrity verification failed reason=checksum-mismatch"
+        )
         throw ModelPackInstallError.integrityChecksumMismatch(
           relativePath: entry.relativePath,
           expectedSHA256: entry.sha256,
@@ -314,6 +366,9 @@ struct SpeakerModelPackInstaller: Sendable {
       sizeBytes += Int64(data.count)
     }
 
+    DspeechLog.modelPack.info(
+      "model pack integrity verification succeeded files=\(normalizedManifest.count, privacy: .public) bytes=\(sizeBytes, privacy: .public)"
+    )
     return VerifiedModelPack(
       checksumSHA256: hexDigest(packHasher.finalize()),
       sizeBytes: sizeBytes
@@ -346,19 +401,30 @@ struct SpeakerModelPackInstaller: Sendable {
     to cacheRoot: URL,
     progress: @escaping @Sendable (ModelPackAcquisition) -> Void
   ) async throws {
-    try await withConfiguredRegistryBaseURL {
-      try await DownloadUtils.downloadRepo(
-        .diarizer, to: cacheRoot,
-        progressHandler: { snapshot in
-          progress(Self.acquisition(from: snapshot))
-        })
+    DspeechLog.modelPack.info(
+      "model pack download started source=\(Self.resolvedRegistrySource(), privacy: .public)"
+    )
+    do {
+      try await withConfiguredRegistryBaseURL {
+        try await DownloadUtils.downloadRepo(
+          .diarizer, to: cacheRoot,
+          progressHandler: { snapshot in
+            progress(Self.acquisition(from: snapshot))
+          })
+      }
+      DspeechLog.modelPack.info("model pack download finished")
+    } catch {
+      DspeechLog.modelPack.error("model pack download failed error=\(error.localizedDescription)")
+      throw error
     }
   }
 
   private static func removeModelDirectory(_ modelDir: URL, fileManager: FileManager = .default)
     throws
   {
+    DspeechLog.modelPack.info("model pack directory removal requested")
     try fileManager.removeItem(at: modelDir)
+    DspeechLog.modelPack.info("model pack directory removal succeeded")
   }
 
   private static func regularModelFiles(at modelDirectory: URL, fileManager: FileManager) throws
@@ -371,6 +437,9 @@ struct SpeakerModelPackInstaller: Sendable {
       guard fileManager.fileExists(atPath: directory.path, isDirectory: &isDirectory),
         isDirectory.boolValue
       else {
+        DspeechLog.modelPack.error(
+          "model pack integrity verification failed reason=model-dir-missing"
+        )
         throw ModelPackInstallError.integrityExpectedFileMissing(directoryName)
       }
       guard
@@ -379,6 +448,9 @@ struct SpeakerModelPackInstaller: Sendable {
           includingPropertiesForKeys: [.isRegularFileKey]
         )
       else {
+        DspeechLog.modelPack.error(
+          "model pack integrity verification failed reason=model-dir-unreadable"
+        )
         throw ModelPackInstallError.integrityExpectedFileMissing(directoryName)
       }
       for case let fileURL as URL in enumerator {
@@ -389,6 +461,9 @@ struct SpeakerModelPackInstaller: Sendable {
             files.insert(relativePath)
           }
         } catch {
+          DspeechLog.modelPack.error(
+            "model pack integrity verification failed reason=file-unreadable"
+          )
           throw ModelPackInstallError.integrityFileUnreadable(relativePath)
         }
       }

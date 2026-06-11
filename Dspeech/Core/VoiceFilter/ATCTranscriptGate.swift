@@ -34,28 +34,34 @@ struct ATCTranscriptGate: Sendable {
   ) -> ATCRelevanceDecision {
     if Self.containsUrgencyBroadcast(in: text) {
       lastCallSignHitAt = timestamp
+      DspeechLog.voiceFilter.debug("atc transcript gate display reason=urgencyBroadcast")
       return .display(reason: .urgencyBroadcast)
     }
 
     switch speaker {
     case .insufficientSpeech:
+      DspeechLog.voiceFilter.debug("atc transcript gate display reason=insufficientSpeech")
       return .display(reason: .insufficientSpeech)
     case .pilot:
+      DspeechLog.voiceFilter.debug("atc transcript gate suppress reason=pilotReadback")
       return .suppress(reason: .pilotReadback)
     case .nonPilot, .mixed:
       break
     }
 
     guard let callSign = configuredCallSign else {
+      DspeechLog.voiceFilter.debug("atc transcript gate display reason=noCallSignConfigured")
       return .display(reason: .noCallSignConfigured)
     }
 
     if callSign.matches(in: text) || callSign.matchesAbbreviated(in: text) {
       lastCallSignHitAt = timestamp
+      DspeechLog.voiceFilter.debug("atc transcript gate display reason=callSignMatch")
       return .display(reason: .callSignMatch)
     }
 
     if let detector = otherCallSignDetector, detector(text) {
+      DspeechLog.voiceFilter.debug("atc transcript gate suppress reason=addressedToOther")
       return .suppress(reason: .addressedToOther)
     }
 
@@ -65,9 +71,11 @@ struct ATCTranscriptGate: Sendable {
       // why: callers pass the transcript segment timestamp, not evaluation wall time;
       // refreshing here keeps multi-utterance ATC exchanges visible as finals arrive.
       lastCallSignHitAt = timestamp
+      DspeechLog.voiceFilter.debug("atc transcript gate display reason=continuationOfRecentHit")
       return .display(reason: .continuationOfRecentHit)
     }
 
+    DspeechLog.voiceFilter.debug("atc transcript gate suppress reason=nonRelevant")
     return .suppress(reason: .nonRelevant)
   }
 
