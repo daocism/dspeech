@@ -1,0 +1,28 @@
+{
+  "enabledPlugins": {
+    "serena@claude-plugins-official": true
+  },
+  "enableAllProjectMcpServers": true,
+  "permissions": {
+    "allow": [
+      "Bash(xcodebuild:*)",
+      "Bash(xcrun:*)",
+      "Bash(ffmpeg:*)",
+      "Bash(ffprobe:*)",
+      "Bash(swift:*)",
+      "Bash(swift-format:*)",
+      "Bash(codex exec:*)",
+      "Bash(gh run:*)",
+      "Bash(gh pr:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push)",
+      "Bash(git push -u origin:*)",
+      "Bash(python3:*)",
+      "Bash(afplay:*)",
+      "Bash(say:*)",
+      "mcp__XcodeBuildMCP__*",
+      "mcp__sosumi__*"
+    ]
+  }
+}

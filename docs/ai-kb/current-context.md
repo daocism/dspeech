@@ -2,6 +2,15 @@
 
 > Rolling 1-page pointer. Updated by `knowledge-curator` after every substantive run.
 
+## READ FIRST (2026-06-12)
+
+PR #3 "production-ready" was FALSE-READY: first human use broke the core flow (text
+replaced at silence boundaries; filter semantics inverted vs owner intent). Incident +
+self-retro: global memory `feedback_primary_scenario_proof`. The binding work now:
+`docs/PLAN-2026-06-12.md` → `docs/SPEC-2026-06-12-core-semantics-rebuild.md`
+(dispatcher-only durable transmission blocks, real-audio harness on the French ATC
+fixtures, WhisperKit phase). Do not trust the previous "ready" claims below.
+
 ## What we are building right now
 
 Native iOS 26+ SwiftUI app: receive-only cockpit/ATC live transcription, on-device only,
