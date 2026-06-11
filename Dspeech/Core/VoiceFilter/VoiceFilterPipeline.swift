@@ -163,7 +163,10 @@ final class VoiceFilterPipeline {
   ) -> VoiceFilterDecision {
     let relevance: ATCRelevanceDecision
     let indicator: ATCVoiceIndicator
-    if enabled, voiceFilterActive() {
+    if ATCTranscriptGate.containsUrgencyBroadcast(in: text) {
+      relevance = gate.evaluate(text: text, speaker: speaker, timestamp: timestamp)
+      indicator = Self.indicator(for: speaker, relevance: relevance)
+    } else if enabled, voiceFilterActive() {
       relevance = gate.evaluate(text: text, speaker: speaker, timestamp: timestamp)
       indicator = Self.indicator(for: speaker, relevance: relevance)
     } else {
@@ -200,6 +203,7 @@ final class VoiceFilterPipeline {
     for speaker: SpeakerMatchDecision,
     relevance: ATCRelevanceDecision
   ) -> ATCVoiceIndicator {
+    if case .display(reason: .urgencyBroadcast) = relevance { return .urgencyBroadcast }
     if case .pilot = speaker { return .pilotSuppressed }
     if case .insufficientSpeech = speaker { return .noiseOrTooShortSuppressed }
     if case .mixed = speaker { return .mixedSpeakerCandidate }
@@ -212,6 +216,8 @@ final class VoiceFilterPipeline {
       return .dispatcherContinuation
     case .display(reason: .noCallSignConfigured):
       return .probableDispatcher
+    case .display(reason: .insufficientSpeech):
+      return .noiseOrTooShortSuppressed
     case .suppress(reason: .addressedToOther), .suppress(reason: .nonRelevant):
       return .otherTrafficSuppressed
     case .suppress(reason: .insufficientSpeech):

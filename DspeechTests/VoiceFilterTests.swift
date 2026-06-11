@@ -407,7 +407,7 @@ struct SpeakerModelPackSourceTests {
     let key = SpeakerModelPackInstaller.registryBaseURLOverrideKey
     let mirror = "https://mirror.example/internal"
 
-    let observed = try await SpeakerModelPackInstaller.withConfiguredRegistryBaseURL(
+    let observed = await SpeakerModelPackInstaller.withConfiguredRegistryBaseURL(
       infoDictionary: [key: mirror]
     ) {
       #expect(ModelRegistry.baseURL == mirror)
@@ -588,6 +588,23 @@ struct ATCTranscriptGateTests {
     #expect(dec == .display(reason: .callSignMatch))
   }
 
+  @Test(arguments: [
+    "November Three Alpha Bravo",
+    "Three Alpha Bravo",
+    "N3AB",
+    "Two Three Alpha Bravo",
+    "Cessna Three Alpha Bravo",
+  ])
+  func nonPilotWithAbbreviatedCallSignMatchDisplays(_ transcript: String) {
+    var gate = ATCTranscriptGate(configuredCallSign: CallSign(raw: "N123AB"))
+    let dec = gate.evaluate(
+      text: transcript,
+      speaker: .nonPilot(bestPilotScore: 0.05),
+      timestamp: t0
+    )
+    #expect(dec == .display(reason: .callSignMatch))
+  }
+
   @Test func continuationWithinWindowDisplays() {
     var gate = ATCTranscriptGate(configuredCallSign: CallSign(raw: "N123AB"))
     _ = gate.evaluate(
@@ -601,6 +618,31 @@ struct ATCTranscriptGateTests {
       timestamp: t0.addingTimeInterval(3)
     )
     #expect(cont == .display(reason: .continuationOfRecentHit))
+  }
+
+  @Test func displayedContinuationRefreshesRelevanceWindow() {
+    var gate = ATCTranscriptGate(
+      config: ATCTranscriptGateConfig(continuationWindowSeconds: 5, readbackMaxWords: 16),
+      configuredCallSign: CallSign(raw: "N123AB")
+    )
+    let first = gate.evaluate(
+      text: "N123AB contact tower one one eight decimal three",
+      speaker: .nonPilot(bestPilotScore: 0.05),
+      timestamp: t0
+    )
+    let second = gate.evaluate(
+      text: "continue approach",
+      speaker: .nonPilot(bestPilotScore: 0.05),
+      timestamp: t0.addingTimeInterval(4)
+    )
+    let third = gate.evaluate(
+      text: "turn base now",
+      speaker: .nonPilot(bestPilotScore: 0.05),
+      timestamp: t0.addingTimeInterval(8)
+    )
+    #expect(first == .display(reason: .callSignMatch))
+    #expect(second == .display(reason: .continuationOfRecentHit))
+    #expect(third == .display(reason: .continuationOfRecentHit))
   }
 
   @Test func nonPilotWithoutCallSignAndExpiredWindowSuppresses() {
@@ -627,10 +669,44 @@ struct ATCTranscriptGateTests {
     #expect(dec == .suppress(reason: .addressedToOther))
   }
 
-  @Test func insufficientSpeechIsSuppressed() {
+  @Test func insufficientSpeechDisplaysFailOpen() {
     var gate = ATCTranscriptGate(configuredCallSign: CallSign(raw: "N123AB"))
     let dec = gate.evaluate(text: "anything", speaker: .insufficientSpeech, timestamp: t0)
-    #expect(dec == .suppress(reason: .insufficientSpeech))
+    #expect(dec == .display(reason: .insufficientSpeech))
+  }
+
+  @Test(arguments: [
+    (
+      "MAYDAY MAYDAY MAYDAY immediate descent",
+      SpeakerMatchDecision.pilot(slot: .primary, score: 0.99)
+    ),
+    ("PAN PAN PAN PAN PAN PAN engine failure", SpeakerMatchDecision.insufficientSpeech),
+    ("pan-pan fuel emergency", SpeakerMatchDecision.nonPilot(bestPilotScore: 0.01)),
+    ("PANPAN medical priority", SpeakerMatchDecision.mixed(bestPilotScore: 0.61)),
+    ("Sécurité traffic advisory", SpeakerMatchDecision.nonPilot(bestPilotScore: 0.01)),
+    ("All stations, stop transmitting", SpeakerMatchDecision.insufficientSpeech),
+  ])
+  func urgencyBroadcastAlwaysDisplaysAboveEveryOtherGate(
+    _ sample: (text: String, speaker: SpeakerMatchDecision)
+  ) {
+    let detector: @Sendable (String) -> Bool = { _ in true }
+    var gate = ATCTranscriptGate(
+      config: ATCTranscriptGateConfig(continuationWindowSeconds: 0, readbackMaxWords: 1),
+      configuredCallSign: CallSign(raw: "N123AB"),
+      otherCallSignDetector: detector
+    )
+    let dec = gate.evaluate(text: sample.text, speaker: sample.speaker, timestamp: t0)
+    #expect(dec == .display(reason: .urgencyBroadcast))
+  }
+
+  @Test func singlePanProseIsNotUrgencyBroadcast() {
+    var gate = ATCTranscriptGate(configuredCallSign: CallSign(raw: "N123AB"))
+    let dec = gate.evaluate(
+      text: "company pan schedule is delayed",
+      speaker: .nonPilot(bestPilotScore: 0.01),
+      timestamp: t0
+    )
+    #expect(dec == .suppress(reason: .nonRelevant))
   }
 }
 
@@ -768,6 +844,23 @@ struct VoiceFilterPipelineTests {
     } else {
       Issue.record("expected callSignMatch display, got \(dec.relevance)")
     }
+  }
+
+  @Test func decideUsesUrgencyIndicatorAboveInsufficientSpeech() {
+    let store = InMemoryStorage()
+    store.callSign = CallSign(raw: "N123AB")
+    store.enabled = true
+    let pipeline = VoiceFilterPipeline(
+      identifier: UnavailableLocalSpeakerIdentifier(),
+      storage: store
+    )
+    let dec = pipeline.decide(
+      text: "MAYDAY MAYDAY MAYDAY United 247",
+      speaker: .insufficientSpeech,
+      timestamp: Date(timeIntervalSince1970: 0)
+    )
+    #expect(dec.relevance == .display(reason: .urgencyBroadcast))
+    #expect(dec.indicator == .urgencyBroadcast)
   }
 
   @Test func routeBeforeTranscriptionDiscardsPilotBeforeSTT() {

@@ -32,9 +32,14 @@ struct ATCTranscriptGate: Sendable {
     speaker: SpeakerMatchDecision,
     timestamp: Date
   ) -> ATCRelevanceDecision {
+    if Self.containsUrgencyBroadcast(in: text) {
+      lastCallSignHitAt = timestamp
+      return .display(reason: .urgencyBroadcast)
+    }
+
     switch speaker {
     case .insufficientSpeech:
-      return .suppress(reason: .insufficientSpeech)
+      return .display(reason: .insufficientSpeech)
     case .pilot:
       return .suppress(reason: .pilotReadback)
     case .nonPilot, .mixed:
@@ -45,7 +50,7 @@ struct ATCTranscriptGate: Sendable {
       return .display(reason: .noCallSignConfigured)
     }
 
-    if callSign.matches(in: text) {
+    if callSign.matches(in: text) || callSign.matchesAbbreviated(in: text) {
       lastCallSignHitAt = timestamp
       return .display(reason: .callSignMatch)
     }
@@ -57,9 +62,43 @@ struct ATCTranscriptGate: Sendable {
     if let lastHit = lastCallSignHitAt,
       timestamp.timeIntervalSince(lastHit) <= config.continuationWindowSeconds
     {
+      // why: callers pass the transcript segment timestamp, not evaluation wall time;
+      // refreshing here keeps multi-utterance ATC exchanges visible as finals arrive.
+      lastCallSignHitAt = timestamp
       return .display(reason: .continuationOfRecentHit)
     }
 
     return .suppress(reason: .nonRelevant)
+  }
+
+  static func containsUrgencyBroadcast(in text: String) -> Bool {
+    let folded =
+      text
+      .folding(
+        options: [.caseInsensitive, .diacriticInsensitive],
+        locale: Locale(identifier: "en_US_POSIX")
+      )
+      .uppercased()
+    let tokens =
+      folded
+      .components(separatedBy: CharacterSet.alphanumerics.inverted)
+      .filter { !$0.isEmpty }
+
+    for token in tokens {
+      if token == "MAYDAY" || token == "PANPAN" || token == "SECURITE" {
+        return true
+      }
+    }
+
+    for index in tokens.indices.dropLast() {
+      let next = tokens[tokens.index(after: index)]
+      if tokens[index] == "PAN", next == "PAN" {
+        return true
+      }
+      if tokens[index] == "ALL", next == "STATIONS" {
+        return true
+      }
+    }
+    return false
   }
 }
