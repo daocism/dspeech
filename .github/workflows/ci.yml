@@ -1,24 +1,33 @@
 name: CI
 
+# why: GitHub free plan — 2000 min/month and macOS runners bill at a 10x multiplier. Heavy
+# simulator lanes therefore run on pull_request + main only (never per-push on feature
+# branches), superseded runs are cancelled, every job is time-capped, and the exhaustive
+# zero-flake bar is enforced on the local mac24 gate (full suite, build test) rather than
+# hosted runners. Hosted CI is the smoke/regression check, not the quality bar.
 on:
   pull_request:
   push:
     branches:
       - main
-      - feat/**
-      - fix/**
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
-  unit-test:
-    name: Unit tests (DspeechTests)
+  tests:
+    name: Unit + UI/a11y tests
     runs-on: macos-26
+    timeout-minutes: 45
     env:
       PROJECT: Dspeech.xcodeproj
       SCHEME: Dspeech
-      RESULT_BUNDLE: UnitTestResults.xcresult
+      UNIT_RESULT_BUNDLE: UnitTestResults.xcresult
+      UI_RESULT_BUNDLE: UITestResults.xcresult
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -31,86 +40,81 @@ jobs:
       - name: Select iOS simulator
         run: scripts/ci/select-ios-simulator.sh
 
-      - name: Build and test (unit)
+      # why: one job, one build — the previous two-runner split built the identical scheme
+      # twice (~2x macOS minutes). Sequential test phases on one runner keep the isolation
+      # the split bought (the CPU-heavy real-audio unit tests never run concurrently with
+      # XCUITests), without paying for two builds and two simulator boots.
+      - name: Build for testing
         run: |
           set -euo pipefail
-          # why: the unit lane runs ONLY DspeechTests (incl. the CPU-heavy real-audio tests). It no
-          # longer shares a runner/simulator with the XCUITests, so the UI suite is never starved of
-          # CPU by parallel audio work — that contention was the root cause of first-attempt UI flakes.
-          # why: -retry-tests-on-failure still guards genuinely transient unit timeouts; a real break
-          # fails all 3 iterations and the flake report (threshold 0) fails the job on any retry-recover.
-          rm -rf "$RESULT_BUNDLE"
+          xcodebuild \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -destination "$SIMULATOR_DESTINATION" \
+            CODE_SIGNING_ALLOWED=NO \
+            build-for-testing
+
+      # why: -test-iterations 2 with -retry-tests-on-failure costs 1x while green (extra
+      # iterations run only for failing tests) and absorbs one hosted-runner transient.
+      - name: Unit tests (DspeechTests)
+        run: |
+          set -euo pipefail
+          rm -rf "$UNIT_RESULT_BUNDLE"
           xcodebuild \
             -project "$PROJECT" \
             -scheme "$SCHEME" \
             -destination "$SIMULATOR_DESTINATION" \
             -only-testing:DspeechTests \
-            -test-iterations 3 \
+            -test-iterations 2 \
             -retry-tests-on-failure \
-            -resultBundlePath "$RESULT_BUNDLE" \
+            -resultBundlePath "$UNIT_RESULT_BUNDLE" \
             CODE_SIGNING_ALLOWED=NO \
-            build test
+            test-without-building
 
-      - name: Report test flakes (unit)
-        if: always()
-        run: scripts/ci/report-test-flakes.sh "$RESULT_BUNDLE"
-
-  ui-test:
-    name: UI + a11y tests (DspeechUITests)
-    runs-on: macos-26
-    env:
-      PROJECT: Dspeech.xcodeproj
-      SCHEME: Dspeech
-      RESULT_BUNDLE: UITestResults.xcresult
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-        with:
-          persist-credentials: false
-
-      - name: Select latest Xcode 26
-        run: scripts/ci/select-xcode26.sh
-
-      - name: Select iOS simulator
-        run: scripts/ci/select-ios-simulator.sh
-
-      - name: Build and test (UI + a11y)
+      - name: UI + a11y tests (DspeechUITests)
         run: |
           set -euo pipefail
-          # why: the UI lane runs ONLY DspeechUITests on a dedicated runner, isolated from the
-          # real-audio unit tests, so XCUITests no longer fail their first attempt under cross-suite
-          # CPU contention / cold-simulator pressure. Source-level fixes (idle-gated hittable waits,
-          # decorative-animation suppression via -dspeech.uitest.reduce-animations) remove the
-          # remaining races; retry+flake-report (threshold 0) stays as a strict DETECTOR, never a mask.
-          rm -rf "$RESULT_BUNDLE"
+          rm -rf "$UI_RESULT_BUNDLE"
           xcodebuild \
             -project "$PROJECT" \
             -scheme "$SCHEME" \
             -destination "$SIMULATOR_DESTINATION" \
             -only-testing:DspeechUITests \
-            -test-iterations 3 \
+            -test-iterations 2 \
             -retry-tests-on-failure \
-            -resultBundlePath "$RESULT_BUNDLE" \
+            -resultBundlePath "$UI_RESULT_BUNDLE" \
             CODE_SIGNING_ALLOWED=NO \
-            build test
+            test-without-building
 
-      - name: Report test flakes (UI + a11y)
+      # why: retry-recovered tests are reported as annotations, not failures — hosted
+      # runners are nondeterministically CPU-starved (observed mass false-reds on image
+      # rollovers) and red-spam trains the owner to ignore CI. The zero-flake bar (threshold
+      # 0, fail on any retry-recover) is enforced on the local mac24 full-suite gate.
+      - name: Report test flakes (non-blocking on hosted)
         if: always()
-        run: scripts/ci/report-test-flakes.sh "$RESULT_BUNDLE"
+        run: |
+          scripts/ci/report-test-flakes.sh "$UNIT_RESULT_BUNDLE" \
+            || echo "::warning::Unit lane had retry-recovered tests (see log above)"
+          scripts/ci/report-test-flakes.sh "$UI_RESULT_BUNDLE" \
+            || echo "::warning::UI lane had retry-recovered tests (see log above)"
 
-      # Manual mac24 parity lane:
-      # DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild \
-      #   -project Dspeech.xcodeproj -scheme Dspeech \
-      #   -only-testing:DspeechUITests \
-      #   -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4' \
-      #   CODE_SIGNING_ALLOWED=NO build test
-      #
-      # Hosted CI selects the latest available iPhone 17 Pro iOS 26.x simulator
-      # from the selected Xcode instead of pinning a runner-image patch version.
+      # why: hosted-only failures were previously undebuggable (no artifacts). Failure-only
+      # + short retention keeps free-tier artifact storage negligible.
+      - name: Upload result bundles on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ github.run_id }}
+          path: |
+            UnitTestResults.xcresult
+            UITestResults.xcresult
+          retention-days: 3
+          if-no-files-found: ignore
 
   lint-secret-scan:
     name: Swift format and secret scan
     runs-on: macos-26
+    timeout-minutes: 10
     steps:
       - name: Checkout full history
         uses: actions/checkout@v5
@@ -136,10 +140,10 @@ jobs:
           set -euo pipefail
           gitleaks git --redact --verbose .
 
-
   release-policy:
     name: Release policy source gate
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -155,6 +159,7 @@ jobs:
   release-archive:
     name: Release archive binary gate
     runs-on: macos-26
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -182,6 +187,7 @@ jobs:
   privacy-manifest:
     name: Privacy manifest validation
     runs-on: macos-26
+    timeout-minutes: 5
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -234,6 +240,7 @@ jobs:
   replay-eval:
     name: Offline ATC voice-filter replay eval
     runs-on: macos-26
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v5
