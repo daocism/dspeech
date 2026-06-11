@@ -588,6 +588,11 @@ enum ThresholdLoader {
 struct ReplayKitCommand {
   static func main() async {
     do {
+      if CommandLine.arguments.dropFirst().first == "transcribe" {
+        let status = try TranscribeCommand.run(Array(CommandLine.arguments.dropFirst(2)))
+        if status != 0 { exit(status) }
+        return
+      }
       let arguments = try ReplayArguments.parse(CommandLine.arguments)
       let data = try Data(contentsOf: arguments.groundTruth)
       let manifest = try JSONDecoder().decode(ReplayManifest.self, from: data)
