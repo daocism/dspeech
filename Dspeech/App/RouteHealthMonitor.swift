@@ -22,6 +22,9 @@ final class RouteHealthMonitor {
     self.now = now
     self.routePreparationFailure = routing.routePreparationStatus.failure
     self.assessment = Self.assessment(for: routing)
+    DspeechLog.routing.info(
+      "route health initialized health=\(self.assessment.health.rawValue, privacy: .public) blocksStart=\(self.blocksStart, privacy: .public)"
+    )
   }
 
   var health: RouteHealth { assessment.health }
@@ -40,6 +43,7 @@ final class RouteHealthMonitor {
 
   func start() {
     if observeTask != nil { return }
+    DspeechLog.routing.info("route health monitor started")
     let stream = routing.routeChangeEvents()
     observeTask = Task { @MainActor [weak self] in
       for await event in stream {
@@ -52,6 +56,7 @@ final class RouteHealthMonitor {
   func stop() {
     observeTask?.cancel()
     observeTask = nil
+    DspeechLog.routing.info("route health monitor stopped")
   }
 
   func refreshFromRouting() {
@@ -67,14 +72,20 @@ final class RouteHealthMonitor {
   }
 
   private func refreshFromRouting(clearStaleInterruption: Bool) {
+    let previousHealth = assessment.health
+    let previousBlocksStart = blocksStart
     routePreparationFailure = routing.routePreparationStatus.failure
     assessment = Self.assessment(for: routing)
     if clearStaleInterruption, isCurrentRouteCaptureCapable {
       isAudioSessionInterrupted = false
     }
+    DspeechLog.routing.info(
+      "route health refreshed health=\(previousHealth.rawValue, privacy: .public)->\(self.assessment.health.rawValue, privacy: .public) blocksStart=\(previousBlocksStart, privacy: .public)->\(self.blocksStart, privacy: .public) clearStaleInterruption=\(clearStaleInterruption, privacy: .public)"
+    )
   }
 
   func handle(event: RouteChangeEvent) {
+    let previousBlocksStart = blocksStart
     lastEvent = event
     routePreparationFailure = routing.routePreparationStatus.failure
     let previous = assessment
@@ -148,6 +159,7 @@ final class RouteHealthMonitor {
         timestamp: now()
       )
     case .mediaServicesWereReset:
+      DspeechLog.routing.error("route health handling media-services reset")
       isAudioSessionInterrupted = false
       routePreparationFailure = routing.routePreparationStatus.failure
       assessment = Self.assessment(for: routing)
@@ -175,10 +187,15 @@ final class RouteHealthMonitor {
         )
       }
     }
+    let notice = lastNotice.map { String(describing: $0.kind) } ?? "none"
+    DspeechLog.routing.info(
+      "route event handled event=\(String(describing: event), privacy: .public) health=\(previous.health.rawValue, privacy: .public)->\(self.assessment.health.rawValue, privacy: .public) blocksStart=\(previousBlocksStart, privacy: .public)->\(self.blocksStart, privacy: .public) notice=\(notice, privacy: .public)"
+    )
   }
 
   func clearNotice() {
     lastNotice = nil
+    DspeechLog.routing.info("route notice cleared")
   }
 
   private static func didImprove(from old: RouteHealth, to new: RouteHealth) -> Bool {

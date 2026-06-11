@@ -60,16 +60,26 @@ actor FluidAudioDiarizerHandle {
 
   private func loadedDiarizer() async throws -> DiarizerManager {
     if let diarizer {
+      DspeechLog.modelPack.debug("fluid audio diarizer reused")
       return diarizer
     }
-    let models = try DiarizerModels.load(
-      localSegmentationModel: segmentationModelURL,
-      localEmbeddingModel: embeddingModelURL
-    )
-    let manager = DiarizerManager()
-    manager.initialize(models: models)
-    diarizer = manager
-    return manager
+    DspeechLog.modelPack.info("fluid audio diarizer load requested")
+    do {
+      let models = try DiarizerModels.load(
+        localSegmentationModel: segmentationModelURL,
+        localEmbeddingModel: embeddingModelURL
+      )
+      let manager = DiarizerManager()
+      manager.initialize(models: models)
+      diarizer = manager
+      DspeechLog.modelPack.info("fluid audio diarizer load succeeded")
+      return manager
+    } catch {
+      DspeechLog.modelPack.error(
+        "fluid audio diarizer load failed error=\(error.localizedDescription)"
+      )
+      throw error
+    }
   }
 }
 
@@ -95,11 +105,18 @@ struct FluidAudioSpeakerIdentifier: LocalSpeakerIdentifier {
   }
 
   func enroll(samples: [Float], sampleRate: Double) async throws -> VoicePrintVector {
+    DspeechLog.modelPack.info(
+      "fluid audio enrollment requested samples=\(samples.count, privacy: .public) sampleRate=\(sampleRate, privacy: .public)"
+    )
     let prepared = SpeakerAudioPreprocessing.prepare(samples: samples, sampleRate: sampleRate)
     guard prepared.quality >= SpeakerAudioPreprocessing.minVoicedQuality else {
+      DspeechLog.modelPack.error("fluid audio enrollment failed reason=insufficient-speech")
       throw LocalSpeakerIdentifierError.insufficientSpeech
     }
     let embedding = try await embedding(for: prepared.samples)
+    DspeechLog.modelPack.info(
+      "fluid audio enrollment succeeded embeddingDimension=\(embedding.count, privacy: .public)"
+    )
     return VoicePrintVector(values: embedding, quality: prepared.quality)
   }
 
@@ -110,11 +127,31 @@ struct FluidAudioSpeakerIdentifier: LocalSpeakerIdentifier {
   ) async throws -> SpeakerMatchDecision {
     let prepared = SpeakerAudioPreprocessing.prepare(samples: samples, sampleRate: sampleRate)
     guard prepared.quality >= SpeakerAudioPreprocessing.minVoicedQuality else {
+      DspeechLog.modelPack.debug("fluid audio classification skipped reason=insufficient-speech")
       return .insufficientSpeech
     }
     let embedding = try await embedding(for: prepared.samples)
     let candidate = VoicePrintVector(values: embedding, quality: prepared.quality)
-    return SpeakerMatcher.match(candidate: candidate, profiles: profiles, config: matchConfig)
+    let decision = SpeakerMatcher.match(
+      candidate: candidate,
+      profiles: profiles,
+      config: matchConfig
+    )
+    let decisionKind: String
+    switch decision {
+    case .pilot:
+      decisionKind = "pilot"
+    case .nonPilot:
+      decisionKind = "nonPilot"
+    case .mixed:
+      decisionKind = "mixed"
+    case .insufficientSpeech:
+      decisionKind = "insufficientSpeech"
+    }
+    DspeechLog.modelPack.debug(
+      "fluid audio classification succeeded decision=\(decisionKind, privacy: .public)"
+    )
+    return decision
   }
 
   private func embedding(for samples: [Float]) async throws -> [Float] {
@@ -122,6 +159,9 @@ struct FluidAudioSpeakerIdentifier: LocalSpeakerIdentifier {
     do {
       embedding = try await handle.extractEmbedding(from: samples)
     } catch {
+      DspeechLog.modelPack.error(
+        "fluid audio embedding failed reason=model-load-or-apply error=\(error.localizedDescription)"
+      )
       throw LocalSpeakerIdentifierError.modelUnavailable(
         reason:
           String(
@@ -129,6 +169,9 @@ struct FluidAudioSpeakerIdentifier: LocalSpeakerIdentifier {
       )
     }
     guard embedding.count == embeddingDimension else {
+      DspeechLog.modelPack.error(
+        "fluid audio embedding failed reason=dimension-mismatch expected=\(embeddingDimension, privacy: .public) got=\(embedding.count, privacy: .public)"
+      )
       throw LocalSpeakerIdentifierError.incompatibleDimension(
         expected: embeddingDimension,
         got: embedding.count
@@ -156,7 +199,11 @@ struct FluidAudioBackendBuilder: LocalSpeakerBackendBuilder {
   }
 
   func makeIdentifier(for pack: InstalledModelPack) throws -> any LocalSpeakerIdentifier {
+    DspeechLog.modelPack.info(
+      "fluid audio identifier build requested identifier=\(pack.identifier, privacy: .public) version=\(pack.version, privacy: .public)"
+    )
     guard let localModelPath = pack.localModelPath, !localModelPath.isEmpty else {
+      DspeechLog.modelPack.error("fluid audio identifier build failed reason=missing-local-path")
       throw LocalSpeakerIdentifierError.modelUnavailable(
         reason: String(localized: "The installed pack contains no local model path.")
       )
@@ -165,15 +212,20 @@ struct FluidAudioBackendBuilder: LocalSpeakerBackendBuilder {
     let segmentationModelURL = base.appendingPathComponent(Self.segmentationModelFileName)
     let embeddingModelURL = base.appendingPathComponent(Self.embeddingModelFileName)
     guard fileExists(segmentationModelURL.path), fileExists(embeddingModelURL.path) else {
+      DspeechLog.modelPack.error("fluid audio identifier build failed reason=model-files-missing")
       throw LocalSpeakerIdentifierError.modelUnavailable(
         reason: String(
           localized: "The local FluidAudio model files are missing from the installed pack.")
       )
     }
-    return FluidAudioSpeakerIdentifier(
+    let identifier = FluidAudioSpeakerIdentifier(
       segmentationModelURL: segmentationModelURL,
       embeddingModelURL: embeddingModelURL,
       matchConfig: matchConfig
     )
+    DspeechLog.modelPack.info(
+      "fluid audio identifier build succeeded embeddingDimension=\(FluidAudioSpeakerIdentifier.weSpeakerEmbeddingDimension, privacy: .public)"
+    )
+    return identifier
   }
 }

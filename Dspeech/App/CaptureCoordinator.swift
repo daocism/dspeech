@@ -36,10 +36,16 @@ final class CaptureCoordinator {
 
   func start() async {
     stoppedByInterruption = false
+    DspeechLog.routing.info(
+      "capture start requested health=\(self.routeMonitor.health.rawValue, privacy: .public) blocksStart=\(self.routeMonitor.blocksStart, privacy: .public)"
+    )
     guard !routeMonitor.blocksStart else {
       startBlockedMessage =
         routeMonitor.routePreparationFailure?.userFacingMessage
         ?? CaptureCoordinator.blockedMessage(for: routeMonitor.health)
+      DspeechLog.routing.info(
+        "capture start blocked health=\(self.routeMonitor.health.rawValue, privacy: .public)"
+      )
       return
     }
     startBlockedMessage = nil
@@ -49,10 +55,12 @@ final class CaptureCoordinator {
     // A genuinely new route problem during this session emits a fresh notice.
     routeMonitor.clearNotice()
     await live.start()
+    DspeechLog.routing.info("capture start delegated to live engine")
   }
 
   func stop() {
     stoppedByInterruption = false
+    DspeechLog.routing.info("capture stop requested")
     live.stop()
   }
 
@@ -69,10 +77,12 @@ final class CaptureCoordinator {
   // so this also matches what the OS would do on suspension, made explicit.
   func stopForBackground() {
     guard live.canStopCurrentSession else { return }
+    DspeechLog.routing.info("capture stopped for background")
     live.stop()
   }
 
   func refreshOnForeground() {
+    DspeechLog.routing.info("capture foreground refresh requested")
     routeMonitor.refreshOnForeground()
     if !routeMonitor.isAudioSessionInterrupted {
       stoppedByInterruption = false
@@ -84,16 +94,23 @@ final class CaptureCoordinator {
 
   func handleRouteEvent(_ event: RouteChangeEvent) {
     let wasCapturing = live.canStopCurrentSession
+    DspeechLog.routing.info(
+      "capture coordinator route event event=\(String(describing: event), privacy: .public) wasCapturing=\(wasCapturing, privacy: .public)"
+    )
     routeMonitor.handle(event: event)
     if case .interruptionBegan = event {
       if wasCapturing {
         stoppedByInterruption = true
+        DspeechLog.routing.info("capture stopped for interruption began")
         live.stop()
       }
       return
     }
     if case .interruptionEnded(let shouldResume) = event {
       let shouldAutoResume = shouldResume && stoppedByInterruption
+      DspeechLog.routing.info(
+        "capture interruption ended shouldResume=\(shouldResume, privacy: .public) autoResume=\(shouldAutoResume, privacy: .public)"
+      )
       stoppedByInterruption = false
       if shouldAutoResume {
         Task { @MainActor [weak self] in
@@ -104,6 +121,9 @@ final class CaptureCoordinator {
     }
     if shouldStopCurrentCapture(after: event), live.canStopCurrentSession {
       stoppedByInterruption = false
+      DspeechLog.routing.info(
+        "capture stopped for route event event=\(String(describing: event), privacy: .public) health=\(self.routeMonitor.health.rawValue, privacy: .public)"
+      )
       live.stop()
     }
   }
@@ -126,6 +146,7 @@ final class CaptureCoordinator {
 
   func beginObservingRouteChanges() {
     guard routeObservation == nil else { return }
+    DspeechLog.routing.info("capture coordinator began route observation")
     let routeChanges = routeMonitor.routeChangeEvents()
     routeObservation = Task { @MainActor [weak self] in
       for await event in routeChanges {
@@ -137,6 +158,7 @@ final class CaptureCoordinator {
   func endObservingRouteChanges() {
     routeObservation?.cancel()
     routeObservation = nil
+    DspeechLog.routing.info("capture coordinator ended route observation")
   }
 
   static func blockedMessage(for health: RouteHealth) -> String {

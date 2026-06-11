@@ -14,7 +14,20 @@ final class VoiceEnrollmentRecorder {
 
   static let targetSeconds: Double = 6
 
-  private(set) var status: Status = .idle
+  private(set) var status: Status = .idle {
+    didSet {
+      switch status {
+      case .idle:
+        DspeechLog.voiceFilter.info("voice enrollment status=idle")
+      case .starting:
+        DspeechLog.voiceFilter.info("voice enrollment status=starting")
+      case .recording:
+        DspeechLog.voiceFilter.info("voice enrollment status=recording")
+      case .unavailable(let reason):
+        DspeechLog.voiceFilter.error("voice enrollment status=unavailable reason=\(reason)")
+      }
+    }
+  }
   private(set) var collected: [Float] = []
   private(set) var captureSampleRate: Double = 16_000
 
@@ -48,8 +61,13 @@ final class VoiceEnrollmentRecorder {
   }
 
   func start() async {
-    guard !isActive else { return }
+    guard !isActive else {
+      DspeechLog.voiceFilter.debug("voice enrollment start ignored reason=already-active")
+      return
+    }
+    DspeechLog.voiceFilter.info("voice enrollment start requested")
     guard arbiter.acquire(.voiceEnrollment) else {
+      DspeechLog.voiceFilter.error("voice enrollment start failed reason=capture-session-busy")
       status = .unavailable(
         String(
           localized:
@@ -64,6 +82,9 @@ final class VoiceEnrollmentRecorder {
 
     guard await authorization.requestMicrophonePermission() else {
       guard isCurrent(sessionID) else { return }
+      DspeechLog.voiceFilter.error(
+        "voice enrollment start failed reason=microphone-permission-denied"
+      )
       activeSessionID = nil
       _ = releaseCaptureLease()
       status = .unavailable(String(localized: "No microphone access. Allow it in Settings."))
@@ -76,9 +97,15 @@ final class VoiceEnrollmentRecorder {
       guard isCurrent(sessionID) else { return }
       status = .recording
     } catch VoiceEnrollmentCaptureError.invalidInputFormat {
+      DspeechLog.voiceFilter.error(
+        "voice enrollment start failed reason=invalid-input-format"
+      )
       await failAfterCapture(
         String(localized: "The microphone is unavailable."), sessionID: sessionID)
     } catch {
+      DspeechLog.voiceFilter.error(
+        "voice enrollment start failed reason=capture-start-failed error=\(error.localizedDescription)"
+      )
       await failAfterCapture(
         String(localized: "Couldn’t start recording: \(error.localizedDescription)"),
         sessionID: sessionID
@@ -90,14 +117,22 @@ final class VoiceEnrollmentRecorder {
   func stop() async -> (samples: [Float], sampleRate: Double)? {
     guard isRecording else {
       if isActive {
+        DspeechLog.voiceFilter.info("voice enrollment stop requested before recording")
         await cleanup(drainQueuedSamples: false)
         status = .idle
       }
       return nil
     }
+    DspeechLog.voiceFilter.info("voice enrollment stop requested")
     await cleanup(drainQueuedSamples: true)
     status = .idle
-    guard !collected.isEmpty else { return nil }
+    guard !collected.isEmpty else {
+      DspeechLog.voiceFilter.error("voice enrollment stopped with no samples")
+      return nil
+    }
+    DspeechLog.voiceFilter.info(
+      "voice enrollment captured samples=\(self.collected.count, privacy: .public) sampleRate=\(self.captureSampleRate, privacy: .public)"
+    )
     return (collected, captureSampleRate)
   }
 
@@ -131,7 +166,13 @@ final class VoiceEnrollmentRecorder {
         )
       }
       captureStarted = true
+      DspeechLog.voiceFilter.info(
+        "voice enrollment capture started sampleRate=\(self.captureSampleRate, privacy: .public)"
+      )
     } catch {
+      DspeechLog.voiceFilter.error(
+        "voice enrollment capture failed error=\(error.localizedDescription)"
+      )
       captureContinuation?.finish()
       captureContinuation = nil
       consumeTask?.cancel()
@@ -141,6 +182,9 @@ final class VoiceEnrollmentRecorder {
   }
 
   private func cleanup(drainQueuedSamples: Bool) async {
+    DspeechLog.voiceFilter.info(
+      "voice enrollment cleanup started drainQueuedSamples=\(drainQueuedSamples, privacy: .public)"
+    )
     let sessionID = activeSessionID
     let continuation = captureContinuation
     captureContinuation = nil
@@ -162,6 +206,7 @@ final class VoiceEnrollmentRecorder {
     if activeSessionID == sessionID {
       activeSessionID = nil
     }
+    DspeechLog.voiceFilter.info("voice enrollment cleanup finished")
   }
 
   private func releaseCaptureLease() -> Bool {
@@ -224,22 +269,34 @@ private final class AVAudioEngineVoiceEnrollmentCapture: VoiceEnrollmentAudioCap
   func start(onBuffer: @escaping @Sendable (AVAudioPCMBuffer) -> Void) throws -> Double {
     do {
       let session = AVAudioSession.sharedInstance()
+      DspeechLog.voiceFilter.info("voice enrollment audio session activation requested")
       try session.setActive(true)
       sessionActivated = true
+      DspeechLog.voiceFilter.info("voice enrollment audio session activation succeeded")
 
       let inputNode = audioEngine.inputNode
       let format = inputNode.outputFormat(forBus: 0)
       guard format.channelCount > 0, format.sampleRate > 0 else {
+        DspeechLog.voiceFilter.error(
+          "voice enrollment audio tap install failed reason=invalid-input-format sampleRate=\(format.sampleRate, privacy: .public) channels=\(format.channelCount, privacy: .public)"
+        )
         throw VoiceEnrollmentCaptureError.invalidInputFormat
       }
       inputNode.removeTap(onBus: 0)
       inputNode.installTap(onBus: 0, bufferSize: 2048, format: nil) { @Sendable buffer, _ in
         onBuffer(buffer)
       }
+      DspeechLog.voiceFilter.info(
+        "voice enrollment audio tap installed sampleRate=\(format.sampleRate, privacy: .public) channels=\(format.channelCount, privacy: .public)"
+      )
       audioEngine.prepare()
       try audioEngine.start()
+      DspeechLog.voiceFilter.info("voice enrollment audio engine started")
       return format.sampleRate
     } catch {
+      DspeechLog.voiceFilter.error(
+        "voice enrollment audio capture start failed error=\(error.localizedDescription)"
+      )
       stop(deactivateSession: false)
       throw error
     }
@@ -251,7 +308,15 @@ private final class AVAudioEngineVoiceEnrollmentCapture: VoiceEnrollmentAudioCap
     }
     audioEngine.inputNode.removeTap(onBus: 0)
     if deactivateSession, sessionActivated {
-      try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+      DspeechLog.voiceFilter.info("voice enrollment audio session deactivation requested")
+      do {
+        try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        DspeechLog.voiceFilter.info("voice enrollment audio session deactivation succeeded")
+      } catch {
+        DspeechLog.voiceFilter.error(
+          "voice enrollment audio session deactivation failed error=\(error.localizedDescription)"
+        )
+      }
       sessionActivated = false
     }
   }

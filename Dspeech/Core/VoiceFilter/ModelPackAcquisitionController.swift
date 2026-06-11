@@ -30,6 +30,7 @@ final class ModelPackAcquisitionController {
   }
 
   func startDownload() {
+    DspeechLog.modelPack.info("model pack acquisition start requested")
     downloadTask?.cancel()
 
     let attemptID = UUID()
@@ -46,8 +47,12 @@ final class ModelPackAcquisitionController {
         }
         self.finish(with: .installed(pack), for: attemptID)
       } catch is CancellationError {
+        DspeechLog.modelPack.info("model pack acquisition cancelled")
         self.finishCancelledAttempt(attemptID)
       } catch {
+        DspeechLog.modelPack.error(
+          "model pack acquisition failed error=\(error.localizedDescription)"
+        )
         self.finish(
           with: .failed(modelPackDownloadFailure(for: error)),
           for: attemptID
@@ -57,6 +62,7 @@ final class ModelPackAcquisitionController {
   }
 
   func cancelDownload() {
+    DspeechLog.modelPack.info("model pack acquisition cancel requested")
     downloadTask?.cancel()
     downloadTask = nil
     currentAttemptID = nil
@@ -64,6 +70,7 @@ final class ModelPackAcquisitionController {
   }
 
   func setState(_ state: ModelPackState) {
+    DspeechLog.modelPack.info("model pack state override requested")
     downloadTask?.cancel()
     downloadTask = nil
     currentAttemptID = nil
@@ -74,6 +81,9 @@ final class ModelPackAcquisitionController {
     guard currentAttemptID == attemptID else { return }
     state = .acquiring(acquisition)
     persist(state)
+    DspeechLog.modelPack.debug(
+      "model pack acquisition progress phase=\(acquisition.phase.rawValue, privacy: .public) percent=\(acquisition.percentComplete, privacy: .public)"
+    )
   }
 
   private func finish(with finalState: ModelPackState, for attemptID: UUID) {
@@ -81,6 +91,24 @@ final class ModelPackAcquisitionController {
     currentAttemptID = nil
     downloadTask = nil
     transition(to: finalState)
+    switch finalState {
+    case .installed(let pack):
+      DspeechLog.modelPack.info(
+        "model pack acquisition succeeded identifier=\(pack.identifier, privacy: .public) version=\(pack.version, privacy: .public) bytes=\(pack.sizeBytes, privacy: .public)"
+      )
+    case .failed(let failure):
+      DspeechLog.modelPack.error(
+        "model pack acquisition finished failed kind=\(failure.kind.rawValue, privacy: .public) retryable=\(failure.isRetryable, privacy: .public)"
+      )
+    case .absent:
+      DspeechLog.modelPack.info("model pack acquisition finished state=absent")
+    case .acquiring(let acquisition):
+      DspeechLog.modelPack.info(
+        "model pack acquisition finished state=acquiring phase=\(acquisition.phase.rawValue, privacy: .public)"
+      )
+    case .disabled:
+      DspeechLog.modelPack.info("model pack acquisition finished state=disabled")
+    }
   }
 
   private func finishCancelledAttempt(_ attemptID: UUID) {
@@ -88,16 +116,38 @@ final class ModelPackAcquisitionController {
     currentAttemptID = nil
     downloadTask = nil
     transition(to: .absent)
+    DspeechLog.modelPack.info("model pack acquisition finished cancelled state=absent")
   }
 
   private func transition(to newState: ModelPackState) {
     state = newState
     persist(newState)
+    switch newState {
+    case .absent:
+      DspeechLog.modelPack.info("model pack state changed state=absent")
+    case .acquiring(let acquisition):
+      DspeechLog.modelPack.info(
+        "model pack state changed state=acquiring phase=\(acquisition.phase.rawValue, privacy: .public) percent=\(acquisition.percentComplete, privacy: .public)"
+      )
+    case .installed(let pack):
+      DspeechLog.modelPack.info(
+        "model pack state changed state=installed identifier=\(pack.identifier, privacy: .public) version=\(pack.version, privacy: .public)"
+      )
+    case .failed(let failure):
+      DspeechLog.modelPack.error(
+        "model pack state changed state=failed kind=\(failure.kind.rawValue, privacy: .public)"
+      )
+    case .disabled(let pack):
+      DspeechLog.modelPack.info(
+        "model pack state changed state=disabled identifier=\(pack.identifier, privacy: .public) version=\(pack.version, privacy: .public)"
+      )
+    }
   }
 }
 
 func modelPackDownloadFailure(for error: Error) -> ModelPackFailure {
   if let installError = error as? ModelPackInstallError, installError.isIntegrityFailure {
+    DspeechLog.modelPack.error("model pack failure mapped kind=checksum")
     return ModelPackFailure(
       kind: .checksum,
       userSafeReason:
@@ -109,6 +159,7 @@ func modelPackDownloadFailure(for error: Error) -> ModelPackFailure {
     )
   }
 
+  DspeechLog.modelPack.error("model pack failure mapped kind=network")
   return ModelPackFailure(
     kind: .network,
     userSafeReason:
@@ -119,7 +170,8 @@ func modelPackDownloadFailure(for error: Error) -> ModelPackFailure {
 }
 
 func modelPackDeleteFailure(for error: Error) -> ModelPackFailure {
-  ModelPackFailure(
+  DspeechLog.modelPack.error("model pack delete failure mapped kind=disk")
+  return ModelPackFailure(
     kind: .disk,
     userSafeReason:
       String(
