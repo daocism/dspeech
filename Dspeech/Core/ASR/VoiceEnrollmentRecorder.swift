@@ -20,18 +20,23 @@ final class VoiceEnrollmentRecorder {
 
   private let authorization: any VoiceEnrollmentMicrophoneAuthorizing
   private let audioCapture: any VoiceEnrollmentAudioCapturing
+  private let arbiter: AudioCaptureArbiter
   private var activeSessionID: UUID?
   private var captureContinuation: AsyncStream<VoiceEnrollmentCapturedSamples>.Continuation?
   private var consumeTask: Task<Void, Never>?
+  private var captureLeaseAcquired = false
+  private var captureStartAttempted = false
   private var captureStarted = false
 
   init(
     authorization: any VoiceEnrollmentMicrophoneAuthorizing =
       SystemVoiceEnrollmentMicrophoneAuthorization(),
-    audioCapture: any VoiceEnrollmentAudioCapturing = AVAudioEngineVoiceEnrollmentCapture()
+    audioCapture: any VoiceEnrollmentAudioCapturing = AVAudioEngineVoiceEnrollmentCapture(),
+    arbiter: AudioCaptureArbiter = .shared
   ) {
     self.authorization = authorization
     self.audioCapture = audioCapture
+    self.arbiter = arbiter
   }
 
   var isRecording: Bool { status == .recording }
@@ -44,6 +49,14 @@ final class VoiceEnrollmentRecorder {
 
   func start() async {
     guard !isActive else { return }
+    guard arbiter.acquire(.voiceEnrollment) else {
+      status = .unavailable(
+        String(
+          localized:
+            "Audio capture is already in use. Stop transcription before recording an enrollment."))
+      return
+    }
+    captureLeaseAcquired = true
     let sessionID = UUID()
     activeSessionID = sessionID
     status = .starting
@@ -52,6 +65,7 @@ final class VoiceEnrollmentRecorder {
     guard await authorization.requestMicrophonePermission() else {
       guard isCurrent(sessionID) else { return }
       activeSessionID = nil
+      _ = releaseCaptureLease()
       status = .unavailable(String(localized: "No microphone access. Allow it in Settings."))
       return
     }
@@ -95,11 +109,13 @@ final class VoiceEnrollmentRecorder {
     consumeTask = Task { @MainActor [weak self] in
       for await captured in captureStream {
         guard let self, self.isCurrent(captured.sessionID) else { continue }
+        self.captureSampleRate = captured.sampleRate
         self.collected.append(contentsOf: captured.samples)
       }
     }
 
     do {
+      captureStartAttempted = true
       captureSampleRate = try audioCapture.start { buffer in
         guard let copy = buffer.dspeechDeepCopy(),
           let samples = AppleSpeechLiveTranscriptionEngine.monoFloatSamples(from: copy)
@@ -107,7 +123,11 @@ final class VoiceEnrollmentRecorder {
           return
         }
         audioContinuation.yield(
-          VoiceEnrollmentCapturedSamples(sessionID: sessionID, samples: samples)
+          VoiceEnrollmentCapturedSamples(
+            sessionID: sessionID,
+            samples: samples,
+            sampleRate: copy.format.sampleRate
+          )
         )
       }
       captureStarted = true
@@ -116,7 +136,6 @@ final class VoiceEnrollmentRecorder {
       captureContinuation = nil
       consumeTask?.cancel()
       consumeTask = nil
-      audioCapture.stop()
       throw error
     }
   }
@@ -126,10 +145,14 @@ final class VoiceEnrollmentRecorder {
     let continuation = captureContinuation
     captureContinuation = nil
     continuation?.finish()
+    let deactivateSession = releaseCaptureLease()
     if captureStarted {
-      audioCapture.stop()
-      captureStarted = false
+      audioCapture.stop(deactivateSession: deactivateSession)
+    } else if captureStartAttempted {
+      audioCapture.stop(deactivateSession: deactivateSession)
     }
+    captureStarted = false
+    captureStartAttempted = false
     if drainQueuedSamples {
       await consumeTask?.value
     } else {
@@ -139,6 +162,12 @@ final class VoiceEnrollmentRecorder {
     if activeSessionID == sessionID {
       activeSessionID = nil
     }
+  }
+
+  private func releaseCaptureLease() -> Bool {
+    guard captureLeaseAcquired else { return false }
+    captureLeaseAcquired = false
+    return arbiter.release(.voiceEnrollment)
   }
 
   private func failAfterCapture(_ reason: String, sessionID: UUID) async {
@@ -155,6 +184,7 @@ final class VoiceEnrollmentRecorder {
 private struct VoiceEnrollmentCapturedSamples: Sendable {
   let sessionID: UUID
   let samples: [Float]
+  let sampleRate: Double
 }
 
 @MainActor
@@ -179,7 +209,7 @@ struct SystemVoiceEnrollmentMicrophoneAuthorization: VoiceEnrollmentMicrophoneAu
 @MainActor
 protocol VoiceEnrollmentAudioCapturing {
   func start(onBuffer: @escaping @Sendable (AVAudioPCMBuffer) -> Void) throws -> Double
-  func stop()
+  func stop(deactivateSession: Bool)
 }
 
 enum VoiceEnrollmentCaptureError: Error {
@@ -189,12 +219,13 @@ enum VoiceEnrollmentCaptureError: Error {
 @MainActor
 private final class AVAudioEngineVoiceEnrollmentCapture: VoiceEnrollmentAudioCapturing {
   private let audioEngine = AVAudioEngine()
+  private var sessionActivated = false
 
   func start(onBuffer: @escaping @Sendable (AVAudioPCMBuffer) -> Void) throws -> Double {
     do {
       let session = AVAudioSession.sharedInstance()
-      try session.setCategory(.record, mode: .measurement, options: [.duckOthers])
-      try session.setActive(true, options: .notifyOthersOnDeactivation)
+      try session.setActive(true)
+      sessionActivated = true
 
       let inputNode = audioEngine.inputNode
       let format = inputNode.outputFormat(forBus: 0)
@@ -209,16 +240,19 @@ private final class AVAudioEngineVoiceEnrollmentCapture: VoiceEnrollmentAudioCap
       try audioEngine.start()
       return format.sampleRate
     } catch {
-      stop()
+      stop(deactivateSession: false)
       throw error
     }
   }
 
-  func stop() {
+  func stop(deactivateSession: Bool) {
     if audioEngine.isRunning {
       audioEngine.stop()
     }
     audioEngine.inputNode.removeTap(onBus: 0)
-    try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    if deactivateSession, sessionActivated {
+      try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+      sessionActivated = false
+    }
   }
 }

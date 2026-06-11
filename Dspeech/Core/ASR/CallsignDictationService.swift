@@ -20,9 +20,12 @@ final class CallsignDictationService {
   private let authorization: any CallsignSpeechAuthorization
   private let recognizerFactory: @MainActor (String) -> (any CallsignSpeechRecognizing)?
   private let audioCapture: any CallsignAudioCapturing
+  private let arbiter: AudioCaptureArbiter
   private var recognizer: (any CallsignSpeechRecognizing)?
   private var task: (any CallsignRecognitionTasking)?
   private var activeSessionID: UUID?
+  private var captureLeaseAcquired = false
+  private var captureStartAttempted = false
   private var captureStarted = false
   private var captureContinuation: AsyncStream<CallsignCapturedBuffer>.Continuation?
   private var consumeTask: Task<Void, Never>?
@@ -33,12 +36,14 @@ final class CallsignDictationService {
     recognizerFactory: @escaping @MainActor (String) -> (any CallsignSpeechRecognizing)? = {
       AppleCallsignSpeechRecognizer(localeIdentifier: $0)
     },
-    audioCapture: any CallsignAudioCapturing = AVAudioEngineCallsignAudioCapture()
+    audioCapture: any CallsignAudioCapturing = AVAudioEngineCallsignAudioCapture(),
+    arbiter: AudioCaptureArbiter = .shared
   ) {
     self.localeIdentifier = localeIdentifier
     self.authorization = authorization
     self.recognizerFactory = recognizerFactory
     self.audioCapture = audioCapture
+    self.arbiter = arbiter
   }
 
   var isListening: Bool { status == .listening }
@@ -56,6 +61,14 @@ final class CallsignDictationService {
 
   func start() async {
     guard !isActive else { return }
+    guard arbiter.acquire(.callsignDictation) else {
+      status = .unavailable(
+        String(
+          localized:
+            "Audio capture is already in use. Stop transcription before using voice entry."))
+      return
+    }
+    captureLeaseAcquired = true
     let sessionID = UUID()
     activeSessionID = sessionID
     status = .starting
@@ -96,6 +109,7 @@ final class CallsignDictationService {
     self.recognizer = recognizer
 
     do {
+      captureStartAttempted = true
       try begin(recognizer: recognizer, sessionID: sessionID)
       guard isCurrent(sessionID) else { return }
       status = .listening
@@ -147,10 +161,14 @@ final class CallsignDictationService {
 
   private func cleanup() {
     activeSessionID = nil
+    let deactivateSession = releaseCaptureLease()
     if captureStarted {
-      audioCapture.stop()
-      captureStarted = false
+      audioCapture.stop(deactivateSession: deactivateSession)
+    } else if captureStartAttempted {
+      audioCapture.stop(deactivateSession: deactivateSession)
     }
+    captureStarted = false
+    captureStartAttempted = false
     captureContinuation?.finish()
     captureContinuation = nil
     consumeTask?.cancel()
@@ -159,6 +177,12 @@ final class CallsignDictationService {
     task?.cancel()
     task = nil
     recognizer = nil
+  }
+
+  private func releaseCaptureLease() -> Bool {
+    guard captureLeaseAcquired else { return false }
+    captureLeaseAcquired = false
+    return arbiter.release(.callsignDictation)
   }
 
   private func handle(update: CallsignRecognitionUpdate, sessionID: UUID) {
@@ -180,6 +204,7 @@ final class CallsignDictationService {
   private func failBeforeCapture(_ reason: String, sessionID: UUID) {
     guard isCurrent(sessionID) else { return }
     activeSessionID = nil
+    _ = releaseCaptureLease()
     status = .unavailable(reason)
   }
 
@@ -248,7 +273,7 @@ protocol CallsignSpeechRecognizing: AnyObject {
 @MainActor
 protocol CallsignAudioCapturing {
   func start(onBuffer: @escaping @Sendable (AVAudioPCMBuffer) -> Void) throws
-  func stop()
+  func stop(deactivateSession: Bool)
 }
 
 @MainActor
@@ -316,12 +341,13 @@ private struct AppleCallsignRecognitionTask: CallsignRecognitionTasking {
 @MainActor
 private final class AVAudioEngineCallsignAudioCapture: CallsignAudioCapturing {
   private let audioEngine = AVAudioEngine()
+  private var sessionActivated = false
 
   func start(onBuffer: @escaping @Sendable (AVAudioPCMBuffer) -> Void) throws {
     do {
       let session = AVAudioSession.sharedInstance()
-      try session.setCategory(.record, mode: .measurement, options: [.duckOthers])
-      try session.setActive(true, options: .notifyOthersOnDeactivation)
+      try session.setActive(true)
+      sessionActivated = true
 
       let inputNode = audioEngine.inputNode
       let recordingFormat = inputNode.outputFormat(forBus: 0)
@@ -336,17 +362,20 @@ private final class AVAudioEngineCallsignAudioCapture: CallsignAudioCapturing {
       audioEngine.prepare()
       try audioEngine.start()
     } catch {
-      stop()
+      stop(deactivateSession: false)
       throw error
     }
   }
 
-  func stop() {
+  func stop(deactivateSession: Bool) {
     if audioEngine.isRunning {
       audioEngine.stop()
     }
     audioEngine.inputNode.removeTap(onBus: 0)
-    try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    if deactivateSession, sessionActivated {
+      try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+      sessionActivated = false
+    }
   }
 }
 

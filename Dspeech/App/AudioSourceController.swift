@@ -7,6 +7,7 @@ final class AudioSourceController {
   private let routing: any AudioSessionRouting
   private let settings: AudioSettings
   private let meter: any InputLevelMetering
+  private let arbiter: AudioCaptureArbiter
 
   private(set) var availableInputs: [PortSnapshot] = []
   private(set) var selectedUID: String = ""
@@ -16,15 +17,18 @@ final class AudioSourceController {
   private(set) var inputLevelError: String?
   private(set) var routePreparationFailure: AudioRoutePreparationFailure?
   private var meterTask: Task<Void, Never>?
+  private var meterLeaseAcquired = false
 
   init(
     routing: any AudioSessionRouting,
     settings: AudioSettings = AudioSettings(),
-    meter: any InputLevelMetering = AVAudioEngineInputLevelMeter()
+    meter: any InputLevelMetering = AVAudioEngineInputLevelMeter(),
+    arbiter: AudioCaptureArbiter = .shared
   ) {
     self.routing = routing
     self.settings = settings
     self.meter = meter
+    self.arbiter = arbiter
     refresh()
   }
 
@@ -33,6 +37,15 @@ final class AudioSourceController {
   // never tap the input at once.
   func startMetering() {
     stopMetering()
+    guard arbiter.acquire(.inputLevelMeter) else {
+      inputLevel = 0
+      inputLevelError = String(
+        localized:
+          "Audio capture is already in use. Stop transcription before testing the input level.")
+      isMetering = false
+      return
+    }
+    meterLeaseAcquired = true
     isMetering = true
     inputLevelError = nil
     meterTask = Task { @MainActor [weak self] in
@@ -46,20 +59,32 @@ final class AudioSourceController {
           self.inputLevel = 0
           self.inputLevelError = message
           self.isMetering = false
+          _ = self.releaseMeterLease()
           self.meter.stop()
           self.meterTask = nil
           return
         }
       }
+      self.isMetering = false
+      _ = self.releaseMeterLease()
+      self.meter.stop()
+      self.meterTask = nil
     }
   }
 
   func stopMetering() {
     meterTask?.cancel()
     meterTask = nil
+    _ = releaseMeterLease()
     meter.stop()
     inputLevel = 0
     isMetering = false
+  }
+
+  private func releaseMeterLease() -> Bool {
+    guard meterLeaseAcquired else { return false }
+    meterLeaseAcquired = false
+    return arbiter.release(.inputLevelMeter)
   }
 
   var hasSelectableInputs: Bool { !availableInputs.isEmpty }
