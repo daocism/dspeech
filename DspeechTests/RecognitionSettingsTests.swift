@@ -122,6 +122,45 @@ struct RecognitionSettingsTests {
     #expect(reloaded.localeIdentifier == frFR)
   }
 
+  @MainActor @Test func engineChoiceDefaultsToApple() {
+    let settings = RecognitionSettings(
+      storage: InMemoryRecognitionSettingsStorage(),
+      supportedLocales: supported,
+      preferredLanguages: ["en-US"])
+
+    #expect(settings.engineChoice == .apple)
+  }
+
+  @MainActor @Test func engineChoicePersistsWhisperKitAndReloads() {
+    let storage = InMemoryRecognitionSettingsStorage()
+    let settings = RecognitionSettings(
+      storage: storage,
+      supportedLocales: supported,
+      preferredLanguages: ["en-US"])
+
+    settings.engineChoice = .whisperKit
+
+    #expect(storage.engineChoice == .whisperKit)
+    let reloaded = RecognitionSettings(
+      storage: storage,
+      supportedLocales: supported,
+      preferredLanguages: ["en-US"])
+    #expect(reloaded.engineChoice == .whisperKit)
+  }
+
+  @Test func userDefaultsEngineChoiceRoundTrip() throws {
+    let suiteName = "dspeech.tests.recognition.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let storage = UserDefaultsRecognitionSettingsStorage(defaults: defaults)
+
+    #expect(storage.loadEngineChoice() == .apple)
+    try storage.saveEngineChoice(.whisperKit)
+    #expect(storage.loadEngineChoice() == .whisperKit)
+    try storage.saveEngineChoice(.apple)
+    #expect(storage.loadEngineChoice() == .apple)
+  }
+
   @MainActor @Test func settingsIgnoreUnsupportedStoredValueOnLoad() {
     let storage = InMemoryRecognitionSettingsStorage()
     storage.stored = "ru-RU"
@@ -252,11 +291,17 @@ private final class InMemoryRecognitionSettingsStorage: RecognitionSettingsStora
   @unchecked Sendable
 {
   var stored: String?
+  var engineChoice: TranscriptionEngineChoice?
   var failSaves = false
   func loadLocaleIdentifier() -> String? { stored }
   func saveLocaleIdentifier(_ identifier: String) throws {
     if failSaves { throw RecognitionSettingsTests.TestError.saveFailed }
     stored = identifier
+  }
+  func loadEngineChoice() -> TranscriptionEngineChoice { engineChoice ?? .apple }
+  func saveEngineChoice(_ choice: TranscriptionEngineChoice) throws {
+    if failSaves { throw RecognitionSettingsTests.TestError.saveFailed }
+    engineChoice = choice
   }
 }
 

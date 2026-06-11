@@ -19,9 +19,27 @@ enum RecognitionLocaleAvailabilityState: Equatable, Sendable {
   case unavailable
 }
 
+enum TranscriptionEngineChoice: String, Codable, Sendable, CaseIterable, Identifiable {
+  case apple
+  case whisperKit
+
+  var id: String { rawValue }
+
+  var displayName: String {
+    switch self {
+    case .apple:
+      return String(localized: "Apple Speech")
+    case .whisperKit:
+      return String(localized: "WhisperKit")
+    }
+  }
+}
+
 protocol RecognitionSettingsStorage: Sendable {
   func loadLocaleIdentifier() -> String?
   func saveLocaleIdentifier(_ identifier: String) throws
+  func loadEngineChoice() -> TranscriptionEngineChoice
+  func saveEngineChoice(_ choice: TranscriptionEngineChoice) throws
   func loadIssue() -> SettingsStorageIssue?
 }
 
@@ -31,6 +49,7 @@ extension RecognitionSettingsStorage {
 
 struct UserDefaultsRecognitionSettingsStorage: RecognitionSettingsStorage, @unchecked Sendable {
   static let localeKey = "dspeech.recognition.locale.v1"
+  static let engineChoiceKey = "dspeech.recognition.engine.v1"
 
   let defaults: UserDefaults
 
@@ -44,6 +63,28 @@ struct UserDefaultsRecognitionSettingsStorage: RecognitionSettingsStorage, @unch
 
   func saveLocaleIdentifier(_ identifier: String) throws {
     defaults.set(identifier, forKey: Self.localeKey)
+  }
+
+  func loadEngineChoice() -> TranscriptionEngineChoice {
+    guard let raw = defaults.string(forKey: Self.engineChoiceKey),
+      let choice = TranscriptionEngineChoice(rawValue: raw)
+    else {
+      return .apple
+    }
+    return choice
+  }
+
+  func saveEngineChoice(_ choice: TranscriptionEngineChoice) throws {
+    defaults.set(choice.rawValue, forKey: Self.engineChoiceKey)
+  }
+
+  func loadIssue() -> SettingsStorageIssue? {
+    if let raw = defaults.string(forKey: Self.engineChoiceKey),
+      TranscriptionEngineChoice(rawValue: raw) == nil
+    {
+      return .recognitionLocaleCorrupted
+    }
+    return nil
   }
 }
 
@@ -155,6 +196,18 @@ final class RecognitionSettings {
     }
   }
 
+  var engineChoice: TranscriptionEngineChoice {
+    didSet {
+      guard engineChoice != oldValue else { return }
+      do {
+        try storage.saveEngineChoice(engineChoice)
+        storageIssue = nil
+      } catch {
+        storageIssue = .recognitionLocaleSaveFailed
+      }
+    }
+  }
+
   var selectedDisplayName: String {
     guard let localeIdentifier else {
       return String(localized: "No recognition language available")
@@ -179,6 +232,7 @@ final class RecognitionSettings {
       displayLocale: displayLocale
     )
     self.localeAvailabilityState = .loading
+    self.engineChoice = storage.loadEngineChoice()
     let storedIdentifier = storage.loadLocaleIdentifier()
     self.localeIdentifier = RecognitionLocaleCatalog.resolve(
       stored: storedIdentifier,
