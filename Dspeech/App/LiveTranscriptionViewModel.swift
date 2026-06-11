@@ -292,6 +292,11 @@ final class LiveTranscriptionViewModel {
         case .segment(let segment):
           self.append(segment: segment)
           self.partialText = ""
+        case .taskRestart:
+          // why: the engine has already committed the live partial as an interim
+          // segment; clearing here prevents the stale partial from lingering until
+          // the next task's first partial arrives.
+          self.partialText = ""
         case .status(let newStatus):
           let oldStatus = self.status
           self.status = newStatus
