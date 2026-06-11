@@ -276,8 +276,12 @@ struct AppleSpeechLiveTranscriptionEngineLifecycleTests {
       audioSession: SpyLiveAudioSession()
     )
     let recorder = EventRecorder()
+    // why: subscribe synchronously BEFORE any emit — the multicast stream only buffers
+    // for already-registered continuations, and on a starved CI runner the collector
+    // Task can otherwise start after the first yield (observed hosted-runner-only flake).
+    let events = engine.events()
     let collector = Task { @MainActor in
-      for await event in engine.events() {
+      for await event in events {
         await recorder.record(event)
       }
     }
