@@ -11,6 +11,19 @@ self-retro: global memory `feedback_primary_scenario_proof`. The binding work no
 (dispatcher-only durable transmission blocks, real-audio harness on the French ATC
 fixtures, WhisperKit phase). Do not trust the previous "ready" claims below.
 
+**Phase A LANDED** (`feat/core-semantics-rebuild` @ `47bc870`, suites green, harness
+gate passed, run-note `docs/run-notes/2026-06-12-core-semantics-rebuild-phase-a.md`):
+D-1 fixed (interim commit at every task boundary + .taskRestart marker), pure
+TransmissionAssembler (gap-glued whole transmissions, overlap-merge), D-2 semantics via
+TransmissionClassifier (urgency/callsign/voice/honest-fallback), French phonetics
+layer, real-ASR harness `dspeech-replay transcribe` + `scripts/
+verify-primary-scenario.sh` (macOS on-device fr-FR; both fixtures = single coherent
+DISPLAYED blocks; callsign anchor + filter verified on real audio). Replay-tail: ON
+(empirical §2.2, loss > duplication). REMAINING: Phase B WhisperKit engine (+ADR 0011,
+engine picker, model download), stage 3 UI wiring (transmission cards + persistence per
+transmission + visual sweep + PR). mac24 env: fr dictation asset installed; CLI Speech
+needs run-loop pumping.
+
 ## What we are building right now
 
 Native iOS 26+ SwiftUI app: receive-only cockpit/ATC live transcription, on-device only,
