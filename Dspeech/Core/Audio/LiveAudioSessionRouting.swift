@@ -7,10 +7,9 @@ import Foundation
 #if canImport(AVFAudio)
   final class LiveAudioSessionRouting: AudioSessionRouting, @unchecked Sendable {
     private let session: AVAudioSession
-    private let continuation: AsyncStream<RouteChangeEvent>.Continuation
     private let lock = NSLock()
     private var _routePreparationStatus: AudioRoutePreparationStatus
-    let routeChanges: AsyncStream<RouteChangeEvent>
+    private var routeContinuations: [UUID: AsyncStream<RouteChangeEvent>.Continuation] = [:]
     private var observers: [NSObjectProtocol] = []
 
     init(session: AVAudioSession = .sharedInstance()) {
@@ -21,38 +20,31 @@ import Foundation
       // Priming the category (without activating — the engine owns activation)
       // lets the OS surface the real input so Start reflects an available mic.
       self._routePreparationStatus = Self.prepareRecordCategory(session)
-      var localContinuation: AsyncStream<RouteChangeEvent>.Continuation!
-      self.routeChanges = AsyncStream<RouteChangeEvent>(
-        bufferingPolicy: .unbounded
-      ) { continuation in
-        localContinuation = continuation
-      }
-      self.continuation = localContinuation
       self.observers = [
         NotificationCenter.default.addObserver(
           forName: AVAudioSession.routeChangeNotification,
           object: session,
           queue: nil
-        ) { [continuation = localContinuation!] note in
+        ) { [weak self] note in
           let rawReason = (note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt) ?? 0
           let event = LiveAudioSessionRouting.event(forRawReason: rawReason)
-          continuation.yield(event)
+          self?.yield(event)
         },
         NotificationCenter.default.addObserver(
           forName: AVAudioSession.interruptionNotification,
           object: session,
           queue: nil
-        ) { [continuation = localContinuation!] note in
+        ) { [weak self] note in
           let event = LiveAudioSessionRouting.event(forInterruptionUserInfo: note.userInfo)
-          continuation.yield(event)
+          self?.yield(event)
         },
         NotificationCenter.default.addObserver(
           forName: AVAudioSession.mediaServicesWereResetNotification,
           object: session,
           queue: nil
-        ) { [weak self, continuation = localContinuation!] _ in
+        ) { [weak self] _ in
           self?.refreshRoutePreparationStatus()
-          continuation.yield(.mediaServicesWereReset)
+          self?.yield(.mediaServicesWereReset)
         },
       ]
     }
@@ -61,7 +53,7 @@ import Foundation
       for observer in observers {
         NotificationCenter.default.removeObserver(observer)
       }
-      continuation.finish()
+      finishRouteContinuations()
     }
 
     var routePreparationStatus: AudioRoutePreparationStatus {
@@ -77,18 +69,58 @@ import Foundation
       lock.unlock()
     }
 
+    static func configureRecordCategory(
+      _ session: AVAudioSession
+    ) throws {
+      try session.setCategory(
+        .playAndRecord,
+        mode: .measurement,
+        options: [.allowBluetoothHFP, .allowBluetoothA2DP, .defaultToSpeaker]
+      )
+    }
+
     private static func prepareRecordCategory(
       _ session: AVAudioSession
     ) -> AudioRoutePreparationStatus {
       do {
-        try session.setCategory(
-          .playAndRecord,
-          mode: .measurement,
-          options: [.allowBluetoothHFP, .allowBluetoothA2DP, .defaultToSpeaker]
-        )
+        try configureRecordCategory(session)
         return .ready
       } catch {
         return .failed(.recordCategoryUnavailable(error.localizedDescription))
+      }
+    }
+
+    func routeChangeEvents() -> AsyncStream<RouteChangeEvent> {
+      let id = UUID()
+      return AsyncStream<RouteChangeEvent>(bufferingPolicy: .unbounded) { continuation in
+        lock.lock()
+        routeContinuations[id] = continuation
+        lock.unlock()
+        continuation.onTermination = { [weak self] _ in
+          guard let self else { return }
+          lock.lock()
+          routeContinuations[id] = nil
+          lock.unlock()
+        }
+      }
+    }
+
+    private func yield(_ event: RouteChangeEvent) {
+      lock.lock()
+      let continuations = Array(routeContinuations.values)
+      lock.unlock()
+      for continuation in continuations {
+        continuation.yield(event)
+      }
+    }
+
+    private func finishRouteContinuations() {
+      lock.lock()
+      let continuations = Array(routeContinuations.values)
+      routeContinuations.removeAll()
+      lock.unlock()
+      for continuation in continuations {
+        continuation.finish()
       }
     }
 

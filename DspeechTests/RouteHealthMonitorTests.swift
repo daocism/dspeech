@@ -127,6 +127,38 @@ struct RouteHealthMonitorTests {
     #expect(monitor.lastNotice?.isUserVisible == true)
   }
 
+  @Test func healthyRouteChangeClearsStaleInterruptionBlock() {
+    let fake = FakeAudioSessionRouting(
+      currentRoute: RouteSnapshot(inputs: [Self.port(.usbAudio, name: "USB Tap")]),
+      availableInputs: [Self.port(.usbAudio, name: "USB Tap")]
+    )
+    let monitor = RouteHealthMonitor(routing: fake)
+    monitor.handle(event: .interruptionBegan)
+    #expect(monitor.blocksStart)
+
+    monitor.handle(event: .categoryChange)
+
+    #expect(!monitor.isAudioSessionInterrupted)
+    #expect(!monitor.blocksStart)
+    #expect(monitor.health == .suitableExternal)
+  }
+
+  @Test func foregroundRefreshClearsStaleInterruptionBlockWhenRouteIsHealthy() {
+    let fake = FakeAudioSessionRouting(
+      currentRoute: RouteSnapshot(inputs: [Self.port(.usbAudio, name: "USB Tap")]),
+      availableInputs: [Self.port(.usbAudio, name: "USB Tap")]
+    )
+    let monitor = RouteHealthMonitor(routing: fake)
+    monitor.handle(event: .interruptionBegan)
+    #expect(monitor.blocksStart)
+
+    monitor.refreshOnForeground()
+
+    #expect(!monitor.isAudioSessionInterrupted)
+    #expect(!monitor.blocksStart)
+    #expect(monitor.health == .suitableExternal)
+  }
+
   @Test func mediaServicesResetShowsVisibleNoticeAndRecomputesRoute() {
     let fake = FakeAudioSessionRouting(
       currentRoute: RouteSnapshot(inputs: [Self.port(.usbAudio, name: "USB Tap")]),
@@ -482,6 +514,22 @@ struct RouteHealthMonitorTests {
     monitor.start()
     monitor.stop()
     monitor.stop()
+  }
+
+  @Test func routeChangeEventsMulticastToIndependentSubscribers() async {
+    let fake = FakeAudioSessionRouting(
+      currentRoute: RouteSnapshot(inputs: [Self.port(.builtInMic)]),
+      availableInputs: [Self.port(.builtInMic)]
+    )
+    var first = fake.routeChangeEvents().makeAsyncIterator()
+    var second = fake.routeChangeEvents().makeAsyncIterator()
+
+    fake.emit(.categoryChange)
+
+    let firstEvent = await first.next()
+    let secondEvent = await second.next()
+    #expect(firstEvent == .categoryChange)
+    #expect(secondEvent == .categoryChange)
   }
 
   private static let forbiddenSubstrings: [String] = [
