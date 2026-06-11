@@ -9,6 +9,20 @@ Canonical registry: `/home/user/projects/MyInfra/config/project-workspaces/proje
 
 ## Current phase
 
+2026-06-11: **Production-readiness remediation** on `fix/production-readiness-2026-06-11`.
+64-agent ultra-review (163+7 findings) → `docs/SPEC-2026-06-11-production-readiness.md`
+(14 WPs, decisions D1-D5, ADR 0009/0010). Waves 1-3 LANDED and green (659 unit + 27 UI,
+zero warnings): session survival + arbiter, filter urgency/abbreviation safety, transcript
+persistence + history + cockpit UX, observability, ASR robustness, voice-data protection,
+settings integrity. Wave 4 in flight (decomposition/iPad/l10n, test honesty, build/CI).
+Execution model: Claude orchestrates/reviews/commits; Codex GPT-5.5 workers implement.
+Open tail: ko locale + it/uk listings, final adversarial cycles, DEVICE verification lane
+(lock/call/cable scenarios per ADR 0010) before any TestFlight claim. See
+docs/ai-kb/current-context.md for the rolling 1-pager.
+
+## Previous phase (2026-06-02, superseded)
+
+
 2026-06-02: **MVP feature-completion** on `feat/mvp-completion-2026-06-02` (5 commits,
 suite green, 0 warnings, device-arch compiles). Closed PRD gates §3 first-run onboarding,
 F8 background ASR stop, F3 on-device translation (Apple Translation framework, local-only),
