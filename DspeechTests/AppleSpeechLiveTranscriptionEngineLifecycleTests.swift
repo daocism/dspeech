@@ -396,15 +396,18 @@ struct AppleSpeechLiveTranscriptionEngineLifecycleTests {
     }
   }
 
+  // why: a yield-only spin starves the MainActor drain tasks on hosted runners where
+  // CPU-heavy suites run in the same process — sleep releases the cooperative thread and
+  // the 30s budget is a starvation ceiling, not a green-path cost (predicate exits early).
   private func waitForEvent(
     _ predicate: @escaping () async -> Bool,
-    timeout: Duration = .seconds(5)
+    timeout: Duration = .seconds(30)
   ) async -> Bool {
     let clock = ContinuousClock()
     let deadline = clock.now.advanced(by: timeout)
     while clock.now < deadline {
       if await predicate() { return true }
-      await Task.yield()
+      try? await Task.sleep(for: .milliseconds(10))
     }
     return await predicate()
   }
