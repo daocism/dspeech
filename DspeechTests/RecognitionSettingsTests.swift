@@ -4,6 +4,10 @@ import Testing
 @testable import Dspeech
 
 struct RecognitionSettingsTests {
+  enum TestError: Error {
+    case saveFailed
+  }
+
   private let supported: Set<Locale> = [
     Locale(identifier: "en-US"),
     Locale(identifier: "fr-FR"),
@@ -139,8 +143,8 @@ struct RecognitionSettingsTests {
     #expect(settings.activeLocaleIdentifier == enUS)
   }
 
-  // A previously-selected language that is no longer capable is re-resolved to a capable one.
-  @MainActor @Test func refreshReResolvesSelectionWhenNoLongerCapable() async {
+  // why: a transient capable-set narrowing must not overwrite the user's stored locale.
+  @MainActor @Test func refreshKeepsStoredLocaleWhenCapableSetNarrows() async {
     let storage = InMemoryRecognitionSettingsStorage()
     storage.stored = deDE
     let settings = RecognitionSettings(
@@ -148,7 +152,10 @@ struct RecognitionSettingsTests {
       availability: FakeAvailability(capable: [Locale(identifier: "en-US")], downloaded: [enUS]))
     #expect(settings.localeIdentifier == deDE)
     await settings.refreshCapableLocales()
-    #expect(settings.localeIdentifier == enUS)
+    #expect(settings.localeIdentifier == deDE)
+    #expect(settings.activeLocaleIdentifier == deDE)
+    #expect(settings.selectedNeedsDownload)
+    #expect(storage.stored == deDE)
   }
 
   @MainActor @Test func refreshEmptyCapableSetClearsActiveSelectionWithoutFakeFallback() async {
@@ -215,14 +222,42 @@ struct RecognitionSettingsTests {
     await settings.refreshSelectedDownloadState()
     #expect(settings.selectedNeedsDownload == false)
   }
+
+  @MainActor @Test func localeSaveFailureSurfacesStaleSettingsIssue() {
+    let storage = InMemoryRecognitionSettingsStorage()
+    storage.failSaves = true
+    let settings = RecognitionSettings(
+      storage: storage, supportedLocales: supported, preferredLanguages: ["en-US"])
+
+    settings.localeIdentifier = frFR
+
+    #expect(settings.localeIdentifier == frFR)
+    #expect(storage.stored == nil)
+    #expect(settings.storageIssue == .recognitionLocaleSaveFailed)
+    #expect(settings.hasStaleSettings)
+  }
+
+  @MainActor @Test func unsupportedStoredLocaleSurfacesCorruptionIssue() {
+    let storage = InMemoryRecognitionSettingsStorage()
+    storage.stored = "zz-ZZ"
+    let settings = RecognitionSettings(
+      storage: storage, supportedLocales: supported, preferredLanguages: ["fr-FR"])
+
+    #expect(settings.localeIdentifier == frFR)
+    #expect(settings.storageIssue == .recognitionLocaleCorrupted)
+  }
 }
 
 private final class InMemoryRecognitionSettingsStorage: RecognitionSettingsStorage,
   @unchecked Sendable
 {
   var stored: String?
+  var failSaves = false
   func loadLocaleIdentifier() -> String? { stored }
-  func saveLocaleIdentifier(_ identifier: String) { stored = identifier }
+  func saveLocaleIdentifier(_ identifier: String) throws {
+    if failSaves { throw RecognitionSettingsTests.TestError.saveFailed }
+    stored = identifier
+  }
 }
 
 private struct FakeAvailability: OnDeviceLocaleAvailability {

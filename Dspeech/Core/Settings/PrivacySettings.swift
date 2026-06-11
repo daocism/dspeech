@@ -17,12 +17,32 @@ enum PrivacyMode: String, CaseIterable, Sendable, Codable {
   }
 }
 
+enum SettingsStorageIssue: Equatable, Sendable {
+  case privacyModeCorrupted
+  case voiceFilterActiveCorrupted
+  case privacyModeSaveFailed
+  case voiceFilterActiveSaveFailed
+  case recognitionLocaleCorrupted
+  case recognitionLocaleSaveFailed
+  case translationEnabledCorrupted
+  case translationTargetCorrupted
+  case translationEnabledSaveFailed
+  case translationTargetSaveFailed
+  case audioPreferredInputCorrupted
+  case audioPreferredInputSaveFailed
+}
+
 protocol PrivacySettingsStorage: Sendable {
   func loadPrivacyMode() -> PrivacyMode
-  func savePrivacyMode(_ mode: PrivacyMode)
+  func savePrivacyMode(_ mode: PrivacyMode) throws
 
   func loadVoiceFilterActive() -> Bool
-  func saveVoiceFilterActive(_ active: Bool)
+  func saveVoiceFilterActive(_ active: Bool) throws
+  func loadIssue() -> SettingsStorageIssue?
+}
+
+extension PrivacySettingsStorage {
+  func loadIssue() -> SettingsStorageIssue? { nil }
 }
 
 struct UserDefaultsPrivacySettingsStorage: PrivacySettingsStorage, @unchecked Sendable {
@@ -44,7 +64,7 @@ struct UserDefaultsPrivacySettingsStorage: PrivacySettingsStorage, @unchecked Se
     return mode
   }
 
-  func savePrivacyMode(_ mode: PrivacyMode) {
+  func savePrivacyMode(_ mode: PrivacyMode) throws {
     defaults.set(mode.rawValue, forKey: Self.privacyModeKey)
   }
 
@@ -53,20 +73,37 @@ struct UserDefaultsPrivacySettingsStorage: PrivacySettingsStorage, @unchecked Se
       return active
     }
     if let raw = defaults.string(forKey: Self.voiceFilterActiveKey) {
-      switch raw.lowercased() {
-      case "1", "true", "yes":
-        return true
-      case "0", "false", "no":
-        return false
-      default:
-        return true
-      }
+      return Self.parseBool(raw) ?? false
     }
+    if defaults.object(forKey: Self.voiceFilterActiveKey) != nil { return false }
     return true
   }
 
-  func saveVoiceFilterActive(_ active: Bool) {
+  func saveVoiceFilterActive(_ active: Bool) throws {
     defaults.set(active, forKey: Self.voiceFilterActiveKey)
+  }
+
+  func loadIssue() -> SettingsStorageIssue? {
+    if let raw = defaults.string(forKey: Self.privacyModeKey),
+      PrivacyMode(rawValue: raw) == nil
+    {
+      return .privacyModeCorrupted
+    }
+    let rawVoiceFilter = defaults.object(forKey: Self.voiceFilterActiveKey)
+    if rawVoiceFilter == nil || rawVoiceFilter is Bool { return nil }
+    if let raw = rawVoiceFilter as? String, Self.parseBool(raw) != nil { return nil }
+    return .voiceFilterActiveCorrupted
+  }
+
+  private static func parseBool(_ raw: String) -> Bool? {
+    switch raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+    case "1", "true", "yes":
+      return true
+    case "0", "false", "no":
+      return false
+    default:
+      return nil
+    }
   }
 }
 
@@ -74,18 +111,30 @@ struct UserDefaultsPrivacySettingsStorage: PrivacySettingsStorage, @unchecked Se
 @Observable
 final class PrivacySettings {
   private let storage: PrivacySettingsStorage
+  private(set) var storageIssue: SettingsStorageIssue?
+  var hasStaleSettings: Bool { storageIssue != nil }
 
   var mode: PrivacyMode {
     didSet {
       guard mode != oldValue else { return }
-      storage.savePrivacyMode(mode)
+      do {
+        try storage.savePrivacyMode(mode)
+        storageIssue = nil
+      } catch {
+        storageIssue = .privacyModeSaveFailed
+      }
     }
   }
 
   var voiceFilterActive: Bool {
     didSet {
       guard voiceFilterActive != oldValue else { return }
-      storage.saveVoiceFilterActive(voiceFilterActive)
+      do {
+        try storage.saveVoiceFilterActive(voiceFilterActive)
+        storageIssue = nil
+      } catch {
+        storageIssue = .voiceFilterActiveSaveFailed
+      }
     }
   }
 
@@ -93,5 +142,6 @@ final class PrivacySettings {
     self.storage = storage
     self.mode = storage.loadPrivacyMode()
     self.voiceFilterActive = storage.loadVoiceFilterActive()
+    self.storageIssue = storage.loadIssue()
   }
 }

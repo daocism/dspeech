@@ -3,9 +3,14 @@ import Observation
 
 protocol AudioSettingsStorage: Sendable {
   func loadPreferredInputUID() -> String?
-  func savePreferredInputUID(_ uid: String?)
+  func savePreferredInputUID(_ uid: String?) throws
   func loadPreferredInputType() -> String?
-  func savePreferredInputType(_ type: String?)
+  func savePreferredInputType(_ type: String?) throws
+  func loadIssue() -> SettingsStorageIssue?
+}
+
+extension AudioSettingsStorage {
+  func loadIssue() -> SettingsStorageIssue? { nil }
 }
 
 struct UserDefaultsAudioSettingsStorage: AudioSettingsStorage, @unchecked Sendable {
@@ -18,21 +23,44 @@ struct UserDefaultsAudioSettingsStorage: AudioSettingsStorage, @unchecked Sendab
     self.defaults = defaults
   }
 
-  func loadPreferredInputUID() -> String? { defaults.string(forKey: Self.uidKey) }
-  func savePreferredInputUID(_ uid: String?) {
+  func loadPreferredInputUID() -> String? {
+    guard let uid = defaults.string(forKey: Self.uidKey), !uid.isEmpty else {
+      return nil
+    }
+    return uid
+  }
+
+  func savePreferredInputUID(_ uid: String?) throws {
     if let uid {
       defaults.set(uid, forKey: Self.uidKey)
     } else {
       defaults.removeObject(forKey: Self.uidKey)
     }
   }
-  func loadPreferredInputType() -> String? { defaults.string(forKey: Self.typeKey) }
-  func savePreferredInputType(_ type: String?) {
+
+  func loadPreferredInputType() -> String? {
+    guard let type = defaults.string(forKey: Self.typeKey), !type.isEmpty else {
+      return nil
+    }
+    return type
+  }
+
+  func savePreferredInputType(_ type: String?) throws {
     if let type {
       defaults.set(type, forKey: Self.typeKey)
     } else {
       defaults.removeObject(forKey: Self.typeKey)
     }
+  }
+
+  func loadIssue() -> SettingsStorageIssue? {
+    if let uid = defaults.string(forKey: Self.uidKey), uid.isEmpty {
+      return .audioPreferredInputCorrupted
+    }
+    if let type = defaults.string(forKey: Self.typeKey), type.isEmpty {
+      return .audioPreferredInputCorrupted
+    }
+    return nil
   }
 }
 
@@ -60,17 +88,25 @@ final class AudioSettings {
   private let storage: AudioSettingsStorage
   private(set) var preferredInputUID: String?
   private(set) var preferredInputType: String?
+  private(set) var storageIssue: SettingsStorageIssue?
+  var hasStaleSettings: Bool { storageIssue != nil }
 
   init(storage: AudioSettingsStorage = UserDefaultsAudioSettingsStorage()) {
     self.storage = storage
     self.preferredInputUID = storage.loadPreferredInputUID()
     self.preferredInputType = storage.loadPreferredInputType()
+    self.storageIssue = storage.loadIssue()
   }
 
   func setPreferred(uid: String, type: String) {
     preferredInputUID = uid
     preferredInputType = type
-    storage.savePreferredInputUID(uid)
-    storage.savePreferredInputType(type)
+    do {
+      try storage.savePreferredInputUID(uid)
+      try storage.savePreferredInputType(type)
+      storageIssue = nil
+    } catch {
+      storageIssue = .audioPreferredInputSaveFailed
+    }
   }
 }
