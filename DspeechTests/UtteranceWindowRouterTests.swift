@@ -357,6 +357,78 @@ struct UtteranceWindowRouterTests {
     #expect(await gate.snapshot() == [])
   }
 
+  @Test("should fail open empty sample buffers without waiting for a decision edge")
+  func emptySampleBufferFailsOpenImmediately() async {
+    let gate = WindowGate()
+    let (appended, appendContinuation) = AsyncStream<Int>.makeStream()
+    let segmenter = ScriptedSegmenter([:])
+    let router = UtteranceWindowRouter<Int>(
+      segmenter: segmenter,
+      classify: Self.gatedClassify(gate: gate, decisions: [1: .discard(reason: .pilotVoice)]),
+      append: { appendContinuation.yield($0) }
+    )
+
+    router.submit(1, samples: [], sampleRate: 16_000)
+
+    var iterator = appended.makeAsyncIterator()
+    #expect(await iterator.next() == 1)
+    #expect(await gate.snapshot() == [])
+    #expect(segmenter.updateCallCount == 0)
+  }
+
+  @Test("should fail open non-positive sample-rate buffers without waiting for a decision edge")
+  func nonPositiveSampleRateFailsOpenImmediately() async {
+    let gate = WindowGate()
+    let (appended, appendContinuation) = AsyncStream<Int>.makeStream()
+    let segmenter = ScriptedSegmenter([:])
+    let router = UtteranceWindowRouter<Int>(
+      segmenter: segmenter,
+      classify: Self.gatedClassify(gate: gate, decisions: [1: .discard(reason: .pilotVoice)]),
+      append: { appendContinuation.yield($0) }
+    )
+
+    router.submit(1, samples: Self.samples(token: 1, count: 4), sampleRate: 0)
+
+    var iterator = appended.makeAsyncIterator()
+    #expect(await iterator.next() == 1)
+    #expect(await gate.snapshot() == [])
+    #expect(segmenter.updateCallCount == 0)
+  }
+
+  @Test("should preserve FIFO when invalid buffers fail open between classified windows")
+  func invalidBufferFailsOpenInFifoOrderWithNeighboringWindows() async {
+    let gate = WindowGate()
+    let (appended, appendContinuation) = AsyncStream<Int>.makeStream()
+    let segmenter = ScriptedSegmenter([
+      1: .cutAfterSilence,
+      3: .cutAfterSilence,
+    ])
+    let router = UtteranceWindowRouter<Int>(
+      segmenter: segmenter,
+      classify: Self.gatedClassify(
+        gate: gate,
+        decisions: [
+          1: .transcribe(reason: .nonPilotVoice),
+          3: .transcribe(reason: .nonPilotVoice),
+        ]
+      ),
+      append: { appendContinuation.yield($0) }
+    )
+
+    router.submit(1, samples: Self.samples(token: 1, count: 4), sampleRate: 16_000)
+    router.submit(2, samples: [], sampleRate: 16_000)
+    router.submit(3, samples: Self.samples(token: 3, count: 4), sampleRate: 16_000)
+
+    await gate.release(3)
+    await gate.release(1)
+
+    var iterator = appended.makeAsyncIterator()
+    #expect(await iterator.next() == 1)
+    #expect(await iterator.next() == 2)
+    #expect(await iterator.next() == 3)
+    #expect(await gate.snapshot() == [.start(1), .finish(1), .start(3), .finish(3)])
+  }
+
   @Test("should fail open and append the whole window when classification throws")
   func classifierErrorFailsOpenAppendingWholeWindow() async {
     let gate = WindowGate()
@@ -487,13 +559,15 @@ struct UtteranceWindowRouterTests {
 private final class ScriptedSegmenter: SpeechActivitySegmenter {
   private let decisionForToken: [Int: SegmentationDecision]
   private let resets = Mutex(0)
+  private let updates = Mutex(0)
 
   init(_ decisionForToken: [Int: SegmentationDecision]) {
     self.decisionForToken = decisionForToken
   }
 
   func update(block: [Float], sampleRate: Double) -> SegmentationDecision {
-    decisionForToken[Int(block.first ?? -1)] ?? .accumulate
+    updates.withLock { $0 += 1 }
+    return decisionForToken[Int(block.first ?? -1)] ?? .accumulate
   }
 
   func reset() {
@@ -501,6 +575,7 @@ private final class ScriptedSegmenter: SpeechActivitySegmenter {
   }
 
   var resetCount: Int { resets.withLock { $0 } }
+  var updateCallCount: Int { updates.withLock { $0 } }
 }
 
 private struct RouterGeneratedCase: Sendable {

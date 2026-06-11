@@ -15,6 +15,7 @@ struct TranscriptSegment: Identifiable, Equatable, Sendable, Codable {
     case confidence
     case sourceLanguageCode
     case source
+    case isStopCommittedPlaceholder
   }
 
   let id: UUID
@@ -24,6 +25,7 @@ struct TranscriptSegment: Identifiable, Equatable, Sendable, Codable {
   let confidence: Double
   let sourceLanguageCode: String
   let source: Source
+  let isStopCommittedPlaceholder: Bool
 
   init(
     id: UUID = UUID(),
@@ -32,7 +34,8 @@ struct TranscriptSegment: Identifiable, Equatable, Sendable, Codable {
     translatedText: String? = nil,
     confidence: Double,
     sourceLanguageCode: String,
-    source: Source
+    source: Source,
+    isStopCommittedPlaceholder: Bool = false
   ) {
     self.id = id
     self.startedAt = startedAt
@@ -41,10 +44,11 @@ struct TranscriptSegment: Identifiable, Equatable, Sendable, Codable {
     self.confidence = confidence
     self.sourceLanguageCode = sourceLanguageCode
     self.source = source
+    self.isStopCommittedPlaceholder = isStopCommittedPlaceholder
   }
 
   var requiresVerification: Bool {
-    confidence < 0.82
+    isStopCommittedPlaceholder || confidence < 0.82
   }
 
   init(from decoder: Decoder) throws {
@@ -65,6 +69,8 @@ struct TranscriptSegment: Identifiable, Equatable, Sendable, Codable {
       )
     }
     source = decodedSource
+    isStopCommittedPlaceholder =
+      try container.decodeIfPresent(Bool.self, forKey: .isStopCommittedPlaceholder) ?? false
   }
 
   func encode(to encoder: Encoder) throws {
@@ -76,5 +82,6 @@ struct TranscriptSegment: Identifiable, Equatable, Sendable, Codable {
     try container.encode(confidence, forKey: .confidence)
     try container.encode(sourceLanguageCode, forKey: .sourceLanguageCode)
     try container.encode(source.rawValue, forKey: .source)
+    try container.encode(isStopCommittedPlaceholder, forKey: .isStopCommittedPlaceholder)
   }
 }

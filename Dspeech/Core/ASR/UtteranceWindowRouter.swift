@@ -21,7 +21,12 @@ final class UtteranceWindowRouter<Buffer> {
   ) {
     self.segmenter = segmenter
     self.inner = SerialBufferRouter<[Buffer]>(
-      classify: classify,
+      classify: { samples, sampleRate in
+        guard !samples.isEmpty, sampleRate > 0 else {
+          return .transcribe(reason: .classifierUnavailable)
+        }
+        return try await classify(samples, sampleRate)
+      },
       // why: one classification decides the whole window — every buffer in
       // the chunk is appended together, in capture order, or none is.
       append: { chunk in for buffer in chunk { append(buffer) } }
@@ -30,6 +35,11 @@ final class UtteranceWindowRouter<Buffer> {
 
   func submit(_ buffer: Buffer, samples: [Float], sampleRate: Double) {
     guard !finished else { return }
+    guard !samples.isEmpty, sampleRate > 0 else {
+      flushPendingFailOpen()
+      inner.submit([buffer], samples: [], sampleRate: 0)
+      return
+    }
     pending.append(Pending(buffer: buffer, samples: samples, sampleRate: sampleRate))
     // why: the segmenter decides the window boundary from speech/silence shape,
     // not a fixed sample count — so a window straddling a pilot→dispatcher PTT
@@ -48,13 +58,19 @@ final class UtteranceWindowRouter<Buffer> {
     // Enqueue it through the serial router before finalizing so an earlier cut
     // window still classifying fail-opens ahead of it instead of being dropped.
     let tailBuffers = pending.map(\.buffer)
-    let tailSamples = pending.flatMap(\.samples)
-    let tailSampleRate = pending.last?.sampleRate ?? 0
     pending.removeAll()
     if !tailBuffers.isEmpty {
-      inner.submit(tailBuffers, samples: tailSamples, sampleRate: tailSampleRate)
+      inner.submit(tailBuffers, samples: [], sampleRate: 0)
     }
     inner.finish()
+  }
+
+  private func flushPendingFailOpen() {
+    guard !pending.isEmpty else { return }
+    let buffers = pending.map(\.buffer)
+    pending.removeAll()
+    segmenter.reset()
+    inner.submit(buffers, samples: [], sampleRate: 0)
   }
 
   private func cutChunk() {

@@ -45,6 +45,15 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
   private var router: UtteranceWindowRouter<AVAudioPCMBuffer>?
   private var audioEngine = AVAudioEngine()
   private var engineConfigurationObserver: NSObjectProtocol?
+  private var recognizerAvailabilityDelegate: LiveRecognizerAvailabilityDelegate?
+  private var recognitionCallbackContinuation: AsyncStream<RecognitionCallbackEvent>.Continuation?
+  private var recognitionCallbackTask: Task<Void, Never>?
+  private var replayTail = AudioReplayTail<AVAudioPCMBuffer>(
+    maxDurationSeconds: 1.0,
+    maxBufferCount: 96
+  )
+  private var restartLoopGuard = ASRRestartLoopGuard(maxRestartCount: 5, window: .seconds(10))
+  private let restartClock = ContinuousClock()
 
   // why: the segmenter cuts a decision window at a trailing-silence utterance edge
   // (>= minSilence after >= minSpeech of speech) or, failing that, at this
@@ -53,7 +62,7 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
   private static let decisionWindowSeconds = 1.0
   private static let minSpeechSeconds = 0.25
   private static let minSilenceSeconds = 0.40
-  private var continuation: AsyncStream<LiveTranscriptionEvent>.Continuation?
+  private var eventContinuations: [UUID: AsyncStream<LiveTranscriptionEvent>.Continuation] = [:]
 
   // why: the realtime audio tap must never touch @MainActor state synchronously —
   // doing so trips swift_task_isCurrentExecutor -> dispatch_assert_queue_fail on the
@@ -105,11 +114,12 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
 
   func events() -> AsyncStream<LiveTranscriptionEvent> {
     AsyncStream<LiveTranscriptionEvent> { continuation in
-      self.continuation = continuation
+      let id = UUID()
+      self.eventContinuations[id] = continuation
       continuation.yield(.status(self.status))
       continuation.onTermination = { [weak self] _ in
         Task { @MainActor [weak self] in
-          self?.stop()
+          self?.removeEventSubscriber(id: id)
         }
       }
     }
@@ -157,29 +167,61 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     DspeechLog.engine.info(
       "live transcription configuring recognizer locale=\(localeID, privacy: .public) requireOnDeviceModel=\(self.requireOnDeviceModel, privacy: .public)"
     )
-    // why: under the skip-permission test seam, tolerate a nil/unavailable recognizer so
-    // the audio-capture path is still exercised (a Simulator may report it unavailable).
     let recognizer = SFSpeechRecognizer(locale: locale)
-    if !skipPermissionRequests {
-      guard let recognizer, recognizer.isAvailable else {
-        guard isCurrentStartup(generation) else { return }
-        DspeechLog.engine.error(
-          "live transcription start failed slug=recognizer-unavailable locale=\(localeID, privacy: .public)"
+    if let recognizer {
+      let firstRead = RecognizerCapabilityRead(
+        isAvailable: recognizer.isAvailable,
+        supportsOnDeviceRecognition: recognizer.supportsOnDeviceRecognition
+      )
+      let secondRead: RecognizerCapabilityRead?
+      if Self.startupGateDecision(
+        firstRead: firstRead,
+        secondRead: nil,
+        requireOnDeviceModel: requireOnDeviceModel,
+        skipPermissionRequests: skipPermissionRequests
+      ) == .ready {
+        secondRead = nil
+      } else {
+        await Task.yield()
+        secondRead = RecognizerCapabilityRead(
+          isAvailable: recognizer.isAvailable,
+          supportsOnDeviceRecognition: recognizer.supportsOnDeviceRecognition
         )
-        status = .failed("recognizer-unavailable")
+      }
+      guard isCurrentStartup(generation) else { return }
+      switch Self.startupGateDecision(
+        firstRead: firstRead,
+        secondRead: secondRead,
+        requireOnDeviceModel: requireOnDeviceModel,
+        skipPermissionRequests: skipPermissionRequests
+      ) {
+      case .ready:
+        break
+      case .fail(let slug):
+        DspeechLog.engine.error(
+          "live transcription start failed slug=\(slug, privacy: .public) locale=\(localeID, privacy: .public)"
+        )
+        if slug == "on-device-model-missing" {
+          status = .failed("on-device-model-missing: \(localeID)")
+        } else {
+          status = .failed(slug)
+        }
         return
       }
-    }
-    // why: requiresOnDeviceRecognition=true (privacy: local-only) errors immediately
-    // if the locale's on-device dictation asset is not provisioned. Check up front
-    // on every platform, including Simulator, so the normal LOCAL UI never falls
-    // back to Apple's server Speech path.
-    if requireOnDeviceModel {
-      guard let recognizer, recognizer.supportsOnDeviceRecognition else {
+      let availabilityDelegate = LiveRecognizerAvailabilityDelegate(engine: self)
+      recognizer.delegate = availabilityDelegate
+      recognizerAvailabilityDelegate = availabilityDelegate
+    } else {
+      guard skipPermissionRequests && !requireOnDeviceModel else {
+        let slug = skipPermissionRequests ? "on-device-model-missing" : "recognizer-unavailable"
         DspeechLog.engine.error(
-          "live transcription start failed slug=on-device-model-missing locale=\(localeID, privacy: .public)"
+          "live transcription start failed slug=\(slug, privacy: .public) locale=\(localeID, privacy: .public)"
         )
-        status = .failed("on-device-model-missing: \(localeID)")
+        if slug == "on-device-model-missing" {
+          status = .failed("on-device-model-missing: \(localeID)")
+        } else {
+          status = .failed(slug)
+        }
         return
       }
     }
@@ -411,6 +453,7 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
   // replaced WITHOUT tearing down the mic + tap — keeping live transcription continuous
   // instead of stopping after the first utterance or the first beat of silence.
   private func installRecognition(recognizer: SFSpeechRecognizer) {
+    teardownRecognitionCallbackConduit()
     let request = SFSpeechAudioBufferRecognitionRequest()
     request.shouldReportPartialResults = true
     request.requiresOnDeviceRecognition = Self.liveRequestsRequireOnDeviceRecognition
@@ -428,9 +471,10 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
 
     taskGeneration += 1
     let generation = taskGeneration
-    let localePrefix = String(activeLocaleIdentifier.prefix(2))
+    let sourceLanguageCode = Self.sourceLanguageCode(for: activeLocaleIdentifier)
+    let callbackContinuation = installRecognitionCallbackConduit(generation: generation)
 
-    task = recognizer.recognitionTask(with: request) { @Sendable [weak self] result, error in
+    task = recognizer.recognitionTask(with: request) { @Sendable result, error in
       let failure: ASRFailure? = (error as NSError?).map {
         ASRFailure(domain: $0.domain, code: $0.code, message: $0.localizedDescription)
       }
@@ -441,6 +485,7 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
       }
       let event: LiveTranscriptionEvent?
       let isFinal: Bool
+      let hasResult = result != nil
       if let result {
         let raw = result.bestTranscription.formattedString
         if result.isFinal {
@@ -453,7 +498,7 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
               text: trimmed,
               translatedText: nil,
               confidence: confidence,
-              sourceLanguageCode: localePrefix,
+              sourceLanguageCode: sourceLanguageCode,
               source: .liveATC
             )
             event = .segment(segment)
@@ -468,15 +513,51 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
         event = nil
         isFinal = false
       }
-      Task { @MainActor [weak self] in
-        // why: ignore callbacks from a superseded task — restart/cleanup bump the
-        // generation, so a cancelled task can't flip state for the live session.
-        guard let self, self.taskGeneration == generation else { return }
-        if let event { self.emit(event) }
-        if isFinal || failure != nil {
-          self.handleTermination(failure: failure)
-        }
+      callbackContinuation.yield(
+        RecognitionCallbackEvent(
+          generation: generation,
+          event: event,
+          isFinal: isFinal,
+          failure: failure,
+          hasResult: hasResult
+        ))
+    }
+    for buffer in replayTail.buffers {
+      request.append(buffer)
+    }
+  }
+
+  private func installRecognitionCallbackConduit(
+    generation: Int
+  ) -> AsyncStream<RecognitionCallbackEvent>.Continuation {
+    let (stream, continuation) = AsyncStream<RecognitionCallbackEvent>.makeStream(
+      bufferingPolicy: .unbounded
+    )
+    recognitionCallbackContinuation = continuation
+    recognitionCallbackTask = Task { @MainActor [weak self] in
+      for await callback in stream {
+        guard let self, self.taskGeneration == generation else { continue }
+        self.handleRecognitionCallback(callback)
       }
+    }
+    return continuation
+  }
+
+  private func teardownRecognitionCallbackConduit() {
+    recognitionCallbackContinuation?.finish()
+    recognitionCallbackContinuation = nil
+    recognitionCallbackTask?.cancel()
+    recognitionCallbackTask = nil
+  }
+
+  private func handleRecognitionCallback(_ callback: RecognitionCallbackEvent) {
+    guard taskGeneration == callback.generation else { return }
+    if callback.hasResult || callback.event != nil {
+      restartLoopGuard.recordResult()
+    }
+    if let event = callback.event { emit(event) }
+    if callback.isFinal || callback.failure != nil {
+      handleTermination(failure: callback.failure)
     }
   }
 
@@ -499,6 +580,17 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
       status = .failed(message)
     case .restart:
       DspeechLog.engine.info("recognition task termination decision=restart")
+      switch restartLoopGuard.recordRestart(now: restartClock.now) {
+      case .allow:
+        break
+      case .fail(let message):
+        DspeechLog.engine.error(
+          "recognition task termination decision=fail slug=\(message, privacy: .public)"
+        )
+        cleanup()
+        status = .failed(message)
+        return
+      }
       guard let recognizer else { return }
       restartRecognition(recognizer: recognizer)
     }
@@ -514,10 +606,34 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     failure: ASRFailure?
   ) -> RecognitionTerminationDecision {
     guard isListening, hasRecognizer else { return .ignore }
-    if let failure, !failure.isBenignNoSpeech {
+    if let failure, !failure.isBenignRestart {
       return .fail("asr-error: \(failure.domain)#\(failure.code) \(failure.message)")
     }
     return .restart
+  }
+
+  static func startupGateDecision(
+    firstRead: RecognizerCapabilityRead,
+    secondRead: RecognizerCapabilityRead?,
+    requireOnDeviceModel: Bool,
+    skipPermissionRequests: Bool
+  ) -> RecognizerStartupGateDecision {
+    let read =
+      firstRead.isReady(
+        requireOnDeviceModel: requireOnDeviceModel,
+        skipPermissionRequests: skipPermissionRequests
+      ) ? firstRead : secondRead ?? firstRead
+    if !skipPermissionRequests, !read.isAvailable {
+      return .fail("recognizer-unavailable")
+    }
+    if requireOnDeviceModel, !read.supportsOnDeviceRecognition {
+      return .fail("on-device-model-missing")
+    }
+    return .ready
+  }
+
+  static func sourceLanguageCode(for localeIdentifier: String) -> String {
+    Locale(identifier: localeIdentifier).language.languageCode?.identifier ?? localeIdentifier
   }
 
   static func restartDecision(
@@ -574,6 +690,11 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
   }
 
   private func routeCaptured(_ captured: CapturedAudioBuffer) {
+    replayTail.append(
+      captured.buffer,
+      sampleCount: Int(captured.buffer.frameLength),
+      sampleRate: captured.sampleRate
+    )
     guard let router else {
       request?.append(captured.buffer)
       return
@@ -629,8 +750,7 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     let segments = transcription.segments
     guard !segments.isEmpty else { return 0.0 }
     let total = segments.reduce(0.0) { $0 + Double($1.confidence) }
-    let avg = total / Double(segments.count)
-    return avg > 0 ? avg : 0.5
+    return total / Double(segments.count)
   }
 
   @discardableResult
@@ -638,7 +758,10 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     DspeechLog.engine.info("live transcription cleanup started")
     lifecycleGeneration += 1
     taskGeneration += 1
+    teardownRecognitionCallbackConduit()
     removeEngineConfigurationObserver()
+    recognizer?.delegate = nil
+    recognizerAvailabilityDelegate = nil
     if audioEngine.isRunning {
       audioEngine.stop()
     }
@@ -657,6 +780,9 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     task?.cancel()
     task = nil
     request = nil
+    recognizer = nil
+    replayTail.removeAll()
+    restartLoopGuard.recordResult()
     var deactivationFailure: String?
     if arbiter.release(.liveTranscription) {
       DspeechLog.engine.info("live audio session deactivation requested")
@@ -675,7 +801,25 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
   }
 
   private func emit(_ event: LiveTranscriptionEvent) {
-    continuation?.yield(event)
+    for continuation in eventContinuations.values {
+      continuation.yield(event)
+    }
+  }
+
+  private func removeEventSubscriber(id: UUID) {
+    eventContinuations[id] = nil
+    if eventContinuations.isEmpty {
+      stop()
+    }
+  }
+
+  fileprivate func handleRecognizerAvailabilityChange(isAvailable: Bool) {
+    guard status == .listening, !isAvailable else { return }
+    DspeechLog.engine.error(
+      "recognizer availability changed unavailable slug=recognizer-became-unavailable"
+    )
+    cleanup()
+    status = .failed("recognizer-became-unavailable")
   }
 
   fileprivate nonisolated static func requestSpeechAuthorization() async -> Bool {
@@ -699,6 +843,36 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
         _ = arbiter.acquire(.liveTranscription)
       }
       status = .listening
+    }
+
+    func simulateRecognizerAvailabilityChangeForTesting(_ isAvailable: Bool) {
+      handleRecognizerAvailabilityChange(isAvailable: isAvailable)
+    }
+
+    func installRecognitionCallbackConduitForTesting(generation: Int) {
+      taskGeneration = generation
+      _ = installRecognitionCallbackConduit(generation: generation)
+    }
+
+    func emitRecognitionCallbackForTesting(
+      generation: Int,
+      event: LiveTranscriptionEvent?,
+      isFinal: Bool,
+      failure: ASRFailure? = nil,
+      hasResult: Bool
+    ) {
+      recognitionCallbackContinuation?.yield(
+        RecognitionCallbackEvent(
+          generation: generation,
+          event: event,
+          isFinal: isFinal,
+          failure: failure,
+          hasResult: hasResult
+        ))
+    }
+
+    func advanceTaskGenerationForTesting() {
+      taskGeneration += 1
     }
   #endif
 }
@@ -817,14 +991,140 @@ enum RecognitionRestartDecision: Equatable, Sendable {
   case fail(String)
 }
 
+struct RecognizerCapabilityRead: Equatable, Sendable {
+  let isAvailable: Bool
+  let supportsOnDeviceRecognition: Bool
+
+  func isReady(requireOnDeviceModel: Bool, skipPermissionRequests: Bool) -> Bool {
+    (skipPermissionRequests || isAvailable)
+      && (!requireOnDeviceModel || supportsOnDeviceRecognition)
+  }
+}
+
+enum RecognizerStartupGateDecision: Equatable, Sendable {
+  case ready
+  case fail(String)
+}
+
+enum ASRRestartLoopDecision: Equatable, Sendable {
+  case allow
+  case fail(String)
+}
+
+struct ASRRestartLoopGuard: Sendable {
+  let maxRestartCount: Int
+  let window: Duration
+  private var restartInstants: [ContinuousClock.Instant] = []
+
+  init(maxRestartCount: Int, window: Duration) {
+    self.maxRestartCount = maxRestartCount
+    self.window = window
+  }
+
+  mutating func recordResult() {
+    restartInstants.removeAll()
+  }
+
+  mutating func recordRestart(now: ContinuousClock.Instant) -> ASRRestartLoopDecision {
+    restartInstants = restartInstants.filter { $0.duration(to: now) <= window }
+    restartInstants.append(now)
+    if restartInstants.count > maxRestartCount {
+      return .fail("asr-restart-loop")
+    }
+    return .allow
+  }
+}
+
+struct AudioReplayTail<Buffer> {
+  private struct Entry {
+    let buffer: Buffer
+    let durationSeconds: Double
+  }
+
+  private let maxDurationSeconds: Double
+  private let maxBufferCount: Int
+  private var entries: [Entry] = []
+
+  init(maxDurationSeconds: Double, maxBufferCount: Int) {
+    self.maxDurationSeconds = max(0, maxDurationSeconds)
+    self.maxBufferCount = max(0, maxBufferCount)
+  }
+
+  var buffers: [Buffer] {
+    entries.map(\.buffer)
+  }
+
+  mutating func append(_ buffer: Buffer, sampleCount: Int, sampleRate: Double) {
+    guard sampleCount > 0, sampleRate > 0, maxBufferCount > 0, maxDurationSeconds > 0 else {
+      return
+    }
+    entries.append(Entry(buffer: buffer, durationSeconds: Double(sampleCount) / sampleRate))
+    trim()
+  }
+
+  mutating func removeAll() {
+    entries.removeAll()
+  }
+
+  private mutating func trim() {
+    while entries.count > maxBufferCount {
+      entries.removeFirst()
+    }
+    while totalDurationSeconds > maxDurationSeconds, !entries.isEmpty {
+      entries.removeFirst()
+    }
+  }
+
+  private var totalDurationSeconds: Double {
+    entries.reduce(0) { $0 + $1.durationSeconds }
+  }
+}
+
+private struct RecognitionCallbackEvent: Sendable {
+  let generation: Int
+  let event: LiveTranscriptionEvent?
+  let isFinal: Bool
+  let failure: ASRFailure?
+  let hasResult: Bool
+}
+
 struct ASRFailure: Equatable, Sendable {
   let domain: String
   let code: Int
   let message: String
 
-  // why: kAFAssistantErrorDomain code 1110 = "No speech detected" — a silence timeout,
-  // not a fault; let the session restart and keep listening rather than show .failed.
-  var isBenignNoSpeech: Bool {
-    domain == "kAFAssistantErrorDomain" && code == 1110
+  // why: these terminations mean the current Apple Speech request ended, not that live capture
+  // is dead. Restart the request, but the engine-level restart-loop guard still fails loudly if
+  // they repeat without any recognized result.
+  var isBenignRestart: Bool {
+    if domain == "kAFAssistantErrorDomain", code == 1110 { return true }
+    if domain == "kAFAssistantErrorDomain", code == 203 {
+      return message.localizedCaseInsensitiveContains("retry")
+    }
+    if domain == "SFSpeechErrorDomain" {
+      let lowercased = message.lowercased()
+      return lowercased.contains("duration limit")
+        || lowercased.contains("request timed out")
+        || lowercased.contains("request-timeout")
+        || lowercased.contains("timed out")
+    }
+    return false
+  }
+}
+
+private final class LiveRecognizerAvailabilityDelegate: NSObject, SFSpeechRecognizerDelegate {
+  weak var engine: AppleSpeechLiveTranscriptionEngine?
+
+  init(engine: AppleSpeechLiveTranscriptionEngine) {
+    self.engine = engine
+  }
+
+  nonisolated func speechRecognizer(
+    _ speechRecognizer: SFSpeechRecognizer,
+    availabilityDidChange available: Bool
+  ) {
+    Task { @MainActor [weak engine] in
+      engine?.handleRecognizerAvailabilityChange(isAvailable: available)
+    }
   }
 }

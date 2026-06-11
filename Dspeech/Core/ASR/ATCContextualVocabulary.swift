@@ -13,6 +13,10 @@ enum ATCContextualVocabulary {
     "Sierra", "Tango", "Uniform", "Victor", "Whiskey", "X-ray", "Yankee", "Zulu",
   ]
 
+  static let digitWords = [
+    "Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Niner",
+  ]
+
   static let phraseology = [
     "cleared for takeoff", "cleared to land", "line up and wait", "hold short",
     "taxi to holding point", "contact tower", "contact ground", "contact approach",
@@ -22,13 +26,30 @@ enum ATCContextualVocabulary {
     "vacate", "expedite", "traffic", "say again", "niner", "decimal",
   ]
 
+  private static let phoneticDisplayNames: [String: String] = {
+    let words = icaoAlphabet + digitWords
+    var result = Dictionary(uniqueKeysWithValues: words.map { ($0.uppercased(), $0) })
+    result["XRAY"] = "X-ray"
+    return result
+  }()
+
   // why: a caller-supplied aircraft callsign is the single highest-value contextual
   // hint (a proper noun the general LM has never seen); appended when known.
   static func strings(callSign: String? = nil) -> [String] {
-    var result = icaoAlphabet + phraseology
+    var result = icaoAlphabet + digitWords + phraseology
     if let callSign, !callSign.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-      result.append(callSign)
+      let trimmed = callSign.trimmingCharacters(in: .whitespacesAndNewlines)
+      if let parsed = CallSign(raw: trimmed) {
+        result.append(parsed.normalized)
+        let spoken = parsed.phoneticTokens.map { phoneticDisplayNames[$0] ?? $0 }.joined(
+          separator: " ")
+        if !spoken.isEmpty { result.append(spoken) }
+      } else {
+        result.append(trimmed)
+      }
     }
-    return result
+    return result.reduce(into: []) { unique, value in
+      if !unique.contains(value) { unique.append(value) }
+    }
   }
 }

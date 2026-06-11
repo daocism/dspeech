@@ -282,6 +282,8 @@ struct LiveTranscriptionViewModelTests {
     // the partial is committed as a segment instead of vanishing on Stop
     #expect(vm.segments.count == 1)
     #expect(vm.segments.first?.text == "descend and maintain three thousand")
+    #expect(vm.segments.first?.isStopCommittedPlaceholder == true)
+    #expect(vm.segments.first?.requiresVerification == true)
     #expect(vm.visibleSegments.count == 1)
   }
 
@@ -295,11 +297,44 @@ struct LiveTranscriptionViewModelTests {
     vm.stop()
     await wait(for: { vm.segments.count == 1 })
     #expect(vm.segments.first?.confidence == 0)
+    #expect(vm.segments.first?.isStopCommittedPlaceholder == true)
     // …then the recognizer's real final for the SAME utterance arrives a beat later.
     engine.push(.segment(makeSegment("November one two three alpha bravo", confidence: 0.91)))
     await wait(for: { (vm.segments.first?.confidence ?? 0) > 0 })
     #expect(vm.segments.count == 1)
     #expect(vm.segments.first?.confidence == 0.91)
+    #expect(vm.segments.first?.isStopCommittedPlaceholder == false)
+  }
+
+  @Test func lateZeroConfidenceFinalAfterStopReplacesPlaceholderByFlag() async {
+    let engine = FakeEngine()
+    let vm = LiveTranscriptionViewModel(engine: engine)
+    await vm.start()
+    engine.push(.partial("November one two three alpha bravo"))
+    await wait(for: { vm.partialText == "November one two three alpha bravo" })
+    vm.stop()
+    await wait(for: { vm.segments.count == 1 })
+    #expect(vm.segments.first?.isStopCommittedPlaceholder == true)
+
+    engine.push(.segment(makeSegment("November one two three alpha bravo", confidence: 0)))
+    await wait(for: { vm.segments.first?.isStopCommittedPlaceholder == false })
+
+    #expect(vm.segments.count == 1)
+    #expect(vm.segments.first?.confidence == 0)
+  }
+
+  @Test func realZeroConfidenceFinalIsNotTreatedAsStopPlaceholder() async {
+    let engine = FakeEngine()
+    let vm = LiveTranscriptionViewModel(engine: engine)
+    await vm.start()
+    engine.push(.segment(makeSegment("November one two three alpha bravo", confidence: 0)))
+    await wait(for: { vm.segments.count == 1 })
+
+    engine.push(.segment(makeSegment("November one two three alpha bravo", confidence: 0.91)))
+    await wait(for: { vm.segments.count == 2 })
+
+    #expect(vm.segments.count == 2)
+    #expect(vm.segments.first?.isStopCommittedPlaceholder == false)
   }
 
   @Test func distinctFinalAfterStopIsNotMergedIntoPlaceholder() async {
@@ -383,6 +418,21 @@ struct LiveTranscriptionViewModelTests {
     engine.push(.segment(demo))
     #expect(await wait(for: { vm.segments.count == 1 }))
 
+    #expect(store.appendedSegments.isEmpty)
+  }
+
+  @Test func persistenceSkipsStopCommittedPlaceholders() async {
+    let engine = FakeEngine()
+    let store = FakeTranscriptStore()
+    let vm = LiveTranscriptionViewModel(engine: engine, transcriptStore: store)
+    await vm.start()
+    engine.push(.partial("hold short runway two seven"))
+    await wait(for: { vm.partialText == "hold short runway two seven" })
+
+    vm.stop()
+    await wait(for: { vm.segments.count == 1 && vm.status == .stopped })
+
+    #expect(vm.segments.first?.isStopCommittedPlaceholder == true)
     #expect(store.appendedSegments.isEmpty)
   }
 

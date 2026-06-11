@@ -14,6 +14,15 @@ protocol OnDeviceLocaleAvailability: Sendable {
 }
 
 enum OnDeviceLocaleResolver {
+  static func speechRecognizerCapableLocales(
+    recognizerSupported: Set<Locale>,
+    onDeviceSupported: Set<Locale>
+  ) -> Set<Locale> {
+    guard !onDeviceSupported.isEmpty else { return [] }
+    let onDeviceKeys = Set(onDeviceSupported.map { $0.identifier(.bcp47) })
+    return recognizerSupported.filter { onDeviceKeys.contains($0.identifier(.bcp47)) }
+  }
+
   static func capableLocales(
     recognizerSupported: Set<Locale>,
     onDeviceSupported: Set<Locale>
@@ -28,6 +37,23 @@ enum OnDeviceLocaleResolver {
   }
 }
 
+enum OnDeviceDownloadPoller {
+  static func isDownloaded(
+    attempts: Int = 6,
+    supportsOnDeviceRecognition: @Sendable () -> Bool,
+    sleep: @Sendable () async throws -> Void = {
+      try await Task.sleep(nanoseconds: 200_000_000)
+    }
+  ) async throws -> Bool {
+    for attempt in 0..<attempts {
+      if supportsOnDeviceRecognition() { return true }
+      guard attempt < attempts - 1 else { break }
+      try await sleep()
+    }
+    return false
+  }
+}
+
 struct SystemOnDeviceLocaleAvailability: OnDeviceLocaleAvailability {
   func capableLocales() async -> Set<Locale> {
     let recognizerSupported = SFSpeechRecognizer.supportedLocales()
@@ -36,7 +62,7 @@ struct SystemOnDeviceLocaleAvailability: OnDeviceLocaleAvailability {
     // (SFSpeechRecognizer) can actually use. Compare by BCP-47 — SpeechTranscriber locales
     // may carry different region/script decoration than the recognizer's.
     let onDevice = await SpeechTranscriber.supportedLocales
-    return OnDeviceLocaleResolver.capableLocales(
+    return OnDeviceLocaleResolver.speechRecognizerCapableLocales(
       recognizerSupported: recognizerSupported,
       onDeviceSupported: Set(onDevice))
   }
@@ -48,10 +74,13 @@ struct SystemOnDeviceLocaleAvailability: OnDeviceLocaleAvailability {
     // Don't also require isAvailable: that conflates "model downloaded" with "authorized /
     // online" and would falsely flag a downloaded language as needing download before speech
     // authorization resolves.
-    for _ in 0..<6 {
-      if recognizer.supportsOnDeviceRecognition { return true }
-      try? await Task.sleep(nanoseconds: 200_000_000)
+    do {
+      return try await OnDeviceDownloadPoller.isDownloaded(
+        supportsOnDeviceRecognition: { recognizer.supportsOnDeviceRecognition })
+    } catch is CancellationError {
+      return false
+    } catch {
+      return false
     }
-    return false
   }
 }

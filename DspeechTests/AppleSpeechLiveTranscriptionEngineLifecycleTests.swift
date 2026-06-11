@@ -88,11 +88,38 @@ struct AppleSpeechLiveTranscriptionEngineLifecycleTests {
         isListening: true, hasRecognizer: true, failure: failure) == .restart)
   }
 
-  @Test func realRecognitionFaultSurfacesAsFailure() {
+  @Test func retryAssetHiccupRestarts() {
     let failure = ASRFailure(domain: "kAFAssistantErrorDomain", code: 203, message: "Retry")
+    #expect(
+      AppleSpeechLiveTranscriptionEngine.terminationDecision(
+        isListening: true, hasRecognizer: true, failure: failure) == .restart)
+  }
+
+  @Test func requestTimedOutTerminationRestarts() {
+    let failure = ASRFailure(
+      domain: "SFSpeechErrorDomain",
+      code: 1,
+      message: "Recognition request timed out.")
+    #expect(
+      AppleSpeechLiveTranscriptionEngine.terminationDecision(
+        isListening: true, hasRecognizer: true, failure: failure) == .restart)
+  }
+
+  @Test func durationLimitTerminationRestarts() {
+    let failure = ASRFailure(
+      domain: "SFSpeechErrorDomain",
+      code: 1,
+      message: "Recognition duration limit was reached.")
+    #expect(
+      AppleSpeechLiveTranscriptionEngine.terminationDecision(
+        isListening: true, hasRecognizer: true, failure: failure) == .restart)
+  }
+
+  @Test func realRecognitionFaultSurfacesAsFailure() {
+    let failure = ASRFailure(domain: "kAFAssistantErrorDomain", code: 203, message: "Asset failed")
     let decision = AppleSpeechLiveTranscriptionEngine.terminationDecision(
       isListening: true, hasRecognizer: true, failure: failure)
-    #expect(decision == .fail("asr-error: kAFAssistantErrorDomain#203 Retry"))
+    #expect(decision == .fail("asr-error: kAFAssistantErrorDomain#203 Asset failed"))
   }
 
   @Test func normalFinalWithNoFailureRestarts() {
@@ -119,6 +146,168 @@ struct AppleSpeechLiveTranscriptionEngineLifecycleTests {
       AppleSpeechLiveTranscriptionEngine.restartDecision(
         isListening: true, isAudioEngineRunning: false)
         == .fail("engine-died-before-restart"))
+  }
+
+  @Test func restartLoopGuardFailsAfterTooManyRestartsWithoutResults() {
+    let clock = ContinuousClock()
+    let start = clock.now
+    var guardState = ASRRestartLoopGuard(maxRestartCount: 5, window: .seconds(10))
+
+    for offset in 0..<5 {
+      #expect(guardState.recordRestart(now: start.advanced(by: .seconds(offset))) == .allow)
+    }
+
+    #expect(
+      guardState.recordRestart(now: start.advanced(by: .seconds(5)))
+        == .fail("asr-restart-loop"))
+  }
+
+  @Test func restartLoopGuardResetsAfterAnyRecognitionResult() {
+    let clock = ContinuousClock()
+    let start = clock.now
+    var guardState = ASRRestartLoopGuard(maxRestartCount: 5, window: .seconds(10))
+
+    for offset in 0..<5 {
+      #expect(guardState.recordRestart(now: start.advanced(by: .seconds(offset))) == .allow)
+    }
+    guardState.recordResult()
+
+    #expect(guardState.recordRestart(now: start.advanced(by: .seconds(6))) == .allow)
+  }
+
+  @Test func restartLoopGuardForgetsRestartsOutsideWindow() {
+    let clock = ContinuousClock()
+    let start = clock.now
+    var guardState = ASRRestartLoopGuard(maxRestartCount: 5, window: .seconds(10))
+
+    for offset in 0..<5 {
+      #expect(guardState.recordRestart(now: start.advanced(by: .seconds(offset))) == .allow)
+    }
+
+    #expect(guardState.recordRestart(now: start.advanced(by: .seconds(11))) == .allow)
+  }
+
+  @Test func startupGateRetriesTransientUnsupportedRead() {
+    let first = RecognizerCapabilityRead(isAvailable: true, supportsOnDeviceRecognition: false)
+    let second = RecognizerCapabilityRead(isAvailable: true, supportsOnDeviceRecognition: true)
+
+    #expect(
+      AppleSpeechLiveTranscriptionEngine.startupGateDecision(
+        firstRead: first,
+        secondRead: second,
+        requireOnDeviceModel: true,
+        skipPermissionRequests: false
+      ) == .ready)
+  }
+
+  @Test func startupGateFailsAfterRepeatedUnsupportedRead() {
+    let first = RecognizerCapabilityRead(isAvailable: true, supportsOnDeviceRecognition: false)
+    let second = RecognizerCapabilityRead(isAvailable: true, supportsOnDeviceRecognition: false)
+
+    #expect(
+      AppleSpeechLiveTranscriptionEngine.startupGateDecision(
+        firstRead: first,
+        secondRead: second,
+        requireOnDeviceModel: true,
+        skipPermissionRequests: false
+      ) == .fail("on-device-model-missing"))
+  }
+
+  @Test func sourceLanguageCodeKeepsThreeLetterLanguageCodes() {
+    #expect(AppleSpeechLiveTranscriptionEngine.sourceLanguageCode(for: "yue-Hant-HK") == "yue")
+  }
+
+  @Test func replayTailKeepsOnlyBoundedRecentBuffers() {
+    var tail = AudioReplayTail<Int>(maxDurationSeconds: 1, maxBufferCount: 4)
+
+    tail.append(1, sampleCount: 16_000, sampleRate: 16_000)
+    tail.append(2, sampleCount: 8_000, sampleRate: 16_000)
+    tail.append(3, sampleCount: 8_000, sampleRate: 16_000)
+    tail.append(4, sampleCount: 8_000, sampleRate: 16_000)
+
+    #expect(tail.buffers == [3, 4])
+  }
+
+  @Test func replayTailDropsOldestBuffersWhenCountBoundIsHit() {
+    var tail = AudioReplayTail<Int>(maxDurationSeconds: 10, maxBufferCount: 2)
+
+    tail.append(1, sampleCount: 1, sampleRate: 16_000)
+    tail.append(2, sampleCount: 1, sampleRate: 16_000)
+    tail.append(3, sampleCount: 1, sampleRate: 16_000)
+
+    #expect(tail.buffers == [2, 3])
+  }
+
+  @Test func eventsMulticastToMultipleSubscribers() async {
+    let engine = AppleSpeechLiveTranscriptionEngine(
+      requireOnDeviceModel: false,
+      skipPermissionRequests: true,
+      audioSession: SpyLiveAudioSession()
+    )
+    let first = EventCursor(engine.events())
+    let second = EventCursor(engine.events())
+
+    #expect(await first.nextStatus() == .idle)
+    #expect(await second.nextStatus() == .idle)
+
+    engine.primeListeningForTesting(acquireCapture: false)
+
+    #expect(await first.nextStatus() == .listening)
+    #expect(await second.nextStatus() == .listening)
+  }
+
+  @Test func recognizerUnavailableWhileListeningFailsVisibly() {
+    let engine = AppleSpeechLiveTranscriptionEngine(
+      requireOnDeviceModel: false,
+      skipPermissionRequests: true,
+      audioSession: SpyLiveAudioSession()
+    )
+    engine.primeListeningForTesting(acquireCapture: true)
+
+    engine.simulateRecognizerAvailabilityChangeForTesting(false)
+
+    #expect(engine.status == .failed("recognizer-became-unavailable"))
+  }
+
+  @Test func orderedCallbackConduitDropsStalePartialAfterFinalRestart() async {
+    let engine = AppleSpeechLiveTranscriptionEngine(
+      requireOnDeviceModel: false,
+      skipPermissionRequests: true,
+      audioSession: SpyLiveAudioSession()
+    )
+    let recorder = EventRecorder()
+    let collector = Task { @MainActor in
+      for await event in engine.events() {
+        await recorder.record(event)
+      }
+    }
+    engine.installRecognitionCallbackConduitForTesting(generation: 7)
+    let final = TranscriptSegment(
+      text: "November one two three alpha bravo",
+      confidence: 0.9,
+      sourceLanguageCode: "en",
+      source: .liveATC
+    )
+
+    engine.emitRecognitionCallbackForTesting(
+      generation: 7,
+      event: .segment(final),
+      isFinal: true,
+      hasResult: true
+    )
+    #expect(await waitForEvent({ await recorder.segmentTexts().contains(final.text) }))
+
+    engine.advanceTaskGenerationForTesting()
+    engine.emitRecognitionCallbackForTesting(
+      generation: 7,
+      event: .partial("stale partial"),
+      isFinal: false,
+      hasResult: true
+    )
+    for _ in 0..<50 { await Task.yield() }
+
+    #expect(!(await recorder.partialTexts().contains("stale partial")))
+    collector.cancel()
   }
 
   @Test func startFailsWhenCaptureSessionIsBusy() async {
@@ -184,6 +373,58 @@ struct AppleSpeechLiveTranscriptionEngineLifecycleTests {
       try? await Task.sleep(nanoseconds: 5_000_000)
     }
     return predicate()
+  }
+
+  // why: a mutating AsyncStream iterator cannot live on an actor under Swift 6 region
+  // isolation; a nonisolated non-Sendable cursor keeps iteration in its own region and is
+  // legally awaited from the MainActor tests.
+  private final class EventCursor {
+    private var iterator: AsyncStream<LiveTranscriptionEvent>.Iterator
+
+    init(_ stream: AsyncStream<LiveTranscriptionEvent>) {
+      iterator = stream.makeAsyncIterator()
+    }
+
+    func nextStatus() async -> LiveTranscriptionStatus? {
+      guard let event = await iterator.next() else { return nil }
+      if case .status(let status) = event { return status }
+      return nil
+    }
+  }
+
+  private func waitForEvent(
+    _ predicate: @escaping () async -> Bool,
+    timeout: Duration = .seconds(5)
+  ) async -> Bool {
+    let clock = ContinuousClock()
+    let deadline = clock.now.advanced(by: timeout)
+    while clock.now < deadline {
+      if await predicate() { return true }
+      await Task.yield()
+    }
+    return await predicate()
+  }
+}
+
+private actor EventRecorder {
+  private var events: [LiveTranscriptionEvent] = []
+
+  func record(_ event: LiveTranscriptionEvent) {
+    events.append(event)
+  }
+
+  func segmentTexts() -> [String] {
+    events.compactMap {
+      if case .segment(let segment) = $0 { return segment.text }
+      return nil
+    }
+  }
+
+  func partialTexts() -> [String] {
+    events.compactMap {
+      if case .partial(let text) = $0 { return text }
+      return nil
+    }
   }
 }
 
