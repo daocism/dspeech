@@ -1,4 +1,10 @@
 import Foundation
+import os
+
+enum DspeechLog {
+  static let subsystem = "com.dspeech.replaykit"
+  static let voiceFilter = Logger(subsystem: subsystem, category: "voice-filter")
+}
 
 enum ReplayKitError: Error, CustomStringConvertible {
   case invalidArguments(String)
@@ -183,37 +189,64 @@ struct PCM16WAVAudioReader: Sendable {
   }
 }
 
-enum SyntheticSpeakerDecision: Sendable {
-  case pilot
-  case nonPilot
-  case mixed
-  case insufficientSpeech
+struct SyntheticReplaySpeakerIdentifier: LocalSpeakerIdentifier {
+  let availability: LocalSpeakerIdentifierAvailability = .available
+  let embeddingDimension = 4
+
+  func enroll(samples: [Float], sampleRate: Double) async throws -> VoicePrintVector {
+    _ = samples
+    _ = sampleRate
+    return VoicePrintVector(values: [1, 0, 0, 0], quality: 0.95)
+  }
+
+  func classify(
+    samples: [Float],
+    sampleRate: Double,
+    profiles: [PilotVoiceProfile]
+  ) async throws -> SpeakerMatchDecision {
+    _ = sampleRate
+    let vector: VoicePrintVector
+    let averageMagnitude = averageMagnitude(samples)
+    if samples.isEmpty {
+      return .insufficientSpeech
+    }
+    if averageMagnitude >= 0.80 {
+      vector = VoicePrintVector(values: [1, 0, 0, 0], quality: 0.95)
+    } else if averageMagnitude >= 0.55 {
+      vector = VoicePrintVector(values: [0.7, 0.7, 0, 0], quality: 0.95)
+    } else {
+      vector = VoicePrintVector(values: [0, 1, 0, 0], quality: 0.95)
+    }
+    return SpeakerMatcher.match(candidate: vector, profiles: profiles)
+  }
+
+  private func averageMagnitude(_ samples: [Float]) -> Float {
+    guard !samples.isEmpty else { return 0 }
+    return samples.reduce(Float(0)) { $0 + abs($1) } / Float(samples.count)
+  }
 }
 
-struct SyntheticReplayFilter: Sendable {
-  let callSign = "n123ab"
+struct ReplayVoiceFilterStorage: VoiceFilterStorage {
+  let profiles: [PilotVoiceProfile]
+  let callSign: CallSign?
+  let config: ATCTranscriptGateConfig
+  let enabled: Bool
 
-  func classify(audio: SourceAudio) -> SyntheticSpeakerDecision {
-    guard !audio.samples.isEmpty else { return .insufficientSpeech }
-    let averageMagnitude =
-      audio.samples.reduce(Float(0)) { $0 + abs($1) } / Float(audio.samples.count)
-    if averageMagnitude >= 0.80 {
-      return .pilot
-    }
-    if averageMagnitude >= 0.55 {
-      return .mixed
-    }
-    return .nonPilot
-  }
+  func loadProfiles() -> [PilotVoiceProfile] { profiles }
+  func saveProfiles(_ profiles: [PilotVoiceProfile]) { _ = profiles }
+  func loadCallSign() -> CallSign? { callSign }
+  func saveCallSign(_ callSign: CallSign?) { _ = callSign }
+  func loadGateConfig() -> ATCTranscriptGateConfig { config }
+  func saveGateConfig(_ config: ATCTranscriptGateConfig) { _ = config }
+  func loadEnabled() -> Bool { enabled }
+  func saveEnabled(_ enabled: Bool) { _ = enabled }
+}
 
-  func filteredTranscript(_ transcript: String, speaker: SyntheticSpeakerDecision) -> String {
-    switch speaker {
-    case .pilot, .insufficientSpeech:
-      return ""
-    case .mixed, .nonPilot:
-      return transcript.lowercased().contains(callSign) ? transcript : ""
-    }
-  }
+struct ReplayModelPackStorage: ModelPackStateStorage {
+  let state: ModelPackState
+
+  func loadState() -> ModelPackState { state }
+  func saveState(_ state: ModelPackState) { _ = state }
 }
 
 struct ReplayMetrics: Sendable {
@@ -222,6 +255,8 @@ struct ReplayMetrics: Sendable {
   let expectedPilotDiscard: Bool
   let actualPilotDiscard: Bool
   let audioOnly: Bool
+  let speakerPath: String
+  let textGateDecision: String
 }
 
 struct ReplayReport: Sendable {
@@ -257,10 +292,19 @@ struct ReplayReport: Sendable {
   }
 
   func csv() -> String {
-    let header = "fixture,WER,pilot-discard-precision,pilot-discard-recall,false-discard-rate"
+    let header =
+      "fixture,WER,pilot-discard-precision,pilot-discard-recall,false-discard-rate,speaker-path,text-gate-decision"
     let body = rows.map { row in
       if row.audioOnly {
-        return [row.fixture, "audio-only", "n/a", "n/a", "n/a"].joined(separator: ",")
+        return [
+          row.fixture,
+          "audio-only",
+          "n/a",
+          "n/a",
+          "n/a",
+          row.speakerPath,
+          row.textGateDecision,
+        ].joined(separator: ",")
       }
       return [
         row.fixture,
@@ -269,6 +313,8 @@ struct ReplayReport: Sendable {
           row.actualPilotDiscard && row.expectedPilotDiscard ? 1 : row.actualPilotDiscard ? 0 : 1),
         Self.format(row.expectedPilotDiscard ? (row.actualPilotDiscard ? 1 : 0) : 1),
         Self.format((row.actualPilotDiscard && !row.expectedPilotDiscard) ? 1 : 0),
+        row.speakerPath,
+        row.textGateDecision,
       ].joined(separator: ",")
     }
     let summary = [
@@ -277,6 +323,8 @@ struct ReplayReport: Sendable {
       Self.format(pilotDiscardPrecision),
       Self.format(pilotDiscardRecall),
       Self.format(falseDiscardRate),
+      "synthetic-amplitude-speaker-substitute",
+      "real-voice-filter-text-gate",
     ].joined(separator: ",")
     return ([header] + body + [summary]).joined(separator: "\n")
   }
@@ -288,25 +336,35 @@ struct ReplayReport: Sendable {
 
 struct ReplayEvaluator: Sendable {
   let audioReader: PCM16WAVAudioReader
-  let filter: SyntheticReplayFilter
 
   init(
-    audioReader: PCM16WAVAudioReader = PCM16WAVAudioReader(),
-    filter: SyntheticReplayFilter = SyntheticReplayFilter()
+    audioReader: PCM16WAVAudioReader = PCM16WAVAudioReader()
   ) {
     self.audioReader = audioReader
-    self.filter = filter
   }
 
-  func evaluate(fixturesDirectory: URL, manifest: ReplayManifest) throws -> ReplayReport {
+  @MainActor
+  func evaluate(fixturesDirectory: URL, manifest: ReplayManifest) async throws -> ReplayReport {
+    let pipeline = Self.makePipeline()
     var rows: [ReplayMetrics] = []
     rows.reserveCapacity(manifest.fixtures.count)
 
-    for fixture in manifest.fixtures {
+    for (index, fixture) in manifest.fixtures.enumerated() {
       let audioURL = fixturesDirectory.appendingPathComponent(fixture.fixture)
       let audio = try audioReader.read(audioURL)
-      let speaker = filter.classify(audio: audio)
-      let actualTranscript = filter.filteredTranscript(fixture.transcript, speaker: speaker)
+      let speaker = try await pipeline.classify(
+        samples: audio.samples,
+        sampleRate: audio.sampleRate
+      )
+      let decision = pipeline.decide(
+        text: fixture.transcript,
+        speaker: speaker,
+        timestamp: Date(timeIntervalSince1970: Double(index))
+      )
+      let actualTranscript = Self.filteredTranscript(
+        fixture.transcript,
+        decision: decision.relevance
+      )
       let metric = ReplayMetrics(
         fixture: fixture.fixture,
         wer: fixture.isAudioOnly
@@ -317,12 +375,72 @@ struct ReplayEvaluator: Sendable {
           ),
         expectedPilotDiscard: fixture.expectedPilotDiscard,
         actualPilotDiscard: actualTranscript.isEmpty && fixture.transcript.isEmpty == false,
-        audioOnly: fixture.isAudioOnly
+        audioOnly: fixture.isAudioOnly,
+        speakerPath: "synthetic-amplitude-speaker-substitute",
+        textGateDecision: Self.describe(decision.relevance)
       )
       rows.append(metric)
     }
 
     return ReplayReport(rows: rows)
+  }
+
+  @MainActor
+  private static func makePipeline() -> VoiceFilterPipeline {
+    let profile = PilotVoiceProfile(
+      slot: .primary,
+      label: "Replay Pilot",
+      voicePrint: VoicePrintVector(values: [1, 0, 0, 0], quality: 0.95),
+      enrolledAt: Date(timeIntervalSince1970: 748_137_600),
+      spokenCallSign: CallSign(raw: "N123AB")
+    )
+    let storage = ReplayVoiceFilterStorage(
+      profiles: [profile],
+      callSign: CallSign(raw: "N123AB"),
+      config: .default,
+      enabled: true
+    )
+    return VoiceFilterPipeline(
+      identifier: SyntheticReplaySpeakerIdentifier(),
+      storage: storage,
+      modelPackStorage: ReplayModelPackStorage(state: .installed(Self.installedPack()))
+    )
+  }
+
+  private static func filteredTranscript(
+    _ transcript: String,
+    decision: ATCRelevanceDecision
+  ) -> String {
+    switch decision {
+    case .display, .holdContinuation:
+      return transcript
+    case .suppress:
+      return ""
+    }
+  }
+
+  private static func describe(_ decision: ATCRelevanceDecision) -> String {
+    switch decision {
+    case .display(let reason):
+      return "display-\(reason)"
+    case .suppress(let reason):
+      return "suppress-\(reason)"
+    case .holdContinuation(let reason):
+      return "hold-\(reason)"
+    }
+  }
+
+  private static func installedPack() -> InstalledModelPack {
+    InstalledModelPack(
+      identifier: "synthetic-replay-speaker",
+      version: "1.0.0",
+      embeddingDimension: 4,
+      checksumSHA256: String(repeating: "b", count: 64),
+      source: "local-replay-fixture",
+      sizeBytes: 4096,
+      installedAt: Date(timeIntervalSince1970: 748_137_600),
+      localModelPath: nil
+    )
   }
 }
 
@@ -468,13 +586,13 @@ enum ThresholdLoader {
 
 @main
 struct ReplayKitCommand {
-  static func main() {
+  static func main() async {
     do {
       let arguments = try ReplayArguments.parse(CommandLine.arguments)
       let data = try Data(contentsOf: arguments.groundTruth)
       let manifest = try JSONDecoder().decode(ReplayManifest.self, from: data)
       let threshold = try ThresholdLoader.load(source: arguments.thresholdSource)
-      let report = try ReplayEvaluator().evaluate(
+      let report = try await ReplayEvaluator().evaluate(
         fixturesDirectory: arguments.fixturesDirectory,
         manifest: manifest
       )

@@ -86,4 +86,92 @@ struct SpeechActivitySegmenterTests {
       segmenter.update(block: block(seconds: 0.8, amplitude: 0.0), sampleRate: Self.sampleRate)
         == .cutAfterSilence)
   }
+
+  @Test("should preserve generated speech and silence cut invariants")
+  func shouldPreserveGeneratedSpeechAndSilenceCutInvariants() {
+    let generatedCaseCount = 300
+    let minSpeech = 0.25
+    let minSilence = 0.20
+    let maxWindow = 0.75
+    let maxBlockSeconds = 0.05
+    var random = DeterministicSegmenterRandom(seed: 0xD5_06_11_05)
+
+    for _ in 0..<generatedCaseCount {
+      let segmenter = EnergySilenceSegmenter(
+        minSpeechSeconds: minSpeech,
+        minSilenceSeconds: minSilence,
+        maxWindowSeconds: maxWindow
+      )
+      var speechSeconds = 0.0
+      var trailingSilenceSeconds = 0.0
+      var windowSeconds = 0.0
+      var cutSeen = false
+
+      for _ in 0..<64 {
+        let seconds = Double(random.int(in: 1...5)) / 100
+        let speech = random.bool()
+        let samples = block(seconds: seconds, amplitude: speech ? 0.35 : 0.0)
+        let blockSeconds = Double(samples.count) / Self.sampleRate
+        let decision = segmenter.update(block: samples, sampleRate: Self.sampleRate)
+
+        windowSeconds += blockSeconds
+        if speech {
+          speechSeconds += blockSeconds
+          trailingSilenceSeconds = 0
+        } else {
+          trailingSilenceSeconds += blockSeconds
+        }
+
+        switch decision {
+        case .accumulate:
+          #expect(windowSeconds < maxWindow)
+        case .cutAfterSilence:
+          #expect(speechSeconds >= minSpeech)
+          #expect(trailingSilenceSeconds >= minSilence)
+          cutSeen = true
+        case .cutAtMaxWindow:
+          #expect(windowSeconds >= maxWindow)
+          #expect(windowSeconds <= maxWindow + maxBlockSeconds)
+          cutSeen = true
+        }
+
+        if cutSeen {
+          segmenter.reset()
+          #expect(
+            segmenter.update(
+              block: block(seconds: 0.05, amplitude: 0.0),
+              sampleRate: Self.sampleRate
+            ) == .accumulate)
+          break
+        }
+      }
+
+      #expect(cutSeen)
+    }
+
+    print("PBT_CASE_COUNT speech-activity-segmenter=300")
+    #expect(generatedCaseCount == 300)
+  }
+
+  private struct DeterministicSegmenterRandom {
+    private var state: UInt64
+
+    init(seed: UInt64) {
+      self.state = seed
+    }
+
+    mutating func next() -> UInt64 {
+      state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+      return state
+    }
+
+    mutating func int(in range: ClosedRange<Int>) -> Int {
+      let span = UInt64(range.upperBound - range.lowerBound + 1)
+      return range.lowerBound + Int(next() % span)
+    }
+
+    mutating func bool() -> Bool {
+      next().isMultiple(of: 2)
+    }
+  }
 }

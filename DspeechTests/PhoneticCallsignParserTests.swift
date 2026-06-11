@@ -86,4 +86,124 @@ struct PhoneticCallsignParserTests {
   @Test func unknownWordsFallBackToAlphanumericPassthrough() {
     #expect(PhoneticCallsignParser.parse("lufthansa 4 0 7") == "LUFTHANSA407")
   }
+
+  @Test("should parse 600 generated spoken registrations to compact equality")
+  func shouldParseGeneratedSpokenRegistrationsToCompactEquality() {
+    let generatedCaseCount = 600
+    var random = DeterministicParserRandom(seed: 0xD5_06_11_01)
+
+    for _ in 0..<generatedCaseCount {
+      let registration = Self.registration(random: &random)
+      let spoken = registration.map { Self.spokenToken(for: $0, random: &random) }
+        .joined(separator: " ")
+      #expect(PhoneticCallsignParser.parse(spoken) == CallSign.normalize(registration))
+    }
+
+    print("PBT_CASE_COUNT phonetic-parser-roundtrip=600")
+    #expect(generatedCaseCount == 600)
+  }
+
+  @Test("should reject 300 generated separator-only garbage strings")
+  func shouldRejectGeneratedSeparatorOnlyGarbageStrings() {
+    let generatedCaseCount = 300
+    var random = DeterministicParserRandom(seed: 0xD5_06_11_02)
+
+    for _ in 0..<generatedCaseCount {
+      let garbage = Self.separatorGarbage(random: &random)
+      #expect(PhoneticCallsignParser.parse(garbage).isEmpty)
+    }
+
+    print("PBT_CASE_COUNT phonetic-parser-garbage=300")
+    #expect(generatedCaseCount == 300)
+  }
+
+  private struct DeterministicParserRandom {
+    private var state: UInt64
+
+    init(seed: UInt64) {
+      self.state = seed
+    }
+
+    mutating func next() -> UInt64 {
+      state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+      return state
+    }
+
+    mutating func int(in range: ClosedRange<Int>) -> Int {
+      let span = UInt64(range.upperBound - range.lowerBound + 1)
+      return range.lowerBound + Int(next() % span)
+    }
+  }
+
+  private static let registrationPrefixes = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+  private static let registrationTailCharacters = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+  private static let separatorCharacters = Array(" \n\t.,;:!?-_/()[]{}")
+
+  private static func registration(random: inout DeterministicParserRandom) -> String {
+    let prefix = registrationPrefixes[random.int(in: 0...(registrationPrefixes.count - 1))]
+    let tailCount = random.int(in: 1...5)
+    var result = String(prefix)
+    for _ in 0..<tailCount {
+      let next = registrationTailCharacters[
+        random.int(in: 0...(registrationTailCharacters.count - 1))]
+      result.append(next)
+    }
+    return result
+  }
+
+  private static func separatorGarbage(random: inout DeterministicParserRandom) -> String {
+    let count = random.int(in: 1...64)
+    var result = ""
+    for _ in 0..<count {
+      result.append(separatorCharacters[random.int(in: 0...(separatorCharacters.count - 1))])
+    }
+    return result
+  }
+
+  private static func spokenToken(
+    for character: Character,
+    random: inout DeterministicParserRandom
+  ) -> String {
+    let variants: [String]
+    switch character {
+    case "A": variants = ["Alpha", "Alfa"]
+    case "B": variants = ["Bravo"]
+    case "C": variants = ["Charlie"]
+    case "D": variants = ["Delta"]
+    case "E": variants = ["Echo"]
+    case "F": variants = ["Foxtrot", "Fox"]
+    case "G": variants = ["Golf"]
+    case "H": variants = ["Hotel"]
+    case "I": variants = ["India"]
+    case "J": variants = ["Juliett", "Juliet"]
+    case "K": variants = ["Kilo"]
+    case "L": variants = ["Lima"]
+    case "M": variants = ["Mike"]
+    case "N": variants = ["November"]
+    case "O": variants = ["Oscar"]
+    case "P": variants = ["Papa"]
+    case "Q": variants = ["Quebec"]
+    case "R": variants = ["Romeo"]
+    case "S": variants = ["Sierra"]
+    case "T": variants = ["Tango"]
+    case "U": variants = ["Uniform"]
+    case "V": variants = ["Victor"]
+    case "W": variants = ["Whiskey", "Whisky"]
+    case "X": variants = ["Xray", "X-ray", "Ex-ray", "X ray"]
+    case "Y": variants = ["Yankee"]
+    case "Z": variants = ["Zulu"]
+    case "0": variants = ["Zero", "Oh"]
+    case "1": variants = ["One", "Won"]
+    case "2": variants = ["Two", "Too", "To"]
+    case "3": variants = ["Three", "Tree"]
+    case "4": variants = ["Four", "Fower", "For", "Fore"]
+    case "5": variants = ["Five", "Fife"]
+    case "6": variants = ["Six"]
+    case "7": variants = ["Seven"]
+    case "8": variants = ["Eight", "Ate"]
+    case "9": variants = ["Nine", "Niner"]
+    default: variants = [String(character)]
+    }
+    return variants[random.int(in: 0...(variants.count - 1))]
+  }
 }

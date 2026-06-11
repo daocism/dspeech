@@ -19,6 +19,18 @@
       "expectedPilotDiscard": false
     },
     {
+      "fixture": "pilot-readback.wav",
+      "transcript": "MAYDAY N123AB engine failure",
+      "expectedTranscriptAfterFilter": "MAYDAY N123AB engine failure",
+      "expectedPilotDiscard": false
+    },
+    {
+      "fixture": "dispatcher-own.wav",
+      "transcript": "Three Alpha Bravo turn left heading two seven zero",
+      "expectedTranscriptAfterFilter": "Three Alpha Bravo turn left heading two seven zero",
+      "expectedPilotDiscard": false
+    },
+    {
       "fixture": "atc-real-img2549.wav",
       "transcript": "",
       "expectedTranscriptAfterFilter": "",
