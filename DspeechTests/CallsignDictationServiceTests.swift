@@ -128,6 +128,52 @@ struct CallsignDictationServiceTests {
     #expect(events.contains("append"))
   }
 
+  @Test func startUsesInjectedRecognitionLocaleProvider() async {
+    let recognizer = FakeCallsignRecognizer()
+    var requestedLocales: [String] = []
+    let service = CallsignDictationService(
+      localeProvider: { "fr-FR" },
+      authorization: FakeAuthorization(),
+      recognizerFactory: { localeIdentifier in
+        requestedLocales.append(localeIdentifier)
+        return recognizer
+      },
+      audioCapture: FakeCallsignAudioCapture(),
+      arbiter: AudioCaptureArbiter()
+    )
+
+    await service.start()
+
+    #expect(requestedLocales == ["fr-FR"])
+    #expect(service.status == .listening)
+  }
+
+  @Test func startSurfacesUnavailableWhenRecognitionLocaleProviderReturnsNil() async {
+    let recognizer = FakeCallsignRecognizer()
+    let service = CallsignDictationService(
+      localeProvider: { nil },
+      authorization: FakeAuthorization(),
+      recognizerFactory: { _ in recognizer },
+      audioCapture: FakeCallsignAudioCapture(),
+      arbiter: AudioCaptureArbiter()
+    )
+
+    await service.start()
+
+    #expect(service.status == .unavailable("No recognition language available."))
+    #expect(recognizer.startCallCount == 0)
+  }
+
+  @Test func recognitionRequestSeedsAviationContextualStrings() async {
+    let recognizer = FakeCallsignRecognizer()
+    let service = makeService(recognizer: recognizer)
+
+    await service.start()
+
+    #expect(recognizer.contextualStrings.contains("Alpha"))
+    #expect(recognizer.contextualStrings.contains("Niner"))
+  }
+
   @Test func partialRecognitionUpdateChangesLiveTranscript() async {
     let recognizer = FakeCallsignRecognizer()
     let service = makeService(recognizer: recognizer)
@@ -289,6 +335,7 @@ struct CallsignDictationServiceTests {
 
   private func makeService(
     localeIdentifier: String = "en-US",
+    localeProvider: (@MainActor () -> String?)? = nil,
     authorization: FakeAuthorization = FakeAuthorization(),
     recognizer: FakeCallsignRecognizer?,
     audioCapture: FakeCallsignAudioCapture = FakeCallsignAudioCapture(),
@@ -296,6 +343,7 @@ struct CallsignDictationServiceTests {
   ) -> CallsignDictationService {
     CallsignDictationService(
       localeIdentifier: localeIdentifier,
+      localeProvider: localeProvider,
       authorization: authorization,
       recognizerFactory: { _ in recognizer },
       audioCapture: audioCapture,
@@ -305,6 +353,7 @@ struct CallsignDictationServiceTests {
 
   private func makeService(
     localeIdentifier: String = "en-US",
+    localeProvider: (@MainActor () -> String?)? = nil,
     authorization: FakeAuthorization = FakeAuthorization(),
     recognizer: FakeCallsignRecognizer = FakeCallsignRecognizer(),
     audioCapture: FakeCallsignAudioCapture = FakeCallsignAudioCapture(),
@@ -312,6 +361,7 @@ struct CallsignDictationServiceTests {
   ) -> CallsignDictationService {
     makeService(
       localeIdentifier: localeIdentifier,
+      localeProvider: localeProvider,
       authorization: authorization,
       recognizer: Optional(recognizer),
       audioCapture: audioCapture,
@@ -394,6 +444,7 @@ private final class FakeCallsignRecognizer: CallsignSpeechRecognizing {
   var onAppend: (() -> Void)?
   private(set) var startCallCount = 0
   private(set) var appendedBuffers: [AVAudioPCMBuffer] = []
+  private(set) var contextualStrings: [String] = []
   private(set) var endAudioCallCount = 0
 
   init(
@@ -408,10 +459,14 @@ private final class FakeCallsignRecognizer: CallsignSpeechRecognizing {
     self.onStart = onStart
   }
 
-  func startRecognition(onUpdate: @escaping @Sendable (CallsignRecognitionUpdate) -> Void)
+  func startRecognition(
+    contextualStrings: [String],
+    onUpdate: @escaping @Sendable (CallsignRecognitionUpdate) -> Void
+  )
     -> any CallsignRecognitionTasking
   {
     startCallCount += 1
+    self.contextualStrings = contextualStrings
     self.onUpdate = onUpdate
     onStart()
     for update in updatesOnStart {

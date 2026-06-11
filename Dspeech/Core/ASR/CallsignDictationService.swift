@@ -29,7 +29,7 @@ final class CallsignDictationService {
   }
   private(set) var liveTranscript: String = ""
 
-  private let localeIdentifier: String
+  private let localeProvider: @MainActor () -> String?
   private let authorization: any CallsignSpeechAuthorization
   private let recognizerFactory: @MainActor (String) -> (any CallsignSpeechRecognizing)?
   private let audioCapture: any CallsignAudioCapturing
@@ -45,6 +45,7 @@ final class CallsignDictationService {
 
   init(
     localeIdentifier: String = "en-US",
+    localeProvider: (@MainActor () -> String?)? = nil,
     authorization: any CallsignSpeechAuthorization = SystemCallsignSpeechAuthorization(),
     recognizerFactory: @escaping @MainActor (String) -> (any CallsignSpeechRecognizing)? = {
       AppleCallsignSpeechRecognizer(localeIdentifier: $0)
@@ -52,7 +53,7 @@ final class CallsignDictationService {
     audioCapture: any CallsignAudioCapturing = AVAudioEngineCallsignAudioCapture(),
     arbiter: AudioCaptureArbiter = .shared
   ) {
-    self.localeIdentifier = localeIdentifier
+    self.localeProvider = localeProvider ?? { localeIdentifier }
     self.authorization = authorization
     self.recognizerFactory = recognizerFactory
     self.audioCapture = audioCapture
@@ -77,8 +78,15 @@ final class CallsignDictationService {
       DspeechLog.engine.debug("callsign dictation start ignored reason=already-active")
       return
     }
+    guard let localeIdentifier = localeProvider() else {
+      DspeechLog.engine.error(
+        "callsign dictation start failed reason=recognition-locale-unavailable"
+      )
+      status = .unavailable(String(localized: "No recognition language available."))
+      return
+    }
     DspeechLog.engine.info(
-      "callsign dictation start requested locale=\(self.localeIdentifier, privacy: .public)"
+      "callsign dictation start requested locale=\(localeIdentifier, privacy: .public)"
     )
     guard arbiter.acquire(.callsignDictation) else {
       DspeechLog.engine.error("callsign dictation start failed reason=capture-session-busy")
@@ -121,7 +129,7 @@ final class CallsignDictationService {
     }
     guard recognizer.supportsOnDeviceRecognition else {
       DspeechLog.engine.error(
-        "callsign dictation start failed reason=on-device-model-missing locale=\(self.localeIdentifier, privacy: .public)"
+        "callsign dictation start failed reason=on-device-model-missing locale=\(localeIdentifier, privacy: .public)"
       )
       failBeforeCapture(
         String(
@@ -172,7 +180,8 @@ final class CallsignDictationService {
       }
     }
 
-    task = recognizer.startRecognition { [weak self] update in
+    task = recognizer.startRecognition(contextualStrings: ATCContextualVocabulary.strings()) {
+      [weak self] update in
       Task { @MainActor [weak self] in
         self?.handle(update: update, sessionID: sessionID)
       }
@@ -310,7 +319,10 @@ protocol CallsignRecognitionTasking {
 protocol CallsignSpeechRecognizing: AnyObject {
   var isAvailable: Bool { get }
   var supportsOnDeviceRecognition: Bool { get }
-  func startRecognition(onUpdate: @escaping @Sendable (CallsignRecognitionUpdate) -> Void)
+  func startRecognition(
+    contextualStrings: [String],
+    onUpdate: @escaping @Sendable (CallsignRecognitionUpdate) -> Void
+  )
     -> any CallsignRecognitionTasking
   func append(_ buffer: AVAudioPCMBuffer)
   func endAudio()
@@ -337,13 +349,17 @@ private final class AppleCallsignSpeechRecognizer: CallsignSpeechRecognizing {
   var isAvailable: Bool { recognizer.isAvailable }
   var supportsOnDeviceRecognition: Bool { recognizer.supportsOnDeviceRecognition }
 
-  func startRecognition(onUpdate: @escaping @Sendable (CallsignRecognitionUpdate) -> Void)
+  func startRecognition(
+    contextualStrings: [String],
+    onUpdate: @escaping @Sendable (CallsignRecognitionUpdate) -> Void
+  )
     -> any CallsignRecognitionTasking
   {
     let request = SFSpeechAudioBufferRecognitionRequest()
     request.shouldReportPartialResults = true
     request.requiresOnDeviceRecognition = true
     request.taskHint = .dictation
+    request.contextualStrings = contextualStrings
     self.request = request
 
     let task = recognizer.recognitionTask(with: request) { result, error in

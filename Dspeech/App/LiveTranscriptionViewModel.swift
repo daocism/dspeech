@@ -113,14 +113,13 @@ final class LiveTranscriptionViewModel {
     let text = partialText.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !text.isEmpty else { return }
     partialText = ""
-    // why: confidence 0 = "unverified" — the recognizer never confirmed this line. The card
-    // hides the meaningless 0% and shows the VERIFY badge, which is the honest signal.
     append(
       segment: TranscriptSegment(
         text: text,
         confidence: 0,
         sourceLanguageCode: lastSourceLanguageCode,
-        source: .liveATC))
+        source: .liveATC,
+        isStopCommittedPlaceholder: true))
   }
 
   func reset() {
@@ -222,12 +221,10 @@ final class LiveTranscriptionViewModel {
     if !segment.sourceLanguageCode.isEmpty { lastSourceLanguageCode = segment.sourceLanguageCode }
     let segmentToPersist: TranscriptSegment
     // why: the recognizer can emit a real final for the SAME utterance a beat AFTER Stop already
-    // committed it as a confidence-0 placeholder (commitPartialAsSegment). Replace the placeholder
-    // in place rather than showing the line twice — one VERIFY card and one identical confirmed
-    // card. A confidence-0 .liveATC segment is only ever a Stop placeholder, so this can't collide
-    // with a legitimately repeated utterance mid-session.
-    if segment.confidence > 0, segment.source == .liveATC,
-      let last = segments.last, last.source == .liveATC, last.confidence == 0,
+    // committed it as an unverified placeholder. Replace only that explicitly-marked placeholder;
+    // confidence 0 can be a real Apple Speech final and must not be used as object identity.
+    if !segment.isStopCommittedPlaceholder, segment.source == .liveATC,
+      let last = segments.last, last.source == .liveATC, last.isStopCommittedPlaceholder,
       last.text.caseInsensitiveCompare(segment.text) == .orderedSame
     {
       clearDerivedState(for: last.id)
@@ -237,7 +234,9 @@ final class LiveTranscriptionViewModel {
       segments.append(segment)
       segmentToPersist = segment
     }
-    persist(segment: segmentToPersist)
+    if !segmentToPersist.isStopCommittedPlaceholder {
+      persist(segment: segmentToPersist)
+    }
     maybeTranslate(segment)
     applyVoiceFilter(to: segment)
   }

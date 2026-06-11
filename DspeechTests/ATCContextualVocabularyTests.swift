@@ -16,12 +16,25 @@ struct ATCContextualVocabularyTests {
     #expect(Set(strings).count == strings.count)
     #expect(
       strings.count == ATCContextualVocabulary.icaoAlphabet.count
+        + ATCContextualVocabulary.digitWords.count
         + ATCContextualVocabulary.phraseology.count)
   }
 
   @Test func appendsNonEmptyCallSign() {
     let strings = ATCContextualVocabulary.strings(callSign: "N123AB")
     #expect(strings.contains("N123AB"))
+  }
+
+  @Test func appendsWrittenAndSpokenCallSignForms() {
+    let strings = ATCContextualVocabulary.strings(callSign: "N123AB")
+    #expect(strings.contains("N123AB"))
+    #expect(strings.contains("November One Two Three Alpha Bravo"))
+  }
+
+  @Test func defaultStringsIncludeAviationDigitWords() {
+    let strings = ATCContextualVocabulary.strings()
+    #expect(strings.contains("Zero"))
+    #expect(strings.contains("Niner"))
   }
 
   @Test func ignoresBlankCallSign() {

@@ -62,6 +62,34 @@ struct OnDeviceSpeechRecognitionTests {
     #expect(AppleSpeechLiveTranscriptionEngine.liveRequestsRequireOnDeviceRecognition)
   }
 
+  @Test func strictOnDeviceCapabilityUsesRecognizerIntersectionOnly() {
+    let capable = OnDeviceLocaleResolver.speechRecognizerCapableLocales(
+      recognizerSupported: [Locale(identifier: "en-US")],
+      onDeviceSupported: [Locale(identifier: "it-IT")]
+    )
+
+    #expect(capable.isEmpty)
+  }
+
+  @Test func strictOnDeviceCapabilityKeepsSharedLocales() {
+    let capable = OnDeviceLocaleResolver.speechRecognizerCapableLocales(
+      recognizerSupported: [Locale(identifier: "en-US"), Locale(identifier: "fr-FR")],
+      onDeviceSupported: [Locale(identifier: "fr-FR"), Locale(identifier: "it-IT")]
+    )
+
+    #expect(capable == [Locale(identifier: "fr-FR")])
+  }
+
+  @Test func downloadPollPropagatesCancellation() async {
+    await #expect(throws: CancellationError.self) {
+      try await OnDeviceDownloadPoller.isDownloaded(
+        attempts: 2,
+        supportsOnDeviceRecognition: { false },
+        sleep: { throw CancellationError() }
+      )
+    }
+  }
+
   // Regression guard for local-only truthfulness: start() for a supported locale may
   // listen if an on-device model is present, or fail visibly when it is missing. It must
   // never switch to server recognition just to keep the normal LOCAL UI green on Simulator.
