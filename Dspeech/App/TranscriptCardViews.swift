@@ -1,24 +1,51 @@
 import SwiftUI
 
 struct HintBubble: View {
+  enum Pointer {
+    case trailing
+    case up
+  }
+
   let text: String
+  var pointer: Pointer = .trailing
+
+  // why: a hint must NEVER be laid out inline with contested chrome — squeezed, it
+  // degrades into letter-soup or "На…" truncation (the 2026-06-11 visual-review defect).
+  // It always renders at its own intrinsic size; callers place it as a floating overlay.
+  private var bubbleText: some View {
+    Text(text)
+      .font(.subheadline.weight(.semibold))
+      .foregroundStyle(.black)
+      .multilineTextAlignment(.trailing)
+      .lineLimit(2)
+      .fixedSize(horizontal: false, vertical: true)
+      .frame(maxWidth: 230, alignment: .trailing)
+      .padding(.horizontal, 14)
+      .padding(.vertical, 10)
+      .background(.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+  }
 
   var body: some View {
-    HStack(spacing: 5) {
-      Text(text)
-        .font(.subheadline.weight(.semibold))
-        .foregroundStyle(.black)
-        .multilineTextAlignment(.trailing)
-        .fixedSize(horizontal: false, vertical: true)
-        .frame(maxWidth: 230, alignment: .trailing)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-      // why: a trail of shrinking circles pointing toward the button to its right.
-      Circle().fill(.white).frame(width: 9, height: 9)
-      Circle().fill(.white).frame(width: 6, height: 6)
-      Circle().fill(.white).frame(width: 3.5, height: 3.5)
+    Group {
+      switch pointer {
+      case .trailing:
+        HStack(spacing: 5) {
+          bubbleText
+          Circle().fill(.white).frame(width: 9, height: 9)
+          Circle().fill(.white).frame(width: 6, height: 6)
+          Circle().fill(.white).frame(width: 3.5, height: 3.5)
+        }
+      case .up:
+        VStack(alignment: .trailing, spacing: 5) {
+          Circle().fill(.white).frame(width: 3.5, height: 3.5)
+          Circle().fill(.white).frame(width: 6, height: 6)
+          Circle().fill(.white).frame(width: 9, height: 9)
+          bubbleText
+        }
+        .padding(.trailing, 22)
+      }
     }
+    .fixedSize()
     .shadow(color: .black.opacity(0.25), radius: 6, y: 2)
     .transition(.opacity.combined(with: .scale(scale: 0.9)))
   }
@@ -129,6 +156,8 @@ struct PartialTranscriptCard: View {
       HStack(spacing: 8) {
         Label(String(localized: "LIVE"), systemImage: "waveform")
           .font(.caption.monospaced().weight(.bold))
+          .lineLimit(1)
+          .minimumScaleFactor(0.65)
           .foregroundStyle(.cyan)
           .padding(.horizontal, 7)
           .padding(.vertical, 3)
@@ -211,6 +240,8 @@ struct TranscriptSegmentCard: View {
     HStack(spacing: 8) {
       Text(segment.sourceLanguageCode.uppercased())
         .font(.caption.monospaced().weight(.bold))
+        .lineLimit(1)
+        .minimumScaleFactor(0.65)
         .padding(.horizontal, 7)
         .padding(.vertical, 3)
         .background(.white.opacity(0.12), in: Capsule())
@@ -218,6 +249,8 @@ struct TranscriptSegmentCard: View {
       if segment.source == .demo {
         Text(String(localized: "DEMO"))
           .font(.caption.monospaced().weight(.bold))
+          .lineLimit(1)
+          .minimumScaleFactor(0.65)
           .foregroundStyle(.cyan.opacity(0.9))
           .padding(.horizontal, 7)
           .padding(.vertical, 3)
@@ -227,6 +260,8 @@ struct TranscriptSegmentCard: View {
       if segment.requiresVerification {
         Text(String(localized: "VERIFY"))
           .font(.caption.monospaced().weight(.bold))
+          .lineLimit(1)
+          .minimumScaleFactor(0.65)
           .foregroundStyle(.yellow)
           .padding(.horizontal, 7)
           .padding(.vertical, 3)

@@ -8,6 +8,7 @@ final class CaptureCoordinator {
   let routeMonitor: RouteHealthMonitor
 
   private(set) var startBlockedMessage: String?
+  private(set) var stoppedForBackgroundNotice = false
   private var routeObservation: Task<Void, Never>?
   private var stoppedByInterruption = false
 
@@ -36,6 +37,7 @@ final class CaptureCoordinator {
 
   func start() async {
     stoppedByInterruption = false
+    stoppedForBackgroundNotice = false
     DspeechLog.routing.info(
       "capture start requested health=\(self.routeMonitor.health.rawValue, privacy: .public) blocksStart=\(self.routeMonitor.blocksStart, privacy: .public)"
     )
@@ -60,8 +62,13 @@ final class CaptureCoordinator {
 
   func stop() {
     stoppedByInterruption = false
+    stoppedForBackgroundNotice = false
     DspeechLog.routing.info("capture stop requested")
     live.stop()
+  }
+
+  func dismissStoppedForBackgroundNotice() {
+    stoppedForBackgroundNotice = false
   }
 
   func toggle() async {
@@ -77,6 +84,7 @@ final class CaptureCoordinator {
   // so this also matches what the OS would do on suspension, made explicit.
   func stopForBackground() {
     guard live.canStopCurrentSession else { return }
+    stoppedForBackgroundNotice = true
     DspeechLog.routing.info("capture stopped for background")
     live.stop()
   }
