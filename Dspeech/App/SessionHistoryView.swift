@@ -112,6 +112,8 @@ private struct SessionSummaryRow: View {
       Spacer(minLength: 0)
       Text(session.endedAt == nil ? String(localized: "Recovered") : String(localized: "Saved"))
         .font(.caption.weight(.semibold))
+        .lineLimit(1)
+        .minimumScaleFactor(0.65)
         .foregroundStyle(session.endedAt == nil ? Color.orange : Color.green)
         .padding(.horizontal, 8)
         .padding(.vertical, 4)

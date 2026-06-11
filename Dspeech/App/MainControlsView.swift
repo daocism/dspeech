@@ -3,7 +3,6 @@ import UIKit
 
 struct MainControlBar: View {
   let isLandscape: Bool
-  let showHints: Bool
   let privacyMode: PrivacyMode
   let routeHealth: RouteHealth
   let isSessionActive: Bool
@@ -25,13 +24,15 @@ struct MainControlBar: View {
           PrivacyBadge(mode: privacyMode)
           RouteHealthChip(health: routeHealth)
         }
+        // why: the privacy/route chips are mandatory cockpit chrome (ADR 0002) — they may
+        // scale via their own minimumScaleFactor but must never be compressed into
+        // letter-wrap fragments by a neighboring hint bubble.
+        .fixedSize()
       }
+      .layoutPriority(2)
 
       Spacer(minLength: 8)
 
-      if showHints {
-        HintBubble(text: String(localized: "Settings are here"))
-      }
       historyButton
       settingsButton
     }
@@ -144,6 +145,8 @@ struct PrivacyBadge: View {
     let tint: Color = .green
     Text(mode.badgeText)
       .font(.caption2.weight(.bold).monospaced())
+      .lineLimit(1)
+      .minimumScaleFactor(0.65)
       .foregroundStyle(tint)
       .padding(.horizontal, 7)
       .padding(.vertical, 3)
@@ -182,8 +185,12 @@ struct RouteHealthChip: View {
     HStack(spacing: 4) {
       Image(systemName: icon)
         .font(.caption2.weight(.bold))
+        .lineLimit(1)
+        .minimumScaleFactor(0.65)
       Text(health.shortLabel)
         .font(.caption2.weight(.bold).monospaced())
+        .lineLimit(1)
+        .minimumScaleFactor(0.65)
     }
     .foregroundStyle(tint)
     .padding(.horizontal, 7)
@@ -278,6 +285,8 @@ private struct LiveFailureBanner: View {
         } label: {
           Text(String(localized: "Open Settings"))
             .font(.caption.weight(.semibold))
+            .lineLimit(1)
+            .minimumScaleFactor(0.65)
             .padding(.horizontal, 8)
             .frame(minHeight: 30)
             .background(.black.opacity(0.35), in: Capsule())

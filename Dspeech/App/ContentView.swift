@@ -186,7 +186,6 @@ struct ContentView: View {
         VStack(spacing: isLandscape ? 8 : 12) {
           MainControlBar(
             isLandscape: isLandscape,
-            showHints: showHints,
             privacyMode: privacy.mode,
             routeHealth: coordinator.routeMonitor.health,
             isSessionActive: liveViewModel.canStopCurrentSession,
@@ -201,6 +200,16 @@ struct ContentView: View {
         .padding(.horizontal, isLandscape ? 16 : 18)
         .padding(.top, isLandscape ? 6 : 10)
         .padding(.bottom, isLandscape ? 8 : 14)
+        // why: the first-run settings hint is a free-floating callout UNDER the gear —
+        // inline in the bar it fought title/chips/buttons for width on long locales and
+        // degraded into truncation (2026-06-11 visual review).
+        .overlay(alignment: .topTrailing) {
+          if showHints {
+            HintBubble(text: String(localized: "Settings are here"), pointer: .up)
+              .padding(.top, isLandscape ? 62 : 84)
+              .padding(.trailing, isLandscape ? 16 : 18)
+          }
+        }
 
         // why: Start + Clear/error float over the transcript (no opaque footer strip);
         // the transcript fills the full height and scrolls its content clear of them.
@@ -216,7 +225,7 @@ struct ContentView: View {
           maxWidth: readableContentMaxWidth,
           showHints: showHints,
           isStopVisible: liveViewModel.canStopCurrentSession,
-          disabled: !liveViewModel.canStopCurrentSession && !coordinator.canStart
+          disabled: liveViewModel.status == .requestingPermission
         ) {
           Task { await toggleListening() }
         }
@@ -360,9 +369,33 @@ struct ContentView: View {
       return
     }
     let source = Locale.Language(identifier: localeIdentifier)
+    if let failure = Self.sameLanguageTranslationFailure(
+      sourceIdentifier: localeIdentifier,
+      targetCode: translation.targetCode
+    ) {
+      translationConfig = nil
+      coordinator.live.clearTranslations()
+      let token = coordinator.live.beginTranslationPreparation()
+      translationPreparationToken = token
+      coordinator.live.recordTranslationPreparationFailure(failure, token: token)
+      return
+    }
     translationPreparationToken = coordinator.live.beginTranslationPreparation()
     translationConfig = TranslationSession.Configuration(
       source: source, target: translation.targetLanguage)
+  }
+
+  static func sameLanguageTranslationFailure(
+    sourceIdentifier: String,
+    targetCode: String
+  ) -> TranslationFailure? {
+    let source = Locale.Language(identifier: sourceIdentifier)
+    let target = Locale.Language(identifier: targetCode)
+    guard let sourceCode = source.languageCode?.identifier.lowercased(),
+      let targetCode = target.languageCode?.identifier.lowercased(),
+      sourceCode == targetCode
+    else { return nil }
+    return .languagePairingUnsupported(source: source, target: target)
   }
 
   private func glossText(for segment: TranscriptSegment) -> String? {
@@ -377,6 +410,7 @@ struct ContentView: View {
   private func bannerStack() -> some View {
     VStack(spacing: 6) {
       routeBanner()
+      backgroundStopNoticeBanner()
       persistenceFailureBanner()
       translationFailureBanner()
     }
@@ -395,6 +429,8 @@ struct ContentView: View {
             systemImage: "line.3.horizontal.decrease.circle.fill"
           )
           .font(.caption.weight(.semibold))
+          .lineLimit(1)
+          .minimumScaleFactor(0.65)
           .foregroundStyle(.yellow)
           .padding(.horizontal, 12)
           .frame(minHeight: 44)
@@ -435,6 +471,40 @@ struct ContentView: View {
           .stroke((coordinator.canStart ? Color.orange : Color.red).opacity(0.4), lineWidth: 1)
       }
       .accessibilityIdentifier("route-banner")
+    }
+  }
+
+  @ViewBuilder
+  private func backgroundStopNoticeBanner() -> some View {
+    if coordinator.stoppedForBackgroundNotice {
+      HStack(spacing: 8) {
+        Image(systemName: "info.circle.fill")
+          .font(.footnote.weight(.semibold))
+        Text(String(localized: "Listening stopped while the app was in the background."))
+          .font(.footnote.weight(.medium))
+          .fixedSize(horizontal: false, vertical: true)
+        Spacer(minLength: 0)
+        Button {
+          coordinator.dismissStoppedForBackgroundNotice()
+        } label: {
+          Image(systemName: "xmark")
+            .font(.caption.weight(.bold))
+            .frame(width: 28, height: 28)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("background-stop-dismiss")
+        .accessibilityLabel(String(localized: "Dismiss background stop notice"))
+      }
+      .foregroundStyle(Color.white.opacity(0.86))
+      .padding(.horizontal, 12)
+      .padding(.vertical, 8)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .background(Color.white.opacity(0.10), in: RoundedRectangle(cornerRadius: 12))
+      .overlay {
+        RoundedRectangle(cornerRadius: 12)
+          .stroke(Color.white.opacity(0.26), lineWidth: 1)
+      }
+      .accessibilityIdentifier("background-stop-banner")
     }
   }
 
@@ -490,6 +560,8 @@ struct ContentView: View {
         } label: {
           Text(String(localized: "Translation settings"))
             .font(.caption.weight(.semibold))
+            .lineLimit(1)
+            .minimumScaleFactor(0.65)
             .padding(.horizontal, 10)
             .frame(minHeight: 32)
             .background(.black.opacity(0.32), in: Capsule())

@@ -332,14 +332,14 @@ struct ReplayKitNetworkDenyTests {
     ]
 
     var emitted: [String] = []
-    var discarded = 0
     for frame in frames {
       let speaker = try await pipeline.classify(samples: frame.samples, sampleRate: 16_000)
       switch pipeline.routeBeforeTranscription(speaker: speaker) {
-      case .discard(reason: .pilotVoice):
-        discarded += 1
       case .discard:
-        Issue.record("Only confident pilot audio may be discarded before ASR.")
+        // why: pre-ASR discard is structurally disabled — audio classified as pilot before
+        // any text exists could carry an emergency call; the post-ASR text gate (with the
+        // urgency bypass) is the only suppression authority.
+        Issue.record("Pre-ASR routing may never discard audio.")
       case .transcribe:
         let transcript = try transcriber.transcribe(frame, privacyMode: privacyMode)
         let decision = pipeline.decide(text: transcript, speaker: speaker)
@@ -350,7 +350,6 @@ struct ReplayKitNetworkDenyTests {
     }
 
     #expect(privacyMode.sendsAudioOffDevice == false)
-    #expect(discarded == 1)
     #expect(
       emitted == [
         "Tower N123AB cleared for takeoff",
@@ -372,7 +371,10 @@ struct ReplayKitNetworkDenyTests {
     let route = try await gate.route(samples: samples, sampleRate: buffer.format.sampleRate)
 
     #expect(engine.status == .idle)
-    #expect(route == .discard(reason: .pilotVoice))
+    guard case .transcribe = route else {
+      Issue.record("Pre-ASR routing may never discard audio; got \(route)")
+      return
+    }
     #expect(scope.attempts().isEmpty)
   }
 

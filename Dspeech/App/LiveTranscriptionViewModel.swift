@@ -4,6 +4,8 @@ import Observation
 @MainActor
 @Observable
 final class LiveTranscriptionViewModel {
+  private static let visibleSegmentLimit = 500
+
   private(set) var segments: [TranscriptSegment] = []
   private(set) var partialText: String = ""
   private(set) var status: LiveTranscriptionStatus = .idle
@@ -30,6 +32,7 @@ final class LiveTranscriptionViewModel {
   private var translationPreparationToken = UUID()
   private var startInFlight = false
   private var activeTranscriptSessionID: UUID?
+  private var mostRecentTranscriptSessionID: UUID?
   private var persistenceUnavailableForCurrentSession = false
   // why: a Stop-committed partial has no language of its own; reuse the last real segment's
   // language, defaulting to the device language (matches the device-language default policy).
@@ -56,8 +59,13 @@ final class LiveTranscriptionViewModel {
   }
 
   var visibleSegments: [TranscriptSegment] {
-    guard !suppressedSegmentIDs.isEmpty else { return segments }
-    return segments.filter { !suppressedSegmentIDs.contains($0.id) }
+    let displayable = displayableSegments
+    guard displayable.count > Self.visibleSegmentLimit else { return displayable }
+    return Array(displayable.suffix(Self.visibleSegmentLimit))
+  }
+
+  var olderSegmentCountInHistory: Int {
+    max(displayableSegments.count - Self.visibleSegmentLimit, 0)
   }
 
   func indicator(for segment: TranscriptSegment) -> ATCVoiceIndicator? {
@@ -124,6 +132,7 @@ final class LiveTranscriptionViewModel {
 
   func reset() {
     endPersistenceSessionIfNeeded()
+    mostRecentTranscriptSessionID = nil
     segments.removeAll()
     partialText = ""
     filterIndicators.removeAll()
@@ -220,6 +229,7 @@ final class LiveTranscriptionViewModel {
   private func append(segment: TranscriptSegment) {
     if !segment.sourceLanguageCode.isEmpty { lastSourceLanguageCode = segment.sourceLanguageCode }
     let segmentToPersist: TranscriptSegment
+    let replacementPersistenceSessionID: UUID?
     // why: the recognizer can emit a real final for the SAME utterance a beat AFTER Stop already
     // committed it as an unverified placeholder. Replace only that explicitly-marked placeholder;
     // confidence 0 can be a real Apple Speech final and must not be used as object identity.
@@ -230,15 +240,20 @@ final class LiveTranscriptionViewModel {
       clearDerivedState(for: last.id)
       segments[segments.count - 1] = segment
       segmentToPersist = segment
+      replacementPersistenceSessionID = activeTranscriptSessionID ?? mostRecentTranscriptSessionID
     } else {
       segments.append(segment)
       segmentToPersist = segment
+      replacementPersistenceSessionID = nil
     }
-    if !segmentToPersist.isStopCommittedPlaceholder {
-      persist(segment: segmentToPersist)
-    }
+    persist(segment: segmentToPersist, fallbackSessionID: replacementPersistenceSessionID)
     maybeTranslate(segment)
     applyVoiceFilter(to: segment)
+  }
+
+  private var displayableSegments: [TranscriptSegment] {
+    guard !suppressedSegmentIDs.isEmpty else { return segments }
+    return segments.filter { !suppressedSegmentIDs.contains($0.id) }
   }
 
   private func applyVoiceFilter(to segment: TranscriptSegment) {
@@ -306,20 +321,21 @@ final class LiveTranscriptionViewModel {
     do {
       let session = try transcriptStore.beginSession(localeIdentifier: localeIdentifier)
       activeTranscriptSessionID = session.id
+      mostRecentTranscriptSessionID = session.id
     } catch {
       persistenceUnavailableForCurrentSession = true
       recordPersistenceFailure()
     }
   }
 
-  private func persist(segment: TranscriptSegment) {
+  private func persist(segment: TranscriptSegment, fallbackSessionID: UUID? = nil) {
     guard segment.source == .liveATC, let transcriptStore else { return }
     if activeTranscriptSessionID == nil, status == .listening {
       beginPersistenceSessionIfNeeded()
     }
-    guard let activeTranscriptSessionID else { return }
+    guard let sessionID = activeTranscriptSessionID ?? fallbackSessionID else { return }
     do {
-      try transcriptStore.append(segment, to: activeTranscriptSessionID)
+      try transcriptStore.append(segment, to: sessionID)
     } catch {
       recordPersistenceFailure()
     }

@@ -34,8 +34,7 @@ struct SettingsView: View {
   // why: "" = follow the device language (default). A non-empty code writes the
   // standard AppleLanguages override, which iOS applies on the next launch -- the clean
   // in-app language switch, no bundle swizzling.
-  @State private var appLanguage: String =
-    (UserDefaults.standard.array(forKey: "AppleLanguages") as? [String])?.first ?? ""
+  @State private var appLanguage: String = Self.currentAppLanguagePickerTag()
 
   private static let appLanguages: [(code: String, name: String)] = [
     ("", String(localized: "System")),
@@ -51,36 +50,40 @@ struct SettingsView: View {
   var body: some View {
     NavigationStack {
       Form {
-        Section {
-          Toggle(isOn: $privacy.voiceFilterActive) {
-            VStack(alignment: .leading, spacing: 2) {
-              Text(String(localized: "Pilot speaker classification"))
-                .font(.body.weight(.medium))
-              Text(
-                privacy.voiceFilterActive
-                  ? String(
-                    localized:
-                      "Confident pilot speech can be stopped before recognition. Callsign relevance filtering stays active separately."
-                  )
-                  : String(
-                    localized:
-                      "Speaker classification is off; all audio buffers pass to recognition. Callsign relevance filtering can still hide irrelevant ATC."
-                  )
-              )
-              .font(.footnote)
-              .foregroundStyle(.secondary)
+        if VoiceFilterFeatureFlag.speakerDiarizationEnabled {
+          Section {
+            Toggle(isOn: $privacy.voiceFilterActive) {
+              VStack(alignment: .leading, spacing: 2) {
+                Text(String(localized: "Pilot speaker classification"))
+                  .font(.body.weight(.medium))
+                Text(
+                  privacy.voiceFilterActive
+                    ? String(
+                      localized:
+                        "Confident pilot speech can be stopped before recognition. Callsign relevance filtering stays active separately."
+                    )
+                    : String(
+                      localized:
+                        "Speaker classification is off; all audio buffers pass to recognition. Callsign relevance filtering can still hide irrelevant ATC."
+                    )
+                )
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+              }
             }
+            .accessibilityIdentifier("voicefilter-active-toggle")
+            .onChange(of: privacy.voiceFilterActive) { _, active in
+              if !active { onVoiceFilterDisabled() }
+            }
+          } header: {
+            Text(String(localized: "Privacy"))
+          } footer: {
+            Text(
+              String(
+                localized: "Dspeech processes audio locally only. Audio never leaves your device."))
           }
-          .accessibilityIdentifier("voicefilter-active-toggle")
-          .onChange(of: privacy.voiceFilterActive) { _, active in
-            if !active { onVoiceFilterDisabled() }
-          }
-        } header: {
-          Text(String(localized: "Privacy"))
-        } footer: {
-          Text(
-            String(
-              localized: "Dspeech processes audio locally only. Audio never leaves your device."))
         }
 
         if let voiceFilter {
@@ -94,6 +97,8 @@ struct SettingsView: View {
             Text(routeFailure.userFacingMessage)
               .font(.footnote)
               .foregroundStyle(.red)
+              .frame(maxWidth: .infinity, alignment: .leading)
+              .fixedSize(horizontal: false, vertical: true)
               .accessibilityIdentifier("audio-route-preparation-error")
           }
           if audioSource.hasSelectableInputs {
@@ -112,11 +117,15 @@ struct SettingsView: View {
             )
             .font(.footnote)
             .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .fixedSize(horizontal: false, vertical: true)
           }
           if let selectionError = audioSource.selectionError {
             Text(selectionError)
               .font(.footnote)
               .foregroundStyle(.orange)
+              .frame(maxWidth: .infinity, alignment: .leading)
+              .fixedSize(horizontal: false, vertical: true)
               .accessibilityIdentifier("audio-source-error")
           }
           Button {
@@ -136,6 +145,8 @@ struct SettingsView: View {
           if audioSource.isMetering {
             HStack(spacing: 12) {
               Text(String(localized: "Level")).font(.footnote).foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
               InputLevelBar(level: audioSource.inputLevel).frame(height: 8)
             }
             .accessibilityIdentifier("audio-input-level")
@@ -144,6 +155,8 @@ struct SettingsView: View {
             Text(inputLevelError)
               .font(.footnote)
               .foregroundStyle(.orange)
+              .frame(maxWidth: .infinity, alignment: .leading)
+              .fixedSize(horizontal: false, vertical: true)
               .accessibilityIdentifier("audio-meter-error")
           }
         } header: {
@@ -155,6 +168,7 @@ struct SettingsView: View {
                 "Your choice is saved for this device. The built-in microphone is for testing; for the cockpit, connect a wired input."
             )
           )
+          .frame(maxWidth: .infinity, alignment: .leading)
           .fixedSize(horizontal: false, vertical: true)
         }
         Section(String(localized: "Recognition")) {
@@ -165,6 +179,8 @@ struct SettingsView: View {
               Text(String(localized: "Checking on-device recognition languages…"))
                 .font(.footnote)
                 .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
             }
             .accessibilityIdentifier("recognition-locale-loading")
           case .available:
@@ -181,6 +197,8 @@ struct SettingsView: View {
               Text(String(localized: "No on-device recognition languages available."))
                 .font(.footnote)
                 .foregroundStyle(.orange)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
               Text(
                 String(
                   localized:
@@ -189,6 +207,8 @@ struct SettingsView: View {
               )
               .font(.footnote)
               .foregroundStyle(.secondary)
+              .frame(maxWidth: .infinity, alignment: .leading)
+              .fixedSize(horizontal: false, vertical: true)
             }
             .accessibilityIdentifier("recognition-locale-unavailable")
           }
@@ -202,6 +222,8 @@ struct SettingsView: View {
               )
               .font(.footnote)
               .foregroundStyle(.orange)
+              .frame(maxWidth: .infinity, alignment: .leading)
+              .fixedSize(horizontal: false, vertical: true)
               .accessibilityIdentifier("recognition-download-hint")
               Button {
                 if let url = URL(string: UIApplication.openSettingsURLString) {
@@ -219,6 +241,8 @@ struct SettingsView: View {
               )
               .font(.footnote)
               .foregroundStyle(.secondary)
+              .frame(maxWidth: .infinity, alignment: .leading)
+              .fixedSize(horizontal: false, vertical: true)
             }
           }
           LabeledContent(String(localized: "ASR model"), value: String(localized: "Apple Speech"))
@@ -229,7 +253,7 @@ struct SettingsView: View {
             .accessibilityIdentifier("translation-enabled-toggle")
           Picker(String(localized: "Target language"), selection: $translation.targetCode) {
             ForEach(translation.availableTargets) { option in
-              Text(option.displayName).tag(option.code)
+              Text(targetPickerLabel(for: option)).tag(option.code)
             }
           }
           .accessibilityIdentifier("translation-target-picker")
@@ -240,6 +264,8 @@ struct SettingsView: View {
             )
             .font(.footnote)
             .foregroundStyle(.orange)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .fixedSize(horizontal: false, vertical: true)
             .accessibilityIdentifier("translation-failure")
           }
         } header: {
@@ -251,6 +277,7 @@ struct SettingsView: View {
                 "Translation runs on-device via Apple's system language packs. The first time you enable it, iOS offers to download a language pack. Audio and text never leave your device."
             )
           )
+          .frame(maxWidth: .infinity, alignment: .leading)
           .fixedSize(horizontal: false, vertical: true)
         }
         Section {
@@ -295,6 +322,42 @@ struct SettingsView: View {
     }
     .accessibilityIdentifier("settings-sheet")
     .preferredColorScheme(.dark)
+  }
+
+  static func pickerTag(forStored stored: String?) -> String {
+    guard let stored, !stored.isEmpty else { return "" }
+    let storedLanguage = Locale(identifier: stored).language
+    guard let storedCode = storedLanguage.languageCode?.identifier else { return "" }
+    let storedScript = storedLanguage.script?.identifier
+    for language in appLanguages where !language.code.isEmpty {
+      let optionLanguage = Locale(identifier: language.code).language
+      guard optionLanguage.languageCode?.identifier == storedCode else { continue }
+      let optionScript = optionLanguage.script?.identifier
+      if storedScript == optionScript || optionScript == nil || storedScript == nil {
+        return language.code
+      }
+    }
+    return ""
+  }
+
+  private static func currentAppLanguagePickerTag(
+    bundleIdentifier: String? = Bundle.main.bundleIdentifier,
+    defaults: UserDefaults = .standard
+  ) -> String {
+    guard let bundleIdentifier,
+      let appleLanguages = defaults.persistentDomain(forName: bundleIdentifier)?["AppleLanguages"]
+        as? [String]
+    else { return "" }
+    return pickerTag(forStored: appleLanguages.first)
+  }
+
+  private func targetPickerLabel(for option: TranslationLanguageOption) -> String {
+    guard let sourceIdentifier = recognition.activeLocaleIdentifier,
+      ContentView.sameLanguageTranslationFailure(
+        sourceIdentifier: sourceIdentifier,
+        targetCode: option.code) != nil
+    else { return option.displayName }
+    return String(localized: "\(option.displayName) (current speech language)")
   }
 }
 

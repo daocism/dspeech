@@ -64,6 +64,7 @@ struct VoiceFilterSettingsSection: View {
       )
       .font(.footnote)
       .foregroundStyle(.secondary)
+      .frame(maxWidth: .infinity, alignment: .leading)
       .fixedSize(horizontal: false, vertical: true)
 
       if !storageIssues.isEmpty {
@@ -83,6 +84,7 @@ struct VoiceFilterSettingsSection: View {
         Text(dictationHint)
           .font(.footnote)
           .foregroundStyle(dictation.unavailableReason == nil ? Color.secondary : Color.orange)
+          .frame(maxWidth: .infinity, alignment: .leading)
           .fixedSize(horizontal: false, vertical: true)
       }
       .onChange(of: callsignDraft) { _, newValue in
@@ -106,10 +108,11 @@ struct VoiceFilterSettingsSection: View {
       Text(
         String(
           localized:
-            "Recognition runs on-device only. Audio and voice samples never leave your device. See ADR 0007 and ADR 0008 for details."
+            "The filter only hides transmissions addressed to other aircraft after they are transcribed. Nothing is deleted — hidden transmissions stay in the filtered list and in history."
         )
       )
     }
+    .onDisappear { stopTransientCapture() }
   }
 
   private var dictationButton: some View {
@@ -160,6 +163,8 @@ struct VoiceFilterSettingsSection: View {
       Text(VoiceFilterStorageIssue.userFacingSummary(storageIssues))
         .font(.footnote)
         .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .fixedSize(horizontal: false, vertical: true)
       Button(String(localized: "Reset corrupted data")) {
         pipeline.clearStorageIssues()
         storageIssues = pipeline.storageIssues
@@ -200,6 +205,14 @@ struct VoiceFilterSettingsSection: View {
 
   private func cancelDownload() {
     modelPackAcquisition.cancelDownload()
+  }
+
+  private func stopTransientCapture() {
+    dictation.stop()
+    recordingSlot = nil
+    Task { @MainActor in
+      await recorder.stop()
+    }
   }
 
   private func deleteModelPack(_ pack: InstalledModelPack) async {
@@ -265,6 +278,7 @@ struct VoiceFilterSettingsSection: View {
       HStack(alignment: .firstTextBaseline, spacing: 6) {
         Image(systemName: "arrow.down.circle")
         Text(String(localized: "Model not installed"))
+          .frame(maxWidth: .infinity, alignment: .leading)
           .fixedSize(horizontal: false, vertical: true)
       }
       .font(.subheadline.weight(.semibold))
@@ -277,6 +291,7 @@ struct VoiceFilterSettingsSection: View {
       )
       .font(.footnote)
       .foregroundStyle(.secondary)
+      .frame(maxWidth: .infinity, alignment: .leading)
       .fixedSize(horizontal: false, vertical: true)
       Button {
         startDownload()
@@ -284,6 +299,7 @@ struct VoiceFilterSettingsSection: View {
         HStack(spacing: 6) {
           Image(systemName: "arrow.down.circle.fill")
           Text(String(localized: "Download voice filter pack (≈ 15 MB)"))
+            .frame(maxWidth: .infinity, alignment: .leading)
             .fixedSize(horizontal: false, vertical: true)
         }
         .font(.subheadline.weight(.semibold))
@@ -305,6 +321,7 @@ struct VoiceFilterSettingsSection: View {
       )
       .font(.caption)
       .foregroundStyle(.secondary)
+      .frame(maxWidth: .infinity, alignment: .leading)
       .fixedSize(horizontal: false, vertical: true)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -351,6 +368,8 @@ struct VoiceFilterSettingsSection: View {
       )
       .font(.footnote)
       .foregroundStyle(.secondary)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .fixedSize(horizontal: false, vertical: true)
 
       if !identifierAvailable {
         VStack(alignment: .leading, spacing: 6) {
@@ -368,6 +387,8 @@ struct VoiceFilterSettingsSection: View {
           )
           .font(.footnote)
           .foregroundStyle(.secondary)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .fixedSize(horizontal: false, vertical: true)
         }
         .accessibilityIdentifier("voicefilter-capability-banner")
       }
@@ -380,6 +401,8 @@ struct VoiceFilterSettingsSection: View {
             Text(enrollSubtitle(for: slot))
               .font(.footnote)
               .foregroundStyle(.secondary)
+              .frame(maxWidth: .infinity, alignment: .leading)
+              .fixedSize(horizontal: false, vertical: true)
           }
           Spacer()
           Button(
@@ -402,6 +425,8 @@ struct VoiceFilterSettingsSection: View {
         Text(enrollMessage)
           .font(.footnote)
           .foregroundStyle(.cyan)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .fixedSize(horizontal: false, vertical: true)
           .accessibilityIdentifier("voicefilter-enroll-message")
       }
 
@@ -425,6 +450,8 @@ struct VoiceFilterSettingsSection: View {
       Text(failure.userSafeReason)
         .font(.footnote)
         .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .fixedSize(horizontal: false, vertical: true)
       if failure.isRetryable {
         Button(String(localized: "Retry download")) {
           startDownload()
@@ -456,6 +483,8 @@ struct VoiceFilterSettingsSection: View {
       )
       .font(.footnote)
       .foregroundStyle(.secondary)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .fixedSize(horizontal: false, vertical: true)
       Button(String(localized: "Enable voice filter")) {
         transition(to: .installed(pack))
       }
