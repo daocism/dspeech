@@ -78,6 +78,7 @@ enum ATCVoiceIndicator: Equatable, Sendable {
   case pilotSuppressed
   case dispatcherAddressedOwnCallSign
   case dispatcherContinuation
+  case urgencyBroadcast
   case probableDispatcher
   case mixedSpeakerCandidate
   case otherTrafficSuppressed
@@ -87,6 +88,7 @@ enum ATCVoiceIndicator: Equatable, Sendable {
 enum ATCRelevanceDecision: Equatable, Sendable {
   enum Reason: Equatable, Sendable {
     case noCallSignConfigured
+    case urgencyBroadcast
     case callSignMatch
     case continuationOfRecentHit
     case addressedToOther

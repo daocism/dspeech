@@ -9,7 +9,7 @@ struct PhoneticCallsignParserTests {
   }
 
   @Test func parsesAviationDigitVariants() {
-    #expect(PhoneticCallsignParser.parse("tree fife niner") == "359")
+    #expect(PhoneticCallsignParser.parse("tree fife fower niner") == "3549")
   }
 
   @Test func parsesMixedSpokenAndLiteral() {
@@ -22,6 +22,10 @@ struct PhoneticCallsignParserTests {
 
   @Test func parsesHyphenatedXray() {
     #expect(PhoneticCallsignParser.parse("x-ray yankee zulu") == "XYZ")
+  }
+
+  @Test func parsesSeparatedXRay() {
+    #expect(PhoneticCallsignParser.parse("x ray yankee zulu") == "XYZ")
   }
 
   @Test func emptyInputYieldsEmpty() {
@@ -46,13 +50,24 @@ struct PhoneticCallsignParserTests {
     ("romeo", "R"), ("sierra", "S"), ("tango", "T"), ("uniform", "U"), ("victor", "V"),
     ("whiskey", "W"), ("whisky", "W"), ("xray", "X"), ("x-ray", "X"), ("ex-ray", "X"),
     ("yankee", "Y"), ("zulu", "Z"),
-    ("zero", "0"), ("oh", "0"), ("one", "1"), ("won", "1"), ("two", "2"), ("too", "2"),
-    ("to", "2"), ("three", "3"), ("tree", "3"), ("four", "4"), ("for", "4"), ("fore", "4"),
+    ("zero", "0"), ("one", "1"), ("won", "1"), ("two", "2"), ("too", "2"),
+    ("to", "2"), ("three", "3"), ("tree", "3"), ("four", "4"), ("fower", "4"), ("for", "4"),
+    ("fore", "4"),
     ("five", "5"), ("fife", "5"), ("six", "6"), ("seven", "7"), ("eight", "8"), ("ate", "8"),
     ("nine", "9"), ("niner", "9"),
   ])
   func parsesEveryIcaoTokenVariant(_ pair: (spoken: String, expected: String)) {
     #expect(PhoneticCallsignParser.parse(pair.spoken) == pair.expected)
+  }
+
+  @Test func parsesOhAsZeroInsideCallsignTailContext() {
+    #expect(PhoneticCallsignParser.parse("november oh seven alpha") == "N07A")
+    #expect(PhoneticCallsignParser.parse("oh seven alpha") == "07A")
+  }
+
+  @Test func preservesOhOutsideCallsignTailContext() {
+    #expect(PhoneticCallsignParser.parse("oh") == "OH")
+    #expect(PhoneticCallsignParser.parse("say oh") == "SAYOH")
   }
 
   @Test func parsesFullAlphabetSentence() {
