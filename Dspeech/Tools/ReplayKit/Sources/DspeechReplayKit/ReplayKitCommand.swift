@@ -589,7 +589,7 @@ struct ReplayKitCommand {
   static func main() async {
     do {
       if CommandLine.arguments.dropFirst().first == "transcribe" {
-        let status = try TranscribeCommand.run(Array(CommandLine.arguments.dropFirst(2)))
+        let status = try await TranscribeCommand.run(Array(CommandLine.arguments.dropFirst(2)))
         if status != 0 { exit(status) }
         return
       }

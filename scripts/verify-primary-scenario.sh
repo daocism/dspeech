@@ -9,7 +9,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPLAYKIT_DIR="$REPO_ROOT/Dspeech/Tools/ReplayKit"
 FIXTURES_DIR="$REPO_ROOT/DspeechTests/Fixtures/ATC"
-ENGINES=("${DSPEECH_ENGINES:-apple}")
+read -r -a ENGINES <<<"${DSPEECH_ENGINES:-apple whisperkit}"
 LOCALE="${DSPEECH_LOCALE:-fr-FR}"
 CALLSIGN="${DSPEECH_CALLSIGN:-}"
 GAP="${DSPEECH_GAP:-3.5}"

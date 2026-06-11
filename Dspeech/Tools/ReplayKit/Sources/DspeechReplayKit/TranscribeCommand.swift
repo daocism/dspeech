@@ -7,8 +7,17 @@ enum TranscribeCommand {
     Usage: dspeech-replay transcribe --audio <wav> --locale <locale> [--engine apple] [--callsign <raw>] [--gap <seconds>] [--simulate-restart <seconds>] [--replay-tail on|off] [--chunk-seconds <seconds>] [--emit-partials on|off]
     """
 
-  static func run(_ arguments: [String]) throws -> Int32 {
+  static func run(_ arguments: [String]) async throws -> Int32 {
     let options = try TranscribeArguments.parse(arguments)
+    if options.engine == "whisperkit" {
+      guard options.restartSeconds.isEmpty else {
+        throw ReplayKitError.invalidArguments(
+          "--simulate-restart mirrors the Apple task-recycle path; not applicable to whisperkit"
+        )
+      }
+      try await WhisperKitTranscribe.run(options: options)
+      return 0
+    }
     let authorizationStatus = SpeechAuthorization.request()
     guard authorizationStatus == .authorized else {
       fputs(
@@ -17,7 +26,7 @@ enum TranscribeCommand {
       )
       return 3
     }
-    try TranscribeRunner(options: options).run()
+    try await TranscribeRunner(options: options).run()
     return 0
   }
 }
@@ -31,6 +40,7 @@ struct TranscribeArguments: Sendable {
   let chunkSeconds: Double
   let emitPartials: Bool
   let transmissionGapSeconds: Double
+  let engine: String
 
   static func parse(_ arguments: [String]) throws -> TranscribeArguments {
     var audioURL: URL?
@@ -41,6 +51,7 @@ struct TranscribeArguments: Sendable {
     var chunkSeconds = 0.1
     var emitPartials = true
     var transmissionGapSeconds = 3.5
+    var engine = "apple"
     var index = 0
 
     while index < arguments.count {
@@ -95,16 +106,12 @@ struct TranscribeArguments: Sendable {
         transmissionGapSeconds = seconds
       case "--engine":
         index += 1
-        guard index < arguments.count else {
-          throw ReplayKitError.invalidArguments("Missing value for --engine")
-        }
-        // why: whisperkit is the SPEC §5 Phase B engine — fail loudly until its
-        // adapter lands so the gate can never silently "pass" the wrong engine.
-        guard arguments[index] == "apple" else {
+        guard index < arguments.count, ["apple", "whisperkit"].contains(arguments[index]) else {
           throw ReplayKitError.invalidArguments(
-            "Unsupported engine '\(arguments[index])' (Phase A supports: apple)"
+            "Invalid value for --engine (supported: apple, whisperkit)"
           )
         }
+        engine = arguments[index]
       case "--help", "-h":
         throw ReplayKitError.invalidArguments(TranscribeCommand.usage)
       default:
@@ -126,7 +133,8 @@ struct TranscribeArguments: Sendable {
       replayTailEnabled: replayTailEnabled,
       chunkSeconds: chunkSeconds,
       emitPartials: emitPartials,
-      transmissionGapSeconds: transmissionGapSeconds
+      transmissionGapSeconds: transmissionGapSeconds,
+      engine: engine
     )
   }
 }
@@ -244,6 +252,7 @@ private final class TranscribeRunner {
   private var failure: TranscribeASRFailure?
   private var replayTail = TranscribeReplayTail(maxDurationSeconds: 1.0, maxBufferCount: 96)
   private var nextRestartIndex = 0
+  private var needsBenignRestart = false
   private let classifierClock: TransmissionClassifierClock
   private var assembler: TransmissionAssembler
   private var closedTransmissions: [Transmission] = []
@@ -324,7 +333,7 @@ private final class TranscribeRunner {
     }
   }
 
-  func run() throws {
+  func run() async throws {
     let audio = try PCM16WAVAudioReader().read(options.audioURL)
     sampleRate = audio.sampleRate
     let chunks = try Self.makeChunks(audio: audio, chunkSeconds: options.chunkSeconds)
@@ -351,19 +360,23 @@ private final class TranscribeRunner {
 
     for chunk in chunks {
       appendChunk(chunk)
-      pumpRunLoop(until: Date().addingTimeInterval(0.1))
+      await pace(seconds: options.chunkSeconds)
       while nextRestartIndex < options.restartSeconds.count
         && currentAudioSeconds >= options.restartSeconds[nextRestartIndex]
       {
         try simulateRestart()
         nextRestartIndex += 1
       }
+      if needsBenignRestart {
+        needsBenignRestart = false
+        try simulateRestart()
+      }
       if let failure { throw failure }
     }
 
     request?.endAudio()
     endAudioSent = true
-    try waitForCompletion(totalSeconds: totalSeconds)
+    try await waitForCompletion(totalSeconds: totalSeconds)
     print("EVENT done     t=\(Self.formatTime(totalSeconds))")
     teardownRecognition()
     finishAssembly(totalSeconds: totalSeconds)
@@ -549,10 +562,6 @@ private final class TranscribeRunner {
     guard callback.generation == generation else { return }
     if let partialText = callback.partialText {
       pendingPartial = partialText
-      assemble(
-        .partial(text: partialText, at: Self.date(at: currentAudioSeconds)),
-        at: currentAudioSeconds
-      )
       if options.emitPartials
         && !partialText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
       {
@@ -569,6 +578,16 @@ private final class TranscribeRunner {
         interim: false,
         segments: final.segments
       )
+      // why: live-partial feed times are load-dependent (a fast feed outruns the
+      // recognizer and stamps everything at end-of-audio); the final's segment
+      // timestamps are the audio-accurate speech evidence, so they drive the
+      // assembler's open/keep-open instead.
+      for segment in final.segments.sorted(by: { $0.startSeconds < $1.startSeconds }) {
+        assemble(
+          .partial(text: final.text, at: Self.date(at: segment.startSeconds)),
+          at: segment.startSeconds
+        )
+      }
       assemble(
         .fragment(
           segment: TranscriptSegment(
@@ -587,8 +606,15 @@ private final class TranscribeRunner {
       if endAudioSent { completed = true }
     }
     if let callbackFailure = callback.failure {
-      if callbackFailure.isBenignNoSpeech && emittedFinal {
-        if endAudioSent { completed = true }
+      if callbackFailure.isBenignNoSpeech {
+        // why: 1110 means "this request saw no speech yet", not a dead session —
+        // the live engine reinstalls the recognition task and replays the tail.
+        // Mirror it: recycle mid-feed, complete once all audio was delivered.
+        if endAudioSent {
+          completed = true
+        } else {
+          needsBenignRestart = true
+        }
       } else {
         failure = callbackFailure
         completed = true
@@ -613,10 +639,10 @@ private final class TranscribeRunner {
     }
   }
 
-  private func waitForCompletion(totalSeconds: Double) throws {
+  private func waitForCompletion(totalSeconds: Double) async throws {
     let deadline = Date().addingTimeInterval(120)
     while !completed && failure == nil && Date() < deadline {
-      pumpRunLoop(until: Date().addingTimeInterval(0.1))
+      await pace(seconds: 0.1)
     }
     if let failure { throw failure }
     guard completed else {
@@ -626,8 +652,12 @@ private final class TranscribeRunner {
     }
   }
 
-  private func pumpRunLoop(until limit: Date) {
-    RunLoop.current.run(mode: .default, before: limit)
+  // why: feed pacing must be wall-clock real-time — an unpaced feed outruns the
+  // recognizer, so a simulated restart cancels the task before its first result
+  // and the successor sees only a burst+endAudio (returns 1110). Speech callbacks
+  // arrive on their own dispatch queue into the inbox; no run-loop service needed.
+  private func pace(seconds: Double) async {
+    try? await Task.sleep(for: .seconds(seconds))
     drainCallbacks()
   }
 
@@ -669,7 +699,7 @@ private final class TranscribeRunner {
 // currentTime to the event timestamp immediately before each synchronous
 // process() call, which is exactly the open transmission's endedAt at classify
 // time. Single-threaded CLI — no concurrent access.
-private final class TransmissionClassifierClock: @unchecked Sendable {
+final class TransmissionClassifierClock: @unchecked Sendable {
   var classifier: TransmissionClassifier
   var currentTime = Date(timeIntervalSince1970: 0)
 
