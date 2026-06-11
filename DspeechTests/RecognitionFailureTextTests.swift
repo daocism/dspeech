@@ -17,6 +17,10 @@ struct RecognitionFailureTextTests {
     "on-device-model-missing: en-US",
     "on-device-model-missing: fr-FR",
     "start-failed: The operation couldn’t be completed.",
+    "engine-configuration-change-failed: invalid-input-format",
+    "engine-died-before-restart",
+    "capture-session-busy",
+    "audio-session-deactivation-failed: session refused",
     "asr-error: kLSRErrorDomain#300 The operation couldn’t be completed.",
     "asr-error: kAFAssistantErrorDomain#1110 No speech detected.",
     "asr-error: kAFAssistantErrorDomain#203 Retry.",
@@ -26,7 +30,8 @@ struct RecognitionFailureTextTests {
   private static let forbiddenTokens = [
     "kLSRErrorDomain", "kAFAssistantErrorDomain", "recognizer-unavailable",
     "recognition-locale-unavailable", "on-device-model-missing", "asr-error",
-    "start-failed", "#300", "#1110", "#203",
+    "start-failed", "engine-configuration-change-failed", "engine-died-before-restart",
+    "capture-session-busy", "audio-session-deactivation-failed", "#300", "#1110", "#203",
   ]
 
   @Test(arguments: allEngineCodes)
@@ -62,6 +67,17 @@ struct RecognitionFailureTextTests {
     let speech = RecognitionFailureText.userFacing("speech-permission-denied")
     #expect(mic != speech)
     #expect(!mic.isEmpty && !speech.isEmpty)
+  }
+
+  @Test func liveSessionSurvivalCodesHaveDistinctActionableMessages() {
+    let configuration = RecognitionFailureText.userFacing(
+      "engine-configuration-change-failed: invalid-input-format")
+    let died = RecognitionFailureText.userFacing("engine-died-before-restart")
+    let busy = RecognitionFailureText.userFacing("capture-session-busy")
+    #expect(!configuration.isEmpty && !died.isEmpty && !busy.isEmpty)
+    #expect(configuration != died)
+    #expect(died != busy)
+    #expect(configuration != busy)
   }
 }
 

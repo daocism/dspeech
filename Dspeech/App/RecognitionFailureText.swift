@@ -37,6 +37,27 @@ enum RecognitionFailureText {
       return String(
         localized: "Couldn't start recognition. Check the microphone and try again.")
     }
+    if rawCode.hasPrefix("engine-configuration-change-failed") {
+      return String(
+        localized:
+          "Audio input changed and recognition couldn't recover. Check the input and start again.")
+    }
+    if rawCode == "engine-died-before-restart" {
+      return String(
+        localized: "Audio input stopped unexpectedly. Check the input and start again.")
+    }
+    if rawCode == "capture-session-busy" {
+      return String(
+        localized:
+          "Another recording task is using the microphone. Stop it before starting live transcription."
+      )
+    }
+    if rawCode.hasPrefix("audio-session-deactivation-failed") {
+      return String(
+        localized:
+          "Audio capture stopped, but iOS couldn't release the audio session. Check the input before starting again."
+      )
+    }
     if rawCode.hasPrefix("asr-error") {
       // why: kLSRErrorDomain#300 specifically means the on-device model could not run for
       // the chosen language — the exact symptom the user reported for a "downloaded" locale.

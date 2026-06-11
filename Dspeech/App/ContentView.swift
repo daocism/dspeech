@@ -66,8 +66,7 @@ struct ContentView: View {
     _coordinator = State(
       initialValue: CaptureCoordinator(
         live: live,
-        routeMonitor: monitor,
-        routeChanges: routing.routeChanges
+        routeMonitor: monitor
       ))
   }
 
@@ -168,7 +167,9 @@ struct ContentView: View {
     }
     .onDisappear { coordinator.endObservingRouteChanges() }
     .onChange(of: scenePhase) { _, newPhase in
-      if newPhase == .background {
+      if newPhase == .active {
+        coordinator.refreshOnForeground()
+      } else if newPhase == .background {
         coordinator.stopForBackground()
       }
     }

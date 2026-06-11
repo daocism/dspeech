@@ -1,3 +1,4 @@
+@preconcurrency import AVFoundation
 import Testing
 
 @testable import Dspeech
@@ -113,6 +114,64 @@ struct AppleSpeechLiveTranscriptionEngineLifecycleTests {
         isListening: true, hasRecognizer: false, failure: nil) == .ignore)
   }
 
+  @Test func restartDecisionFailsWhenListeningEngineIsNotRunning() {
+    #expect(
+      AppleSpeechLiveTranscriptionEngine.restartDecision(
+        isListening: true, isAudioEngineRunning: false)
+        == .fail("engine-died-before-restart"))
+  }
+
+  @Test func startFailsWhenCaptureSessionIsBusy() async {
+    let arbiter = AudioCaptureArbiter()
+    #expect(arbiter.acquire(.callsignDictation))
+    let engine = AppleSpeechLiveTranscriptionEngine(
+      requireOnDeviceModel: false,
+      skipPermissionRequests: true,
+      arbiter: arbiter,
+      audioSession: SpyLiveAudioSession()
+    )
+
+    await engine.start()
+
+    #expect(engine.status == .failed("capture-session-busy"))
+    #expect(arbiter.activeClient == .callsignDictation)
+  }
+
+  @Test func stopReleasesLiveCaptureAndDeactivatesWhenHolder() {
+    let arbiter = AudioCaptureArbiter()
+    let audioSession = SpyLiveAudioSession()
+    let engine = AppleSpeechLiveTranscriptionEngine(
+      requireOnDeviceModel: false,
+      skipPermissionRequests: true,
+      arbiter: arbiter,
+      audioSession: audioSession
+    )
+    engine.primeListeningForTesting(acquireCapture: true)
+    #expect(arbiter.activeClient == .liveTranscription)
+
+    engine.stop()
+
+    #expect(arbiter.activeClient == nil)
+    #expect(audioSession.setActiveCalls == [.inactive(options: .notifyOthersOnDeactivation)])
+  }
+
+  @Test func stopSkipsDeactivationWhenLiveCaptureIsNotHolder() {
+    let arbiter = AudioCaptureArbiter()
+    let audioSession = SpyLiveAudioSession()
+    let engine = AppleSpeechLiveTranscriptionEngine(
+      requireOnDeviceModel: false,
+      skipPermissionRequests: true,
+      arbiter: arbiter,
+      audioSession: audioSession
+    )
+    engine.primeListeningForTesting(acquireCapture: false)
+
+    engine.stop()
+
+    #expect(arbiter.activeClient == nil)
+    #expect(audioSession.setActiveCalls.isEmpty)
+  }
+
   @discardableResult
   private func wait(
     for predicate: @MainActor () -> Bool,
@@ -132,6 +191,25 @@ struct AppleSpeechLiveTranscriptionEngineLifecycleTests {
 private struct ImmediateLiveSpeechAuthorizer: LiveSpeechAuthorizing {
   func requestSpeechAuthorization() async -> Bool { true }
   func requestMicrophonePermission() async -> Bool { true }
+}
+
+@MainActor
+private final class SpyLiveAudioSession: LiveAudioSessionManaging {
+  enum SetActiveCall: Equatable {
+    case active(options: AVAudioSession.SetActiveOptions)
+    case inactive(options: AVAudioSession.SetActiveOptions)
+  }
+
+  private(set) var configuredForLiveRecording = false
+  private(set) var setActiveCalls: [SetActiveCall] = []
+
+  func configureForLiveRecording() throws {
+    configuredForLiveRecording = true
+  }
+
+  func setActive(_ active: Bool, options: AVAudioSession.SetActiveOptions) throws {
+    setActiveCalls.append(active ? .active(options: options) : .inactive(options: options))
+  }
 }
 
 @MainActor

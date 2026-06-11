@@ -274,6 +274,62 @@ struct CaptureCoordinatorTests {
     #expect(coordinator.routeBanner != nil)
   }
 
+  @Test func interruptionEndedWithResumeRestartsWhenInterruptionStoppedCapture() async {
+    let (coordinator, engine, _) = Self.makeCoordinator(
+      route: RouteSnapshot(inputs: [Self.port(.usbAudio, name: "USB Tap")]),
+      availableInputs: [Self.port(.usbAudio, name: "USB Tap")]
+    )
+    await coordinator.start()
+    await Self.wait(for: { coordinator.live.isListening })
+    coordinator.handleRouteEvent(.interruptionBegan)
+    await Self.wait(for: { engine.stopCallCount == 1 })
+
+    coordinator.handleRouteEvent(.interruptionEnded(shouldResume: true))
+
+    await Self.wait(for: { engine.startCallCount == 2 })
+    #expect(engine.startCallCount == 2)
+    #expect(engine.stopCallCount == 1)
+  }
+
+  @Test func interruptionEndedWithoutResumeDoesNotRestartAndClearsLatch() async {
+    let (coordinator, engine, _) = Self.makeCoordinator(
+      route: RouteSnapshot(inputs: [Self.port(.usbAudio, name: "USB Tap")]),
+      availableInputs: [Self.port(.usbAudio, name: "USB Tap")]
+    )
+    await coordinator.start()
+    await Self.wait(for: { coordinator.live.isListening })
+    coordinator.handleRouteEvent(.interruptionBegan)
+    await Self.wait(for: { engine.stopCallCount == 1 })
+
+    coordinator.handleRouteEvent(.interruptionEnded(shouldResume: false))
+    coordinator.handleRouteEvent(.interruptionEnded(shouldResume: true))
+    await Self.wait(for: {
+      coordinator.routeMonitor.lastNotice?.kind == .interruptionEnded(shouldResume: true)
+    })
+
+    #expect(engine.startCallCount == 1)
+    #expect(engine.stopCallCount == 1)
+  }
+
+  @Test func userStopClearsInterruptionResumeLatch() async {
+    let (coordinator, engine, _) = Self.makeCoordinator(
+      route: RouteSnapshot(inputs: [Self.port(.usbAudio, name: "USB Tap")]),
+      availableInputs: [Self.port(.usbAudio, name: "USB Tap")]
+    )
+    await coordinator.start()
+    await Self.wait(for: { coordinator.live.isListening })
+    coordinator.handleRouteEvent(.interruptionBegan)
+    await Self.wait(for: { engine.stopCallCount == 1 })
+
+    coordinator.stop()
+    coordinator.handleRouteEvent(.interruptionEnded(shouldResume: true))
+    await Self.wait(for: {
+      coordinator.routeMonitor.lastNotice?.kind == .interruptionEnded(shouldResume: true)
+    })
+
+    #expect(engine.startCallCount == 1)
+  }
+
   @Test func interruptionEndedWhileIdleShowsNoticeWithoutRestartingCapture() {
     let (coordinator, engine, _) = Self.makeCoordinator(
       route: RouteSnapshot(inputs: [Self.port(.usbAudio, name: "USB Tap")]),
@@ -308,6 +364,41 @@ struct CaptureCoordinatorTests {
     #expect(coordinator.routeMonitor.health == .cautionBuiltIn)
     #expect(coordinator.routeMonitor.lastNotice?.kind == .mediaServicesReset)
     #expect(coordinator.routeBanner != nil)
+  }
+
+  @Test func noSuitableRouteWhileListeningStopsAndShowsNotice() async {
+    let (coordinator, engine, routing) = Self.makeCoordinator(
+      route: RouteSnapshot(inputs: [Self.port(.usbAudio, name: "USB Tap")]),
+      availableInputs: [Self.port(.usbAudio, name: "USB Tap")]
+    )
+    await coordinator.start()
+    await Self.wait(for: { coordinator.live.isListening })
+    routing.updateRoute(RouteSnapshot(), availableInputs: [])
+
+    coordinator.handleRouteEvent(.noSuitableRouteForCategory)
+
+    await Self.wait(for: { engine.stopCallCount == 1 })
+    #expect(engine.stopCallCount == 1)
+    #expect(coordinator.routeMonitor.health == .noInput)
+    #expect(coordinator.routeMonitor.lastNotice?.kind == .noSuitableRoute)
+    #expect(coordinator.routeBanner != nil)
+  }
+
+  @Test func oldDeviceUnavailableToNoInputStopsCapture() async {
+    let (coordinator, engine, routing) = Self.makeCoordinator(
+      route: RouteSnapshot(inputs: [Self.port(.usbAudio, name: "USB Tap")]),
+      availableInputs: [Self.port(.usbAudio, name: "USB Tap")]
+    )
+    await coordinator.start()
+    await Self.wait(for: { coordinator.live.isListening })
+    routing.updateRoute(RouteSnapshot(), availableInputs: [])
+
+    coordinator.handleRouteEvent(.oldDeviceUnavailable)
+
+    await Self.wait(for: { engine.stopCallCount == 1 })
+    #expect(engine.stopCallCount == 1)
+    #expect(coordinator.routeMonitor.health == .noInput)
+    #expect(coordinator.routeMonitor.lastNotice?.kind == .noSuitableRoute)
   }
 
   @Test func mediaServicesResetWhileStoppedShowsNoticeWithoutStopCall() {
@@ -382,6 +473,20 @@ struct CaptureCoordinatorTests {
     #expect(engine.stopCallCount == 0)
   }
 
+  @Test func refreshOnForegroundClearsStaleRouteBlock() {
+    let (coordinator, _, _) = Self.makeCoordinator(
+      route: RouteSnapshot(inputs: [Self.port(.usbAudio, name: "USB Tap")]),
+      availableInputs: [Self.port(.usbAudio, name: "USB Tap")]
+    )
+    coordinator.handleRouteEvent(.interruptionBegan)
+    #expect(coordinator.canStart == false)
+
+    coordinator.refreshOnForeground()
+
+    #expect(coordinator.canStart)
+    #expect(coordinator.startBlockedMessage == nil)
+  }
+
   @Test func stopForBackgroundStopsStartupInProgress() async {
     let (coordinator, engine, _) = Self.makeCoordinator(
       route: RouteSnapshot(inputs: [Self.port(.usbAudio)]),
@@ -425,6 +530,25 @@ struct CaptureCoordinatorTests {
     engine.completeStart()
     await startTask.value
     #expect(coordinator.live.status == .stopped)
+  }
+
+  @Test func observingRouteChangesReceivesEventsAfterEndBeginCycle() async {
+    let (coordinator, _, routing) = Self.makeCoordinator(
+      route: RouteSnapshot(inputs: [Self.port(.usbAudio, name: "USB Tap")]),
+      availableInputs: [Self.port(.usbAudio, name: "USB Tap")]
+    )
+    coordinator.beginObservingRouteChanges()
+    routing.emit(.categoryChange)
+    await Self.wait(for: { coordinator.routeMonitor.lastEvent == .categoryChange })
+    coordinator.endObservingRouteChanges()
+    routing.updateRoute(RouteSnapshot(), availableInputs: [])
+    coordinator.beginObservingRouteChanges()
+
+    routing.emit(.noSuitableRouteForCategory)
+
+    await Self.wait(for: { coordinator.routeMonitor.lastEvent == .noSuitableRouteForCategory })
+    #expect(coordinator.routeMonitor.lastEvent == .noSuitableRouteForCategory)
+    #expect(coordinator.routeMonitor.health == .noInput)
   }
 
   @Test func interruptionBeganStopsStartupInProgress() async {

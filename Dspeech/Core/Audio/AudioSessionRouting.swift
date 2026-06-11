@@ -4,7 +4,7 @@ protocol AudioSessionRouting: Sendable {
   var routePreparationStatus: AudioRoutePreparationStatus { get }
   var currentRouteSnapshot: RouteSnapshot { get }
   var availableInputSnapshots: [PortSnapshot] { get }
-  var routeChanges: AsyncStream<RouteChangeEvent> { get }
+  func routeChangeEvents() -> AsyncStream<RouteChangeEvent>
   func requestRecordPermission() async -> Bool
   func setPreferredInput(uid: String) throws
 }
@@ -42,8 +42,7 @@ final class FakeAudioSessionRouting: AudioSessionRouting, @unchecked Sendable {
   private let _permissionGranted: Bool
   private let _rejectedPreferredInputUIDs: Set<String>
   private var _preferredInputUIDs: [String] = []
-  private var continuation: AsyncStream<RouteChangeEvent>.Continuation?
-  let routeChanges: AsyncStream<RouteChangeEvent>
+  private var routeContinuations: [UUID: AsyncStream<RouteChangeEvent>.Continuation] = [:]
 
   init(
     routePreparationStatus: AudioRoutePreparationStatus = .ready,
@@ -57,13 +56,6 @@ final class FakeAudioSessionRouting: AudioSessionRouting, @unchecked Sendable {
     self._availableInputs = availableInputs
     self._permissionGranted = permissionGranted
     self._rejectedPreferredInputUIDs = rejectedPreferredInputUIDs
-    var localContinuation: AsyncStream<RouteChangeEvent>.Continuation!
-    self.routeChanges = AsyncStream<RouteChangeEvent>(
-      bufferingPolicy: .unbounded
-    ) { continuation in
-      localContinuation = continuation
-    }
-    self.continuation = localContinuation
   }
 
   var routePreparationStatus: AudioRoutePreparationStatus {
@@ -113,12 +105,38 @@ final class FakeAudioSessionRouting: AudioSessionRouting, @unchecked Sendable {
     lock.unlock()
   }
 
+  func routeChangeEvents() -> AsyncStream<RouteChangeEvent> {
+    let id = UUID()
+    return AsyncStream<RouteChangeEvent>(bufferingPolicy: .unbounded) { continuation in
+      lock.lock()
+      routeContinuations[id] = continuation
+      lock.unlock()
+      continuation.onTermination = { [weak self] _ in
+        guard let self else { return }
+        lock.lock()
+        routeContinuations[id] = nil
+        lock.unlock()
+      }
+    }
+  }
+
   func emit(_ event: RouteChangeEvent) {
-    continuation?.yield(event)
+    lock.lock()
+    let continuations = Array(routeContinuations.values)
+    lock.unlock()
+    for continuation in continuations {
+      continuation.yield(event)
+    }
   }
 
   func finish() {
-    continuation?.finish()
+    lock.lock()
+    let continuations = Array(routeContinuations.values)
+    routeContinuations.removeAll()
+    lock.unlock()
+    for continuation in continuations {
+      continuation.finish()
+    }
   }
 
   var preferredInputCalls: [String] {

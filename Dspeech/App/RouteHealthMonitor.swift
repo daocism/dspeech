@@ -27,6 +27,9 @@ final class RouteHealthMonitor {
   var health: RouteHealth { assessment.health }
   var primaryInputName: String? { assessment.primaryInputName }
   var primaryInputTypeRaw: String? { assessment.primaryInputTypeRaw }
+  var isCurrentRouteCaptureCapable: Bool {
+    Self.isCaptureCapable(assessment: assessment, routePreparationFailure: routePreparationFailure)
+  }
 
   var blocksStart: Bool {
     isAudioSessionInterrupted
@@ -37,7 +40,7 @@ final class RouteHealthMonitor {
 
   func start() {
     if observeTask != nil { return }
-    let stream = routing.routeChanges
+    let stream = routing.routeChangeEvents()
     observeTask = Task { @MainActor [weak self] in
       for await event in stream {
         guard let self else { return }
@@ -52,8 +55,23 @@ final class RouteHealthMonitor {
   }
 
   func refreshFromRouting() {
+    refreshFromRouting(clearStaleInterruption: false)
+  }
+
+  func refreshOnForeground() {
+    refreshFromRouting(clearStaleInterruption: true)
+  }
+
+  func routeChangeEvents() -> AsyncStream<RouteChangeEvent> {
+    routing.routeChangeEvents()
+  }
+
+  private func refreshFromRouting(clearStaleInterruption: Bool) {
     routePreparationFailure = routing.routePreparationStatus.failure
     assessment = Self.assessment(for: routing)
+    if clearStaleInterruption, isCurrentRouteCaptureCapable {
+      isAudioSessionInterrupted = false
+    }
   }
 
   func handle(event: RouteChangeEvent) {
@@ -62,6 +80,13 @@ final class RouteHealthMonitor {
     let previous = assessment
     let recomputed = Self.assessment(for: routing)
     assessment = recomputed
+    if event.clearsStaleInterruptionWhenHealthy,
+      Self.isCaptureCapable(
+        assessment: recomputed,
+        routePreparationFailure: routePreparationFailure)
+    {
+      isAudioSessionInterrupted = false
+    }
 
     switch event {
     case .newDeviceAvailable:
@@ -79,7 +104,17 @@ final class RouteHealthMonitor {
         )
       }
     case .oldDeviceUnavailable:
-      if previous.health == .suitableExternal && recomputed.health != .suitableExternal {
+      if Self.isCaptureCapable(assessment: previous, routePreparationFailure: nil),
+        !Self.isCaptureCapable(
+          assessment: recomputed,
+          routePreparationFailure: routePreparationFailure)
+      {
+        lastNotice = RouteChangeNotice(
+          kind: .noSuitableRoute,
+          portName: nil,
+          timestamp: now()
+        )
+      } else if previous.health == .suitableExternal && recomputed.health != .suitableExternal {
         lastNotice = RouteChangeNotice(
           kind: .lost,
           portName: recomputed.primaryInputName,
@@ -122,11 +157,23 @@ final class RouteHealthMonitor {
         timestamp: now()
       )
     case .categoryChange, .override, .wakeFromSleep, .routeConfigurationChange, .unknown:
-      lastNotice = RouteChangeNotice(
-        kind: .silent,
-        portName: recomputed.primaryInputName,
-        timestamp: now()
-      )
+      if Self.isCaptureCapable(assessment: previous, routePreparationFailure: nil),
+        !Self.isCaptureCapable(
+          assessment: recomputed,
+          routePreparationFailure: routePreparationFailure)
+      {
+        lastNotice = RouteChangeNotice(
+          kind: .noSuitableRoute,
+          portName: nil,
+          timestamp: now()
+        )
+      } else {
+        lastNotice = RouteChangeNotice(
+          kind: .silent,
+          portName: recomputed.primaryInputName,
+          timestamp: now()
+        )
+      }
     }
   }
 
@@ -136,6 +183,19 @@ final class RouteHealthMonitor {
 
   private static func didImprove(from old: RouteHealth, to new: RouteHealth) -> Bool {
     rank(new) > rank(old)
+  }
+
+  private static func isCaptureCapable(
+    assessment: RouteHealthAssessment,
+    routePreparationFailure: AudioRoutePreparationFailure?
+  ) -> Bool {
+    guard routePreparationFailure == nil else { return false }
+    switch assessment.health {
+    case .noInput, .unsuitableOutputOnly:
+      return false
+    case .suitableExternal, .cautionBuiltIn, .unknownExternal:
+      return true
+    }
   }
 
   private static func assessment(for routing: AudioSessionRouting) -> RouteHealthAssessment {
@@ -155,6 +215,18 @@ final class RouteHealthMonitor {
     case .unknownExternal: return 2
     case .cautionBuiltIn: return 3
     case .suitableExternal: return 4
+    }
+  }
+}
+
+extension RouteChangeEvent {
+  fileprivate var clearsStaleInterruptionWhenHealthy: Bool {
+    switch self {
+    case .interruptionBegan, .interruptionEnded, .mediaServicesWereReset:
+      return false
+    case .newDeviceAvailable, .oldDeviceUnavailable, .categoryChange, .override, .wakeFromSleep,
+      .noSuitableRouteForCategory, .routeConfigurationChange, .unknown:
+      return true
     }
   }
 }

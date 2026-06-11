@@ -9,16 +9,14 @@ final class CaptureCoordinator {
 
   private(set) var startBlockedMessage: String?
   private var routeObservation: Task<Void, Never>?
-  private let routeChanges: AsyncStream<RouteChangeEvent>?
+  private var stoppedByInterruption = false
 
   init(
     live: LiveTranscriptionViewModel,
-    routeMonitor: RouteHealthMonitor,
-    routeChanges: AsyncStream<RouteChangeEvent>? = nil
+    routeMonitor: RouteHealthMonitor
   ) {
     self.live = live
     self.routeMonitor = routeMonitor
-    self.routeChanges = routeChanges
   }
 
   var canStart: Bool { !routeMonitor.blocksStart }
@@ -37,6 +35,7 @@ final class CaptureCoordinator {
   }
 
   func start() async {
+    stoppedByInterruption = false
     guard !routeMonitor.blocksStart else {
       startBlockedMessage =
         routeMonitor.routePreparationFailure?.userFacingMessage
@@ -53,6 +52,7 @@ final class CaptureCoordinator {
   }
 
   func stop() {
+    stoppedByInterruption = false
     live.stop()
   }
 
@@ -72,9 +72,38 @@ final class CaptureCoordinator {
     live.stop()
   }
 
+  func refreshOnForeground() {
+    routeMonitor.refreshOnForeground()
+    if !routeMonitor.isAudioSessionInterrupted {
+      stoppedByInterruption = false
+    }
+    if !routeMonitor.blocksStart {
+      startBlockedMessage = nil
+    }
+  }
+
   func handleRouteEvent(_ event: RouteChangeEvent) {
+    let wasCapturing = live.canStopCurrentSession
     routeMonitor.handle(event: event)
+    if case .interruptionBegan = event {
+      if wasCapturing {
+        stoppedByInterruption = true
+        live.stop()
+      }
+      return
+    }
+    if case .interruptionEnded(let shouldResume) = event {
+      let shouldAutoResume = shouldResume && stoppedByInterruption
+      stoppedByInterruption = false
+      if shouldAutoResume {
+        Task { @MainActor [weak self] in
+          await self?.start()
+        }
+      }
+      return
+    }
     if shouldStopCurrentCapture(after: event), live.canStopCurrentSession {
+      stoppedByInterruption = false
       live.stop()
     }
   }
@@ -82,17 +111,22 @@ final class CaptureCoordinator {
   private func shouldStopCurrentCapture(after event: RouteChangeEvent) -> Bool {
     switch event {
     case .oldDeviceUnavailable:
-      return routeMonitor.lastNotice?.kind == .lost
-    case .interruptionBegan, .mediaServicesWereReset:
+      return routeMonitor.lastNotice?.kind == .lost || !routeMonitor.isCurrentRouteCaptureCapable
+    case .mediaServicesWereReset:
       return true
+    case .noSuitableRouteForCategory:
+      return !routeMonitor.isCurrentRouteCaptureCapable
     case .newDeviceAvailable, .categoryChange, .override, .wakeFromSleep,
-      .noSuitableRouteForCategory, .routeConfigurationChange, .interruptionEnded, .unknown:
+      .routeConfigurationChange, .unknown:
+      return !routeMonitor.isCurrentRouteCaptureCapable
+    case .interruptionBegan, .interruptionEnded:
       return false
     }
   }
 
   func beginObservingRouteChanges() {
-    guard routeObservation == nil, let routeChanges else { return }
+    guard routeObservation == nil else { return }
+    let routeChanges = routeMonitor.routeChangeEvents()
     routeObservation = Task { @MainActor [weak self] in
       for await event in routeChanges {
         self?.handleRouteEvent(event)
