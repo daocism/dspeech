@@ -75,45 +75,7 @@ extension AppleSpeechLiveTranscriptionEngine {
   }
 
   nonisolated static func monoFloatSamples(from buffer: AVAudioPCMBuffer) -> [Float]? {
-    guard buffer.format.commonFormat == .pcmFormatFloat32,
-      let channelData = buffer.floatChannelData
-    else {
-      return nil
-    }
-    let frameLength = Int(buffer.frameLength)
-    let channelCount = Int(buffer.format.channelCount)
-    guard frameLength > 0, channelCount > 0 else { return nil }
-
-    if channelCount == 1 {
-      return Array(UnsafeBufferPointer(start: channelData[0], count: frameLength))
-    }
-
-    var mono = [Float](repeating: 0, count: frameLength)
-    let scale = 1.0 / Float(channelCount)
-    if buffer.format.isInterleaved {
-      // why: interleaved multichannel lives in a single pointer as L,R,L,R…; index
-      // by frame*channelCount + channel, not per-channel pointers (which would be
-      // out of bounds for interleaved external-interface input).
-      let pointer = channelData[0]
-      for frame in 0..<frameLength {
-        var sum: Float = 0
-        for channel in 0..<channelCount {
-          sum += pointer[frame * channelCount + channel]
-        }
-        mono[frame] = sum * scale
-      }
-    } else {
-      for channel in 0..<channelCount {
-        let pointer = channelData[channel]
-        for frame in 0..<frameLength {
-          mono[frame] += pointer[frame]
-        }
-      }
-      for frame in 0..<frameLength {
-        mono[frame] *= scale
-      }
-    }
-    return mono
+    LiveAudioCaptureConduit.monoFloatSamples(from: buffer)
   }
 
   nonisolated static func averageConfidence(for transcription: SFTranscription) -> Double {
@@ -136,12 +98,6 @@ extension AppleSpeechLiveTranscriptionEngine {
   }
 }
 
-struct CapturedAudioBuffer: @unchecked Sendable {
-  let buffer: AVAudioPCMBuffer
-  let samples: [Float]
-  let sampleRate: Double
-}
-
 struct PendingRecognitionPartial: Sendable {
   private var text = ""
 
@@ -162,64 +118,6 @@ struct PendingRecognitionPartial: Sendable {
 
   mutating func clear() {
     text = ""
-  }
-}
-
-extension AVAudioPCMBuffer {
-  // why: AVAudioEngine reuses the tap's buffer storage across callbacks, so any
-  // buffer handed to async work must be deep-copied synchronously inside the tap or
-  // its samples are overwritten before they are read.
-  func dspeechDeepCopy() -> AVAudioPCMBuffer? {
-    guard let copy = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCapacity) else {
-      return nil
-    }
-    copy.frameLength = frameLength
-    let frames = Int(frameLength)
-    let channels = Int(format.channelCount)
-    guard frames > 0, channels > 0 else { return copy }
-    // why: interleaved buffers expose ONE channel pointer holding frames*channels
-    // samples (L,R,L,R…); deinterleaved expose `channels` pointers of `frames` each.
-    // Indexing per-channel on an interleaved buffer reads out of bounds and copies
-    // only half the audio — silent corruption on external USB / line-in routes.
-    let pointerCount = format.isInterleaved ? 1 : channels
-    let elementsPerPointer = format.isInterleaved ? frames * channels : frames
-    if let source = floatChannelData, let destination = copy.floatChannelData {
-      for index in 0..<pointerCount {
-        destination[index].update(from: source[index], count: elementsPerPointer)
-      }
-    } else if let source = int16ChannelData, let destination = copy.int16ChannelData {
-      for index in 0..<pointerCount {
-        destination[index].update(from: source[index], count: elementsPerPointer)
-      }
-    } else if let source = int32ChannelData, let destination = copy.int32ChannelData {
-      for index in 0..<pointerCount {
-        destination[index].update(from: source[index], count: elementsPerPointer)
-      }
-    } else {
-      return nil
-    }
-    return copy
-  }
-}
-
-struct LiveEngineCleanupResult {
-  let deactivationFailureSlug: String?
-}
-
-enum LiveEngineError: LocalizedError {
-  case invalidInputFormat
-  case capturePipelineUnavailable
-  case audioEngineNotRunningAfterConfigurationChange
-
-  var errorDescription: String? {
-    switch self {
-    case .invalidInputFormat:
-      return "invalid-input-format"
-    case .capturePipelineUnavailable:
-      return "capture-pipeline-unavailable"
-    case .audioEngineNotRunningAfterConfigurationChange:
-      return "audio-engine-not-running-after-configuration-change"
-    }
   }
 }
 
@@ -391,28 +289,5 @@ struct AppleLiveSpeechAuthorizer: LiveSpeechAuthorizing {
 
   func requestMicrophonePermission() async -> Bool {
     await AppleSpeechLiveTranscriptionEngine.requestMicrophonePermission()
-  }
-}
-
-@MainActor
-protocol LiveAudioSessionManaging: AnyObject {
-  func configureForLiveRecording() throws
-  func setActive(_ active: Bool, options: AVAudioSession.SetActiveOptions) throws
-}
-
-@MainActor
-final class SystemLiveAudioSession: LiveAudioSessionManaging {
-  private let session: AVAudioSession
-
-  init(session: AVAudioSession = .sharedInstance()) {
-    self.session = session
-  }
-
-  func configureForLiveRecording() throws {
-    try LiveAudioSessionRouting.configureRecordCategory(session)
-  }
-
-  func setActive(_ active: Bool, options: AVAudioSession.SetActiveOptions) throws {
-    try session.setActive(active, options: options)
   }
 }
