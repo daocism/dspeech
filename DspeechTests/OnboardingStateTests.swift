@@ -60,4 +60,16 @@ struct OnboardingStateTests {
     defaults.set("false", forKey: UserDefaultsOnboardingStateStorage.completedKey)
     #expect(storage.loadHasCompletedOnboarding() == false)
   }
+
+  @Test func firstSessionUserDefaultsRoundTrip() {
+    let suiteName = "dspeech.tests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let storage = UserDefaultsFirstSessionStateStorage(defaults: defaults)
+    #expect(storage.loadHasEverStarted() == false)
+
+    storage.saveHasEverStarted(true)
+    #expect(storage.loadHasEverStarted() == true)
+  }
 }

@@ -89,6 +89,7 @@ final class AccessibilityAuditUITests: XCTestCase {
       "-AppleLanguages", "(\(locale))",
       "-dspeech.privacy.mode.v1", "localOnly",
       "-dspeech.onboarding.completed.v1", skipOnboarding ? "true" : "false",
+      "-dspeech.first-session.has-ever-started.v1", "false",
       // why: suppress the decorative infinite Start-button glow so the run loop reaches idle —
       // `performAccessibilityAudit` and element queries are otherwise intermittently destabilized
       // by a perpetual `repeatForever` animation on the hosted CI simulator. The audit measures

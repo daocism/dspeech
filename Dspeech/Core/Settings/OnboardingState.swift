@@ -27,6 +27,31 @@ struct UserDefaultsOnboardingStateStorage: OnboardingStateStorage, @unchecked Se
   }
 }
 
+protocol FirstSessionStateStorage: Sendable {
+  func loadHasEverStarted() -> Bool
+  func saveHasEverStarted(_ hasEverStarted: Bool)
+}
+
+// why: UserDefaults is safe for simple key reads/writes and this value type has no mutable
+// shared state of its own.
+struct UserDefaultsFirstSessionStateStorage: FirstSessionStateStorage, @unchecked Sendable {
+  static let hasEverStartedKey = "dspeech.first-session.has-ever-started.v1"
+
+  let defaults: UserDefaults
+
+  init(defaults: UserDefaults = .standard) {
+    self.defaults = defaults
+  }
+
+  func loadHasEverStarted() -> Bool {
+    defaults.bool(forKey: Self.hasEverStartedKey)
+  }
+
+  func saveHasEverStarted(_ hasEverStarted: Bool) {
+    defaults.set(hasEverStarted, forKey: Self.hasEverStartedKey)
+  }
+}
+
 @MainActor
 @Observable
 final class OnboardingState {

@@ -35,6 +35,49 @@ final class DspeechUITests: XCTestCase {
   }
 
   @MainActor
+  func testSessionHistoryButtonExists() throws {
+    let app = launchAppWithCleanPrivacyDefaults()
+
+    XCTAssertTrue(
+      app.buttons["session-history-button"].waitForExistence(timeout: 8),
+      "history button must be reachable on the main surface")
+  }
+
+  @MainActor
+  func testClearShowsConfirmation() throws {
+    // why: confirmationDialog renders through UIKit's alert controller, which drops
+    // SwiftUI accessibility identifiers — the dialog button is only reachable by its
+    // visible title, so this test pins the locale to English explicitly.
+    let app = launchAppWithSeededSuppressedSegment(
+      extraArguments: ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"])
+
+    let clear = app.buttons["clear-button"]
+    XCTAssertTrue(clear.waitForExistence(timeout: 8))
+    XCTAssertTrue(waitUntilHittable(clear))
+    clear.tap()
+
+    XCTAssertTrue(
+      app.buttons["Clear view"].waitForExistence(timeout: 4),
+      "clear must require confirmation before resetting the view")
+  }
+
+  @MainActor
+  func testSeededSuppressedSegmentShowsReviewSheet() throws {
+    let app = launchAppWithSeededSuppressedSegment()
+
+    let pill = app.buttons["filtered-count-pill"]
+    XCTAssertTrue(pill.waitForExistence(timeout: 8))
+    XCTAssertTrue(waitUntilHittable(pill))
+    pill.tap()
+
+    XCTAssertTrue(
+      app.descendants(matching: .any)
+        .matching(identifier: "filtered-review-sheet").firstMatch.waitForExistence(timeout: 4),
+      "filtered-count pill must open the suppressed-segment review sheet")
+    XCTAssertTrue(app.buttons["show-suppressed-segment"].exists)
+  }
+
+  @MainActor
   func testPrivacyBadgeStaysLocalAndRemoteOptInControlIsAbsent() throws {
     let app = launchAppWithCleanPrivacyDefaults()
 
@@ -457,16 +500,26 @@ final class DspeechUITests: XCTestCase {
   }
 
   @MainActor
-  private func launchAppWithCleanPrivacyDefaults() -> XCUIApplication {
+  private func launchAppWithCleanPrivacyDefaults(extraArguments: [String] = []) -> XCUIApplication {
     let app = XCUIApplication()
     app.launchArguments += [
       "-AppleLanguages", "(ru)", "-AppleLocale", "ru_RU",
       "-dspeech.privacy.mode.v1", "localOnly",
       "-dspeech.privacy.voicefilter.active.v1", "true",
       "-dspeech.onboarding.completed.v1", "true",
+      "-dspeech.first-session.has-ever-started.v1", "false",
     ]
+    app.launchArguments += extraArguments
     app.launch()
     return app
+  }
+
+  @MainActor
+  private func launchAppWithSeededSuppressedSegment(
+    extraArguments: [String] = []
+  ) -> XCUIApplication {
+    launchAppWithCleanPrivacyDefaults(
+      extraArguments: ["-dspeech.uitest.seed-suppressed"] + extraArguments)
   }
 
   @MainActor
