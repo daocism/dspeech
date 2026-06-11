@@ -1,0 +1,3 @@
+// why: Version metadata lives here so Debug and Release resolve identical bundle values; bump MARKETING_VERSION for user-visible releases and CURRENT_PROJECT_VERSION monotonically for each TestFlight/App Store upload.
+MARKETING_VERSION = 0.1.0
+CURRENT_PROJECT_VERSION = 1

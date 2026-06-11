@@ -15,8 +15,21 @@ if [ -z "$bundle" ] || [ ! -d "$bundle" ]; then
   exit 2
 fi
 
-summary_json="$(xcrun xcresulttool get test-results summary --path "$bundle" --format json 2>/dev/null || echo '{}')"
-tests_json="$(xcrun xcresulttool get test-results tests --path "$bundle" --format json 2>/dev/null || echo '{}')"
+xcresult_json() {
+  local section="$1"
+  local stderr_path
+  stderr_path="$(mktemp)"
+  if ! xcrun xcresulttool get test-results "$section" --path "$bundle" --format json 2>"$stderr_path"; then
+    echo "report-test-flakes: xcresulttool failed reading ${section} from '${bundle}':" >&2
+    sed 's/^/  /' "$stderr_path" >&2
+    rm -f "$stderr_path"
+    exit 2
+  fi
+  rm -f "$stderr_path"
+}
+
+summary_json="$(xcresult_json summary)"
+tests_json="$(xcresult_json tests)"
 
 FLAKE_THRESHOLD="$threshold" \
 SUMMARY_JSON="$summary_json" \

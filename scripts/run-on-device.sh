@@ -16,10 +16,11 @@ DERIVED="build/device"
 echo "▸ Resolving connected iPhone…"
 # xcodebuild build-destination id (hardware UDID) — must target a SPECIFIC device so a
 # free Personal Team registers it and -allowProvisioningUpdates can mint a profile.
+DESTINATIONS="$(xcodebuild -showdestinations -project Dspeech.xcodeproj -scheme "$SCHEME" 2>/dev/null || true)"
 BUILD_ID=$(
-  xcodebuild -showdestinations -project Dspeech.xcodeproj -scheme "$SCHEME" 2>/dev/null \
+  printf '%s\n' "$DESTINATIONS" \
     | grep -E 'platform:iOS,' | grep -viE 'Simulator|placeholder' \
-    | grep -oE 'id:[0-9A-Fa-f-]+' | head -1 | cut -d: -f2
+    | grep -oE 'id:[0-9A-Fa-f-]+' | head -1 | cut -d: -f2 || true
 )
 # devicectl install id (CoreDevice identifier — different from the build UDID)
 xcrun devicectl list devices --json-output /tmp/dspeech-devices.json >/dev/null 2>&1 || true
@@ -41,6 +42,7 @@ rm -f /tmp/dspeech-devices.json
 if [ -z "$BUILD_ID" ] || [ -z "$INSTALL_ID" ]; then
   echo "✗ No connected iPhone found. Plug in a data cable, unlock, tap Trust, and enable"
   echo "  Developer Mode (Settings → Privacy & Security → Developer Mode)."
+  echo "  If the device is already connected, open Xcode's Devices window once to finish pairing."
   exit 1
 fi
 

@@ -30,7 +30,7 @@ jobs:
       UI_RESULT_BUNDLE: UITestResults.xcresult
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
         with:
           persist-credentials: false
 
@@ -102,7 +102,7 @@ jobs:
       # + short retention keeps free-tier artifact storage negligible.
       - name: Upload result bundles on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: test-results-${{ github.run_id }}
           path: |
@@ -117,7 +117,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout full history
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -130,10 +130,31 @@ jobs:
           set -euo pipefail
           swift format lint --strict --recursive Dspeech DspeechTests DspeechUITests
 
-      - name: Install gitleaks
+      - name: Install pinned gitleaks
         run: |
           set -euo pipefail
-          brew install gitleaks
+          gitleaks_version="8.30.1"
+          case "$(uname -m)" in
+            arm64) gitleaks_arch="arm64" ;;
+            x86_64) gitleaks_arch="x64" ;;
+            *) echo "Unsupported macOS architecture for gitleaks: $(uname -m)" >&2; exit 1 ;;
+          esac
+          tmp_dir="$(mktemp -d)"
+          trap 'rm -rf "$tmp_dir"' EXIT
+          asset="gitleaks_${gitleaks_version}_darwin_${gitleaks_arch}.tar.gz"
+          base_url="https://github.com/gitleaks/gitleaks/releases/download/v${gitleaks_version}"
+          curl -fsSL "${base_url}/${asset}" -o "${tmp_dir}/${asset}"
+          curl -fsSL "${base_url}/gitleaks_${gitleaks_version}_checksums.txt" -o "${tmp_dir}/checksums.txt"
+          grep " ${asset}$" "${tmp_dir}/checksums.txt" > "${tmp_dir}/checksum.txt"
+          (
+            cd "$tmp_dir"
+            shasum -a 256 -c checksum.txt
+            tar -xzf "$asset" gitleaks
+          )
+          mkdir -p "${RUNNER_TEMP}/bin"
+          install "${tmp_dir}/gitleaks" "${RUNNER_TEMP}/bin/gitleaks"
+          echo "${RUNNER_TEMP}/bin" >> "$GITHUB_PATH"
+          "${RUNNER_TEMP}/bin/gitleaks" version
 
       - name: Gitleaks history scan
         run: |
@@ -146,7 +167,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
         with:
           persist-credentials: false
 
@@ -162,7 +183,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
         with:
           persist-credentials: false
 
@@ -190,7 +211,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
         with:
           persist-credentials: false
 
@@ -243,7 +264,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
         with:
           persist-credentials: false
 

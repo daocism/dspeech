@@ -53,13 +53,4 @@ if [ "${#staged_swift_files[@]}" -gt 0 ]; then
 fi
 
 require_gitleaks
-gitleaks git --staged --redact --verbose
-git diff --cached --binary | gitleaks stdin --redact --verbose
-
-untracked_files=()
-while IFS= read -r untracked_file; do
-  untracked_files+=("$untracked_file")
-done < <(git ls-files --others --exclude-standard)
-if [ "${#untracked_files[@]}" -gt 0 ]; then
-  gitleaks dir --redact --verbose "${untracked_files[@]}"
-fi
+gitleaks protect --staged --redact --verbose

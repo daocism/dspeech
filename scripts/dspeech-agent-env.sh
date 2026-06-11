@@ -8,7 +8,6 @@ set -euo pipefail
 ROOT="${DSPEECH_WORKSPACE:-/Users/andre/projects/dspeech-ios}"
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
 export HERMES_HOME="${HERMES_HOME:-/Users/andre/.hermes/profiles/dspeech-dev}"
-export DSPPEECH_AGENT_WORKSPACE="$ROOT"
 export DSPEECH_AGENT_WORKSPACE="$ROOT"
 mkdir -p "$HERMES_HOME"/logs "$HERMES_HOME"/sessions "$HERMES_HOME"/state "$HERMES_HOME"/skills
 cd "$ROOT"

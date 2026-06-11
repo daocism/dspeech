@@ -11,3 +11,6 @@ tmp/
 *.m4a
 *.wav
 *.caf
+!DspeechTests/Fixtures/
+!DspeechTests/Fixtures/**
+*.xcresult
