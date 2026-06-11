@@ -21,7 +21,12 @@ enum RecognitionLocaleAvailabilityState: Equatable, Sendable {
 
 protocol RecognitionSettingsStorage: Sendable {
   func loadLocaleIdentifier() -> String?
-  func saveLocaleIdentifier(_ identifier: String)
+  func saveLocaleIdentifier(_ identifier: String) throws
+  func loadIssue() -> SettingsStorageIssue?
+}
+
+extension RecognitionSettingsStorage {
+  func loadIssue() -> SettingsStorageIssue? { nil }
 }
 
 struct UserDefaultsRecognitionSettingsStorage: RecognitionSettingsStorage, @unchecked Sendable {
@@ -37,7 +42,7 @@ struct UserDefaultsRecognitionSettingsStorage: RecognitionSettingsStorage, @unch
     defaults.string(forKey: Self.localeKey)
   }
 
-  func saveLocaleIdentifier(_ identifier: String) {
+  func saveLocaleIdentifier(_ identifier: String) throws {
     defaults.set(identifier, forKey: Self.localeKey)
   }
 }
@@ -127,6 +132,8 @@ final class RecognitionSettings {
   // why: drives the "Download <language>" affordance — true when the selected locale is
   // capable on-device but its model isn't downloaded yet. Updated async (model state is I/O).
   private(set) var selectedNeedsDownload = false
+  private(set) var storageIssue: SettingsStorageIssue?
+  var hasStaleSettings: Bool { storageIssue != nil }
   // why: the download-state check is async I/O; a fast picker change can spawn overlapping
   // checks that finish out of order and write a stale result. Each check captures the
   // current generation; only the latest one is allowed to commit (kills the race).
@@ -136,7 +143,12 @@ final class RecognitionSettings {
     didSet {
       guard localeIdentifier != oldValue else { return }
       if let localeIdentifier {
-        storage.saveLocaleIdentifier(localeIdentifier)
+        do {
+          try storage.saveLocaleIdentifier(localeIdentifier)
+          storageIssue = nil
+        } catch {
+          storageIssue = .recognitionLocaleSaveFailed
+        }
       } else {
         selectedNeedsDownload = false
       }
@@ -167,11 +179,17 @@ final class RecognitionSettings {
       displayLocale: displayLocale
     )
     self.localeAvailabilityState = .loading
+    let storedIdentifier = storage.loadLocaleIdentifier()
     self.localeIdentifier = RecognitionLocaleCatalog.resolve(
-      stored: storage.loadLocaleIdentifier(),
+      stored: storedIdentifier,
       supported: supportedLocales,
       preferredLanguages: preferredLanguages
     )
+    if let storedIdentifier, storedIdentifier != self.localeIdentifier {
+      self.storageIssue = .recognitionLocaleCorrupted
+    } else {
+      self.storageIssue = storage.loadIssue()
+    }
   }
 
   var activeLocaleIdentifier: String? {
@@ -191,14 +209,14 @@ final class RecognitionSettings {
       localeAvailabilityState = .unavailable
       return
     }
-    let resolved = RecognitionLocaleCatalog.resolve(
-      stored: localeIdentifier ?? storage.loadLocaleIdentifier(),
-      supported: capable,
-      preferredLanguages: preferredLanguages)
-    localeAvailabilityState = .available
-    if resolved != localeIdentifier {
-      localeIdentifier = resolved
+    if localeIdentifier == nil {
+      localeIdentifier =
+        storage.loadLocaleIdentifier()
+        ?? RecognitionLocaleCatalog.defaultIdentifier(
+          supported: capable,
+          preferredLanguages: preferredLanguages)
     }
+    localeAvailabilityState = .available
     await refreshSelectedDownloadState()
   }
 

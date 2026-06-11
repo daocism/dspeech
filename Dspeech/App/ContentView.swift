@@ -252,6 +252,7 @@ struct ContentView: View {
     .onChange(of: scenePhase) { _, newPhase in
       if newPhase == .active {
         coordinator.refreshOnForeground()
+        Task { await recognition.refreshCapableLocales() }
       } else if newPhase == .background {
         coordinator.stopForBackground()
       }

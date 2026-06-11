@@ -9,9 +9,9 @@ struct AudioSourceControllerTests {
     var uid: String?
     var type: String?
     func loadPreferredInputUID() -> String? { uid }
-    func savePreferredInputUID(_ value: String?) { uid = value }
+    func savePreferredInputUID(_ value: String?) throws { uid = value }
     func loadPreferredInputType() -> String? { type }
-    func savePreferredInputType(_ value: String?) { type = value }
+    func savePreferredInputType(_ value: String?) throws { type = value }
   }
 
   private func port(_ type: AudioPortType, _ name: String, _ uid: String) -> PortSnapshot {
@@ -97,6 +97,47 @@ struct AudioSourceControllerTests {
       routing: routing, settings: AudioSettings(storage: storage))
     controller.applyPersistedPreference()
     #expect(routing.preferredInputCalls.contains("u-usb"))
+  }
+
+  @Test func applyPersistedPreferenceAppliesPortTypeFallbackWhenUIDMissing() {
+    let storage = InMemoryStorage()
+    storage.uid = "old-usb"
+    storage.type = "USBAudio"
+    let routing = FakeAudioSessionRouting(
+      currentRoute: RouteSnapshot(inputs: [port(.builtInMic, "Mic", "u-mic")]),
+      availableInputs: [port(.builtInMic, "Mic", "u-mic"), port(.usbAudio, "USB", "new-usb")]
+    )
+    let controller = AudioSourceController(
+      routing: routing, settings: AudioSettings(storage: storage))
+
+    controller.applyPersistedPreference()
+
+    #expect(routing.preferredInputCalls == ["new-usb"])
+    #expect(controller.selectedUID == "new-usb")
+    #expect(storage.uid == "new-usb")
+    #expect(storage.type == "USBAudio")
+    #expect(controller.selectionError == nil)
+  }
+
+  @Test func applyPersistedPreferenceRejectedPortTypeFallbackKeepsCurrentRoute() {
+    let storage = InMemoryStorage()
+    storage.uid = "old-usb"
+    storage.type = "USBAudio"
+    let routing = FakeAudioSessionRouting(
+      currentRoute: RouteSnapshot(inputs: [port(.builtInMic, "Mic", "u-mic")]),
+      availableInputs: [port(.builtInMic, "Mic", "u-mic"), port(.usbAudio, "USB", "new-usb")],
+      rejectedPreferredInputUIDs: ["new-usb"]
+    )
+    let controller = AudioSourceController(
+      routing: routing, settings: AudioSettings(storage: storage))
+
+    controller.applyPersistedPreference()
+
+    #expect(routing.preferredInputCalls == ["new-usb"])
+    #expect(controller.selectedUID == "u-mic")
+    #expect(controller.selectionError?.isEmpty == false)
+    #expect(storage.uid == "old-usb")
+    #expect(storage.type == "USBAudio")
   }
 
   @Test func applyPersistedPreferenceSurfacesRejectedInputAndKeepsCurrentRoute() {

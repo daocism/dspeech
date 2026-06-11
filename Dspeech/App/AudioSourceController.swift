@@ -115,18 +115,22 @@ final class AudioSourceController {
   // rejection is visible because otherwise Settings would claim an inactive source.
   func applyPersistedPreference() {
     guard routePreparationFailure == nil else { return }
-    guard let uid = settings.preferredInputUID,
-      let port = availableInputs.first(where: { $0.uid == uid })
+    guard
+      let port = PreferredInputResolver.resolve(
+        uid: settings.preferredInputUID,
+        type: settings.preferredInputType,
+        available: availableInputs
+      )
     else { return }
     do {
-      try routing.setPreferredInput(uid: uid)
-      selectedUID = uid
-      settings.setPreferred(uid: uid, type: port.portType.rawValue)
+      try routing.setPreferredInput(uid: port.uid)
+      selectedUID = port.uid
+      settings.setPreferred(uid: port.uid, type: port.portType.rawValue)
       selectionError = nil
     } catch {
       selectionError = String(
         localized: "Couldn’t select this input: \(error.localizedDescription)")
-      selectedUID = resolvedFallbackUID(rejectedUID: uid)
+      selectedUID = resolvedFallbackUID(rejectedUID: port.uid)
     }
   }
 

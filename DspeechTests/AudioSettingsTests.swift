@@ -5,13 +5,24 @@ import Testing
 
 @MainActor
 struct AudioSettingsTests {
+  enum TestError: Error {
+    case saveFailed
+  }
+
   final class InMemoryStorage: AudioSettingsStorage, @unchecked Sendable {
     var uid: String?
     var type: String?
+    var failSaves = false
     func loadPreferredInputUID() -> String? { uid }
-    func savePreferredInputUID(_ value: String?) { uid = value }
+    func savePreferredInputUID(_ value: String?) throws {
+      if failSaves { throw TestError.saveFailed }
+      uid = value
+    }
     func loadPreferredInputType() -> String? { type }
-    func savePreferredInputType(_ value: String?) { type = value }
+    func savePreferredInputType(_ value: String?) throws {
+      if failSaves { throw TestError.saveFailed }
+      type = value
+    }
   }
 
   private func port(_ type: AudioPortType, _ name: String, _ uid: String) -> PortSnapshot {
@@ -22,6 +33,7 @@ struct AudioSettingsTests {
     let settings = AudioSettings(storage: InMemoryStorage())
     #expect(settings.preferredInputUID == nil)
     #expect(settings.preferredInputType == nil)
+    #expect(settings.storageIssue == nil)
   }
 
   @Test func setPreferredPersists() {
@@ -31,6 +43,22 @@ struct AudioSettingsTests {
     #expect(settings.preferredInputUID == "uid-1")
     #expect(storage.uid == "uid-1")
     #expect(storage.type == "USBAudio")
+    #expect(settings.storageIssue == nil)
+  }
+
+  @Test func setPreferredSaveFailureSurfacesStaleSettingsIssue() {
+    let storage = InMemoryStorage()
+    storage.failSaves = true
+    let settings = AudioSettings(storage: storage)
+
+    settings.setPreferred(uid: "uid-1", type: "USBAudio")
+
+    #expect(settings.preferredInputUID == "uid-1")
+    #expect(settings.preferredInputType == "USBAudio")
+    #expect(storage.uid == nil)
+    #expect(storage.type == nil)
+    #expect(settings.storageIssue == .audioPreferredInputSaveFailed)
+    #expect(settings.hasStaleSettings)
   }
 
   @Test func reflectsStoredOnInit() {
@@ -63,19 +91,31 @@ struct AudioSettingsTests {
     #expect(resolved == nil)
   }
 
-  @Test func userDefaultsRoundTrip() {
+  @Test func userDefaultsRoundTrip() throws {
     let suite = "dspeech.tests.\(UUID().uuidString)"
     let defaults = UserDefaults(suiteName: suite)!
     defer { defaults.removePersistentDomain(forName: suite) }
     let storage = UserDefaultsAudioSettingsStorage(defaults: defaults)
 
     #expect(storage.loadPreferredInputUID() == nil)
-    storage.savePreferredInputUID("u1")
-    storage.savePreferredInputType("USBAudio")
+    try storage.savePreferredInputUID("u1")
+    try storage.savePreferredInputType("USBAudio")
     #expect(storage.loadPreferredInputUID() == "u1")
     #expect(storage.loadPreferredInputType() == "USBAudio")
 
-    storage.savePreferredInputUID(nil)
+    try storage.savePreferredInputUID(nil)
     #expect(storage.loadPreferredInputUID() == nil)
+  }
+
+  @Test func userDefaultsBlankPersistedInputFallsBackToNilAndSurfacesIssue() {
+    let suite = "dspeech.tests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suite)!
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let storage = UserDefaultsAudioSettingsStorage(defaults: defaults)
+
+    defaults.set("", forKey: UserDefaultsAudioSettingsStorage.uidKey)
+
+    #expect(storage.loadPreferredInputUID() == nil)
+    #expect(storage.loadIssue() == .audioPreferredInputCorrupted)
   }
 }
