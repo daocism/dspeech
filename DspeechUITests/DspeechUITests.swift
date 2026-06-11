@@ -155,6 +155,49 @@ final class DspeechUITests: XCTestCase {
   }
 
   @MainActor
+  func testScriptedEngineShowsPartialFinalAndClearFlow() throws {
+    let app = launchAppWithCleanPrivacyDefaults(
+      extraArguments: [
+        "-AppleLanguages", "(en)", "-AppleLocale", "en_US",
+        "-dspeech.uitest.scripted-engine",
+        "-dspeech.uitest.reduce-animations",
+      ])
+
+    let startButton = app.buttons["start-button"]
+    XCTAssertTrue(startButton.waitForExistence(timeout: 8))
+    XCTAssertTrue(waitUntilHittable(startButton))
+    startButton.tap()
+
+    let partialCard = app.descendants(matching: .any)
+      .matching(identifier: "partial-transcript").firstMatch
+    XCTAssertTrue(partialCard.waitForExistence(timeout: 8))
+    XCTAssertTrue(app.staticTexts["Tower N123AB"].waitForExistence(timeout: 4))
+
+    XCTAssertTrue(
+      app.staticTexts["Tower N123AB cleared for takeoff"].waitForExistence(timeout: 8),
+      "scripted final segment text must render")
+    XCTAssertTrue(
+      app.staticTexts["96%"].waitForExistence(timeout: 4)
+        || app.staticTexts["VERIFY"].waitForExistence(timeout: 1),
+      "final card must expose either confidence or verification state")
+
+    let clear = app.buttons["clear-button"]
+    XCTAssertTrue(clear.waitForExistence(timeout: 4))
+    XCTAssertTrue(waitUntilHittable(clear))
+    clear.tap()
+
+    let clearView = app.buttons["Clear view"]
+    XCTAssertTrue(clearView.waitForExistence(timeout: 4))
+    clearView.tap()
+
+    XCTAssertTrue(app.staticTexts["transcript-empty-state"].waitForExistence(timeout: 4))
+    let finalSegment = app.descendants(matching: .any)
+      .matching(identifier: "transcript-segment").firstMatch
+    XCTAssertTrue(waitUntilGone(finalSegment))
+    XCTAssertTrue(waitUntilGone(partialCard))
+  }
+
+  @MainActor
   private func acceptPermissionAlertsIfPresent(in app: XCUIApplication) {
     let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
     for _ in 0..<3 {
@@ -489,6 +532,14 @@ final class DspeechUITests: XCTestCase {
   @discardableResult
   private func waitUntilHittable(_ element: XCUIElement, timeout: TimeInterval = 8) -> Bool {
     let predicate = NSPredicate(format: "isHittable == true")
+    let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
+    return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
+  }
+
+  @MainActor
+  @discardableResult
+  private func waitUntilGone(_ element: XCUIElement, timeout: TimeInterval = 4) -> Bool {
+    let predicate = NSPredicate(format: "exists == false")
     let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
     return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
   }

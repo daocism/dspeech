@@ -563,7 +563,7 @@ struct LiveTranscriptionViewModelTests {
 
   private func translatingVM(
     engine: FakeEngine,
-    backend: FakeTranslationBackend,
+    backend: any TranslationService,
     target: String?
   ) -> LiveTranscriptionViewModel {
     LiveTranscriptionViewModel(
@@ -571,6 +571,99 @@ struct LiveTranscriptionViewModelTests {
       translator: backend,
       translationTarget: { target.map { Locale.Language(identifier: $0) } }
     )
+  }
+
+  // why: test cases are serialized, and NSLock protects the suspended translation
+  // and completion waiters that are resumed across task boundaries.
+  final class CompletionTrackingTranslationBackend: TranslationService, @unchecked Sendable {
+    var translationResult = "STALE"
+    private(set) var translateCallCount = 0
+    private(set) var recordedInputs: [String] = []
+
+    private struct CompletionWaiter {
+      let completedAfter: Int
+      let continuation: CheckedContinuation<Void, Never>
+    }
+
+    private let lock = NSLock()
+    private var pending: [CheckedContinuation<Void, Never>] = []
+    private var completionWaiters: [CompletionWaiter] = []
+    private var completedCount = 0
+
+    var completedTranslationCount: Int {
+      lock.lock()
+      let value = completedCount
+      lock.unlock()
+      return value
+    }
+
+    func availability(
+      translatingFrom source: Locale.Language,
+      into target: Locale.Language
+    ) async -> TranslationLanguageStatus {
+      .installed
+    }
+
+    func translate(
+      _ text: String,
+      from source: Locale.Language,
+      into target: Locale.Language
+    ) async throws(TranslationServiceError) -> String {
+      translateCallCount += 1
+      recordedInputs.append(text)
+      await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+        lock.lock()
+        pending.append(continuation)
+        lock.unlock()
+      }
+      let result = translationResult
+      completeOneTranslation()
+      return result
+    }
+
+    func releaseAll() {
+      lock.lock()
+      let continuations = pending
+      pending.removeAll()
+      lock.unlock()
+      for continuation in continuations { continuation.resume() }
+    }
+
+    func waitForCompletion(after completedBeforeRelease: Int) async {
+      await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+        lock.lock()
+        if completedCount > completedBeforeRelease {
+          lock.unlock()
+          continuation.resume()
+        } else {
+          completionWaiters.append(
+            CompletionWaiter(
+              completedAfter: completedBeforeRelease,
+              continuation: continuation
+            ))
+          lock.unlock()
+        }
+      }
+    }
+
+    private func completeOneTranslation() {
+      let ready: [CheckedContinuation<Void, Never>]
+      lock.lock()
+      completedCount += 1
+      var remaining: [CompletionWaiter] = []
+      var resumable: [CheckedContinuation<Void, Never>] = []
+      for waiter in completionWaiters {
+        if completedCount > waiter.completedAfter {
+          resumable.append(waiter.continuation)
+        } else {
+          remaining.append(waiter)
+        }
+      }
+      completionWaiters = remaining
+      ready = resumable
+      lock.unlock()
+      for continuation in ready { continuation.resume() }
+    }
   }
 
   private func expectTranslationFailure(
@@ -608,7 +701,8 @@ struct LiveTranscriptionViewModelTests {
     let seg = makeSegment("Descend and maintain three thousand")
     engine.push(.segment(seg))
     await wait(for: { vm.segments.count == 1 })
-    _ = await wait(for: { backend.translateCallCount > 0 }, timeout: .milliseconds(300))
+    engine.push(.partial("translation barrier after same-source segment"))
+    #expect(await wait(for: { vm.partialText == "translation barrier after same-source segment" }))
     #expect(backend.translateCallCount == 0)
     #expect(vm.translations[seg.id] == nil)
   }
@@ -621,7 +715,8 @@ struct LiveTranscriptionViewModelTests {
     let seg = makeSegment("Descend")
     engine.push(.segment(seg))
     await wait(for: { vm.segments.count == 1 })
-    _ = await wait(for: { backend.translateCallCount > 0 }, timeout: .milliseconds(300))
+    engine.push(.partial("translation barrier after disabled segment"))
+    #expect(await wait(for: { vm.partialText == "translation barrier after disabled segment" }))
     #expect(backend.translateCallCount == 0)
   }
 
@@ -779,9 +874,7 @@ struct LiveTranscriptionViewModelTests {
 
   @Test func taskSupersededByResetDoesNotWriteStaleGloss() async {
     let engine = FakeEngine()
-    let backend = FakeTranslationBackend()
-    backend.suspendUntilReleased = true
-    backend.translationResult = "STALE"
+    let backend = CompletionTrackingTranslationBackend()
     let vm = translatingVM(engine: engine, backend: backend, target: "ru")
     await vm.start()
     let seg = makeSegment("Descend")
@@ -791,10 +884,11 @@ struct LiveTranscriptionViewModelTests {
     #expect(vm.translations[seg.id] == nil)
 
     vm.reset()  // clears the per-segment token; the in-flight task is now superseded
+    let completedBeforeRelease = backend.completedTranslationCount
     backend.releaseAll()  // task resumes and returns "STALE", but its token no longer matches
+    await backend.waitForCompletion(after: completedBeforeRelease)
 
     // would land if the token guard were missing; with it, the stale write is dropped
-    _ = await wait(for: { vm.translations[seg.id] == "STALE" }, timeout: .milliseconds(400))
     #expect(vm.translations.isEmpty)
   }
 }
