@@ -430,7 +430,7 @@ struct ContentView: View {
           )
           .font(.caption.weight(.semibold))
           .lineLimit(1)
-          .minimumScaleFactor(0.65)
+          .fixedSize()
           .foregroundStyle(.yellow)
           .padding(.horizontal, 12)
           .frame(minHeight: 44)

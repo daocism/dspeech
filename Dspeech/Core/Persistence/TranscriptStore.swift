@@ -187,7 +187,7 @@ final class FileTranscriptStore: TranscriptStoring {
     } catch {
       throw TranscriptStoreError.ioFailure(error.localizedDescription)
     }
-    return try decodeSegmentLines(data, sessionID: sessionID)
+    return Self.dedupedStopPlaceholders(try decodeSegmentLines(data, sessionID: sessionID))
   }
 
   func deleteSession(_ sessionID: UUID) throws {
@@ -258,6 +258,30 @@ final class FileTranscriptStore: TranscriptStoring {
     formatter.timeZone = TimeZone(secondsFromGMT: 0)
     formatter.dateFormat = "HH:mm:ss"
     return formatter
+  }
+
+  private static func dedupedStopPlaceholders(
+    _ segments: [TranscriptSegment]
+  ) -> [TranscriptSegment] {
+    guard segments.count > 1 else { return segments }
+    var deduped: [TranscriptSegment] = []
+    deduped.reserveCapacity(segments.count)
+    for index in segments.indices {
+      let segment = segments[index]
+      if index < segments.index(before: segments.endIndex) {
+        let next = segments[segments.index(after: index)]
+        if segment.source == .liveATC,
+          segment.isStopCommittedPlaceholder,
+          next.source == .liveATC,
+          !next.isStopCommittedPlaceholder,
+          segment.text.caseInsensitiveCompare(next.text) == .orderedSame
+        {
+          continue
+        }
+      }
+      deduped.append(segment)
+    }
+    return deduped
   }
 
   private func sessionDirectory(for sessionID: UUID) -> URL {

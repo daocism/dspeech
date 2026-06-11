@@ -113,6 +113,74 @@ struct TranscriptStoreTests {
         """)
   }
 
+  @Test func stopPlaceholderOnlySessionSurvivesHistoryRead() throws {
+    let root = try Self.makeRoot()
+    defer { Self.removeRoot(root) }
+    let store = try FileTranscriptStore(rootDirectory: root)
+    let summary = try store.beginSession(localeIdentifier: "en-US")
+    let placeholder = Self.segment(
+      id: UUID(uuidString: "00000000-0000-0000-0000-000000000203")!,
+      startedAt: Date(timeIntervalSince1970: 15),
+      text: "Hold short runway two seven",
+      confidence: 0,
+      isStopCommittedPlaceholder: true)
+
+    try store.append(placeholder, to: summary.id)
+
+    #expect(try store.segments(in: summary.id) == [placeholder])
+  }
+
+  @Test func immediatelyFollowingMatchingFinalDedupesStopPlaceholderOnRead() throws {
+    let root = try Self.makeRoot()
+    defer { Self.removeRoot(root) }
+    let store = try FileTranscriptStore(rootDirectory: root) { Date(timeIntervalSince1970: 0) }
+    let summary = try store.beginSession(localeIdentifier: "en-US")
+    let placeholder = Self.segment(
+      id: UUID(uuidString: "00000000-0000-0000-0000-000000000204")!,
+      startedAt: Date(timeIntervalSince1970: 15),
+      text: "Hold short runway two seven",
+      confidence: 0,
+      isStopCommittedPlaceholder: true)
+    let final = Self.segment(
+      id: UUID(uuidString: "00000000-0000-0000-0000-000000000205")!,
+      startedAt: Date(timeIntervalSince1970: 16),
+      text: "hold short runway two seven",
+      confidence: 0.91)
+
+    try store.append(placeholder, to: summary.id)
+    try store.append(final, to: summary.id)
+
+    #expect(try store.segments(in: summary.id) == [final])
+  }
+
+  @Test func exportTextDedupesStopPlaceholderWhenMatchingFinalFollows() throws {
+    let root = try Self.makeRoot()
+    defer { Self.removeRoot(root) }
+    let store = try FileTranscriptStore(rootDirectory: root) { Date(timeIntervalSince1970: 0) }
+    let summary = try store.beginSession(localeIdentifier: "en-US")
+    let placeholder = Self.segment(
+      id: UUID(uuidString: "00000000-0000-0000-0000-000000000206")!,
+      startedAt: Date(timeIntervalSince1970: 15),
+      text: "Hold short runway two seven",
+      confidence: 0,
+      isStopCommittedPlaceholder: true)
+    let final = Self.segment(
+      id: UUID(uuidString: "00000000-0000-0000-0000-000000000207")!,
+      startedAt: Date(timeIntervalSince1970: 16),
+      text: "hold short runway two seven",
+      confidence: 0.91)
+
+    try store.append(placeholder, to: summary.id)
+    try store.append(final, to: summary.id)
+
+    #expect(
+      try store.exportText(for: summary.id)
+        == """
+        Dspeech transcript  1970-01-01  en-US
+        00:00:16  hold short runway two seven
+        """)
+  }
+
   @Test func deleteSessionRemovesDirectoryAndListing() throws {
     let root = try Self.makeRoot()
     defer { Self.removeRoot(root) }
@@ -189,7 +257,8 @@ struct TranscriptStoreTests {
     startedAt: Date,
     text: String,
     translatedText: String? = nil,
-    confidence: Double = 0.91
+    confidence: Double = 0.91,
+    isStopCommittedPlaceholder: Bool = false
   ) -> TranscriptSegment {
     TranscriptSegment(
       id: id,
@@ -198,7 +267,8 @@ struct TranscriptStoreTests {
       translatedText: translatedText,
       confidence: confidence,
       sourceLanguageCode: "en",
-      source: .liveATC
+      source: .liveATC,
+      isStopCommittedPlaceholder: isStopCommittedPlaceholder
     )
   }
 

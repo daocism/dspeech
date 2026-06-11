@@ -421,7 +421,7 @@ struct LiveTranscriptionViewModelTests {
     #expect(store.appendedSegments.isEmpty)
   }
 
-  @Test func persistenceSkipsStopCommittedPlaceholders() async {
+  @Test func persistenceAppendsStopCommittedPlaceholders() async throws {
     let engine = FakeEngine()
     let store = FakeTranscriptStore()
     let vm = LiveTranscriptionViewModel(engine: engine, transcriptStore: store)
@@ -432,8 +432,32 @@ struct LiveTranscriptionViewModelTests {
     vm.stop()
     await wait(for: { vm.segments.count == 1 && vm.status == .stopped })
 
-    #expect(vm.segments.first?.isStopCommittedPlaceholder == true)
-    #expect(store.appendedSegments.isEmpty)
+    let persisted = try #require(store.appendedSegments.first?.segment)
+    #expect(store.appendedSegments.count == 1)
+    #expect(persisted.text == "hold short runway two seven")
+    #expect(persisted.isStopCommittedPlaceholder)
+  }
+
+  @Test func persistenceAppendsLateFinalAfterStopPlaceholderReplacement() async throws {
+    let engine = FakeEngine()
+    let store = FakeTranscriptStore()
+    let vm = LiveTranscriptionViewModel(engine: engine, transcriptStore: store)
+    await vm.start()
+    engine.push(.partial("November one two three alpha bravo"))
+    await wait(for: { vm.partialText == "November one two three alpha bravo" })
+
+    vm.stop()
+    await wait(for: { vm.segments.count == 1 && vm.status == .stopped })
+    engine.push(.segment(makeSegment("November one two three alpha bravo", confidence: 0.91)))
+    await wait(for: { store.appendedSegments.count == 2 })
+
+    #expect(vm.segments.count == 1)
+    #expect(vm.segments.first?.isStopCommittedPlaceholder == false)
+    #expect(store.appendedSegments.map(\.segment.isStopCommittedPlaceholder) == [true, false])
+    #expect(
+      store.appendedSegments.map(\.segment.text) == [
+        "November one two three alpha bravo", "November one two three alpha bravo",
+      ])
   }
 
   @Test func persistenceAppendFailureWarnsWithoutDroppingSegment() async {
@@ -509,6 +533,22 @@ struct LiveTranscriptionViewModelTests {
     vm.reset()
     #expect(vm.segments.isEmpty)
     #expect(vm.partialText.isEmpty)
+  }
+
+  @Test func visibleSegmentsCapsLastFiveHundredAndCountsOlderHistory() async {
+    let engine = FakeEngine()
+    let vm = LiveTranscriptionViewModel(engine: engine)
+    await vm.start()
+
+    for index in 0..<10_050 {
+      engine.push(.segment(makeSegment("Transmission \(index)")))
+    }
+    #expect(await wait(for: { vm.segments.count == 10_050 }))
+
+    #expect(vm.visibleSegments.count == 500)
+    #expect(vm.olderSegmentCountInHistory == 9_550)
+    #expect(vm.visibleSegments.first?.text == "Transmission 9550")
+    #expect(vm.visibleSegments.last?.text == "Transmission 10049")
   }
 
   @Test func unhideSuppressedSegmentKeepsIndicator() async throws {
