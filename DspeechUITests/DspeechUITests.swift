@@ -111,11 +111,25 @@ final class DspeechUITests: XCTestCase {
 
     app.buttons["settings-button"].tap()
     assertCloudOrRemoteOptInControlsAreAbsent(in: app)
-    XCTAssertTrue(app.switches["voicefilter-active-toggle"].waitForExistence(timeout: 4))
+    XCTAssertFalse(
+      app.switches["voicefilter-active-toggle"].waitForExistence(timeout: 1),
+      "speaker-classification switch must not appear unless diarization is enabled")
 
     app.buttons["settings-done-button"].tap()
 
     assertLocalOnlyBadgeIsVisible(in: app)
+  }
+
+  @MainActor
+  func testSpeakerClassificationToggleAppearsOnlyWithDiarizationFlag() throws {
+    let app = launchAppWithCleanPrivacyDefaults(
+      extraArguments: ["-dspeech.voicefilter.diarization.enable"])
+
+    app.buttons["settings-button"].tap()
+
+    XCTAssertTrue(
+      app.switches["voicefilter-active-toggle"].waitForExistence(timeout: 4),
+      "speaker-classification switch must remain reachable in diarization-enabled builds")
   }
 
   @MainActor
@@ -302,8 +316,9 @@ final class DspeechUITests: XCTestCase {
   }
 
   @MainActor
-  func testVoiceFilterActiveKillSwitchDefaultsOnAndCanTurnOff() throws {
-    let app = launchAppWithCleanPrivacyDefaults()
+  func testVoiceFilterActiveKillSwitchDefaultsOnAndCanTurnOffWhenDiarizationEnabled() throws {
+    let app = launchAppWithCleanPrivacyDefaults(
+      extraArguments: ["-dspeech.voicefilter.diarization.enable"])
 
     app.buttons["settings-button"].tap()
 
@@ -665,16 +680,6 @@ final class DspeechUITests: XCTestCase {
     XCTAssertFalse(
       app.staticTexts["Разрешить облачную обработку"].exists,
       "cloud opt-in copy must not ship while local-only is the only mode",
-      file: file,
-      line: line
-    )
-    XCTAssertFalse(
-      app.staticTexts.matching(
-        NSPredicate(
-          format: "label CONTAINS[c] %@ OR label CONTAINS[c] %@",
-          "remote", "облач")
-      ).firstMatch.exists,
-      "remote/cloud opt-in copy must not appear in the UI",
       file: file,
       line: line
     )

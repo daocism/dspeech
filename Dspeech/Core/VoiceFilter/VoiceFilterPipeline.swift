@@ -284,8 +284,8 @@ final class VoiceFilterPipeline {
     }
     switch speaker {
     case .pilot:
-      DspeechLog.voiceFilter.debug("pre-asr voice filter route=discard reason=pilotVoice")
-      return .discard(reason: .pilotVoice)
+      DspeechLog.voiceFilter.debug("pre-asr voice filter route=transcribe reason=pilotVoice")
+      return .transcribe(reason: .pilotVoice)
     case .nonPilot:
       DspeechLog.voiceFilter.debug("pre-asr voice filter route=transcribe reason=nonPilotVoice")
       return .transcribe(reason: .nonPilotVoice)

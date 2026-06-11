@@ -244,18 +244,24 @@ jobs:
           if manifest["NSPrivacyTrackingDomains"] != []:
               raise SystemExit("NSPrivacyTrackingDomains must be empty")
 
-          user_defaults_entries = [
-              entry
-              for entry in manifest["NSPrivacyAccessedAPITypes"]
-              if entry.get("NSPrivacyAccessedAPIType") == "NSPrivacyAccessedAPICategoryUserDefaults"
-          ]
-          if not user_defaults_entries:
-              raise SystemExit("Missing UserDefaults required-reason API entry")
-          reasons = set()
-          for entry in user_defaults_entries:
-              reasons.update(entry.get("NSPrivacyAccessedAPITypeReasons", []))
-          if "CA92.1" not in reasons:
-              raise SystemExit("Missing UserDefaults reason CA92.1")
+          expected_accessed_apis = {
+              "NSPrivacyAccessedAPICategoryDiskSpace": {"E174.1"},
+              "NSPrivacyAccessedAPICategoryFileTimestamp": {"C617.1"},
+              "NSPrivacyAccessedAPICategoryUserDefaults": {"CA92.1"},
+          }
+          actual_accessed_apis = {}
+          for entry in manifest["NSPrivacyAccessedAPITypes"]:
+              api_type = entry.get("NSPrivacyAccessedAPIType")
+              if api_type in actual_accessed_apis:
+                  raise SystemExit(f"Duplicate required-reason API entry: {api_type}")
+              actual_accessed_apis[api_type] = set(
+                  entry.get("NSPrivacyAccessedAPITypeReasons", [])
+              )
+          if actual_accessed_apis != expected_accessed_apis:
+              raise SystemExit(
+                  "Unexpected required-reason API entries: "
+                  f"{actual_accessed_apis}"
+              )
           PY
 
   replay-eval:

@@ -1123,7 +1123,7 @@ struct VoiceFilterPipelineTests {
     #expect(dec.indicator == .urgencyBroadcast)
   }
 
-  @Test func routeBeforeTranscriptionDiscardsPilotBeforeSTT() {
+  @Test func routeBeforeTranscriptionTranscribesPilotBeforeSTT() {
     let store = InMemoryStorage()
     store.enabled = true
     store.profiles = [
@@ -1140,7 +1140,7 @@ struct VoiceFilterPipelineTests {
     let route = pipeline.routeBeforeTranscription(
       speaker: .pilot(slot: .primary, score: 0.91)
     )
-    #expect(route == .discard(reason: .pilotVoice))
+    #expect(route == .transcribe(reason: .pilotVoice))
   }
 
   @Test func routeBeforeTranscriptionKeepsMixedSegmentsVisible() {
@@ -2209,7 +2209,9 @@ struct LocalSpeakerIdentifierFactoryTests {
       Issue.record("expected pilot decision through factory-backed pipeline, got \(decision)")
       return
     }
-    #expect(pipeline.routeBeforeTranscription(speaker: decision) == .discard(reason: .pilotVoice))
+    #expect(
+      pipeline.routeBeforeTranscription(speaker: decision)
+        == .transcribe(reason: .pilotVoice))
   }
 
   @Test func factoryBackedPipelineKeepsMixedSpeechTranscribed() async throws {
@@ -2351,14 +2353,35 @@ struct SpeechAudioBufferGateTests {
     )
   }
 
-  @Test func confidentPilotIsDiscardedBeforeASR() async throws {
+  @Test func confidentPilotTranscribesBeforeASR() async throws {
     let gate = VoiceFilterSpeechAudioBufferGate(
       pipeline: Self.enabledPipeline(
-        identifier: ScriptedIdentifier(decision: .pilot(slot: .primary, score: 0.94))
+        identifier: ScriptedIdentifier(decision: .pilot(slot: .primary, score: 1.0))
       )
     )
     let route = try await gate.route(samples: [0.1, 0.2, 0.1, 0.2], sampleRate: 16_000)
-    #expect(route == .discard(reason: .pilotVoice))
+    #expect(route == .transcribe(reason: .pilotVoice))
+  }
+
+  @Test func pilotClassifiedBufferStillReachesAppend() async {
+    let gate = VoiceFilterSpeechAudioBufferGate(
+      pipeline: Self.enabledPipeline(
+        identifier: ScriptedIdentifier(decision: .pilot(slot: .primary, score: 1.0))
+      )
+    )
+    let (appended, appendContinuation) = AsyncStream<Int>.makeStream()
+    let router = SerialBufferRouter<Int>(
+      classify: { samples, sampleRate in
+        try await gate.route(samples: samples, sampleRate: sampleRate)
+      },
+      append: { appendContinuation.yield($0) }
+    )
+
+    router.submit(1, samples: [0.1, 0.2, 0.1, 0.2], sampleRate: 16_000)
+
+    var iterator = appended.makeAsyncIterator()
+    #expect(await iterator.next() == 1)
+    appendContinuation.finish()
   }
 
   @Test func nonPilotTranscribes() async throws {

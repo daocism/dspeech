@@ -103,6 +103,20 @@ struct CaptureCoordinatorTests {
     #expect(coordinator.startBlockedMessage != nil)
   }
 
+  @Test func toggleWhileBlockedSurfacesMessageWithoutStartingEngine() async {
+    let (coordinator, engine, _) = Self.makeCoordinator(
+      route: RouteSnapshot(),
+      availableInputs: []
+    )
+    #expect(coordinator.canStart == false)
+
+    await coordinator.toggle()
+
+    #expect(engine.startCallCount == 0)
+    #expect(coordinator.live.isListening == false)
+    #expect(coordinator.startBlockedMessage != nil)
+  }
+
   @Test func startBlockedByRoutePreparationFailureUsesTypedReason() async {
     let engine = FakeEngine()
     let routing = FakeAudioSessionRouting(
@@ -464,6 +478,49 @@ struct CaptureCoordinatorTests {
     #expect(engine.stopCallCount == 1)
   }
 
+  @Test func stopForBackgroundSetsNoticeOnlyWhenCaptureWasActive() async {
+    let (coordinator, engine, _) = Self.makeCoordinator(
+      route: RouteSnapshot(inputs: [Self.port(.usbAudio)]),
+      availableInputs: [Self.port(.usbAudio)]
+    )
+    #expect(coordinator.stoppedForBackgroundNotice == false)
+
+    coordinator.stopForBackground()
+    #expect(engine.stopCallCount == 0)
+    #expect(coordinator.stoppedForBackgroundNotice == false)
+
+    await coordinator.start()
+    await Self.wait(for: { coordinator.live.isListening })
+    coordinator.stopForBackground()
+    await Self.wait(for: { engine.stopCallCount == 1 })
+
+    #expect(coordinator.stoppedForBackgroundNotice)
+  }
+
+  @Test func startAndUserStopClearBackgroundStopNotice() async {
+    let (coordinator, engine, _) = Self.makeCoordinator(
+      route: RouteSnapshot(inputs: [Self.port(.usbAudio)]),
+      availableInputs: [Self.port(.usbAudio)]
+    )
+    await coordinator.start()
+    await Self.wait(for: { coordinator.live.isListening })
+    coordinator.stopForBackground()
+    await Self.wait(for: { engine.stopCallCount == 1 && coordinator.live.status == .stopped })
+    #expect(coordinator.stoppedForBackgroundNotice)
+
+    await coordinator.start()
+    await Self.wait(for: { engine.startCallCount == 2 && coordinator.live.isListening })
+    #expect(coordinator.live.isListening)
+    #expect(coordinator.stoppedForBackgroundNotice == false)
+
+    coordinator.stopForBackground()
+    await Self.wait(for: { engine.stopCallCount == 2 })
+    #expect(coordinator.stoppedForBackgroundNotice)
+
+    coordinator.stop()
+    #expect(coordinator.stoppedForBackgroundNotice == false)
+  }
+
   @Test func stopForBackgroundIsNoOpWhenIdle() {
     let (coordinator, engine, _) = Self.makeCoordinator(
       route: RouteSnapshot(inputs: [Self.port(.usbAudio)]),
@@ -586,6 +643,20 @@ struct CaptureCoordinatorTests {
           "blockedMessage for \(health) contained forbidden phrase \(forbidden)")
       }
     }
+  }
+
+  @Test func sameLanguageTranslationConflictUsesUnsupportedPairFailure() throws {
+    let failure = try #require(
+      ContentView.sameLanguageTranslationFailure(sourceIdentifier: "en-US", targetCode: "en"))
+
+    #expect(
+      failure
+        == .languagePairingUnsupported(
+          source: Locale.Language(identifier: "en-US"),
+          target: Locale.Language(identifier: "en")))
+    #expect(
+      ContentView.sameLanguageTranslationFailure(sourceIdentifier: "fr-FR", targetCode: "en")
+        == nil)
   }
 
   private static let forbiddenSubstrings: [String] = [
