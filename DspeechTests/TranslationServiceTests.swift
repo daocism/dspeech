@@ -13,6 +13,56 @@ struct TranslationServiceTests {
     LocalTranslationService(backend: backend)
   }
 
+  @Test func appleTranslationAvailabilityMatchesFrameworkStatusBeforeSessionBoundary() async {
+    let service = AppleTranslationService()
+    let frameworkAvailability = LanguageAvailability()
+    let pairs = [
+      (source: en, target: ru),
+      (source: en, target: Locale.Language(identifier: "fr")),
+      (source: en, target: Locale.Language(identifier: "zz")),
+    ]
+
+    for pair in pairs {
+      let frameworkStatus = await frameworkAvailability.status(from: pair.source, to: pair.target)
+      let adapterStatus = await service.availability(
+        translatingFrom: pair.source,
+        into: pair.target
+      )
+      #expect(adapterStatus == Self.status(from: frameworkStatus))
+    }
+  }
+
+  @Test func appleTranslationRejectsEmptyInputBeforeAvailabilityOrSession() async {
+    do {
+      _ = try await AppleTranslationService().translate(" \n\t ", from: en, into: ru)
+      Issue.record("expected emptyInput")
+    } catch {
+      #expect(error == .emptyInput)
+    }
+  }
+
+  @Test func serviceErrorsMapToVisibleTranslationFailures() {
+    let failures: [(TranslationServiceError, TranslationFailure)] = [
+      (.emptyInput, .emptyInput),
+      (.sourceLanguageUnsupported(en), .sourceLanguageUnsupported(en)),
+      (.targetLanguageUnsupported(ru), .targetLanguageUnsupported(ru)),
+      (
+        .languagePairingUnsupported(source: en, target: ru),
+        .languagePairingUnsupported(source: en, target: ru)
+      ),
+      (
+        .languagePackNotInstalled(source: en, target: ru),
+        .languagePackNotInstalled(source: en, target: ru)
+      ),
+      (.sessionCancelled, .sessionCancelled),
+      (.engineFailure("TranslationBackend#42"), .engineFailure("TranslationBackend#42")),
+    ]
+
+    for (error, expected) in failures {
+      #expect(TranslationFailure.service(error) == expected)
+    }
+  }
+
   @Test func availabilityPassesThroughInstalled() async {
     let backend = FakeTranslationBackend()
     backend.statusToReturn = .installed
@@ -124,4 +174,81 @@ struct TranslationServiceTests {
     }
     #expect(message.contains("TranslationBackend"))
   }
+
+  private static func status(
+    from frameworkStatus: LanguageAvailability.Status
+  ) -> TranslationLanguageStatus {
+    switch frameworkStatus {
+    case .installed:
+      return .installed
+    case .supported:
+      return .downloadable
+    case .unsupported:
+      return .unsupported
+    @unknown default:
+      return .unsupported
+    }
+  }
+
+  #if DEBUG
+    @Test func scriptedEngineFactoryRequiresUITestLaunchArgument() {
+      #expect(ScriptedLiveTranscriptionEngine.makeFromLaunchArguments(["Dspeech"]) == nil)
+    }
+
+    @Test func scriptedEngineEmitsDeterministicLaunchScript() async throws {
+      let engine = try #require(
+        ScriptedLiveTranscriptionEngine.makeFromLaunchArguments([
+          "Dspeech",
+          "-dspeech.uitest.scripted-engine",
+        ]))
+      var iterator = engine.events().makeAsyncIterator()
+
+      await engine.start()
+
+      try Self.expectStatus(await iterator.next(), .idle)
+      try Self.expectStatus(await iterator.next(), .requestingPermission)
+      try Self.expectStatus(await iterator.next(), .listening)
+      try Self.expectPartial(await iterator.next(), "Tower N123AB")
+      let segment = try Self.requireSegment(await iterator.next())
+      #expect(segment.text == "Tower N123AB cleared for takeoff")
+      #expect(segment.confidence == 0.96)
+      #expect(segment.source == .liveATC)
+      try Self.expectStatus(await iterator.next(), .stopped)
+      #expect(engine.status == .stopped)
+    }
+
+    private static func expectStatus(
+      _ event: LiveTranscriptionEvent?,
+      _ expected: LiveTranscriptionStatus
+    ) throws {
+      guard case .status(let status) = try #require(event) else {
+        Issue.record("expected status \(expected)")
+        return
+      }
+      #expect(status == expected)
+    }
+
+    private static func expectPartial(
+      _ event: LiveTranscriptionEvent?,
+      _ expected: String
+    ) throws {
+      guard case .partial(let text) = try #require(event) else {
+        Issue.record("expected partial \(expected)")
+        return
+      }
+      #expect(text == expected)
+    }
+
+    private static func requireSegment(
+      _ event: LiveTranscriptionEvent?
+    ) throws -> TranscriptSegment {
+      guard case .segment(let segment) = try #require(event) else {
+        Issue.record("expected segment")
+        throw TestExpectationFailure()
+      }
+      return segment
+    }
+
+    private struct TestExpectationFailure: Error {}
+  #endif
 }

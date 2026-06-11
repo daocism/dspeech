@@ -189,6 +189,33 @@ struct CallSignTests {
     #expect(generatedCaseCount == 1_000)
   }
 
+  @Test("should keep generated abbreviated callsigns out of the full-match tier")
+  func shouldKeepGeneratedAbbreviatedCallSignsOutOfFullMatchTier() throws {
+    let generatedCaseCount = 500
+    var random = DeterministicCallSignRandom(seed: 0xD5_06_11_04)
+
+    for _ in 0..<generatedCaseCount {
+      let registration = Self.registration(random: &random)
+      let callSign = try #require(CallSign(raw: registration))
+      let suffix = Array(callSign.normalized.dropFirst())
+      guard suffix.count >= 2 else {
+        Issue.record("generated registration must include an abbreviated suffix")
+        return
+      }
+      let tailLength = random.int(in: 2...suffix.count)
+      let tail = String(suffix.suffix(tailLength))
+      let spokenTail = tail.map {
+        Self.spokenToken(for: $0, random: &random)
+      }.joined(separator: " ")
+
+      #expect(callSign.matches(in: spokenTail) == false)
+      #expect(callSign.matchesAbbreviated(in: spokenTail))
+    }
+
+    print("PBT_CASE_COUNT callsign-abbreviation-tier=500")
+    #expect(generatedCaseCount == 500)
+  }
+
   private struct DeterministicCallSignRandom {
     private var state: UInt64
 

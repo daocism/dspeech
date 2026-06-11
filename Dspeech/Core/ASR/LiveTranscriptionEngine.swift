@@ -23,6 +23,84 @@ protocol LiveTranscriptionEngine: AnyObject {
   func stop()
 }
 
+#if DEBUG
+  @MainActor
+  final class ScriptedLiveTranscriptionEngine: LiveTranscriptionEngine {
+    enum Step: Sendable {
+      case partial(String)
+      case segment(String, confidence: Double, sourceLanguageCode: String)
+      case status(LiveTranscriptionStatus)
+    }
+
+    static let launchArgument = "-dspeech.uitest.scripted-engine"
+
+    private static let defaultScript: [Step] = [
+      .partial("Tower N123AB"),
+      .segment(
+        "Tower N123AB cleared for takeoff",
+        confidence: 0.96,
+        sourceLanguageCode: "en"
+      ),
+    ]
+
+    private let script: [Step]
+    private var continuation: AsyncStream<LiveTranscriptionEvent>.Continuation?
+    private(set) var status: LiveTranscriptionStatus = .idle
+
+    init(script: [Step] = defaultScript) {
+      self.script = script
+    }
+
+    static func makeFromLaunchArguments(
+      _ arguments: [String] = CommandLine.arguments
+    ) -> ScriptedLiveTranscriptionEngine? {
+      guard arguments.contains(launchArgument) else { return nil }
+      return ScriptedLiveTranscriptionEngine()
+    }
+
+    func events() -> AsyncStream<LiveTranscriptionEvent> {
+      AsyncStream<LiveTranscriptionEvent> { continuation in
+        self.continuation = continuation
+        continuation.yield(.status(self.status))
+      }
+    }
+
+    func start() async {
+      transition(to: .requestingPermission)
+      transition(to: .listening)
+      for step in script {
+        switch step {
+        case .partial(let text):
+          continuation?.yield(.partial(text))
+        case .segment(let text, let confidence, let sourceLanguageCode):
+          continuation?.yield(
+            .segment(
+              TranscriptSegment(
+                text: text,
+                confidence: confidence,
+                sourceLanguageCode: sourceLanguageCode,
+                source: .liveATC
+              )))
+        case .status(let status):
+          transition(to: status)
+        }
+      }
+      if status == .requestingPermission || status == .ready || status == .listening {
+        transition(to: .stopped)
+      }
+    }
+
+    func stop() {
+      transition(to: .stopped)
+    }
+
+    private func transition(to newStatus: LiveTranscriptionStatus) {
+      status = newStatus
+      continuation?.yield(.status(newStatus))
+    }
+  }
+#endif
+
 @MainActor
 protocol SpeechAudioBufferGate: AnyObject {
   func route(samples: [Float], sampleRate: Double) async throws -> PreTranscriptionRoutingDecision
