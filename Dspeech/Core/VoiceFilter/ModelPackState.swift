@@ -74,6 +74,19 @@ struct InstalledModelPack: Equatable, Sendable, Codable {
     self.installedAt = installedAt
     self.localModelPath = localModelPath
   }
+
+  func replacingLocalModelPath(_ localModelPath: String?) -> InstalledModelPack {
+    InstalledModelPack(
+      identifier: identifier,
+      version: version,
+      embeddingDimension: embeddingDimension,
+      checksumSHA256: checksumSHA256,
+      source: source,
+      sizeBytes: sizeBytes,
+      installedAt: installedAt,
+      localModelPath: localModelPath
+    )
+  }
 }
 
 struct ModelPackFailure: Equatable, Sendable, Codable {
@@ -160,9 +173,12 @@ struct UserDefaultsModelPackStateStorage: ModelPackStateStorage, @unchecked Send
   static let stateKey = "dspeech.voicefilter.modelpack.v1"
 
   let defaults: UserDefaults
+  let applicationSupportDirectory: URL
 
-  init(defaults: UserDefaults = .standard) {
+  init(defaults: UserDefaults = .standard, applicationSupportDirectory: URL? = nil) {
     self.defaults = defaults
+    self.applicationSupportDirectory =
+      applicationSupportDirectory ?? Self.defaultApplicationSupportDirectory()
   }
 
   func loadState() -> ModelPackState {
@@ -182,15 +198,35 @@ struct UserDefaultsModelPackStateStorage: ModelPackStateStorage, @unchecked Send
     }
     do {
       let decoded = try JSONDecoder().decode(ModelPackState.self, from: data)
-      return decoded.recoveredAfterColdStart()
+      let recovered = decoded.recoveredAfterColdStart()
+      let resolved = Self.resolvedModelPaths(
+        in: recovered,
+        applicationSupportDirectory: applicationSupportDirectory
+      )
+      let persisted = Self.persistedModelPaths(
+        in: resolved,
+        applicationSupportDirectory: applicationSupportDirectory
+      )
+      if persisted != decoded {
+        saveState(resolved)
+      }
+      return resolved
     } catch {
       return .failed(Self.corruptPersistedStateFailure)
     }
   }
 
   func saveState(_ state: ModelPackState) {
-    guard let data = try? JSONEncoder().encode(state) else { return }
-    defaults.set(data, forKey: Self.stateKey)
+    do {
+      let persisted = Self.persistedModelPaths(
+        in: state,
+        applicationSupportDirectory: applicationSupportDirectory
+      )
+      let data = try JSONEncoder().encode(persisted)
+      defaults.set(data, forKey: Self.stateKey)
+    } catch {
+      return
+    }
   }
 
   #if DEBUG
@@ -238,4 +274,101 @@ struct UserDefaultsModelPackStateStorage: ModelPackStateStorage, @unchecked Send
       ),
     isRetryable: false
   )
+
+  private static func defaultApplicationSupportDirectory() -> URL {
+    FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+  }
+
+  private static func resolvedModelPaths(
+    in state: ModelPackState,
+    applicationSupportDirectory: URL
+  ) -> ModelPackState {
+    switch state {
+    case .installed(let pack):
+      return .installed(
+        pack.replacingLocalModelPath(
+          resolvedLocalModelPath(
+            pack.localModelPath,
+            applicationSupportDirectory: applicationSupportDirectory
+          )))
+    case .disabled(let pack):
+      return .disabled(
+        pack.replacingLocalModelPath(
+          resolvedLocalModelPath(
+            pack.localModelPath,
+            applicationSupportDirectory: applicationSupportDirectory
+          )))
+    case .absent, .acquiring, .failed:
+      return state
+    }
+  }
+
+  private static func persistedModelPaths(
+    in state: ModelPackState,
+    applicationSupportDirectory: URL
+  ) -> ModelPackState {
+    switch state {
+    case .installed(let pack):
+      return .installed(
+        pack.replacingLocalModelPath(
+          persistedLocalModelPath(
+            pack.localModelPath,
+            applicationSupportDirectory: applicationSupportDirectory
+          )))
+    case .disabled(let pack):
+      return .disabled(
+        pack.replacingLocalModelPath(
+          persistedLocalModelPath(
+            pack.localModelPath,
+            applicationSupportDirectory: applicationSupportDirectory
+          )))
+    case .absent, .acquiring, .failed:
+      return state
+    }
+  }
+
+  private static func resolvedLocalModelPath(
+    _ path: String?,
+    applicationSupportDirectory: URL
+  ) -> String? {
+    guard let path, !path.isEmpty else { return path }
+    if path.hasPrefix("/") {
+      let relative = relativePathInsideApplicationSupport(
+        path,
+        applicationSupportDirectory: applicationSupportDirectory
+      )
+      guard relative != path else { return path }
+      return applicationSupportDirectory.appendingPathComponent(relative, isDirectory: true).path
+    }
+    return applicationSupportDirectory.appendingPathComponent(path, isDirectory: true).path
+  }
+
+  private static func persistedLocalModelPath(
+    _ path: String?,
+    applicationSupportDirectory: URL
+  ) -> String? {
+    guard let path, !path.isEmpty else { return path }
+    return relativePathInsideApplicationSupport(
+      path,
+      applicationSupportDirectory: applicationSupportDirectory
+    )
+  }
+
+  private static func relativePathInsideApplicationSupport(
+    _ path: String,
+    applicationSupportDirectory: URL
+  ) -> String {
+    guard path.hasPrefix("/") else { return path }
+    let standardizedPath = URL(fileURLWithPath: path).standardizedFileURL.path
+    let appSupportPath = applicationSupportDirectory.standardizedFileURL.path
+    let prefix = appSupportPath.hasSuffix("/") ? appSupportPath : appSupportPath + "/"
+    if standardizedPath.hasPrefix(prefix) {
+      return String(standardizedPath.dropFirst(prefix.count))
+    }
+    let marker = "/Application Support/"
+    guard let range = standardizedPath.range(of: marker) else {
+      return path
+    }
+    return String(standardizedPath[range.upperBound...])
+  }
 }

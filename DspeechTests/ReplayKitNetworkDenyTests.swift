@@ -449,7 +449,7 @@ struct ReplayKitNetworkDenyTests {
     let original = ModelRegistry.baseURL
     defer { ModelRegistry.baseURL = original }
 
-    let withoutOverride = await SpeakerModelPackInstaller.withConfiguredRegistryBaseURL(
+    let withoutOverride = try await SpeakerModelPackInstaller.withConfiguredRegistryBaseURL(
       infoDictionary: ["Other": "x"]
     ) {
       #expect(ModelRegistry.baseURL == original)
@@ -459,7 +459,7 @@ struct ReplayKitNetworkDenyTests {
     #expect(ModelRegistry.baseURL == original)
 
     let mirror = "https://mirror.internal.example"
-    let withOverride = await SpeakerModelPackInstaller.withConfiguredRegistryBaseURL(
+    let withOverride = try await SpeakerModelPackInstaller.withConfiguredRegistryBaseURL(
       infoDictionary: [SpeakerModelPackInstaller.registryBaseURLOverrideKey: mirror]
     ) {
       #expect(ModelRegistry.baseURL == mirror)
@@ -471,6 +471,7 @@ struct ReplayKitNetworkDenyTests {
     #expect(
       SpeakerModelPackInstaller.resolvedRegistrySource(
         infoDictionary: [SpeakerModelPackInstaller.registryBaseURLOverrideKey: mirror])
-        == "\(mirror)/\(SpeakerModelPackInstaller.source)")
+        == "\(mirror)/\(SpeakerModelPackInstaller.source)/resolve/\(SpeakerModelPackInstaller.sourceRevision)"
+    )
   }
 }

@@ -153,31 +153,102 @@ func modelPackDownloadFailure(for error: Error) -> ModelPackFailure {
       userSafeReason:
         String(
           localized:
-            "The model pack failed its checksum or integrity check. Retry the download to get a verified copy."
+            "The model pack changed upstream and no longer matches Dspeech's pinned integrity manifest. Continue without the voice filter until the app updates its model manifest."
+        ),
+      isRetryable: false
+    )
+  }
+
+  if isDiskFull(error) {
+    DspeechLog.modelPack.error("model pack failure mapped kind=disk")
+    return ModelPackFailure(
+      kind: .disk,
+      userSafeReason:
+        String(
+          localized:
+            "There isn't enough device storage to install the voice filter model pack. Free storage and try again."
         ),
       isRetryable: true
     )
   }
 
-  DspeechLog.modelPack.error("model pack failure mapped kind=network")
+  if error is CancellationError || error as? ModelPackInstallError == .cancelled {
+    DspeechLog.modelPack.info("model pack failure mapped kind=cancelled")
+    return ModelPackFailure(
+      kind: .cancelled,
+      userSafeReason: String(localized: "The model pack download was cancelled."),
+      isRetryable: true
+    )
+  }
+
+  if error is URLError {
+    DspeechLog.modelPack.error("model pack failure mapped kind=network")
+    return ModelPackFailure(
+      kind: .network,
+      userSafeReason:
+        String(
+          localized:
+            "Couldn't download the model pack because the network request failed. Check your connection and try again."
+        ),
+      isRetryable: true
+    )
+  }
+
+  let nsError = error as NSError
+  if nsError.domain == NSURLErrorDomain {
+    DspeechLog.modelPack.error("model pack failure mapped kind=network")
+    return ModelPackFailure(
+      kind: .network,
+      userSafeReason:
+        String(
+          localized:
+            "Couldn't download the model pack because the network request failed. Check your connection and try again."
+        ),
+      isRetryable: true
+    )
+  }
+
+  DspeechLog.modelPack.error("model pack failure mapped kind=unknown")
   return ModelPackFailure(
-    kind: .network,
+    kind: .unknown,
     userSafeReason:
       String(
-        localized: "Couldn't download the model pack. Check your network connection and try again."),
-    isRetryable: true
+        localized:
+          "Couldn't install the model pack because the installer did not produce the expected local files."
+      ),
+    isRetryable: false
   )
 }
 
 func modelPackDeleteFailure(for error: Error) -> ModelPackFailure {
-  DspeechLog.modelPack.error("model pack delete failure mapped kind=disk")
+  let nsError = error as NSError
+  DspeechLog.modelPack.error(
+    "model pack delete failure mapped kind=disk domain=\(nsError.domain, privacy: .public) code=\(nsError.code, privacy: .public)"
+  )
   return ModelPackFailure(
     kind: .disk,
     userSafeReason:
       String(
         localized:
-          "Couldn't delete the model pack from the device. Check storage access and try again later."
+          "Couldn't delete the model pack from the device. The device reported a storage or file-access error. Try again later."
       ),
     isRetryable: false
   )
+}
+
+private func isDiskFull(_ error: Error) -> Bool {
+  if case .insufficientDiskSpace = error as? ModelPackInstallError {
+    return true
+  }
+  let nsError = error as NSError
+  if nsError.domain == NSCocoaErrorDomain && nsError.code == NSFileWriteOutOfSpaceError {
+    return true
+  }
+  if nsError.domain == NSPOSIXErrorDomain && nsError.code == Int(POSIXErrorCode.ENOSPC.rawValue) {
+    return true
+  }
+  if let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? Error {
+    return isDiskFull(underlying)
+  }
+  return false
 }

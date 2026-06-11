@@ -41,6 +41,7 @@ protocol VoiceFilterStorage: Sendable {
 
   func loadProfiles() -> [PilotVoiceProfile]
   func saveProfiles(_ profiles: [PilotVoiceProfile])
+  func deleteAllProfiles()
 
   func loadCallSign() -> CallSign?
   func saveCallSign(_ callSign: CallSign?)
@@ -69,6 +70,10 @@ extension VoiceFilterStorage {
     if issues.contains(.gateConfigCorrupted) { saveGateConfig(.default) }
     if issues.contains(.enabledFlagCorrupted) { saveEnabled(false) }
   }
+
+  func deleteAllProfiles() {
+    saveProfiles([])
+  }
 }
 
 struct UserDefaultsVoiceFilterStorage: VoiceFilterStorage, @unchecked Sendable {
@@ -76,11 +81,14 @@ struct UserDefaultsVoiceFilterStorage: VoiceFilterStorage, @unchecked Sendable {
   static let callSignKey = "dspeech.voicefilter.callsign.v1"
   static let configKey = "dspeech.voicefilter.gateconfig.v1"
   static let enabledKey = "dspeech.voicefilter.enabled.v1"
+  static let profileStoreFileName = "pilot-voice-profiles.v1.json"
 
   let defaults: UserDefaults
+  let profileStoreURL: URL
 
-  init(defaults: UserDefaults = .standard) {
+  init(defaults: UserDefaults = .standard, profileStoreURL: URL? = nil) {
     self.defaults = defaults
+    self.profileStoreURL = profileStoreURL ?? Self.defaultProfileStoreURL()
   }
 
   func loadProfiles() -> [PilotVoiceProfile] {
@@ -88,8 +96,23 @@ struct UserDefaultsVoiceFilterStorage: VoiceFilterStorage, @unchecked Sendable {
   }
 
   func saveProfiles(_ profiles: [PilotVoiceProfile]) {
-    guard let data = try? JSONEncoder().encode(profiles) else { return }
-    defaults.set(data, forKey: Self.profilesKey)
+    do {
+      try persistProfiles(profiles)
+      defaults.removeObject(forKey: Self.profilesKey)
+    } catch {
+      return
+    }
+  }
+
+  func deleteAllProfiles() {
+    if FileManager.default.fileExists(atPath: profileStoreURL.path) {
+      do {
+        try FileManager.default.removeItem(at: profileStoreURL)
+      } catch {
+        return
+      }
+    }
+    defaults.removeObject(forKey: Self.profilesKey)
   }
 
   func loadCallSign() -> CallSign? {
@@ -126,17 +149,9 @@ struct UserDefaultsVoiceFilterStorage: VoiceFilterStorage, @unchecked Sendable {
     var issues: [VoiceFilterStorageIssue] = []
     let decoder = JSONDecoder()
 
-    let profiles: [PilotVoiceProfile]
-    if let data = defaults.data(forKey: Self.profilesKey) {
-      do {
-        profiles = try decoder.decode([PilotVoiceProfile].self, from: data)
-      } catch {
-        profiles = []
-        issues.append(.profilesCorrupted)
-      }
-    } else {
-      profiles = []
-    }
+    let profileLoad = loadProfilesFromFileOrMigratedDefaults(decoder: decoder)
+    let profiles = profileLoad.profiles
+    issues.append(contentsOf: profileLoad.issues)
 
     let callSign: CallSign?
     if let data = defaults.data(forKey: Self.callSignKey) {
@@ -184,9 +199,64 @@ struct UserDefaultsVoiceFilterStorage: VoiceFilterStorage, @unchecked Sendable {
   }
 
   func clearCorruptValues(_ issues: Set<VoiceFilterStorageIssue>) {
-    if issues.contains(.profilesCorrupted) { defaults.removeObject(forKey: Self.profilesKey) }
+    if issues.contains(.profilesCorrupted) { deleteAllProfiles() }
     if issues.contains(.callSignCorrupted) { defaults.removeObject(forKey: Self.callSignKey) }
     if issues.contains(.gateConfigCorrupted) { defaults.removeObject(forKey: Self.configKey) }
     if issues.contains(.enabledFlagCorrupted) { defaults.removeObject(forKey: Self.enabledKey) }
+  }
+
+  private static func defaultProfileStoreURL() -> URL {
+    FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
+      .first!
+      .appendingPathComponent("Dspeech", isDirectory: true)
+      .appendingPathComponent("VoiceFilter", isDirectory: true)
+      .appendingPathComponent(profileStoreFileName, isDirectory: false)
+  }
+
+  private func loadProfilesFromFileOrMigratedDefaults(
+    decoder: JSONDecoder
+  ) -> (profiles: [PilotVoiceProfile], issues: [VoiceFilterStorageIssue]) {
+    if FileManager.default.fileExists(atPath: profileStoreURL.path) {
+      do {
+        let data = try Data(contentsOf: profileStoreURL)
+        return (try decoder.decode([PilotVoiceProfile].self, from: data), [])
+      } catch {
+        return ([], [.profilesCorrupted])
+      }
+    }
+
+    guard let legacyData = defaults.data(forKey: Self.profilesKey) else {
+      return ([], [])
+    }
+
+    do {
+      let migratedProfiles = try decoder.decode([PilotVoiceProfile].self, from: legacyData)
+      try persistProfiles(migratedProfiles)
+      defaults.removeObject(forKey: Self.profilesKey)
+      return (migratedProfiles, [])
+    } catch {
+      return ([], [.profilesCorrupted])
+    }
+  }
+
+  private func persistProfiles(_ profiles: [PilotVoiceProfile]) throws {
+    let data = try JSONEncoder().encode(profiles)
+    let directory = profileStoreURL.deletingLastPathComponent()
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    try data.write(to: profileStoreURL, options: .atomic)
+    try applyVoiceProfileFileAttributes(to: profileStoreURL)
+  }
+
+  private func applyVoiceProfileFileAttributes(to url: URL) throws {
+    var attributeURL = url
+    var values = URLResourceValues()
+    values.isExcludedFromBackup = true
+    #if os(iOS)
+      try FileManager.default.setAttributes(
+        [.protectionKey: FileProtectionType.complete],
+        ofItemAtPath: url.path
+      )
+    #endif
+    try attributeURL.setResourceValues(values)
   }
 }

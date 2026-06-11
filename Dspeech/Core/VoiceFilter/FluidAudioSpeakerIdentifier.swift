@@ -117,7 +117,7 @@ struct FluidAudioSpeakerIdentifier: LocalSpeakerIdentifier {
     DspeechLog.modelPack.info(
       "fluid audio enrollment succeeded embeddingDimension=\(embedding.count, privacy: .public)"
     )
-    return VoicePrintVector(values: embedding, quality: prepared.quality)
+    return try VoicePrintVector(validatingValues: embedding, quality: prepared.quality)
   }
 
   func classify(
@@ -131,7 +131,7 @@ struct FluidAudioSpeakerIdentifier: LocalSpeakerIdentifier {
       return .insufficientSpeech
     }
     let embedding = try await embedding(for: prepared.samples)
-    let candidate = VoicePrintVector(values: embedding, quality: prepared.quality)
+    let candidate = try VoicePrintVector(validatingValues: embedding, quality: prepared.quality)
     let decision = SpeakerMatcher.match(
       candidate: candidate,
       profiles: profiles,

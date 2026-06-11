@@ -1,6 +1,16 @@
 import Foundation
 
+enum VoicePrintVectorError: Error, Equatable, Sendable {
+  case nonFiniteValue(index: Int)
+  case nonFiniteQuality
+}
+
 struct VoicePrintVector: Equatable, Sendable, Codable {
+  private enum CodingKeys: String, CodingKey {
+    case values
+    case quality
+  }
+
   let values: [Float]
   let quality: Float
 
@@ -9,6 +19,30 @@ struct VoicePrintVector: Equatable, Sendable, Codable {
   init(values: [Float], quality: Float) {
     self.values = values
     self.quality = quality
+  }
+
+  init(validatingValues values: [Float], quality: Float) throws {
+    for (index, value) in values.enumerated() where !value.isFinite {
+      throw VoicePrintVectorError.nonFiniteValue(index: index)
+    }
+    guard quality.isFinite else {
+      throw VoicePrintVectorError.nonFiniteQuality
+    }
+    self.values = values
+    self.quality = quality
+  }
+
+  init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    let values = try container.decode([Float].self, forKey: .values)
+    let quality = try container.decode(Float.self, forKey: .quality)
+    try self.init(validatingValues: values, quality: quality)
+  }
+
+  func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(values, forKey: .values)
+    try container.encode(quality, forKey: .quality)
   }
 }
 
