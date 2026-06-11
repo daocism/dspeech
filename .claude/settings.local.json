@@ -1,7 +1,4 @@
 {
-  "enabledPlugins": {
-    "serena@claude-plugins-official": true
-  },
   "enableAllProjectMcpServers": true,
   "permissions": {
     "allow": [
