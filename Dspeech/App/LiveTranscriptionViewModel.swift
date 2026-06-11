@@ -11,12 +11,16 @@ final class LiveTranscriptionViewModel {
   private(set) var suppressedSegmentIDs: Set<UUID> = []
   private(set) var translations: [UUID: String] = [:]
   private(set) var translationFailure: TranslationFailure?
+  private(set) var persistenceFailure: String?
   // why: the demo/mockup transcript is a first-run illustration only. Once the user has
   // started a real session it must never reappear over (or instead of) real content — the
   // "press Stop and the transcript turns back into demo" confusion.
   private(set) var hasEverStarted = false
 
   private let engine: any LiveTranscriptionEngine
+  private let transcriptStore: (any TranscriptStoring)?
+  private let recognitionLocaleIdentifier: @MainActor () -> String?
+  private let firstSessionStorage: any FirstSessionStateStorage
   private let voiceFilter: VoiceFilterPipeline?
   private let translator: (any TranslationService)?
   private let translationTarget: @MainActor () -> Locale.Language?
@@ -25,6 +29,8 @@ final class LiveTranscriptionViewModel {
   private var translationTaskTokens: [UUID: UUID] = [:]
   private var translationPreparationToken = UUID()
   private var startInFlight = false
+  private var activeTranscriptSessionID: UUID?
+  private var persistenceUnavailableForCurrentSession = false
   // why: a Stop-committed partial has no language of its own; reuse the last real segment's
   // language, defaulting to the device language (matches the device-language default policy).
   private var lastSourceLanguageCode = String(
@@ -32,14 +38,21 @@ final class LiveTranscriptionViewModel {
 
   init(
     engine: any LiveTranscriptionEngine,
+    transcriptStore: (any TranscriptStoring)? = nil,
+    recognitionLocaleIdentifier: @escaping @MainActor () -> String? = { nil },
+    firstSessionStorage: any FirstSessionStateStorage = UserDefaultsFirstSessionStateStorage(),
     voiceFilter: VoiceFilterPipeline? = nil,
     translator: (any TranslationService)? = nil,
     translationTarget: @escaping @MainActor () -> Locale.Language? = { nil }
   ) {
     self.engine = engine
+    self.transcriptStore = transcriptStore
+    self.recognitionLocaleIdentifier = recognitionLocaleIdentifier
+    self.firstSessionStorage = firstSessionStorage
     self.voiceFilter = voiceFilter
     self.translator = translator
     self.translationTarget = translationTarget
+    self.hasEverStarted = firstSessionStorage.loadHasEverStarted()
   }
 
   var visibleSegments: [TranscriptSegment] {
@@ -77,7 +90,10 @@ final class LiveTranscriptionViewModel {
     guard !canStopCurrentSession else { return }
     startInFlight = true
     defer { startInFlight = false }
-    hasEverStarted = true
+    if !hasEverStarted {
+      hasEverStarted = true
+      firstSessionStorage.saveHasEverStarted(true)
+    }
     if eventTask == nil {
       startObservingEvents()
     }
@@ -108,11 +124,28 @@ final class LiveTranscriptionViewModel {
   }
 
   func reset() {
+    endPersistenceSessionIfNeeded()
     segments.removeAll()
     partialText = ""
     filterIndicators.removeAll()
     suppressedSegmentIDs.removeAll()
     clearTranslations()
+  }
+
+  func dismissPersistenceFailure() {
+    persistenceFailure = nil
+  }
+
+  func recordPersistenceUnavailable() {
+    recordPersistenceFailure()
+  }
+
+  func unhideSuppressedSegment(id: UUID) {
+    suppressedSegmentIDs.remove(id)
+  }
+
+  func unhideAllSuppressedSegments() {
+    suppressedSegmentIDs.removeAll()
   }
 
   func clearTranslations() {
@@ -187,6 +220,7 @@ final class LiveTranscriptionViewModel {
 
   private func append(segment: TranscriptSegment) {
     if !segment.sourceLanguageCode.isEmpty { lastSourceLanguageCode = segment.sourceLanguageCode }
+    let segmentToPersist: TranscriptSegment
     // why: the recognizer can emit a real final for the SAME utterance a beat AFTER Stop already
     // committed it as a confidence-0 placeholder (commitPartialAsSegment). Replace the placeholder
     // in place rather than showing the line twice — one VERIFY card and one identical confirmed
@@ -198,9 +232,12 @@ final class LiveTranscriptionViewModel {
     {
       clearDerivedState(for: last.id)
       segments[segments.count - 1] = segment
+      segmentToPersist = segment
     } else {
       segments.append(segment)
+      segmentToPersist = segment
     }
+    persist(segment: segmentToPersist)
     maybeTranslate(segment)
     applyVoiceFilter(to: segment)
   }
@@ -242,10 +279,88 @@ final class LiveTranscriptionViewModel {
           self.append(segment: segment)
           self.partialText = ""
         case .status(let newStatus):
+          let oldStatus = self.status
           self.status = newStatus
-          if newStatus == .stopped { self.partialText = "" }
+          if oldStatus != .listening, newStatus == .listening {
+            self.beginPersistenceSessionIfNeeded()
+          }
+          if newStatus == .stopped {
+            self.partialText = ""
+            self.endPersistenceSessionIfNeeded()
+          }
+          if case .failed = newStatus {
+            self.endPersistenceSessionIfNeeded()
+          }
         }
       }
     }
   }
+
+  private func beginPersistenceSessionIfNeeded() {
+    guard let transcriptStore,
+      activeTranscriptSessionID == nil,
+      !persistenceUnavailableForCurrentSession
+    else {
+      return
+    }
+    let localeIdentifier = recognitionLocaleIdentifier() ?? Locale.current.identifier
+    do {
+      let session = try transcriptStore.beginSession(localeIdentifier: localeIdentifier)
+      activeTranscriptSessionID = session.id
+    } catch {
+      persistenceUnavailableForCurrentSession = true
+      recordPersistenceFailure()
+    }
+  }
+
+  private func persist(segment: TranscriptSegment) {
+    guard segment.source == .liveATC, let transcriptStore else { return }
+    if activeTranscriptSessionID == nil, status == .listening {
+      beginPersistenceSessionIfNeeded()
+    }
+    guard let activeTranscriptSessionID else { return }
+    do {
+      try transcriptStore.append(segment, to: activeTranscriptSessionID)
+    } catch {
+      recordPersistenceFailure()
+    }
+  }
+
+  private func endPersistenceSessionIfNeeded() {
+    defer {
+      activeTranscriptSessionID = nil
+      persistenceUnavailableForCurrentSession = false
+    }
+    guard let activeTranscriptSessionID, let transcriptStore else { return }
+    do {
+      try transcriptStore.endSession(activeTranscriptSessionID)
+    } catch {
+      recordPersistenceFailure()
+    }
+  }
+
+  private func recordPersistenceFailure() {
+    // why: persistence is flight-data durability, but capture is the primary safety path.
+    // A store failure warns the pilot without stopping or hiding the live ATC transcript.
+    persistenceFailure = String(
+      localized: "Couldn't save the transcript. Live transcription continues.")
+  }
+
+  #if DEBUG
+    func seedSuppressedDemoSegmentForUITests() {
+      let segment = TranscriptSegment(
+        startedAt: Date(timeIntervalSince1970: 1_000),
+        text: "Speedbird 42, contact tower one one eight decimal seven.",
+        confidence: 0.92,
+        sourceLanguageCode: "en",
+        source: .demo
+      )
+      segments = [segment]
+      filterIndicators = [segment.id: .otherTrafficSuppressed]
+      suppressedSegmentIDs = [segment.id]
+      // why: in-memory only — persisting the flag from a UI-test seed would leak
+      // first-run state across UI tests and make them order-dependent.
+      hasEverStarted = true
+    }
+  #endif
 }

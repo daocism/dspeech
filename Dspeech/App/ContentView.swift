@@ -9,7 +9,13 @@ struct ContentView: View {
   @State private var recognition: RecognitionSettings
   @State private var translation: TranslationSettings
   @State private var audioSource: AudioSourceController
+  @State private var transcriptStore: (any TranscriptStoring)?
   @State private var showSettings: Bool = false
+  @State private var showHistory: Bool = false
+  @State private var showClearConfirmation: Bool = false
+  @State private var showSuppressedReview: Bool = false
+  @State private var followsLiveTranscript: Bool = true
+  @State private var transcriptViewportHeight: CGFloat = 0
   @State private var onboarding: OnboardingState
   @State private var translationConfig: TranslationSession.Configuration?
   @State private var translationPreparationToken = UUID()
@@ -21,11 +27,24 @@ struct ContentView: View {
     voiceFilter: VoiceFilterPipeline? = nil,
     routing: AudioSessionRouting = LiveAudioSessionRouting(),
     onboarding: OnboardingState? = nil,
-    recognitionAvailability: (any OnDeviceLocaleAvailability)? = nil
+    recognitionAvailability: (any OnDeviceLocaleAvailability)? = nil,
+    transcriptStore: (any TranscriptStoring)? = nil
   ) {
     let privacySettings = PrivacySettings()
     let recognitionSettings = RecognitionSettings(
       availability: recognitionAvailability ?? SystemOnDeviceLocaleAvailability())
+    let persistentTranscriptStore: (any TranscriptStoring)?
+    var transcriptStoreUnavailable = false
+    if let transcriptStore {
+      persistentTranscriptStore = transcriptStore
+    } else {
+      do {
+        persistentTranscriptStore = try FileTranscriptStore()
+      } catch {
+        persistentTranscriptStore = nil
+        transcriptStoreUnavailable = true
+      }
+    }
     let filter: VoiceFilterPipeline
     if let voiceFilter {
       filter = voiceFilter
@@ -52,16 +71,27 @@ struct ContentView: View {
     let translationSettings = TranslationSettings()
     let live = LiveTranscriptionViewModel(
       engine: resolvedEngine,
+      transcriptStore: persistentTranscriptStore,
+      recognitionLocaleIdentifier: { recognitionSettings.activeLocaleIdentifier },
       voiceFilter: filter,
       translator: LocalTranslationService(backend: AppleTranslationService()),
       translationTarget: { translationSettings.enabled ? translationSettings.targetLanguage : nil }
     )
+    #if DEBUG
+      if CommandLine.arguments.contains("-dspeech.uitest.seed-suppressed") {
+        live.seedSuppressedDemoSegmentForUITests()
+      }
+    #endif
+    if transcriptStoreUnavailable {
+      live.recordPersistenceUnavailable()
+    }
     let monitor = RouteHealthMonitor(routing: routing)
     _privacy = State(initialValue: privacySettings)
     _recognition = State(initialValue: recognitionSettings)
     _voiceFilter = State(initialValue: filter)
     _translation = State(initialValue: translationSettings)
     _audioSource = State(initialValue: AudioSourceController(routing: routing))
+    _transcriptStore = State(initialValue: persistentTranscriptStore)
     _onboarding = State(initialValue: onboarding ?? OnboardingState())
     _coordinator = State(
       initialValue: CaptureCoordinator(
@@ -71,6 +101,14 @@ struct ContentView: View {
   }
 
   private var liveViewModel: LiveTranscriptionViewModel { coordinator.live }
+
+  private var suppressedSegmentsForReview: [TranscriptSegment] {
+    liveViewModel.segments.filter { liveViewModel.suppressedSegmentIDs.contains($0.id) }
+  }
+
+  private var canClearTranscriptView: Bool {
+    !liveViewModel.segments.isEmpty || !liveViewModel.partialText.isEmpty
+  }
 
   private var transcriptSegmentsForDisplay: [TranscriptSegment] {
     let liveSegments = liveViewModel.visibleSegments
@@ -84,6 +122,11 @@ struct ContentView: View {
       return liveSegments
     }
     return TranscriptDemoViewModel.demo.segments
+  }
+
+  private func updateIdleTimerDisabled() {
+    UIApplication.shared.isIdleTimerDisabled =
+      scenePhase == .active && liveViewModel.canStopCurrentSession
   }
 
   // why: the localized first-run invitation, reused for the idle state and the failure state so
@@ -130,7 +173,8 @@ struct ContentView: View {
 
         VStack(spacing: isLandscape ? 8 : 12) {
           controlBar(isLandscape: isLandscape)
-          routeBanner()
+          bannerStack()
+          filteredCountPill()
           transcriptArea(isLandscape: isLandscape)
         }
         .padding(.horizontal, isLandscape ? 16 : 18)
@@ -151,7 +195,42 @@ struct ContentView: View {
         audioSource: audioSource,
         translationFailure: liveViewModel.translationFailure,
         captureActive: liveViewModel.isListening,
-        voiceFilter: voiceFilter)
+        voiceFilter: voiceFilter,
+        onVoiceFilterDisabled: { liveViewModel.unhideAllSuppressedSegments() })
+    }
+    .sheet(isPresented: $showHistory) {
+      if let transcriptStore {
+        SessionHistoryView(store: transcriptStore)
+      } else {
+        ContentUnavailableView(
+          String(localized: "Session history unavailable"),
+          systemImage: "clock.badge.questionmark",
+          description: Text(String(localized: "Transcript storage is not available."))
+        )
+        .preferredColorScheme(.dark)
+      }
+    }
+    .sheet(isPresented: $showSuppressedReview) {
+      SuppressedSegmentsReviewSheet(
+        segments: suppressedSegmentsForReview,
+        indicator: { liveViewModel.indicator(for: $0) },
+        showSegment: { liveViewModel.unhideSuppressedSegment(id: $0.id) }
+      )
+    }
+    .confirmationDialog(
+      String(localized: "Clear current transcript?"),
+      isPresented: $showClearConfirmation,
+      titleVisibility: .visible
+    ) {
+      Button(String(localized: "Clear view"), role: .destructive) {
+        liveViewModel.reset()
+      }
+      Button(String(localized: "Cancel"), role: .cancel) {}
+    } message: {
+      Text(
+        String(
+          localized:
+            "This clears the cockpit view only. Saved session history stays on this iPhone."))
     }
     .onAppear {
       coordinator.beginObservingRouteChanges()
@@ -160,18 +239,26 @@ struct ContentView: View {
       // a returning user who left translation ON needs the config armed here — it
       // drives .translationTask -> prepareTranslation (the only pack-download path).
       updateTranslationConfig()
+      updateIdleTimerDisabled()
     }
     .task {
       await recognition.refreshCapableLocales()
       if translation.enabled { updateTranslationConfig() }
     }
-    .onDisappear { coordinator.endObservingRouteChanges() }
+    .onDisappear {
+      coordinator.endObservingRouteChanges()
+      UIApplication.shared.isIdleTimerDisabled = false
+    }
     .onChange(of: scenePhase) { _, newPhase in
       if newPhase == .active {
         coordinator.refreshOnForeground()
       } else if newPhase == .background {
         coordinator.stopForBackground()
       }
+      updateIdleTimerDisabled()
+    }
+    .onChange(of: liveViewModel.canStopCurrentSession) { _, _ in
+      updateIdleTimerDisabled()
     }
     .fullScreenCover(isPresented: onboardingPresented) {
       OnboardingView { onboarding.complete() }
@@ -249,6 +336,44 @@ struct ContentView: View {
   }
 
   @ViewBuilder
+  private func bannerStack() -> some View {
+    VStack(spacing: 6) {
+      routeBanner()
+      persistenceFailureBanner()
+      translationFailureBanner()
+    }
+  }
+
+  @ViewBuilder
+  private func filteredCountPill() -> some View {
+    let count = liveViewModel.suppressedSegmentIDs.count
+    if count > 0 {
+      HStack {
+        Button {
+          showSuppressedReview = true
+        } label: {
+          Label(
+            String(localized: "\(count) filtered"),
+            systemImage: "line.3.horizontal.decrease.circle.fill"
+          )
+          .font(.caption.weight(.semibold))
+          .foregroundStyle(.yellow)
+          .padding(.horizontal, 12)
+          .frame(minHeight: 44)
+          .background(.yellow.opacity(0.14), in: Capsule())
+          .overlay {
+            Capsule().stroke(.yellow.opacity(0.42), lineWidth: 1)
+          }
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("filtered-count-pill")
+        .accessibilityLabel(String(localized: "\(count) filtered segments"))
+        Spacer(minLength: 0)
+      }
+    }
+  }
+
+  @ViewBuilder
   private func routeBanner() -> some View {
     if let message = coordinator.routeBanner ?? coordinator.startBlockedMessage {
       HStack(spacing: 8) {
@@ -256,7 +381,7 @@ struct ContentView: View {
           .font(.footnote.weight(.semibold))
         Text(message)
           .font(.footnote.weight(.medium))
-          .lineLimit(2)
+          .fixedSize(horizontal: false, vertical: true)
         Spacer(minLength: 0)
       }
       .foregroundStyle(coordinator.canStart ? Color.orange : Color.red)
@@ -272,6 +397,78 @@ struct ContentView: View {
           .stroke((coordinator.canStart ? Color.orange : Color.red).opacity(0.4), lineWidth: 1)
       }
       .accessibilityIdentifier("route-banner")
+    }
+  }
+
+  @ViewBuilder
+  private func persistenceFailureBanner() -> some View {
+    if let persistenceFailure = liveViewModel.persistenceFailure {
+      HStack(spacing: 8) {
+        Image(systemName: "externaldrive.badge.exclamationmark")
+          .font(.footnote.weight(.semibold))
+        Text(persistenceFailure)
+          .font(.footnote.weight(.medium))
+          .fixedSize(horizontal: false, vertical: true)
+        Spacer(minLength: 0)
+        Button {
+          liveViewModel.dismissPersistenceFailure()
+        } label: {
+          Image(systemName: "xmark")
+            .font(.caption.weight(.bold))
+            .frame(width: 28, height: 28)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("persistence-failure-dismiss")
+        .accessibilityLabel(String(localized: "Dismiss transcript storage warning"))
+      }
+      .foregroundStyle(Color.orange)
+      .padding(.horizontal, 12)
+      .padding(.vertical, 8)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .background(Color.orange.opacity(0.14), in: RoundedRectangle(cornerRadius: 12))
+      .overlay {
+        RoundedRectangle(cornerRadius: 12)
+          .stroke(Color.orange.opacity(0.4), lineWidth: 1)
+      }
+      .accessibilityIdentifier("persistence-failure-banner")
+    }
+  }
+
+  @ViewBuilder
+  private func translationFailureBanner() -> some View {
+    if translation.enabled, let translationFailure = liveViewModel.translationFailure {
+      HStack(spacing: 8) {
+        Image(
+          systemName: liveViewModel.translationUnavailable
+            ? "arrow.down.circle.fill" : "exclamationmark.triangle.fill"
+        )
+        .font(.footnote.weight(.semibold))
+        Text(TranslationFailureText.userFacing(translationFailure))
+          .font(.footnote.weight(.medium))
+          .fixedSize(horizontal: false, vertical: true)
+        Spacer(minLength: 0)
+        Button {
+          showSettings = true
+        } label: {
+          Text(String(localized: "Translation settings"))
+            .font(.caption.weight(.semibold))
+            .padding(.horizontal, 10)
+            .frame(minHeight: 32)
+            .background(.black.opacity(0.32), in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("translation-settings-action")
+      }
+      .foregroundStyle(Color.cyan)
+      .padding(.horizontal, 12)
+      .padding(.vertical, 8)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .background(Color.cyan.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+      .overlay {
+        RoundedRectangle(cornerRadius: 12)
+          .stroke(Color.cyan.opacity(0.38), lineWidth: 1)
+      }
+      .accessibilityIdentifier("translation-failure-banner")
     }
   }
 
@@ -293,24 +490,100 @@ struct ContentView: View {
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
     } else {
-      ScrollView {
-        LazyVStack(alignment: .leading, spacing: isLandscape ? 10 : 12) {
-          ForEach(displayedSegments) { segment in
-            TranscriptSegmentCard(
-              segment: segment,
-              translatedText: glossText(for: segment),
-              isLandscape: isLandscape
-            )
+      ScrollViewReader { proxy in
+        ZStack(alignment: .bottom) {
+          ScrollView {
+            LazyVStack(alignment: .leading, spacing: isLandscape ? 10 : 12) {
+              ForEach(displayedSegments) { segment in
+                TranscriptSegmentCard(
+                  segment: segment,
+                  translatedText: glossText(for: segment),
+                  isLandscape: isLandscape
+                )
+              }
+              if !liveViewModel.partialText.isEmpty {
+                PartialTranscriptCard(text: liveViewModel.partialText, isLandscape: isLandscape)
+              }
+              Color.clear
+                .frame(height: 1)
+                .id(TranscriptScrollAnchor.bottom)
+                .background {
+                  GeometryReader { geometry in
+                    Color.clear.preference(
+                      key: TranscriptBottomOffsetPreferenceKey.self,
+                      value: geometry.frame(in: .named("transcript-scroll")).maxY)
+                  }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
           }
-          if !liveViewModel.partialText.isEmpty {
-            PartialTranscriptCard(text: liveViewModel.partialText, isLandscape: isLandscape)
+          // why: floating controls (Start/mic, jump-to-live) overlay the scroll area;
+          // a bottom content margin keeps transcript text from ever sliding UNDER them —
+          // the audit's "potentially inaccessible text" class — at every scroll offset,
+          // not just after the last card.
+          .contentMargins(.bottom, 104, for: .scrollContent)
+          .scrollIndicators(.hidden)
+          .coordinateSpace(name: "transcript-scroll")
+          .background {
+            GeometryReader { geometry in
+              Color.clear.preference(
+                key: TranscriptViewportHeightPreferenceKey.self,
+                value: geometry.size.height)
+            }
+          }
+          .simultaneousGesture(
+            DragGesture(minimumDistance: 6).onChanged { _ in
+              followsLiveTranscript = false
+            }
+          )
+          .onPreferenceChange(TranscriptViewportHeightPreferenceKey.self) { height in
+            transcriptViewportHeight = height
+          }
+          .onPreferenceChange(TranscriptBottomOffsetPreferenceKey.self) { bottomY in
+            guard transcriptViewportHeight > 0, bottomY > 0 else { return }
+            if bottomY <= transcriptViewportHeight + 24 {
+              followsLiveTranscript = true
+            }
+          }
+          .onAppear {
+            scrollTranscriptToLive(proxy, animated: false)
+          }
+          .onChange(of: displayedSegments.map(\.id)) { _, _ in
+            scrollTranscriptToLive(proxy)
+          }
+          .onChange(of: liveViewModel.partialText) { _, _ in
+            scrollTranscriptToLive(proxy)
+          }
+
+          if !followsLiveTranscript {
+            Button {
+              followsLiveTranscript = true
+              scrollTranscriptToLive(proxy)
+            } label: {
+              Label(String(localized: "Jump to live"), systemImage: "arrow.down")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.black)
+                .padding(.horizontal, 14)
+                .frame(minHeight: 44)
+                .background(.cyan, in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .padding(.bottom, 90)
+            .accessibilityIdentifier("jump-to-live")
           }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        // why: clear the floating Start button so the last segment can scroll above it.
-        .padding(.bottom, 84)
       }
-      .scrollIndicators(.hidden)
+    }
+  }
+
+  private func scrollTranscriptToLive(_ proxy: ScrollViewProxy, animated: Bool = true) {
+    guard followsLiveTranscript else { return }
+    if animated {
+      withAnimation(.easeOut(duration: 0.18)) {
+        proxy.scrollTo(TranscriptScrollAnchor.bottom, anchor: .bottom)
+      }
+    } else {
+      proxy.scrollTo(TranscriptScrollAnchor.bottom, anchor: .bottom)
     }
   }
 
@@ -318,8 +591,13 @@ struct ContentView: View {
   // Start), so they grab attention once and never nag after the user has used the app.
   // why: the coachmark hint bubbles are first-run nice-to-haves; at accessibility text sizes
   // they can't fit beside the floating controls without clipping, so suppress them there.
+  // why: the hint bubbles are FIRST-RUN nudges for an empty cockpit. Shown over content
+  // they cover real controls (the "Tap to start" bubble sits exactly on the Clear button —
+  // an obscured-hit-region defect), so any prior session or any on-screen segments retire
+  // them.
   private var showHints: Bool {
     liveViewModel.status == .idle && !dynamicTypeSize.isAccessibilitySize
+      && !liveViewModel.hasEverStarted && liveViewModel.segments.isEmpty
   }
 
   private func startControls(isLandscape: Bool) -> some View {
@@ -341,23 +619,18 @@ struct ContentView: View {
 
   private func bottomLeftControls(isLandscape: Bool) -> some View {
     HStack(spacing: 10) {
-      if !liveViewModel.segments.isEmpty {
+      if canClearTranscriptView {
         Button(String(localized: "Clear")) {
-          liveViewModel.reset()
+          showClearConfirmation = true
         }
         .font(.subheadline.weight(.medium))
         .foregroundStyle(.white.opacity(0.85))
+        .frame(minHeight: 44)
+        .contentShape(Rectangle())
         .accessibilityIdentifier("clear-button")
       }
       if let error = liveViewModel.lastErrorMessage {
-        Text(RecognitionFailureText.userFacing(error))
-          .font(.caption)
-          .foregroundStyle(Color(red: 1.0, green: 0.72, blue: 0.3))
-          .fixedSize(horizontal: false, vertical: true)
-          .padding(.horizontal, 9)
-          .padding(.vertical, 5)
-          .background(.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 9))
-          .accessibilityIdentifier("error-banner")
+        LiveFailureBanner(error: error)
       }
       // why: reserve the bottom-trailing column so the error text never wraps under the
       // floating mic button (the obscured/unreadable banner the audit's elementDetection
@@ -404,8 +677,34 @@ struct ContentView: View {
       if showHints {
         HintBubble(text: "Settings are here")
       }
+      historyButton(isLandscape: isLandscape)
       settingsButton(isLandscape: isLandscape)
     }
+  }
+
+  private func historyButton(isLandscape: Bool) -> some View {
+    let diameter: CGFloat = isLandscape ? 46 : 56
+    return Button {
+      showHistory = true
+    } label: {
+      Image(systemName: "clock.arrow.circlepath")
+        .font(.system(size: isLandscape ? 21 : 25, weight: .semibold))
+        .foregroundStyle(.white.opacity(liveViewModel.canStopCurrentSession ? 0.35 : 0.9))
+        .frame(width: diameter, height: diameter)
+        .background(
+          Circle()
+            .fill(.white.opacity(liveViewModel.canStopCurrentSession ? 0.06 : 0.12))
+        )
+        .overlay(
+          Circle()
+            .stroke(.white.opacity(0.18), lineWidth: 1)
+        )
+    }
+    .buttonStyle(.plain)
+    .contentShape(Circle())
+    .disabled(liveViewModel.canStopCurrentSession)
+    .accessibilityIdentifier("session-history-button")
+    .accessibilityLabel(String(localized: "Session history"))
   }
 
   private func settingsButton(isLandscape: Bool) -> some View {
@@ -503,6 +802,7 @@ struct SettingsView: View {
   var translationFailure: TranslationFailure?
   var captureActive: Bool
   var voiceFilter: VoiceFilterPipeline?
+  var onVoiceFilterDisabled: () -> Void
   @Environment(\.dismiss) private var dismiss
 
   init(
@@ -511,7 +811,8 @@ struct SettingsView: View {
     audioSource: AudioSourceController,
     translationFailure: TranslationFailure? = nil,
     captureActive: Bool = false,
-    voiceFilter: VoiceFilterPipeline? = nil
+    voiceFilter: VoiceFilterPipeline? = nil,
+    onVoiceFilterDisabled: @escaping () -> Void = {}
   ) {
     self.privacy = privacy
     self.recognition = recognition
@@ -520,6 +821,7 @@ struct SettingsView: View {
     self.translationFailure = translationFailure
     self.captureActive = captureActive
     self.voiceFilter = voiceFilter
+    self.onVoiceFilterDisabled = onVoiceFilterDisabled
   }
 
   // why: "" = follow the device language (default). A non-empty code writes the
@@ -562,6 +864,9 @@ struct SettingsView: View {
             }
           }
           .accessibilityIdentifier("voicefilter-active-toggle")
+          .onChange(of: privacy.voiceFilterActive) { _, active in
+            if !active { onVoiceFilterDisabled() }
+          }
         } header: {
           Text(String(localized: "Privacy"))
         } footer: {
@@ -571,7 +876,9 @@ struct SettingsView: View {
         }
 
         if let voiceFilter {
-          VoiceFilterSettingsSection(pipeline: voiceFilter)
+          VoiceFilterSettingsSection(
+            pipeline: voiceFilter,
+            onDisabled: onVoiceFilterDisabled)
         }
 
         Section {
@@ -785,6 +1092,7 @@ struct SettingsView: View {
 
 struct VoiceFilterSettingsSection: View {
   let pipeline: VoiceFilterPipeline
+  let onDisabled: () -> Void
 
   @State private var enabled: Bool
   @State private var callsignDraft: String
@@ -796,8 +1104,9 @@ struct VoiceFilterSettingsSection: View {
   @State private var enrollMessage: String?
   private let installer: SpeakerModelPackInstaller
 
-  init(pipeline: VoiceFilterPipeline) {
+  init(pipeline: VoiceFilterPipeline, onDisabled: @escaping () -> Void = {}) {
     self.pipeline = pipeline
+    self.onDisabled = onDisabled
     let installer = SpeakerModelPackInstaller()
     self.installer = installer
     _enabled = State(initialValue: pipeline.enabled)
@@ -836,6 +1145,7 @@ struct VoiceFilterSettingsSection: View {
       .accessibilityIdentifier("voicefilter-enabled-toggle")
       .onChange(of: enabled) { _, newValue in
         pipeline.setEnabled(newValue)
+        if !newValue { onDisabled() }
       }
       Text(
         enabled
@@ -1386,6 +1696,119 @@ private struct InputLevelBar: View {
   }
 }
 
+private struct LiveFailureBanner: View {
+  let error: String
+
+  private var canOpenSettings: Bool {
+    error == "speech-permission-denied" || error == "microphone-permission-denied"
+  }
+
+  var body: some View {
+    HStack(spacing: 8) {
+      Text(RecognitionFailureText.userFacing(error))
+        .fixedSize(horizontal: false, vertical: true)
+      if canOpenSettings {
+        Button {
+          if let url = URL(string: UIApplication.openSettingsURLString) {
+            UIApplication.shared.open(url)
+          }
+        } label: {
+          Text(String(localized: "Open Settings"))
+            .font(.caption.weight(.semibold))
+            .padding(.horizontal, 8)
+            .frame(minHeight: 30)
+            .background(.black.opacity(0.35), in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("open-settings-button")
+      }
+    }
+    .font(.caption)
+    .foregroundStyle(Color(red: 1.0, green: 0.72, blue: 0.3))
+    .padding(.horizontal, 9)
+    .padding(.vertical, 5)
+    .background(.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 9))
+    .accessibilityIdentifier("error-banner")
+  }
+}
+
+private struct SuppressedSegmentsReviewSheet: View {
+  let segments: [TranscriptSegment]
+  let indicator: (TranscriptSegment) -> ATCVoiceIndicator?
+  let showSegment: (TranscriptSegment) -> Void
+  @Environment(\.dismiss) private var dismiss
+
+  var body: some View {
+    NavigationStack {
+      List {
+        if segments.isEmpty {
+          ContentUnavailableView(
+            String(localized: "No filtered speech"),
+            systemImage: "line.3.horizontal.decrease.circle",
+            description: Text(String(localized: "All transcript segments are visible."))
+          )
+        } else {
+          ForEach(segments) { segment in
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+              VStack(alignment: .leading, spacing: 6) {
+                Text(reasonLabel(for: indicator(segment)))
+                  .font(.caption.weight(.semibold))
+                  .foregroundStyle(.yellow)
+                Text(segment.text)
+                  .font(.body.monospaced())
+                Text(segment.startedAt.formatted(date: .omitted, time: .standard))
+                  .font(.caption.monospacedDigit())
+                  .foregroundStyle(.secondary)
+              }
+              Spacer(minLength: 0)
+              Button(String(localized: "Show")) {
+                showSegment(segment)
+              }
+              .buttonStyle(.bordered)
+              .controlSize(.regular)
+              .accessibilityIdentifier("show-suppressed-segment")
+            }
+          }
+        }
+      }
+      .navigationTitle(String(localized: "Filtered speech"))
+      .navigationBarTitleDisplayMode(.inline)
+      .toolbar {
+        ToolbarItem(placement: .confirmationAction) {
+          Button(String(localized: "Done")) {
+            dismiss()
+          }
+        }
+      }
+    }
+    .accessibilityIdentifier("filtered-review-sheet")
+    .preferredColorScheme(.dark)
+  }
+
+  private func reasonLabel(for indicator: ATCVoiceIndicator?) -> String {
+    switch indicator {
+    case .pilotSuppressed:
+      return String(localized: "Pilot")
+    case .otherTrafficSuppressed:
+      return String(localized: "Other traffic")
+    case .noiseOrTooShortSuppressed:
+      return String(localized: "Noise")
+    case .dispatcherAddressedOwnCallSign:
+      return String(localized: "Own callsign")
+    case .dispatcherContinuation:
+      return String(localized: "Continuation")
+    case .probableDispatcher:
+      return String(localized: "Dispatcher")
+    case .mixedSpeakerCandidate:
+      return String(localized: "Mixed speaker")
+    case .filterOff:
+      return String(localized: "Filter off")
+    default:
+      return String(localized: "Filtered")
+    }
+  }
+}
+
 // why: the in-progress (partial) line must read as the SAME transcript, just live — not a
 // visually foreign cyan italic block. It mirrors TranscriptSegmentCard's layout and
 // typography (white card, same large monospaced text) with only a small "LIVE" badge +
@@ -1528,6 +1951,26 @@ private struct TranscriptSegmentCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityIdentifier("transcript-translation")
     }
+  }
+}
+
+private enum TranscriptScrollAnchor {
+  static let bottom = "transcript-live-bottom"
+}
+
+private struct TranscriptViewportHeightPreferenceKey: PreferenceKey {
+  static let defaultValue: CGFloat = 0
+
+  static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+    value = nextValue()
+  }
+}
+
+private struct TranscriptBottomOffsetPreferenceKey: PreferenceKey {
+  static let defaultValue: CGFloat = 0
+
+  static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+    value = nextValue()
   }
 }
 

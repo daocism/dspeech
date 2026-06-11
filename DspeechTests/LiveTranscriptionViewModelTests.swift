@@ -88,6 +88,57 @@ struct LiveTranscriptionViewModelTests {
     func saveEnabled(_ enabled: Bool) { self.enabled = enabled }
   }
 
+  // why: test cases are serialized on MainActor; mutable state never crosses concurrent callers.
+  final class FirstSessionMemoryStorage: FirstSessionStateStorage, @unchecked Sendable {
+    var stored: Bool
+
+    init(stored: Bool = false) {
+      self.stored = stored
+    }
+
+    func loadHasEverStarted() -> Bool { stored }
+    func saveHasEverStarted(_ hasEverStarted: Bool) { stored = hasEverStarted }
+  }
+
+  struct StoreFailure: Error, Equatable {}
+
+  final class FakeTranscriptStore: TranscriptStoring {
+    var beginLocaleIdentifiers: [String] = []
+    var appendedSegments: [(sessionID: UUID, segment: TranscriptSegment)] = []
+    var endedSessionIDs: [UUID] = []
+    var beginError: StoreFailure?
+    var appendError: StoreFailure?
+    var endError: StoreFailure?
+    private var nextSessionID = UUID()
+
+    func beginSession(localeIdentifier: String) throws -> TranscriptSessionSummary {
+      if let beginError { throw beginError }
+      beginLocaleIdentifiers.append(localeIdentifier)
+      return TranscriptSessionSummary(
+        id: nextSessionID,
+        startedAt: Date(timeIntervalSince1970: 1_000),
+        endedAt: nil,
+        segmentCount: 0,
+        localeIdentifier: localeIdentifier
+      )
+    }
+
+    func append(_ segment: TranscriptSegment, to sessionID: UUID) throws {
+      if let appendError { throw appendError }
+      appendedSegments.append((sessionID, segment))
+    }
+
+    func endSession(_ sessionID: UUID) throws {
+      if let endError { throw endError }
+      endedSessionIDs.append(sessionID)
+    }
+
+    func sessions() throws -> [TranscriptSessionSummary] { [] }
+    func segments(in sessionID: UUID) throws -> [TranscriptSegment] { [] }
+    func deleteSession(_ sessionID: UUID) throws {}
+    func exportText(for sessionID: UUID) throws -> String { "" }
+  }
+
   @discardableResult
   private func wait(
     for predicate: @MainActor () -> Bool,
@@ -276,10 +327,88 @@ struct LiveTranscriptionViewModelTests {
 
   @Test func hasEverStartedFlipsOnFirstStart() async {
     let engine = FakeEngine()
-    let vm = LiveTranscriptionViewModel(engine: engine)
+    let firstSessionStorage = FirstSessionMemoryStorage()
+    let vm = LiveTranscriptionViewModel(engine: engine, firstSessionStorage: firstSessionStorage)
     #expect(vm.hasEverStarted == false)
     await vm.start()
     #expect(vm.hasEverStarted)
+    #expect(firstSessionStorage.stored)
+  }
+
+  @Test func persistedHasEverStartedIsLoadedOnInit() {
+    let engine = FakeEngine()
+    let vm = LiveTranscriptionViewModel(
+      engine: engine,
+      firstSessionStorage: FirstSessionMemoryStorage(stored: true)
+    )
+
+    #expect(vm.hasEverStarted)
+  }
+
+  @Test func persistenceBeginsAppendsAndEndsLiveSession() async throws {
+    let engine = FakeEngine()
+    let store = FakeTranscriptStore()
+    let vm = LiveTranscriptionViewModel(
+      engine: engine,
+      transcriptStore: store,
+      recognitionLocaleIdentifier: { "fr-FR" }
+    )
+    await vm.start()
+    #expect(await wait(for: { store.beginLocaleIdentifiers == ["fr-FR"] }))
+
+    let segment = makeSegment("Descend and maintain three thousand.")
+    engine.push(.segment(segment))
+    #expect(await wait(for: { store.appendedSegments.count == 1 }))
+
+    vm.stop()
+    #expect(await wait(for: { store.endedSessionIDs.count == 1 }))
+
+    let appended = try #require(store.appendedSegments.first)
+    #expect(appended.segment == segment)
+    #expect(appended.sessionID == store.endedSessionIDs.first)
+  }
+
+  @Test func persistenceSkipsDemoSegments() async {
+    let engine = FakeEngine()
+    let store = FakeTranscriptStore()
+    let vm = LiveTranscriptionViewModel(engine: engine, transcriptStore: store)
+    await vm.start()
+    let demo = TranscriptSegment(
+      text: "Demo traffic",
+      confidence: 0.9,
+      sourceLanguageCode: "en",
+      source: .demo
+    )
+
+    engine.push(.segment(demo))
+    #expect(await wait(for: { vm.segments.count == 1 }))
+
+    #expect(store.appendedSegments.isEmpty)
+  }
+
+  @Test func persistenceAppendFailureWarnsWithoutDroppingSegment() async {
+    let engine = FakeEngine()
+    let store = FakeTranscriptStore()
+    store.appendError = StoreFailure()
+    let vm = LiveTranscriptionViewModel(engine: engine, transcriptStore: store)
+    await vm.start()
+
+    engine.push(.segment(makeSegment("Maintain present heading.")))
+    #expect(await wait(for: { vm.segments.count == 1 && vm.persistenceFailure != nil }))
+
+    #expect(vm.visibleSegments.count == 1)
+    #expect(vm.status == .listening)
+  }
+
+  @Test func persistenceEndsSessionOnFailedStatus() async {
+    let engine = FakeEngine()
+    let store = FakeTranscriptStore()
+    let vm = LiveTranscriptionViewModel(engine: engine, transcriptStore: store)
+    await vm.start()
+    #expect(await wait(for: { store.beginLocaleIdentifiers.count == 1 }))
+
+    engine.push(.status(.failed("asr-error:kLSRErrorDomain#300")))
+    #expect(await wait(for: { store.endedSessionIDs.count == 1 }))
   }
 
   @Test func duplicateStartWhileStartInFlightDoesNotCallEngineTwice() async {
@@ -330,6 +459,54 @@ struct LiveTranscriptionViewModelTests {
     vm.reset()
     #expect(vm.segments.isEmpty)
     #expect(vm.partialText.isEmpty)
+  }
+
+  @Test func unhideSuppressedSegmentKeepsIndicator() async throws {
+    let engine = FakeEngine()
+    let storage = VoiceFilterMemoryStorage()
+    storage.enabled = true
+    storage.callSign = CallSign(raw: "N123AB")
+    let pipeline = VoiceFilterPipeline(
+      identifier: UnavailableLocalSpeakerIdentifier(),
+      storage: storage
+    )
+    let vm = LiveTranscriptionViewModel(engine: engine, voiceFilter: pipeline)
+    await vm.start()
+
+    engine.push(.segment(makeSegment("United 247 contact ground point niner")))
+    engine.push(.segment(makeSegment("Delta 45 monitor tower")))
+    #expect(await wait(for: { vm.suppressedSegmentIDs.count == 2 }))
+    let hiddenID = try #require(vm.segments.first?.id)
+
+    vm.unhideSuppressedSegment(id: hiddenID)
+
+    #expect(!vm.suppressedSegmentIDs.contains(hiddenID))
+    #expect(vm.visibleSegments.contains { $0.id == hiddenID })
+    #expect(vm.indicator(for: try #require(vm.segments.first)) == .otherTrafficSuppressed)
+  }
+
+  @Test func unhideAllSuppressedSegmentsKeepsIndicators() async throws {
+    let engine = FakeEngine()
+    let storage = VoiceFilterMemoryStorage()
+    storage.enabled = true
+    storage.callSign = CallSign(raw: "N123AB")
+    let pipeline = VoiceFilterPipeline(
+      identifier: UnavailableLocalSpeakerIdentifier(),
+      storage: storage
+    )
+    let vm = LiveTranscriptionViewModel(engine: engine, voiceFilter: pipeline)
+    await vm.start()
+
+    engine.push(.segment(makeSegment("United 247 contact ground point niner")))
+    engine.push(.segment(makeSegment("Delta 45 monitor tower")))
+    #expect(await wait(for: { vm.suppressedSegmentIDs.count == 2 }))
+    let first = try #require(vm.segments.first)
+
+    vm.unhideAllSuppressedSegments()
+
+    #expect(vm.suppressedSegmentIDs.isEmpty)
+    #expect(vm.visibleSegments.count == 2)
+    #expect(vm.indicator(for: first) == .otherTrafficSuppressed)
   }
 
   // MARK: - Translation orchestration (F3)
