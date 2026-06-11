@@ -587,71 +587,6 @@
         }
       }
     },
-    "Audio and transcripts stay on this iPhone. Nothing leaves your device.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Audio and transcripts stay on this iPhone. Nothing leaves your device."
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Аудио и расшифровки остаются на этом iPhone. Ничего не покидает устройство."
-          }
-        },
-        "uk": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Аудіо й транскрипти залишаються на цьому iPhone. Нічого не залишає ваш пристрій."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "El audio y las transcripciones permanecen en este iPhone. Nada sale de tu dispositivo."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "L'audio et les transcriptions restent sur cet iPhone. Rien ne quitte votre appareil."
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Audio und Transkripte bleiben auf diesem iPhone. Nichts verlässt dein Gerät."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Audio e trascrizioni restano su questo iPhone. Niente lascia il dispositivo."
-          }
-        },
-        "pt": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "O áudio e as transcrições ficam neste iPhone. Nada sai do seu dispositivo."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "音频和转写文本保留在本 iPhone 上。不会有任何内容离开您的设备。"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "音声と文字起こしはこのiPhone内に留まります。端末外に出るものはありません。"
-          }
-        }
-      }
-    },
     "Audio capture was interrupted by the system. Recording paused.": {
       "extractionState": "manual",
       "localizations": {
@@ -1038,71 +973,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "キャプチャソース: %@"
-          }
-        }
-      }
-    },
-    "Check dictation languages in iPhone Settings. Dspeech won't fall back to cloud recognition in place of local mode.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Check dictation languages in iPhone Settings. Dspeech won't fall back to cloud recognition in place of local mode."
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Проверьте языки диктовки в Настройках iPhone. Dspeech не подставляет облачное распознавание вместо локального режима."
-          }
-        },
-        "uk": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Перевірте мови диктування в Налаштуваннях iPhone. Dspeech не переходить на хмарне розпізнавання замість локального режиму."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Comprueba los idiomas de dictado en Ajustes del iPhone. Dspeech no recurrirá al reconocimiento en la nube en lugar del modo local."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Vérifiez les langues de dictée dans les Réglages de l'iPhone. Dspeech ne basculera pas vers la reconnaissance cloud à la place du mode local."
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Prüfe die Diktiersprachen in den iPhone-Einstellungen. Dspeech weicht nicht auf Cloud-Erkennung statt des lokalen Modus aus."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Controlla le lingue di dettatura in Impostazioni di iPhone. Dspeech non ricorre al riconoscimento cloud al posto della modalità locale."
-          }
-        },
-        "pt": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Verifique os idiomas de ditado nas Definições do iPhone. O Dspeech não recorre ao reconhecimento na nuvem em vez do modo local."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "请在 iPhone 设置中检查听写语言。Dspeech 不会改用云端识别来替代本地模式。"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "iPhoneの設定で音声入力の言語を確認してください。Dspeechはローカルモードの代わりにクラウド認識へフォールバックすることはありません。"
           }
         }
       }
@@ -4688,61 +4558,61 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "No microphone access. Allow it in iPhone Settings."
+            "value": "No microphone access. Allow it in device Settings."
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Нет доступа к микрофону. Разрешите его в Настройках iPhone."
+            "value": "Нет доступа к микрофону. Разрешите его в настройках устройства."
           }
         },
         "uk": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Немає доступу до мікрофона. Дозвольте його в Налаштуваннях iPhone."
+            "value": "Немає доступу до мікрофона. Дозвольте його в налаштуваннях пристрою."
           }
         },
         "es": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Sin acceso al micrófono. Permítelo en Ajustes del iPhone."
+            "value": "Sin acceso al micrófono. Permítelo en Ajustes del dispositivo."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Aucun accès au microphone. Autorisez-le dans les Réglages de l'iPhone."
+            "value": "Aucun accès au microphone. Autorisez-le dans les réglages de l'appareil."
           }
         },
         "de": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Kein Mikrofonzugriff. Erlaube ihn in den iPhone-Einstellungen."
+            "value": "Kein Mikrofonzugriff. Erlaube ihn in den Geräteeinstellungen."
           }
         },
         "it": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Nessun accesso al microfono. Consentilo in Impostazioni di iPhone."
+            "value": "Nessun accesso al microfono. Consentilo nelle impostazioni del dispositivo."
           }
         },
         "pt": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Sem acesso ao microfone. Permita-o nas Definições do iPhone."
+            "value": "Sem acesso ao microfone. Permita-o nas definições do dispositivo."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "无麦克风权限。请在 iPhone 设置中允许。"
+            "value": "无麦克风权限。请在设备设置中允许。"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "マイクへのアクセスがありません。iPhoneの設定で許可してください。"
+            "value": "マイクへのアクセスがありません。デバイスの設定で許可してください。"
           }
         }
       }
@@ -5078,61 +4948,61 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "No speech recognition access. Allow it in iPhone Settings."
+            "value": "No speech recognition access. Allow it in device Settings."
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Нет доступа к распознаванию речи. Разрешите его в Настройках iPhone."
+            "value": "Нет доступа к распознаванию речи. Разрешите его в настройках устройства."
           }
         },
         "uk": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Немає доступу до розпізнавання мовлення. Дозвольте його в Налаштуваннях iPhone."
+            "value": "Немає доступу до розпізнавання мовлення. Дозвольте його в налаштуваннях пристрою."
           }
         },
         "es": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Sin acceso al reconocimiento de voz. Permítelo en Ajustes del iPhone."
+            "value": "Sin acceso al reconocimiento de voz. Permítelo en Ajustes del dispositivo."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Aucun accès à la reconnaissance vocale. Autorisez-le dans les Réglages de l'iPhone."
+            "value": "Aucun accès à la reconnaissance vocale. Autorisez-le dans les réglages de l'appareil."
           }
         },
         "de": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Kein Zugriff auf Spracherkennung. Erlaube ihn in den iPhone-Einstellungen."
+            "value": "Kein Zugriff auf Spracherkennung. Erlaube ihn in den Geräteeinstellungen."
           }
         },
         "it": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Nessun accesso al riconoscimento vocale. Consentilo in Impostazioni di iPhone."
+            "value": "Nessun accesso al riconoscimento vocale. Consentilo nelle impostazioni del dispositivo."
           }
         },
         "pt": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Sem acesso ao reconhecimento de fala. Permita-o nas Definições do iPhone."
+            "value": "Sem acesso ao reconhecimento de fala. Permita-o nas definições do dispositivo."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "无语音识别权限。请在 iPhone 设置中允许。"
+            "value": "无语音识别权限。请在设备设置中允许。"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "音声認識へのアクセスがありません。iPhoneの設定で許可してください。"
+            "value": "音声認識へのアクセスがありません。デバイスの設定で許可してください。"
           }
         }
       }
@@ -5588,71 +5458,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "端末内翻訳のセットアップがキャンセルされました。必要な場合は翻訳を再度オンにしてください。"
-          }
-        }
-      }
-    },
-    "Open iPhone Settings": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Open iPhone Settings"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Открыть Настройки iPhone"
-          }
-        },
-        "uk": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Відкрити Налаштування iPhone"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Abrir Ajustes del iPhone"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Ouvrir les Réglages de l'iPhone"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "iPhone-Einstellungen öffnen"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Apri Impostazioni iPhone"
-          }
-        },
-        "pt": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Abrir Definições do iPhone"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "打开 iPhone 设置"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "iPhoneの設定を開く"
           }
         }
       }
@@ -6238,71 +6043,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "認識言語"
-          }
-        }
-      }
-    },
-    "Recognition runs on-device only. Audio and voice samples never leave your iPhone. See ADR 0007 and ADR 0008 for details.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Recognition runs on-device only. Audio and voice samples never leave your iPhone. See ADR 0007 and ADR 0008 for details."
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Распознавание выполняется только на устройстве. Аудио и образцы голоса не покидают iPhone. Подробности — ADR 0007 и ADR 0008."
-          }
-        },
-        "uk": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Розпізнавання виконується лише на пристрої. Аудіо й голосові зразки ніколи не залишають ваш iPhone. Деталі див. в ADR 0007 та ADR 0008."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "El reconocimiento se ejecuta solo en el dispositivo. El audio y las muestras de voz nunca salen de tu iPhone. Consulta ADR 0007 y ADR 0008 para más detalles."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "La reconnaissance s'exécute uniquement sur l'appareil. L'audio et les échantillons vocaux ne quittent jamais votre iPhone. Voir ADR 0007 et ADR 0008 pour plus de détails."
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Die Erkennung läuft ausschließlich auf dem Gerät. Audio und Stimmproben verlassen nie dein iPhone. Details siehe ADR 0007 und ADR 0008."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Il riconoscimento avviene solo sul dispositivo. Audio e campioni vocali non lasciano mai l'iPhone. Vedi ADR 0007 e ADR 0008 per i dettagli."
-          }
-        },
-        "pt": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "O reconhecimento é feito apenas no dispositivo. O áudio e as amostras de voz nunca saem do seu iPhone. Consulte os ADR 0007 e ADR 0008 para mais detalhes."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "识别仅在设备端运行。音频和语音样本绝不离开您的 iPhone。详见 ADR 0007 和 ADR 0008。"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "認識は端末内のみで実行されます。音声と声のサンプルがiPhoneの外に出ることはありません。詳細はADR 0007およびADR 0008を参照してください。"
           }
         }
       }
@@ -10012,71 +9752,6 @@
         }
       }
     },
-    "Translation runs on-device via Apple's system language packs. The first time you enable it, iOS offers to download a language pack. Audio and text never leave your iPhone.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Translation runs on-device via Apple's system language packs. The first time you enable it, iOS offers to download a language pack. Audio and text never leave your iPhone."
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Перевод выполняется на устройстве через системные языковые пакеты Apple. При первом включении iOS предложит скачать языковой пакет. Аудио и текст не покидают iPhone."
-          }
-        },
-        "uk": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Переклад виконується на пристрої через системні мовні пакети Apple. Під час першого ввімкнення iOS запропонує завантажити мовний пакет. Аудіо й текст ніколи не залишають ваш iPhone."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "La traducción se ejecuta en el dispositivo mediante los paquetes de idioma del sistema de Apple. La primera vez que la actives, iOS te ofrecerá descargar un paquete de idioma. El audio y el texto nunca salen de tu iPhone."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "La traduction s'exécute sur l'appareil via les modules linguistiques système d'Apple. La première fois que vous l'activez, iOS propose de télécharger un module linguistique. L'audio et le texte ne quittent jamais votre iPhone."
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Die Übersetzung läuft auf dem Gerät über Apples System-Sprachpakete. Beim ersten Aktivieren bietet iOS den Download eines Sprachpakets an. Audio und Text verlassen nie dein iPhone."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "La traduzione avviene sul dispositivo tramite i pacchetti lingua di sistema Apple. Alla prima attivazione, iOS propone di scaricare un pacchetto lingua. Audio e testo non lasciano mai l'iPhone."
-          }
-        },
-        "pt": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "A tradução é feita no dispositivo através dos pacotes de idioma do sistema da Apple. Na primeira vez que a ativar, o iOS propõe descarregar um pacote de idioma. O áudio e o texto nunca saem do seu iPhone."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "翻译通过 Apple 系统语言包在设备端运行。首次启用时，iOS 会提示下载语言包。音频和文本绝不离开您的 iPhone。"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "翻訳はAppleのシステム言語パックを使って端末内で実行されます。初めて有効にすると、iOSが言語パックのダウンロードを提案します。音声とテキストがiPhoneの外に出ることはありません。"
-          }
-        }
-      }
-    },
     "Unknown input": {
       "extractionState": "manual",
       "localizations": {
@@ -10603,61 +10278,61 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "iPhone microphone"
+            "value": "Built-in microphone"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Микрофон iPhone"
+            "value": "Встроенный микрофон"
           }
         },
         "uk": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Мікрофон iPhone"
+            "value": "Вбудований мікрофон"
           }
         },
         "es": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Micrófono del iPhone"
+            "value": "Micrófono integrado"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Microphone de l'iPhone"
+            "value": "Microphone intégré"
           }
         },
         "de": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "iPhone-Mikrofon"
+            "value": "Integriertes Mikrofon"
           }
         },
         "it": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Microfono iPhone"
+            "value": "Microfono integrato"
           }
         },
         "pt": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Microfone do iPhone"
+            "value": "Microfone integrado"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "iPhone 麦克风"
+            "value": "内置麦克风"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "iPhoneのマイク"
+            "value": "内蔵マイク"
           }
         }
       }
@@ -10856,6 +10531,1761 @@
           }
         }
       }
-    }
+    },
+          "Audio and transcripts stay on this device. Nothing leaves your device.": {
+            "extractionState": "manual",
+            "localizations": {
+                  "en": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "Audio and transcripts stay on this device. Nothing leaves your device."
+                        }
+                  },
+                  "ru": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "Аудио и транскрипты остаются на этом устройстве. Ничего не покидает устройство."
+                        }
+                  },
+                  "uk": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Аудіо й транскрипти залишаються на цьому пристрої. Нічого не залишає пристрій."
+                        }
+                  },
+                  "es": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "El audio y las transcripciones permanecen en este dispositivo. Nada sale del dispositivo."
+                        }
+                  },
+                  "fr": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "L'audio et les transcriptions restent sur cet appareil. Rien ne quitte l'appareil."
+                        }
+                  },
+                  "de": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Audio und Transkripte bleiben auf diesem Gerät. Nichts verlässt das Gerät."
+                        }
+                  },
+                  "it": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Audio e trascrizioni restano su questo dispositivo. Nulla lascia il dispositivo."
+                        }
+                  },
+                  "pt": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Áudio e transcrições ficam neste dispositivo. Nada sai do dispositivo."
+                        }
+                  },
+                  "zh-Hans": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "音频和转写保留在此设备上。不会离开设备。"
+                        }
+                  },
+                  "ja": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "音声と文字起こしはこのデバイス上に残ります。何もデバイス外へ送信されません。"
+                        }
+                  }
+            }
+      },
+          "This deletes the saved transcript from this device. Current view is unchanged.": {
+            "extractionState": "manual",
+            "localizations": {
+                  "en": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "This deletes the saved transcript from this device. Current view is unchanged."
+                        }
+                  },
+                  "ru": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "Сохранённый транскрипт будет удалён с этого устройства. Текущий вид не изменится."
+                        }
+                  },
+                  "uk": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Збережений транскрипт буде видалено з цього пристрою. Поточний вигляд не зміниться."
+                        }
+                  },
+                  "es": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Esto elimina la transcripción guardada de este dispositivo. La vista actual no cambia."
+                        }
+                  },
+                  "fr": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Cela supprime la transcription enregistrée de cet appareil. La vue actuelle ne change pas."
+                        }
+                  },
+                  "de": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Dies löscht das gespeicherte Transkript von diesem Gerät. Die aktuelle Ansicht bleibt unverändert."
+                        }
+                  },
+                  "it": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Elimina la trascrizione salvata da questo dispositivo. La vista attuale non cambia."
+                        }
+                  },
+                  "pt": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Isto exclui a transcrição salva deste dispositivo. A vista atual não muda."
+                        }
+                  },
+                  "zh-Hans": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "这会从此设备删除已保存的转写。当前视图不变。"
+                        }
+                  },
+                  "ja": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "保存済みの文字起こしをこのデバイスから削除します。現在の表示は変わりません。"
+                        }
+                  }
+            }
+      },
+          "LOCAL": {
+            "extractionState": "manual",
+            "localizations": {
+                  "en": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "LOCAL"
+                        }
+                  },
+                  "ru": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "ЛОКАЛЬНО"
+                        }
+                  },
+                  "uk": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "ЛОКАЛЬНО"
+                        }
+                  },
+                  "es": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "LOCAL"
+                        }
+                  },
+                  "fr": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "LOCAL"
+                        }
+                  },
+                  "de": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "LOKAL"
+                        }
+                  },
+                  "it": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "LOCALE"
+                        }
+                  },
+                  "pt": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "LOCAL"
+                        }
+                  },
+                  "zh-Hans": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "本地"
+                        }
+                  },
+                  "ja": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "ローカル"
+                        }
+                  }
+            }
+      },
+          "Pilot speaker classification": {
+            "extractionState": "manual",
+            "localizations": {
+                  "en": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "Pilot speaker classification"
+                        }
+                  },
+                  "ru": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "Классификация голоса пилота"
+                        }
+                  },
+                  "uk": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Класифікація голосу пілота"
+                        }
+                  },
+                  "es": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Clasificación de voz del piloto"
+                        }
+                  },
+                  "fr": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Classification de la voix pilote"
+                        }
+                  },
+                  "de": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Pilotenstimmen-Klassifizierung"
+                        }
+                  },
+                  "it": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Classificazione voce pilota"
+                        }
+                  },
+                  "pt": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Classificação da voz do piloto"
+                        }
+                  },
+                  "zh-Hans": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "飞行员语音分类"
+                        }
+                  },
+                  "ja": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "パイロット音声分類"
+                        }
+                  }
+            }
+      },
+          "Confident pilot speech can be stopped before recognition. Callsign relevance filtering stays active separately.": {
+            "extractionState": "manual",
+            "localizations": {
+                  "en": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "Confident pilot speech can be stopped before recognition. Callsign relevance filtering stays active separately."
+                        }
+                  },
+                  "ru": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "Уверенно распознанная речь пилота может останавливаться до распознавания. Фильтр релевантности позывного работает отдельно."
+                        }
+                  },
+                  "uk": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Упевнено розпізнану мову пілота можна зупиняти до розпізнавання. Фільтр релевантності позивного працює окремо."
+                        }
+                  },
+                  "es": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "La voz del piloto identificada con confianza puede detenerse antes del reconocimiento. El filtro de relevancia del indicativo sigue activo por separado."
+                        }
+                  },
+                  "fr": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "La voix pilote reconnue avec confiance peut être arrêtée avant la reconnaissance. Le filtrage de pertinence de l'indicatif reste actif séparément."
+                        }
+                  },
+                  "de": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Sicher erkannte Pilotenansagen können vor der Erkennung gestoppt werden. Die Rufzeichen-Relevanzfilterung bleibt separat aktiv."
+                        }
+                  },
+                  "it": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "La voce pilota riconosciuta con sicurezza può essere fermata prima del riconoscimento. Il filtro di rilevanza del nominativo resta attivo separatamente."
+                        }
+                  },
+                  "pt": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "A fala do piloto identificada com confiança pode ser bloqueada antes do reconhecimento. O filtro de relevância do indicativo continua ativo separadamente."
+                        }
+                  },
+                  "zh-Hans": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "高置信度的飞行员语音可在识别前停止。呼号相关性过滤会单独保持启用。"
+                        }
+                  },
+                  "ja": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "高い確度のパイロット音声は認識前に止められます。コールサイン関連性フィルタは別に有効のままです。"
+                        }
+                  }
+            }
+      },
+          "Speaker classification is off; all audio buffers pass to recognition. Callsign relevance filtering can still hide irrelevant ATC.": {
+            "extractionState": "manual",
+            "localizations": {
+                  "en": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "Speaker classification is off; all audio buffers pass to recognition. Callsign relevance filtering can still hide irrelevant ATC."
+                        }
+                  },
+                  "ru": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "Классификация голоса выключена; все аудиобуферы идут на распознавание. Фильтр позывного всё ещё может скрывать нерелевантный ATC."
+                        }
+                  },
+                  "uk": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Класифікацію голосу вимкнено; усі аудіобуфери йдуть на розпізнавання. Фільтр позивного все ще може приховувати нерелевантний ATC."
+                        }
+                  },
+                  "es": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "La clasificación de voz está desactivada; todo el audio pasa al reconocimiento. El filtro de indicativo aún puede ocultar ATC no relevante."
+                        }
+                  },
+                  "fr": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "La classification vocale est désactivée ; tout l'audio passe à la reconnaissance. Le filtre d'indicatif peut encore masquer l'ATC non pertinent."
+                        }
+                  },
+                  "de": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Die Sprecherklassifizierung ist aus; alle Audiopuffer gehen zur Erkennung. Die Rufzeichenfilterung kann weiterhin irrelevanten ATC ausblenden."
+                        }
+                  },
+                  "it": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "La classificazione vocale è disattivata; tutto l’audio passa al riconoscimento. Il filtro del nominativo può ancora nascondere ATC non rilevante."
+                        }
+                  },
+                  "pt": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "A classificação de voz está desligada; todo o áudio segue para reconhecimento. O filtro de indicativo ainda pode ocultar ATC irrelevante."
+                        }
+                  },
+                  "zh-Hans": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "说话人分类已关闭；所有音频缓冲都会进入识别。呼号相关性过滤仍可隐藏无关 ATC。"
+                        }
+                  },
+                  "ja": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "話者分類はオフです。すべての音声バッファは認識へ送られます。コールサイン関連性フィルタは無関係なATCを非表示にできます。"
+                        }
+                  }
+            }
+      },
+          "Check dictation languages in device Settings. Dspeech won't fall back to cloud recognition in place of local mode.": {
+            "extractionState": "manual",
+            "localizations": {
+                  "en": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "Check dictation languages in device Settings. Dspeech won't fall back to cloud recognition in place of local mode."
+                        }
+                  },
+                  "ru": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "Проверьте языки диктовки в настройках устройства. Dspeech не заменяет локальный режим облачным распознаванием."
+                        }
+                  },
+                  "uk": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Перевірте мови диктування в налаштуваннях пристрою. Dspeech не замінює локальний режим хмарним розпізнаванням."
+                        }
+                  },
+                  "es": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Revise los idiomas de dictado en Ajustes del dispositivo. Dspeech no sustituye el modo local con reconocimiento en la nube."
+                        }
+                  },
+                  "fr": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Vérifiez les langues de dictée dans les réglages de l'appareil. Dspeech ne remplace pas le mode local par la reconnaissance cloud."
+                        }
+                  },
+                  "de": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Prüfe die Diktier-Sprachen in den Geräteeinstellungen. Dspeech ersetzt den lokalen Modus nicht durch Cloud-Erkennung."
+                        }
+                  },
+                  "it": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Controlla le lingue di dettatura nelle impostazioni del dispositivo. Dspeech non sostituisce la modalità locale con il riconoscimento cloud."
+                        }
+                  },
+                  "pt": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Verifique os idiomas de ditado nos Ajustes do dispositivo. O Dspeech não troca o modo local por reconhecimento em nuvem."
+                        }
+                  },
+                  "zh-Hans": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "请在设备设置中检查听写语言。Dspeech 不会用云端识别替代本地模式。"
+                        }
+                  },
+                  "ja": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "デバイス設定で音声入力言語を確認してください。Dspeech はローカルモードの代わりにクラウド認識へ切り替えません。"
+                        }
+                  }
+            }
+      },
+          "Open Device Settings": {
+            "extractionState": "manual",
+            "localizations": {
+                  "en": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "Open Device Settings"
+                        }
+                  },
+                  "ru": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "Открыть настройки устройства"
+                        }
+                  },
+                  "uk": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Відкрити налаштування пристрою"
+                        }
+                  },
+                  "es": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Abrir Ajustes del dispositivo"
+                        }
+                  },
+                  "fr": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Ouvrir les réglages de l'appareil"
+                        }
+                  },
+                  "de": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Geräteeinstellungen öffnen"
+                        }
+                  },
+                  "it": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Apri impostazioni dispositivo"
+                        }
+                  },
+                  "pt": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Abrir Ajustes do dispositivo"
+                        }
+                  },
+                  "zh-Hans": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "打开设备设置"
+                        }
+                  },
+                  "ja": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "デバイス設定を開く"
+                        }
+                  }
+            }
+      },
+          "Then: General -> Keyboard -> Dictation Languages -- turn on Dictation and add this language. The model downloads, and recognition works offline.": {
+            "extractionState": "manual",
+            "localizations": {
+                  "en": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "Then: General -> Keyboard -> Dictation Languages -- turn on Dictation and add this language. The model downloads, and recognition works offline."
+                        }
+                  },
+                  "ru": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "Затем: Основные -> Клавиатура -> Языки диктовки -- включите диктовку и добавьте этот язык. Модель загрузится, и распознавание будет работать офлайн."
+                        }
+                  },
+                  "uk": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Далі: Основні -> Клавіатура -> Мови диктування -- увімкніть диктування й додайте цю мову. Модель завантажиться, і розпізнавання працюватиме офлайн."
+                        }
+                  },
+                  "es": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Luego: General -> Teclado -> Idiomas de dictado -- active Dictado y añada este idioma. El modelo se descarga y el reconocimiento funciona sin conexión."
+                        }
+                  },
+                  "fr": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Ensuite : Général -> Clavier -> Langues de dictée -- activez Dictée et ajoutez cette langue. Le modèle se télécharge et la reconnaissance fonctionne hors ligne."
+                        }
+                  },
+                  "de": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Dann: Allgemein -> Tastatur -> Diktier-Sprachen -- aktiviere Diktat und füge diese Sprache hinzu. Das Modell wird geladen, danach funktioniert die Erkennung offline."
+                        }
+                  },
+                  "it": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Poi: Generali -> Tastiera -> Lingue dettatura -- attiva Dettatura e aggiungi questa lingua. Il modello viene scaricato e il riconoscimento funziona offline."
+                        }
+                  },
+                  "pt": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Depois: Geral -> Teclado -> Idiomas de Ditado -- ative o Ditado e adicione este idioma. O modelo baixa e o reconhecimento funciona offline."
+                        }
+                  },
+                  "zh-Hans": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "然后：通用 -> 键盘 -> 听写语言 -- 打开听写并添加此语言。模型会下载，识别可离线工作。"
+                        }
+                  },
+                  "ja": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "次に: 一般 -> キーボード -> 音声入力言語 -- 音声入力をオンにしてこの言語を追加します。モデルがダウンロードされ、認識はオフラインで動作します。"
+                        }
+                  }
+            }
+      },
+          "Apple Speech": {
+            "extractionState": "manual",
+            "localizations": {
+                  "en": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "Apple Speech"
+                        }
+                  },
+                  "ru": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "Apple Speech"
+                        }
+                  },
+                  "uk": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Apple Speech"
+                        }
+                  },
+                  "es": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Apple Speech"
+                        }
+                  },
+                  "fr": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Apple Speech"
+                        }
+                  },
+                  "de": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Apple Speech"
+                        }
+                  },
+                  "it": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Apple Speech"
+                        }
+                  },
+                  "pt": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Apple Speech"
+                        }
+                  },
+                  "zh-Hans": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Apple Speech"
+                        }
+                  },
+                  "ja": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Apple Speech"
+                        }
+                  }
+            }
+      },
+          "Translation runs on-device via Apple's system language packs. The first time you enable it, iOS offers to download a language pack. Audio and text never leave your device.": {
+            "extractionState": "manual",
+            "localizations": {
+                  "en": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "Translation runs on-device via Apple's system language packs. The first time you enable it, iOS offers to download a language pack. Audio and text never leave your device."
+                        }
+                  },
+                  "ru": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "Перевод выполняется на устройстве через системные языковые пакеты Apple. При первом включении iOS предложит загрузить языковой пакет. Аудио и текст не покидают устройство."
+                        }
+                  },
+                  "uk": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Переклад виконується на пристрої через системні мовні пакети Apple. Під час першого ввімкнення iOS запропонує завантажити мовний пакет. Аудіо й текст не залишають пристрій."
+                        }
+                  },
+                  "es": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "La traducción se ejecuta en el dispositivo mediante paquetes de idioma del sistema de Apple. La primera vez que la active, iOS ofrece descargar un paquete. El audio y el texto nunca salen del dispositivo."
+                        }
+                  },
+                  "fr": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "La traduction s'exécute sur l'appareil via les packs de langue système d'Apple. Lors de la première activation, iOS propose de télécharger un pack. L'audio et le texte ne quittent jamais l'appareil."
+                        }
+                  },
+                  "de": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Übersetzung läuft auf dem Gerät über Apples System-Sprachpakete. Beim ersten Aktivieren bietet iOS den Download eines Sprachpakets an. Audio und Text verlassen das Gerät nie."
+                        }
+                  },
+                  "it": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "La traduzione avviene sul dispositivo tramite i pacchetti lingua di sistema Apple. Alla prima attivazione, iOS propone di scaricare un pacchetto. Audio e testo non lasciano mai il dispositivo."
+                        }
+                  },
+                  "pt": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "A tradução roda no dispositivo pelos pacotes de idioma do sistema da Apple. Na primeira ativação, o iOS oferece baixar um pacote de idioma. Áudio e texto nunca saem do dispositivo."
+                        }
+                  },
+                  "zh-Hans": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "翻译通过 Apple 系统语言包在设备上运行。首次启用时，iOS 会提示下载语言包。音频和文本绝不会离开设备。"
+                        }
+                  },
+                  "ja": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "翻訳は Apple のシステム言語パックを使ってデバイス上で実行されます。初回有効化時に iOS が言語パックのダウンロードを案内します。音声とテキストはデバイス外へ送信されません。"
+                        }
+                  }
+            }
+      },
+          "This clears the cockpit view only. Saved session history stays on this device.": {
+            "extractionState": "manual",
+            "localizations": {
+                  "en": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "This clears the cockpit view only. Saved session history stays on this device."
+                        }
+                  },
+                  "ru": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "Очищается только вид кабины. История сохранённых сессий остаётся на этом устройстве."
+                        }
+                  },
+                  "uk": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Очищується лише вигляд кабіни. Історія збережених сесій залишається на цьому пристрої."
+                        }
+                  },
+                  "es": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Esto solo limpia la vista de cabina. El historial de sesiones guardadas permanece en este dispositivo."
+                        }
+                  },
+                  "fr": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Cela efface uniquement la vue cockpit. L'historique des sessions enregistrées reste sur cet appareil."
+                        }
+                  },
+                  "de": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Dies leert nur die Cockpit-Ansicht. Der gespeicherte Sitzungsverlauf bleibt auf diesem Gerät."
+                        }
+                  },
+                  "it": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Pulisce solo la vista cockpit. La cronologia delle sessioni salvate resta su questo dispositivo."
+                        }
+                  },
+                  "pt": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Isto limpa apenas a vista do cockpit. O histórico de sessões salvo permanece neste dispositivo."
+                        }
+                  },
+                  "zh-Hans": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "这只会清空驾驶舱视图。已保存的会话历史仍保留在此设备上。"
+                        }
+                  },
+                  "ja": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "コックピット表示だけを消去します。保存済みセッション履歴はこのデバイス上に残ります。"
+                        }
+                  }
+            }
+      },
+          "Core ML": {
+            "extractionState": "manual",
+            "localizations": {
+                  "en": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "Core ML"
+                        }
+                  },
+                  "ru": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "Core ML"
+                        }
+                  },
+                  "uk": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Core ML"
+                        }
+                  },
+                  "es": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Core ML"
+                        }
+                  },
+                  "fr": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Core ML"
+                        }
+                  },
+                  "de": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Core ML"
+                        }
+                  },
+                  "it": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Core ML"
+                        }
+                  },
+                  "pt": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Core ML"
+                        }
+                  },
+                  "zh-Hans": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Core ML"
+                        }
+                  },
+                  "ja": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Core ML"
+                        }
+                  }
+            }
+      },
+          "Recognition runs on-device only. Audio and voice samples never leave your device. See ADR 0007 and ADR 0008 for details.": {
+            "extractionState": "manual",
+            "localizations": {
+                  "en": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "Recognition runs on-device only. Audio and voice samples never leave your device. See ADR 0007 and ADR 0008 for details."
+                        }
+                  },
+                  "ru": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "Распознавание выполняется только на устройстве. Аудио и образцы голоса не покидают устройство. Подробности: ADR 0007 и ADR 0008."
+                        }
+                  },
+                  "uk": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Розпізнавання виконується лише на пристрої. Аудіо й зразки голосу не залишають пристрій. Деталі: ADR 0007 і ADR 0008."
+                        }
+                  },
+                  "es": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "El reconocimiento se ejecuta solo en el dispositivo. El audio y las muestras de voz nunca salen del dispositivo. Consulte ADR 0007 y ADR 0008."
+                        }
+                  },
+                  "fr": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "La reconnaissance s'exécute uniquement sur l'appareil. L'audio et les échantillons vocaux ne quittent jamais l'appareil. Voir ADR 0007 et ADR 0008."
+                        }
+                  },
+                  "de": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Erkennung läuft nur auf dem Gerät. Audio und Stimmproben verlassen das Gerät nie. Details in ADR 0007 und ADR 0008."
+                        }
+                  },
+                  "it": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Il riconoscimento avviene solo sul dispositivo. Audio e campioni vocali non lasciano mai il dispositivo. Vedi ADR 0007 e ADR 0008."
+                        }
+                  },
+                  "pt": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "O reconhecimento roda apenas no dispositivo. Áudio e amostras de voz nunca saem do dispositivo. Veja ADR 0007 e ADR 0008."
+                        }
+                  },
+                  "zh-Hans": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "识别仅在设备上运行。音频和语音样本绝不会离开设备。详情见 ADR 0007 和 ADR 0008。"
+                        }
+                  },
+                  "ja": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "認識はデバイス上だけで実行されます。音声と音声サンプルはデバイス外へ送信されません。詳細は ADR 0007 と ADR 0008 を参照してください。"
+                        }
+                  }
+            }
+      },
+          "Listening -- spell out the callsign (for example: \"november one two three alpha bravo\").": {
+            "extractionState": "manual",
+            "localizations": {
+                  "en": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "Listening -- spell out the callsign (for example: \"november one two three alpha bravo\")."
+                        }
+                  },
+                  "ru": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "Слушаю -- произнесите позывной по буквам (например: \"november one two three alpha bravo\")."
+                        }
+                  },
+                  "uk": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Слухаю -- промовте позивний по літерах (наприклад: \"november one two three alpha bravo\")."
+                        }
+                  },
+                  "es": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Escuchando -- deletree el indicativo (por ejemplo: \"november one two three alpha bravo\")."
+                        }
+                  },
+                  "fr": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Écoute -- épelez l’indicatif (par exemple : \"november one two three alpha bravo\")."
+                        }
+                  },
+                  "de": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Hört zu -- buchstabiere das Rufzeichen (zum Beispiel: \"november one two three alpha bravo\")."
+                        }
+                  },
+                  "it": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "In ascolto -- scandisci il nominativo (per esempio: \"november one two three alpha bravo\")."
+                        }
+                  },
+                  "pt": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Ouvindo -- soletre o indicativo (por exemplo: \"november one two three alpha bravo\")."
+                        }
+                  },
+                  "zh-Hans": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "正在听取 -- 请拼读呼号（例如：“november one two three alpha bravo”）。"
+                        }
+                  },
+                  "ja": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "聞き取り中 -- コールサインを綴ってください（例: \"november one two three alpha bravo\"）。"
+                        }
+                  }
+            }
+      },
+          "Recording -- speak for a few seconds, then tap Stop.": {
+            "extractionState": "manual",
+            "localizations": {
+                  "en": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "Recording -- speak for a few seconds, then tap Stop."
+                        }
+                  },
+                  "ru": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "Идёт запись -- говорите несколько секунд, затем нажмите «Стоп»."
+                        }
+                  },
+                  "uk": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Триває запис -- говоріть кілька секунд, потім натисніть «Стоп»."
+                        }
+                  },
+                  "es": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Grabando -- hable unos segundos y toque Detener."
+                        }
+                  },
+                  "fr": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Enregistrement -- parlez quelques secondes, puis touchez Arrêter."
+                        }
+                  },
+                  "de": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Aufnahme -- sprich einige Sekunden und tippe dann auf Stopp."
+                        }
+                  },
+                  "it": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Registrazione -- parla per alcuni secondi, poi tocca Stop."
+                        }
+                  },
+                  "pt": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Gravando -- fale por alguns segundos e toque em Parar."
+                        }
+                  },
+                  "zh-Hans": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "正在录制 -- 请说几秒钟，然后轻点停止。"
+                        }
+                  },
+                  "ja": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "録音中 -- 数秒話してから停止をタップしてください。"
+                        }
+                  }
+            }
+      },
+          "Recording failed -- try again.": {
+            "extractionState": "manual",
+            "localizations": {
+                  "en": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "Recording failed -- try again."
+                        }
+                  },
+                  "ru": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "Запись не удалась -- попробуйте снова."
+                        }
+                  },
+                  "uk": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Не вдалося записати -- спробуйте ще раз."
+                        }
+                  },
+                  "es": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "La grabación falló -- inténtelo de nuevo."
+                        }
+                  },
+                  "fr": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "L'enregistrement a échoué -- réessayez."
+                        }
+                  },
+                  "de": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Aufnahme fehlgeschlagen -- versuche es erneut."
+                        }
+                  },
+                  "it": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Registrazione non riuscita -- riprova."
+                        }
+                  },
+                  "pt": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "A gravação falhou -- tente novamente."
+                        }
+                  },
+                  "zh-Hans": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "录制失败 -- 请重试。"
+                        }
+                  },
+                  "ja": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "録音に失敗しました -- もう一度試してください。"
+                        }
+                  }
+            }
+      },
+          "Too quiet or too short -- record a clearer sample.": {
+            "extractionState": "manual",
+            "localizations": {
+                  "en": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "Too quiet or too short -- record a clearer sample."
+                        }
+                  },
+                  "ru": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "Слишком тихо или коротко -- запишите более чёткий образец."
+                        }
+                  },
+                  "uk": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Занадто тихо або коротко -- запишіть чіткіший зразок."
+                        }
+                  },
+                  "es": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Demasiado bajo o corto -- grabe una muestra más clara."
+                        }
+                  },
+                  "fr": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Trop faible ou trop court -- enregistrez un échantillon plus clair."
+                        }
+                  },
+                  "de": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Zu leise oder zu kurz -- nimm eine klarere Probe auf."
+                        }
+                  },
+                  "it": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Troppo basso o troppo breve -- registra un campione più chiaro."
+                        }
+                  },
+                  "pt": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Baixo demais ou curto demais -- grave uma amostra mais clara."
+                        }
+                  },
+                  "zh-Hans": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "太轻或太短 -- 请录制更清晰的样本。"
+                        }
+                  },
+                  "ja": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "小さすぎるか短すぎます -- より明瞭なサンプルを録音してください。"
+                        }
+                  }
+            }
+      },
+          "The FluidAudio model (%@) is downloaded once at this request. Only the model download request leaves the device -- audio, transcripts and voice samples are not transmitted.": {
+            "extractionState": "manual",
+            "localizations": {
+                  "en": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "The FluidAudio model (%@) is downloaded once at this request. Only the model download request leaves the device -- audio, transcripts and voice samples are not transmitted."
+                        }
+                  },
+                  "ru": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "Модель FluidAudio (%@) загружается один раз по этому запросу. С устройства уходит только запрос загрузки модели -- аудио, транскрипты и образцы голоса не передаются."
+                        }
+                  },
+                  "uk": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Модель FluidAudio (%@) завантажується один раз за цим запитом. З пристрою виходить лише запит завантаження моделі -- аудіо, транскрипти й зразки голосу не передаються."
+                        }
+                  },
+                  "es": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "El modelo FluidAudio (%@) se descarga una vez con esta solicitud. Solo sale del dispositivo la solicitud de descarga del modelo -- no se transmiten audio, transcripciones ni muestras de voz."
+                        }
+                  },
+                  "fr": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Le modèle FluidAudio (%@) se télécharge une seule fois à cette demande. Seule la demande de téléchargement du modèle quitte l'appareil -- l'audio, les transcriptions et les échantillons vocaux ne sont pas transmis."
+                        }
+                  },
+                  "de": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Das FluidAudio-Modell (%@) wird auf diese Anforderung einmalig geladen. Nur die Modelldownload-Anforderung verlässt das Gerät -- Audio, Transkripte und Stimmproben werden nicht übertragen."
+                        }
+                  },
+                  "it": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Il modello FluidAudio (%@) viene scaricato una volta su questa richiesta. Solo la richiesta di download del modello lascia il dispositivo -- audio, trascrizioni e campioni vocali non vengono trasmessi."
+                        }
+                  },
+                  "pt": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "O modelo FluidAudio (%@) é baixado uma vez a partir desta solicitação. Apenas a solicitação de download do modelo sai do dispositivo -- áudio, transcrições e amostras de voz não são transmitidos."
+                        }
+                  },
+                  "zh-Hans": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "FluidAudio 模型（%@）只会按此请求下载一次。只有模型下载请求会离开设备 -- 音频、转写和语音样本不会传输。"
+                        }
+                  },
+                  "ja": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "FluidAudio モデル（%@）はこのリクエストで一度だけダウンロードされます。デバイス外へ送信されるのはモデルダウンロード要求だけです -- 音声、文字起こし、音声サンプルは送信されません。"
+                        }
+                  }
+            }
+      },
+          "Pilot 1": {
+            "extractionState": "manual",
+            "localizations": {
+                  "en": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "Pilot 1"
+                        }
+                  },
+                  "ru": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "Пилот 1"
+                        }
+                  },
+                  "uk": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Пілот 1"
+                        }
+                  },
+                  "es": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Piloto 1"
+                        }
+                  },
+                  "fr": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Pilote 1"
+                        }
+                  },
+                  "de": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Pilot 1"
+                        }
+                  },
+                  "it": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Pilota 1"
+                        }
+                  },
+                  "pt": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Piloto 1"
+                        }
+                  },
+                  "zh-Hans": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "飞行员 1"
+                        }
+                  },
+                  "ja": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "パイロット 1"
+                        }
+                  }
+            }
+      },
+          "Pilot 2": {
+            "extractionState": "manual",
+            "localizations": {
+                  "en": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "Pilot 2"
+                        }
+                  },
+                  "ru": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "Пилот 2"
+                        }
+                  },
+                  "uk": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Пілот 2"
+                        }
+                  },
+                  "es": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Piloto 2"
+                        }
+                  },
+                  "fr": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Pilote 2"
+                        }
+                  },
+                  "de": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Pilot 2"
+                        }
+                  },
+                  "it": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Pilota 2"
+                        }
+                  },
+                  "pt": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Piloto 2"
+                        }
+                  },
+                  "zh-Hans": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "飞行员 2"
+                        }
+                  },
+                  "ja": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "パイロット 2"
+                        }
+                  }
+            }
+      },
+          "Pilot 1 (Captain)": {
+            "extractionState": "manual",
+            "localizations": {
+                  "en": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "Pilot 1 (Captain)"
+                        }
+                  },
+                  "ru": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "Пилот 1 (капитан)"
+                        }
+                  },
+                  "uk": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Пілот 1 (капітан)"
+                        }
+                  },
+                  "es": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Piloto 1 (capitán)"
+                        }
+                  },
+                  "fr": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Pilote 1 (commandant)"
+                        }
+                  },
+                  "de": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Pilot 1 (Kapitän)"
+                        }
+                  },
+                  "it": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Pilota 1 (comandante)"
+                        }
+                  },
+                  "pt": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Piloto 1 (comandante)"
+                        }
+                  },
+                  "zh-Hans": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "飞行员 1（机长）"
+                        }
+                  },
+                  "ja": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "パイロット 1（機長）"
+                        }
+                  }
+            }
+      },
+          "Pilot 2 (First Officer)": {
+            "extractionState": "manual",
+            "localizations": {
+                  "en": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "Pilot 2 (First Officer)"
+                        }
+                  },
+                  "ru": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "Пилот 2 (второй пилот)"
+                        }
+                  },
+                  "uk": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Пілот 2 (другий пілот)"
+                        }
+                  },
+                  "es": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Piloto 2 (primer oficial)"
+                        }
+                  },
+                  "fr": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Pilote 2 (copilote)"
+                        }
+                  },
+                  "de": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Pilot 2 (Erster Offizier)"
+                        }
+                  },
+                  "it": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Pilota 2 (primo ufficiale)"
+                        }
+                  },
+                  "pt": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Piloto 2 (primeiro oficial)"
+                        }
+                  },
+                  "zh-Hans": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "飞行员 2（副驾驶）"
+                        }
+                  },
+                  "ja": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "パイロット 2（副操縦士）"
+                        }
+                  }
+            }
+      },
+          "LIVE": {
+            "extractionState": "manual",
+            "localizations": {
+                  "en": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "LIVE"
+                        }
+                  },
+                  "ru": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "ЭФИР"
+                        }
+                  },
+                  "uk": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "НАЖИВО"
+                        }
+                  },
+                  "es": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "EN VIVO"
+                        }
+                  },
+                  "fr": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "DIRECT"
+                        }
+                  },
+                  "de": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "LIVE"
+                        }
+                  },
+                  "it": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "LIVE"
+                        }
+                  },
+                  "pt": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "AO VIVO"
+                        }
+                  },
+                  "zh-Hans": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "实时"
+                        }
+                  },
+                  "ja": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "ライブ"
+                        }
+                  }
+            }
+      },
+          "DEMO": {
+            "extractionState": "manual",
+            "localizations": {
+                  "en": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "DEMO"
+                        }
+                  },
+                  "ru": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "ДЕМО"
+                        }
+                  },
+                  "uk": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "ДЕМО"
+                        }
+                  },
+                  "es": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "DEMO"
+                        }
+                  },
+                  "fr": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "DÉMO"
+                        }
+                  },
+                  "de": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "DEMO"
+                        }
+                  },
+                  "it": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "DEMO"
+                        }
+                  },
+                  "pt": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "DEMO"
+                        }
+                  },
+                  "zh-Hans": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "演示"
+                        }
+                  },
+                  "ja": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "デモ"
+                        }
+                  }
+            }
+      },
+          "VERIFY": {
+            "extractionState": "manual",
+            "localizations": {
+                  "en": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "VERIFY"
+                        }
+                  },
+                  "ru": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "ПРОВЕРИТЬ"
+                        }
+                  },
+                  "uk": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "ПЕРЕВІРИТИ"
+                        }
+                  },
+                  "es": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "VERIFICAR"
+                        }
+                  },
+                  "fr": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "VÉRIFIER"
+                        }
+                  },
+                  "de": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "PRÜFEN"
+                        }
+                  },
+                  "it": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "VERIFICA"
+                        }
+                  },
+                  "pt": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "VERIFICAR"
+                        }
+                  },
+                  "zh-Hans": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "核验"
+                        }
+                  },
+                  "ja": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "確認"
+                        }
+                  }
+            }
+      },
+          "conf %@": {
+            "extractionState": "manual",
+            "localizations": {
+                  "en": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "conf %@"
+                        }
+                  },
+                  "ru": {
+                        "stringUnit": {
+                              "state": "translated",
+                              "value": "дост. %@"
+                        }
+                  },
+                  "uk": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "дов. %@"
+                        }
+                  },
+                  "es": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "conf. %@"
+                        }
+                  },
+                  "fr": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "conf. %@"
+                        }
+                  },
+                  "de": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "Konf. %@"
+                        }
+                  },
+                  "it": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "conf. %@"
+                        }
+                  },
+                  "pt": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "conf. %@"
+                        }
+                  },
+                  "zh-Hans": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "置信 %@"
+                        }
+                  },
+                  "ja": {
+                        "stringUnit": {
+                              "state": "needs_review",
+                              "value": "信頼度 %@"
+                        }
+                  }
+            }
+      }
   }
 }

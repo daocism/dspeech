@@ -1,4 +1,5 @@
 import AppIntents
+import UIKit
 import XCTest
 
 final class DspeechUITests: XCTestCase {
@@ -41,6 +42,30 @@ final class DspeechUITests: XCTestCase {
     XCTAssertTrue(
       app.buttons["session-history-button"].waitForExistence(timeout: 8),
       "history button must be reachable on the main surface")
+  }
+
+  @MainActor
+  func testIPadMainSettingsAndHistoryRenderOnRegularWidth() throws {
+    guard UIDevice.current.userInterfaceIdiom == .pad else {
+      throw XCTSkip("iPad-only regular-width smoke")
+    }
+    let app = launchAppWithCleanPrivacyDefaults(
+      extraArguments: ["-dspeech.uitest.reduce-animations"])
+
+    XCTAssertTrue(app.buttons["start-button"].waitForExistence(timeout: 8))
+    XCTAssertTrue(app.buttons["settings-button"].waitForExistence(timeout: 4))
+    app.buttons["settings-button"].tap()
+    XCTAssertTrue(app.buttons["settings-done-button"].waitForExistence(timeout: 8))
+    app.buttons["settings-done-button"].tap()
+
+    let historyButton = app.buttons["session-history-button"]
+    XCTAssertTrue(historyButton.waitForExistence(timeout: 4))
+    XCTAssertTrue(waitUntilHittable(historyButton))
+    historyButton.tap()
+    XCTAssertTrue(
+      app.descendants(matching: .any)
+        .matching(identifier: "session-history-list").firstMatch.waitForExistence(timeout: 8),
+      "history sheet must render on iPad regular width")
   }
 
   @MainActor

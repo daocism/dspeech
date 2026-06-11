@@ -69,7 +69,7 @@ struct SessionHistoryView: View {
         Text(
           String(
             localized:
-              "This deletes the saved transcript from this iPhone. Current view is unchanged."))
+              "This deletes the saved transcript from this device. Current view is unchanged."))
       }
     }
     .preferredColorScheme(.dark)

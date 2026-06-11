@@ -11,6 +11,7 @@ struct OnboardingCard: Identifiable {
 struct OnboardingView: View {
   let onComplete: () -> Void
   @State private var selection = 0
+  @Environment(\.dynamicTypeSize) private var dynamicTypeSize
   // why: the hero icon scales with the user's Dynamic Type setting instead of a fixed 64pt.
   @ScaledMetric(relativeTo: .largeTitle) private var iconSize: CGFloat = 64
 
@@ -31,7 +32,7 @@ struct OnboardingView: View {
       systemImage: "lock.shield",
       title: String(localized: "Local by default"),
       message:
-        String(localized: "Audio and transcripts stay on this iPhone. Nothing leaves your device."),
+        String(localized: "Audio and transcripts stay on this device. Nothing leaves your device."),
       accessibilityIdentifier: "onboarding-card-local-first"
     ),
     OnboardingCard(
@@ -50,35 +51,41 @@ struct OnboardingView: View {
   private var isLastCard: Bool { selection == Self.cards.count - 1 }
 
   var body: some View {
-    ZStack {
-      LinearGradient(
-        colors: [Color.black, Color(red: 0.03, green: 0.06, blue: 0.10)],
-        startPoint: .top,
-        endPoint: .bottom
-      )
-      .ignoresSafeArea()
+    GeometryReader { geometry in
+      let useScrollablePages = shouldUseScrollablePages(size: geometry.size)
 
-      VStack(spacing: 24) {
-        TabView(selection: $selection) {
-          ForEach(Self.cards) { card in
-            cardView(card).tag(card.id)
+      ZStack {
+        LinearGradient(
+          colors: [Color.black, Color(red: 0.03, green: 0.06, blue: 0.10)],
+          startPoint: .top,
+          endPoint: .bottom
+        )
+        .ignoresSafeArea()
+
+        VStack(spacing: 24) {
+          TabView(selection: $selection) {
+            ForEach(Self.cards) { card in
+              cardView(card, scrollable: useScrollablePages).tag(card.id)
+            }
           }
-        }
-        .tabViewStyle(.page(indexDisplayMode: .always))
-        .indexViewStyle(.page(backgroundDisplayMode: .always))
+          .tabViewStyle(.page(indexDisplayMode: .always))
+          .indexViewStyle(.page(backgroundDisplayMode: .always))
 
-        Button(action: advance) {
-          Text(isLastCard ? String(localized: "Get started") : String(localized: "Next"))
-            .font(.headline)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
-            .background(Capsule().fill(Color.cyan))
-            .foregroundStyle(.black)
+          Button(action: advance) {
+            Text(isLastCard ? String(localized: "Get started") : String(localized: "Next"))
+              .font(.headline)
+              .frame(maxWidth: .infinity)
+              .padding(.vertical, 14)
+              .background(Capsule().fill(Color.cyan))
+              .foregroundStyle(.black)
+          }
+          .buttonStyle(.plain)
+          .accessibilityIdentifier(
+            isLastCard ? "onboarding-done-button" : "onboarding-next-button"
+          )
+          .padding(.horizontal, 32)
+          .padding(.bottom, 24)
         }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier(isLastCard ? "onboarding-done-button" : "onboarding-next-button")
-        .padding(.horizontal, 32)
-        .padding(.bottom, 24)
       }
     }
     .preferredColorScheme(.dark)
@@ -92,9 +99,30 @@ struct OnboardingView: View {
     }
   }
 
-  private func cardView(_ card: OnboardingCard) -> some View {
+  private func shouldUseScrollablePages(size: CGSize) -> Bool {
+    dynamicTypeSize.isAccessibilitySize || size.height < 560
+  }
+
+  @ViewBuilder
+  private func cardView(_ card: OnboardingCard, scrollable: Bool) -> some View {
+    if scrollable {
+      ScrollView {
+        cardContent(card, includeSpacers: false)
+          .frame(maxWidth: .infinity)
+          .padding(.vertical, 36)
+      }
+      .accessibilityIdentifier(card.accessibilityIdentifier)
+    } else {
+      cardContent(card, includeSpacers: true)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityIdentifier(card.accessibilityIdentifier)
+    }
+  }
+
+  @ViewBuilder
+  private func cardContent(_ card: OnboardingCard, includeSpacers: Bool) -> some View {
     VStack(spacing: 20) {
-      Spacer()
+      if includeSpacers { Spacer() }
       Image(systemName: card.systemImage)
         .font(.system(size: iconSize, weight: .semibold))
         .foregroundStyle(.cyan)
@@ -108,10 +136,8 @@ struct OnboardingView: View {
         .multilineTextAlignment(.center)
         .fixedSize(horizontal: false, vertical: true)
         .padding(.horizontal, 32)
-      Spacer()
+      if includeSpacers { Spacer() }
     }
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .accessibilityIdentifier(card.accessibilityIdentifier)
   }
 }
 
