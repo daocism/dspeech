@@ -34,6 +34,9 @@ PRODUCTION_SOURCE_FORBIDDEN_MARKERS = [
     "http://",
     "https://",
 ]
+PRODUCTION_SOURCE_NETWORK_ALLOWLIST = {
+    Path("Dspeech/Core/VoiceFilter/SpeakerModelPackInstaller.swift"): {"URLSession", "URLRequest"},
+}
 
 
 class CheckState:
@@ -156,8 +159,12 @@ def check_model_pack_contract(state: CheckState) -> None:
         pattern = rf'static let {name} = "{re.escape(expected)}"'
         if not re.search(pattern, text):
             state.fail(f"SpeakerModelPackInstaller.{name} must stay pinned to {expected}")
-    if "DownloadUtils.downloadRepo(" not in text or ".diarizer" not in text:
-        state.fail("SpeakerModelPackInstaller must keep the FluidAudio diarizer download boundary explicit")
+    if (
+        "pinnedDownloadURL(relativePath:" not in text
+        or "URLSession.shared.download" not in text
+        or "Repo.diarizer.folderName" not in text
+    ):
+        state.fail("SpeakerModelPackInstaller must keep the pinned FluidAudio diarizer download boundary explicit")
     if "ModelRegistry.baseURL" not in text:
         state.fail("SpeakerModelPackInstaller must keep registry base URL handling explicit")
     match = re.search(r"expectedModelFileManifest:\s*\[ExpectedModelFile\]\s*=\s*\[(.*?)\n\s*\]", text, re.S)
@@ -187,6 +194,8 @@ def check_production_source_no_unexpected_network(state: CheckState) -> None:
             continue
         text = path.read_text(encoding="utf-8")
         for marker in PRODUCTION_SOURCE_FORBIDDEN_MARKERS:
+            if marker in PRODUCTION_SOURCE_NETWORK_ALLOWLIST.get(relative, set()):
+                continue
             if marker in text:
                 state.fail(f"unexpected production network marker {marker!r} in {relative}")
 
@@ -231,6 +240,48 @@ def check_source_privacy_manifest(state: CheckState) -> None:
     validate_privacy_manifest_bytes(path.read_bytes(), state, "source PrivacyInfo.xcprivacy")
 
 
+def localizable_catalog_locales(state: CheckState) -> set[str]:
+    path = ROOT / "Dspeech/Localizable.xcstrings"
+    if not path.exists():
+        state.fail(f"missing string catalog: {rel(path)}")
+        return set()
+    try:
+        catalog = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        state.fail(f"invalid Localizable.xcstrings JSON: {exc}")
+        return set()
+    strings = catalog.get("strings")
+    if not isinstance(strings, dict):
+        state.fail("Localizable.xcstrings must contain a strings dictionary")
+        return set()
+    return {
+        locale
+        for entry in strings.values()
+        if isinstance(entry, dict)
+        for locale in (entry.get("localizations") or {}).keys()
+    }
+
+
+def app_store_listing_locales(state: CheckState) -> set[str]:
+    listing_dir = ROOT / "docs/product/app-store"
+    paths = sorted(listing_dir.glob("listing-*.md"))
+    if not paths:
+        state.fail("no App Store listing markdown files found")
+        return set()
+    return {path.stem.removeprefix("listing-") for path in paths}
+
+
+def check_app_store_listing_locales_have_app_catalog_locale(state: CheckState) -> None:
+    listing_locales = app_store_listing_locales(state)
+    catalog_locales = localizable_catalog_locales(state)
+    missing = sorted(listing_locales - catalog_locales)
+    if missing:
+        state.fail(
+            "App Store listing locale(s) missing from Localizable.xcstrings: "
+            + ", ".join(missing)
+        )
+
+
 def source_checks(state: CheckState) -> None:
     check_package_pin(ROOT / APP_PACKAGE_RESOLVED, state, require_version=False)
     check_package_pin(ROOT / SPEAKER_EVAL_PACKAGE_RESOLVED, state, require_version=True)
@@ -239,6 +290,7 @@ def source_checks(state: CheckState) -> None:
     check_model_pack_contract(state)
     check_production_source_no_unexpected_network(state)
     check_source_privacy_manifest(state)
+    check_app_store_listing_locales_have_app_catalog_locale(state)
 
 
 def archive_app_paths(archive_path: Path) -> dict[str, Path]:

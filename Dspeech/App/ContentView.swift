@@ -62,8 +62,15 @@ struct ContentView: View {
         voiceFilterActive: { privacySettings.voiceFilterActive }
       )
     }
+    #if DEBUG
+      let debugScriptedEngine: (any LiveTranscriptionEngine)? =
+        RenderStableScriptedLiveTranscriptionEngine.makeFromLaunchArguments()
+    #else
+      let debugScriptedEngine: (any LiveTranscriptionEngine)? = nil
+    #endif
     let resolvedEngine =
       engine
+      ?? debugScriptedEngine
       ?? AppleSpeechLiveTranscriptionEngine(
         localeProvider: { recognitionSettings.activeLocaleIdentifier },
         bufferGate: VoiceFilterSpeechAudioBufferGate(pipeline: filter),
@@ -657,6 +664,66 @@ private struct TranscriptViewportHeightPreferenceKey: PreferenceKey {
     value = nextValue()
   }
 }
+
+#if DEBUG
+  @MainActor
+  private final class RenderStableScriptedLiveTranscriptionEngine: LiveTranscriptionEngine {
+    private var continuation: AsyncStream<LiveTranscriptionEvent>.Continuation?
+    private var finalTask: Task<Void, Never>?
+    private(set) var status: LiveTranscriptionStatus = .idle
+
+    static func makeFromLaunchArguments(
+      _ arguments: [String] = CommandLine.arguments
+    ) -> RenderStableScriptedLiveTranscriptionEngine? {
+      guard ScriptedLiveTranscriptionEngine.makeFromLaunchArguments(arguments) != nil else {
+        return nil
+      }
+      return RenderStableScriptedLiveTranscriptionEngine()
+    }
+
+    func events() -> AsyncStream<LiveTranscriptionEvent> {
+      AsyncStream<LiveTranscriptionEvent> { continuation in
+        self.continuation = continuation
+        continuation.yield(.status(self.status))
+      }
+    }
+
+    func start() async {
+      transition(to: .requestingPermission)
+      transition(to: .listening)
+      continuation?.yield(.partial("Tower N123AB"))
+      finalTask?.cancel()
+      finalTask = Task { @MainActor [weak self] in
+        do {
+          try await Task.sleep(nanoseconds: 2_500_000_000)
+        } catch {
+          return
+        }
+        guard let self, self.status == .listening else { return }
+        self.continuation?.yield(
+          .segment(
+            TranscriptSegment(
+              text: "Tower N123AB cleared for takeoff",
+              confidence: 0.96,
+              sourceLanguageCode: "en",
+              source: .liveATC
+            )))
+        self.transition(to: .stopped)
+      }
+    }
+
+    func stop() {
+      finalTask?.cancel()
+      finalTask = nil
+      transition(to: .stopped)
+    }
+
+    private func transition(to newStatus: LiveTranscriptionStatus) {
+      status = newStatus
+      continuation?.yield(.status(newStatus))
+    }
+  }
+#endif
 
 private struct TranscriptBottomOffsetPreferenceKey: PreferenceKey {
   static let defaultValue: CGFloat = 0

@@ -26,10 +26,55 @@ struct TranscriptSegmentTests {
     #expect(!segment.requiresVerification)
   }
 
+  @Test func confidenceExactlyAtVerificationThresholdDoesNotRequireVerification() {
+    let segment = TranscriptSegment(
+      text: "Cleared for takeoff runway two seven",
+      confidence: 0.82,
+      sourceLanguageCode: "en",
+      source: .liveATC
+    )
+
+    #expect(!segment.requiresVerification)
+  }
+
+  @Test func confidenceOneUlpBelowVerificationThresholdRequiresVerification() {
+    let segment = TranscriptSegment(
+      text: "Hold short runway two seven",
+      confidence: 0.82.nextDown,
+      sourceLanguageCode: "en",
+      source: .liveATC
+    )
+
+    #expect(segment.requiresVerification)
+  }
+
+  @Test func confidenceOneUlpAboveVerificationThresholdDoesNotRequireVerification() {
+    let segment = TranscriptSegment(
+      text: "Contact tower one one eight decimal seven",
+      confidence: 0.82.nextUp,
+      sourceLanguageCode: "en",
+      source: .liveATC
+    )
+
+    #expect(!segment.requiresVerification)
+  }
+
   @Test func stopCommittedPlaceholderRequiresVerificationEvenWithHighConfidence() {
     let segment = TranscriptSegment(
       text: "Hold short runway two seven",
       confidence: 0.94,
+      sourceLanguageCode: "en",
+      source: .liveATC,
+      isStopCommittedPlaceholder: true
+    )
+
+    #expect(segment.requiresVerification)
+  }
+
+  @Test func stopCommittedPlaceholderRequiresVerificationAtMaximumConfidence() {
+    let segment = TranscriptSegment(
+      text: "Maintain runway heading",
+      confidence: 1.0,
       sourceLanguageCode: "en",
       source: .liveATC,
       isStopCommittedPlaceholder: true
