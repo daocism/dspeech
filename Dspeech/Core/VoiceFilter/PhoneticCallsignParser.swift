@@ -1,6 +1,8 @@
 import Foundation
 
 enum PhoneticCallsignParser {
+  private static let posixLocale = Locale(identifier: "en_US_POSIX")
+
   private static let tokenMap: [String: String] = [
     "alpha": "A", "alfa": "A",
     "bravo": "B",
@@ -40,9 +42,31 @@ enum PhoneticCallsignParser {
     "nine": "9", "niner": "9",
   ]
 
-  private static func tokens(from spoken: String) -> [String] {
+  private static let frenchTokenMap: [String: String] = [
+    "zero": "0",
+    "un": "1", "unite": "1",
+    "deux": "2",
+    "trois": "3",
+    "quatre": "4",
+    "cinq": "5",
+    "six": "6",
+    "sept": "7",
+    "huit": "8",
+    "neuf": "9",
+  ]
+
+  private static let frenchIgnoredTokens: Set<String> = ["decimale", "virgule"]
+
+  private static func tokens(from spoken: String, foldDiacritics: Bool) -> [String] {
+    let source =
+      foldDiacritics
+      ? spoken.folding(
+        options: [.caseInsensitive, .diacriticInsensitive],
+        locale: posixLocale
+      )
+      : spoken.lowercased()
     let rawTokens =
-      spoken
+      source
       .lowercased()
       .components(separatedBy: CharacterSet.alphanumerics.inverted)
       .filter { !$0.isEmpty }
@@ -64,21 +88,37 @@ enum PhoneticCallsignParser {
     return tokens
   }
 
+  private static func isFrenchLocale(_ localeIdentifier: String?) -> Bool {
+    guard let localeIdentifier else { return false }
+    let language = localeIdentifier.split { $0 == "-" || $0 == "_" }.first
+    return language?.lowercased() == "fr"
+  }
+
+  private static func lookupToken(_ token: String, usesFrench: Bool) -> String? {
+    tokenMap[token] ?? (usesFrench ? frenchTokenMap[token] : nil)
+  }
+
   private static func mappedToken(
     _ token: String,
     previous: String?,
-    next: String?
+    next: String?,
+    usesFrench: Bool
   ) -> String? {
+    if usesFrench, frenchIgnoredTokens.contains(token) {
+      return ""
+    }
     if token == "oh" {
-      return previous.flatMap({ tokenMap[$0] }) != nil || next.flatMap({ tokenMap[$0] }) != nil
+      return previous.flatMap({ lookupToken($0, usesFrench: usesFrench) }) != nil
+        || next.flatMap({ lookupToken($0, usesFrench: usesFrench) }) != nil
         ? "0"
         : nil
     }
-    return tokenMap[token]
+    return lookupToken(token, usesFrench: usesFrench)
   }
 
-  static func parse(_ spoken: String) -> String {
-    let words = tokens(from: spoken)
+  static func parse(_ spoken: String, localeIdentifier: String? = nil) -> String {
+    let usesFrench = isFrenchLocale(localeIdentifier)
+    let words = tokens(from: spoken, foldDiacritics: usesFrench)
 
     var result = ""
     for index in words.indices {
@@ -86,7 +126,7 @@ enum PhoneticCallsignParser {
       let next =
         words.index(after: index) == words.endIndex ? nil : words[words.index(after: index)]
       let word = words[index]
-      if let mapped = mappedToken(word, previous: previous, next: next) {
+      if let mapped = mappedToken(word, previous: previous, next: next, usesFrench: usesFrench) {
         result += mapped
       } else {
         for scalar in word.unicodeScalars where CharacterSet.alphanumerics.contains(scalar) {

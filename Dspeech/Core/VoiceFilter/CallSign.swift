@@ -60,9 +60,29 @@ struct CallSign: Equatable, Hashable, Sendable, Codable {
 
   private static let posixLocale = Locale(identifier: "en_US_POSIX")
   private static let compactRunSeparators = CharacterSet(charactersIn: "-/")
+  private static let frenchPhoneticDecode: [String: String] = [
+    "ZERO": "0",
+    "UN": "1", "UNITE": "1",
+    "DEUX": "2",
+    "TROIS": "3",
+    "QUATRE": "4",
+    "CINQ": "5",
+    "SIX": "6",
+    "SEPT": "7",
+    "HUIT": "8",
+    "NEUF": "9",
+  ]
+  private static let frenchIgnoredTokens: Set<String> = ["DECIMALE", "VIRGULE"]
 
-  private static func decode(token: String) -> String? {
+  private static func isFrenchLocale(_ localeIdentifier: String?) -> Bool {
+    guard let localeIdentifier else { return false }
+    let language = localeIdentifier.split { $0 == "-" || $0 == "_" }.first
+    return language?.lowercased() == "fr"
+  }
+
+  private static func decode(token: String, usesFrench: Bool) -> String? {
     if let mapped = phoneticDecode[token] { return mapped }
+    if usesFrench, let mapped = frenchPhoneticDecode[token] { return mapped }
     if !token.isEmpty, token.allSatisfy({ $0.isNumber }) { return token }
     return nil
   }
@@ -70,14 +90,15 @@ struct CallSign: Equatable, Hashable, Sendable, Codable {
   private static func decode(
     token: String,
     previous: String?,
-    next: String?
+    next: String?,
+    usesFrench: Bool
   ) -> String? {
     if token == "OH" {
-      let previousDecoded = previous.flatMap(decode(token:))
-      let nextDecoded = next.flatMap(decode(token:))
+      let previousDecoded = previous.flatMap { decode(token: $0, usesFrench: usesFrench) }
+      let nextDecoded = next.flatMap { decode(token: $0, usesFrench: usesFrench) }
       return previousDecoded != nil || nextDecoded != nil ? "0" : nil
     }
-    return decode(token: token)
+    return decode(token: token, usesFrench: usesFrench)
   }
 
   private static func phoneticWords(in text: String) -> [String] {
@@ -103,7 +124,8 @@ struct CallSign: Equatable, Hashable, Sendable, Codable {
     return words
   }
 
-  private static func decodedRuns(in text: String) -> [String] {
+  private static func decodedRuns(in text: String, localeIdentifier: String?) -> [String] {
+    let usesFrench = isFrenchLocale(localeIdentifier)
     let words = phoneticWords(in: text)
     var runs: [String] = []
     var run = ""
@@ -111,7 +133,15 @@ struct CallSign: Equatable, Hashable, Sendable, Codable {
       let previous = index == words.startIndex ? nil : words[words.index(before: index)]
       let next =
         words.index(after: index) == words.endIndex ? nil : words[words.index(after: index)]
-      if let decoded = Self.decode(token: words[index], previous: previous, next: next) {
+      if usesFrench, frenchIgnoredTokens.contains(words[index]) {
+        continue
+      }
+      if let decoded = Self.decode(
+        token: words[index],
+        previous: previous,
+        next: next,
+        usesFrench: usesFrench
+      ) {
         run += decoded
       } else {
         if !run.isEmpty { runs.append(run) }
@@ -143,13 +173,17 @@ struct CallSign: Equatable, Hashable, Sendable, Codable {
     return runs
   }
 
-  private static func matches(_ candidates: Set<String>, in text: String) -> Bool {
+  private static func matches(
+    _ candidates: Set<String>,
+    in text: String,
+    localeIdentifier: String?
+  ) -> Bool {
     guard !candidates.isEmpty else { return false }
     let compactRuns = compactAlphanumericRuns(in: text)
     if compactRuns.contains(where: { candidates.contains($0) }) {
       return true
     }
-    return decodedRuns(in: text).contains { run in
+    return decodedRuns(in: text, localeIdentifier: localeIdentifier).contains { run in
       candidates.contains { run.contains($0) }
     }
   }
@@ -157,12 +191,18 @@ struct CallSign: Equatable, Hashable, Sendable, Codable {
   // why: abbreviated tails ("3AB" for N123AB) must match only a COMPLETE spoken run, never
   // a substring of a longer decoded run — substring matching makes every other aircraft
   // whose callsign merely contains the tail read as "addressed to us".
-  private static func matchesExactRun(_ candidates: Set<String>, in text: String) -> Bool {
+  private static func matchesExactRun(
+    _ candidates: Set<String>,
+    in text: String,
+    localeIdentifier: String?
+  ) -> Bool {
     guard !candidates.isEmpty else { return false }
     if compactAlphanumericRuns(in: text).contains(where: { candidates.contains($0) }) {
       return true
     }
-    return decodedRuns(in: text).contains { candidates.contains($0) }
+    return decodedRuns(in: text, localeIdentifier: localeIdentifier).contains {
+      candidates.contains($0)
+    }
   }
 
   private static func abbreviationCandidates(for normalized: String) -> Set<String> {
@@ -179,15 +219,19 @@ struct CallSign: Equatable, Hashable, Sendable, Codable {
     return candidates
   }
 
-  func matches(in text: String) -> Bool {
+  func matches(in text: String, localeIdentifier: String? = nil) -> Bool {
     guard !normalized.isEmpty else { return false }
-    return Self.matches([normalized], in: text)
+    return Self.matches([normalized], in: text, localeIdentifier: localeIdentifier)
   }
 
   // why: separate display-biased tier (ICAO abbreviated addressing — prefix + at least the
   // last two characters, or the bare tail). The gate uses it to SHOW a possibly-own call;
   // it must never feed a suppression decision, so it stays out of matches(in:).
-  func matchesAbbreviated(in text: String) -> Bool {
-    Self.matchesExactRun(Self.abbreviationCandidates(for: normalized), in: text)
+  func matchesAbbreviated(in text: String, localeIdentifier: String? = nil) -> Bool {
+    Self.matchesExactRun(
+      Self.abbreviationCandidates(for: normalized),
+      in: text,
+      localeIdentifier: localeIdentifier
+    )
   }
 }

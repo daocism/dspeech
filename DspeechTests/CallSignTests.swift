@@ -68,6 +68,25 @@ struct CallSignTests {
     #expect(cs.matches(in: "November One Two Three Alpha Bravo line up and wait"))
   }
 
+  @Test func frenchSpokenCallSignMatchesWhenLocaleIsFrench() throws {
+    let cs = try #require(CallSign(raw: "FGO78"))
+    #expect(
+      cs.matches(
+        in: "Tour, Foxtrot Golf Oscar sept huit, autorisé atterrissage piste deux six",
+        localeIdentifier: "fr-FR"
+      ))
+  }
+
+  @Test func frenchAbbreviatedCallSignMatchesWhenLocaleIsFrench() throws {
+    let cs = try #require(CallSign(raw: "FGO78"))
+    #expect(cs.matchesAbbreviated(in: "sept huit, rappelez finale", localeIdentifier: "fr-FR"))
+  }
+
+  @Test func frenchOnlyDigitWordsDoNotMatchWithoutFrenchLocale() throws {
+    let cs = try #require(CallSign(raw: "FGO78"))
+    #expect(cs.matches(in: "Foxtrot Golf Oscar sept huit") == false)
+  }
+
   @Test func everydayNineSpellingMatches() throws {
     // the recognizer emits "nine", not the ICAO "niner"
     let cs = try #require(CallSign(raw: "N9A"))
@@ -216,6 +235,27 @@ struct CallSignTests {
     #expect(generatedCaseCount == 500)
   }
 
+  @Test("should preserve French callsign matching across 500 generated spoken registrations")
+  func shouldPreserveFrenchCallSignMatchingAcross500GeneratedSpokenRegistrations() throws {
+    let generatedCaseCount = 500
+    var random = DeterministicCallSignRandom(seed: 0xD5_06_12_05)
+
+    for _ in 0..<generatedCaseCount {
+      let registration = Self.registration(random: &random)
+      let callSign = try #require(CallSign(raw: registration))
+      let spoken = Self.renderFrench(registration: registration, random: &random)
+      #expect(callSign.matches(in: spoken, localeIdentifier: "fr-FR"))
+
+      let other = Self.nonCollidingRegistration(with: registration, random: &random)
+      let otherSpoken = Self.renderFrench(registration: other, random: &random)
+      #expect(callSign.matches(in: otherSpoken, localeIdentifier: "fr-FR") == false)
+      #expect(callSign.matchesAbbreviated(in: otherSpoken, localeIdentifier: "fr-FR") == false)
+    }
+
+    print("PBT_CASE_COUNT callsign-fr=500")
+    #expect(generatedCaseCount == 500)
+  }
+
   private struct DeterministicCallSignRandom {
     private var state: UInt64
 
@@ -288,6 +328,13 @@ struct CallSignTests {
     return selected.map { spokenToken(for: $0, random: &random) }.joined(separator: " ")
   }
 
+  private static func renderFrench(
+    registration: String,
+    random: inout DeterministicCallSignRandom
+  ) -> String {
+    Array(registration).map { frenchSpokenToken(for: $0, random: &random) }.joined(separator: " ")
+  }
+
   private static func spokenToken(
     for character: Character,
     random: inout DeterministicCallSignRandom
@@ -330,6 +377,53 @@ struct CallSignTests {
     case "7": variants = ["Seven"]
     case "8": variants = ["Eight"]
     case "9": variants = ["Nine", "Niner"]
+    default: variants = [String(character)]
+    }
+    return variants[random.int(in: 0...(variants.count - 1))]
+  }
+
+  private static func frenchSpokenToken(
+    for character: Character,
+    random: inout DeterministicCallSignRandom
+  ) -> String {
+    let variants: [String]
+    switch character {
+    case "A": variants = ["Alpha", "Alfa"]
+    case "B": variants = ["Bravo"]
+    case "C": variants = ["Charlie"]
+    case "D": variants = ["Delta"]
+    case "E": variants = ["Echo"]
+    case "F": variants = ["Foxtrot"]
+    case "G": variants = ["Golf"]
+    case "H": variants = ["Hotel"]
+    case "I": variants = ["India"]
+    case "J": variants = ["Juliett", "Juliet"]
+    case "K": variants = ["Kilo"]
+    case "L": variants = ["Lima"]
+    case "M": variants = ["Mike"]
+    case "N": variants = ["November"]
+    case "O": variants = ["Oscar"]
+    case "P": variants = ["Papa"]
+    case "Q": variants = ["Quebec"]
+    case "R": variants = ["Romeo"]
+    case "S": variants = ["Sierra"]
+    case "T": variants = ["Tango"]
+    case "U": variants = ["Uniform"]
+    case "V": variants = ["Victor"]
+    case "W": variants = ["Whiskey", "Whisky"]
+    case "X": variants = ["Xray", "X-ray", "X ray"]
+    case "Y": variants = ["Yankee"]
+    case "Z": variants = ["Zulu"]
+    case "0": variants = ["Zéro", "Zero"]
+    case "1": variants = ["Un", "Unité"]
+    case "2": variants = ["Deux"]
+    case "3": variants = ["Trois"]
+    case "4": variants = ["Quatre"]
+    case "5": variants = ["Cinq"]
+    case "6": variants = ["Six"]
+    case "7": variants = ["Sept"]
+    case "8": variants = ["Huit"]
+    case "9": variants = ["Neuf"]
     default: variants = [String(character)]
     }
     return variants[random.int(in: 0...(variants.count - 1))]
