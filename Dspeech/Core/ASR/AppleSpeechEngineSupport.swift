@@ -3,6 +3,18 @@ import Foundation
 @preconcurrency import Speech
 
 extension AppleSpeechLiveTranscriptionEngine {
+  // why: the segmenter cuts a decision window at a trailing-silence utterance edge
+  // (>= minSilence after >= minSpeech of speech) or, failing that, at this
+  // conservative max-window cap — keeping the prior 1.0 s ceiling as a strict upper
+  // bound so this change is never a latency regression; sub-window tails fail open.
+  static let decisionWindowSeconds = 1.0
+  static let minSpeechSeconds = 0.25
+  static let minSilenceSeconds = 0.40
+
+  var isStartupOrListening: Bool {
+    status == .requestingPermission || status == .listening
+  }
+
   // why: the restart-vs-surface decision is the most important business logic in the engine
   // (the F1 silent-failure fix). Extracted as a pure, synchronous function so it is unit-tested
   // directly with synthesized failures — the live recognitionTask callback that produces those
@@ -41,6 +53,16 @@ extension AppleSpeechLiveTranscriptionEngine {
 
   static func sourceLanguageCode(for localeIdentifier: String) -> String {
     Locale(identifier: localeIdentifier).language.languageCode?.identifier ?? localeIdentifier
+  }
+
+  static func interimRestartSegment(text: String, localeIdentifier: String) -> TranscriptSegment {
+    TranscriptSegment(
+      text: text,
+      confidence: 0,
+      sourceLanguageCode: Self.sourceLanguageCode(for: localeIdentifier),
+      source: .liveATC,
+      isInterimRestartCommit: true
+    )
   }
 
   static func restartDecision(
@@ -92,6 +114,54 @@ extension AppleSpeechLiveTranscriptionEngine {
       }
     }
     return mono
+  }
+
+  nonisolated static func averageConfidence(for transcription: SFTranscription) -> Double {
+    let segments = transcription.segments
+    guard !segments.isEmpty else { return 0.0 }
+    let total = segments.reduce(0.0) { $0 + Double($1.confidence) }
+    return total / Double(segments.count)
+  }
+
+  nonisolated static func requestSpeechAuthorization() async -> Bool {
+    await withCheckedContinuation { continuation in
+      SFSpeechRecognizer.requestAuthorization { status in
+        continuation.resume(returning: status == .authorized)
+      }
+    }
+  }
+
+  nonisolated static func requestMicrophonePermission() async -> Bool {
+    await AVAudioApplication.requestRecordPermission()
+  }
+}
+
+struct CapturedAudioBuffer: @unchecked Sendable {
+  let buffer: AVAudioPCMBuffer
+  let samples: [Float]
+  let sampleRate: Double
+}
+
+struct PendingRecognitionPartial: Sendable {
+  private var text = ""
+
+  mutating func record(event: LiveTranscriptionEvent?, isFinal: Bool) {
+    if case .partial(let partialText) = event {
+      text = partialText
+    }
+    if isFinal {
+      clear()
+    }
+  }
+
+  mutating func takeTrimmedText() -> String? {
+    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    clear()
+    return trimmed.isEmpty ? nil : trimmed
+  }
+
+  mutating func clear() {
+    text = ""
   }
 }
 
