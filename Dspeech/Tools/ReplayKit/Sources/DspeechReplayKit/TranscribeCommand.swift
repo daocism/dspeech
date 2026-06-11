@@ -4,7 +4,7 @@ import Foundation
 
 enum TranscribeCommand {
   static let usage = """
-    Usage: dspeech-replay transcribe --audio <wav> --locale <locale> [--callsign <raw>] [--simulate-restart <seconds>] [--replay-tail on|off] [--chunk-seconds <seconds>] [--emit-partials on|off]
+    Usage: dspeech-replay transcribe --audio <wav> --locale <locale> [--engine apple] [--callsign <raw>] [--gap <seconds>] [--simulate-restart <seconds>] [--replay-tail on|off] [--chunk-seconds <seconds>] [--emit-partials on|off]
     """
 
   static func run(_ arguments: [String]) throws -> Int32 {
@@ -30,6 +30,7 @@ struct TranscribeArguments: Sendable {
   let replayTailEnabled: Bool
   let chunkSeconds: Double
   let emitPartials: Bool
+  let transmissionGapSeconds: Double
 
   static func parse(_ arguments: [String]) throws -> TranscribeArguments {
     var audioURL: URL?
@@ -39,6 +40,7 @@ struct TranscribeArguments: Sendable {
     var replayTailEnabled = true
     var chunkSeconds = 0.1
     var emitPartials = true
+    var transmissionGapSeconds = 3.5
     var index = 0
 
     while index < arguments.count {
@@ -85,6 +87,24 @@ struct TranscribeArguments: Sendable {
           throw ReplayKitError.invalidArguments("Invalid value for --emit-partials")
         }
         emitPartials = value.isOn
+      case "--gap":
+        index += 1
+        guard index < arguments.count, let seconds = Double(arguments[index]), seconds > 0 else {
+          throw ReplayKitError.invalidArguments("Invalid value for --gap")
+        }
+        transmissionGapSeconds = seconds
+      case "--engine":
+        index += 1
+        guard index < arguments.count else {
+          throw ReplayKitError.invalidArguments("Missing value for --engine")
+        }
+        // why: whisperkit is the SPEC §5 Phase B engine — fail loudly until its
+        // adapter lands so the gate can never silently "pass" the wrong engine.
+        guard arguments[index] == "apple" else {
+          throw ReplayKitError.invalidArguments(
+            "Unsupported engine '\(arguments[index])' (Phase A supports: apple)"
+          )
+        }
       case "--help", "-h":
         throw ReplayKitError.invalidArguments(TranscribeCommand.usage)
       default:
@@ -105,7 +125,8 @@ struct TranscribeArguments: Sendable {
       restartSeconds: restartSeconds.sorted(),
       replayTailEnabled: replayTailEnabled,
       chunkSeconds: chunkSeconds,
-      emitPartials: emitPartials
+      emitPartials: emitPartials,
+      transmissionGapSeconds: transmissionGapSeconds
     )
   }
 }
@@ -223,9 +244,84 @@ private final class TranscribeRunner {
   private var failure: TranscribeASRFailure?
   private var replayTail = TranscribeReplayTail(maxDurationSeconds: 1.0, maxBufferCount: 96)
   private var nextRestartIndex = 0
+  private let classifierClock: TransmissionClassifierClock
+  private var assembler: TransmissionAssembler
+  private var closedTransmissions: [Transmission] = []
 
   init(options: TranscribeArguments) {
     self.options = options
+    let clock = TransmissionClassifierClock(
+      classifier: TransmissionClassifier(
+        configuredCallSign: options.callSign.flatMap { CallSign(raw: $0) },
+        localeIdentifier: options.localeIdentifier,
+        voicePackActive: false
+      )
+    )
+    classifierClock = clock
+    assembler = TransmissionAssembler(
+      config: TransmissionAssemblerConfig(
+        transmissionGapSeconds: options.transmissionGapSeconds
+      ),
+      localeIdentifier: options.localeIdentifier,
+      classify: { text, speakers in
+        clock.classify(text: text, speakers: speakers)
+      }
+    )
+  }
+
+  private func assemble(_ input: TransmissionAssemblerInput, at seconds: Double) {
+    classifierClock.currentTime = Self.date(at: seconds)
+    for update in assembler.process(input) {
+      record(update)
+    }
+  }
+
+  private func record(_ update: TransmissionUpdate) {
+    if case .closed(let transmission) = update {
+      closedTransmissions.append(transmission)
+    }
+  }
+
+  private func finishAssembly(totalSeconds: Double) {
+    classifierClock.currentTime = Self.date(at: totalSeconds)
+    for update in assembler.finish(at: Self.date(at: totalSeconds)) {
+      record(update)
+    }
+  }
+
+  private func printTransmissionBlocks() {
+    let blocks = closedTransmissions.filter { !$0.text.isEmpty }
+    print(
+      "TRANSMISSIONS gap=\(Self.formatTime(options.transmissionGapSeconds))s locale=\(options.localeIdentifier) callsign=\(options.callSign ?? "<none>")"
+    )
+    guard !blocks.isEmpty else {
+      print("  (no transmissions assembled)")
+      return
+    }
+    for transmission in blocks {
+      let kind = transmission.classification.isDisplayed ? "DISPLAYED" : "FILTERED "
+      print(
+        "[\(kind) \(Self.formatClock(transmission.startedAt))-\(Self.formatClock(transmission.endedAt))] «\(transmission.text)»  (reason: \(Self.describe(transmission.classification)))"
+      )
+    }
+  }
+
+  private static func date(at seconds: Double) -> Date {
+    Date(timeIntervalSince1970: seconds)
+  }
+
+  private static func formatClock(_ date: Date) -> String {
+    let seconds = date.timeIntervalSince1970
+    let minutes = Int(seconds) / 60
+    let remainder = seconds - Double(minutes * 60)
+    return String(format: "%02d:%05.2f", minutes, remainder)
+  }
+
+  private static func describe(_ classification: TransmissionClassification) -> String {
+    switch classification {
+    case .displayed(let reason): reason.rawValue
+    case .filtered(let reason): reason.rawValue
+    }
   }
 
   func run() throws {
@@ -270,6 +366,8 @@ private final class TranscribeRunner {
     try waitForCompletion(totalSeconds: totalSeconds)
     print("EVENT done     t=\(Self.formatTime(totalSeconds))")
     teardownRecognition()
+    finishAssembly(totalSeconds: totalSeconds)
+    printTransmissionBlocks()
   }
 
   private static func makeChunks(
@@ -404,13 +502,28 @@ private final class TranscribeRunner {
 
   private func simulateRestart() throws {
     let restartSeconds = currentAudioSeconds
-    if !pendingPartial.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+    let trimmedPartial = pendingPartial.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !trimmedPartial.isEmpty {
       printFinal(
-        text: pendingPartial.trimmingCharacters(in: .whitespacesAndNewlines),
+        text: trimmedPartial,
         endSeconds: restartSeconds,
         confidence: 0,
         interim: true,
         segments: []
+      )
+      assemble(
+        .fragment(
+          segment: TranscriptSegment(
+            text: trimmedPartial,
+            confidence: 0,
+            sourceLanguageCode: Self.languageCode(for: options.localeIdentifier),
+            source: .replay,
+            isInterimRestartCommit: true
+          ),
+          speaker: nil,
+          at: Self.date(at: restartSeconds)
+        ),
+        at: restartSeconds
       )
       emittedFinal = true
       pendingPartial = ""
@@ -421,16 +534,25 @@ private final class TranscribeRunner {
     print(
       "EVENT restart  t=\(Self.formatTime(restartSeconds))  replayedTailSeconds=\(Self.formatTime(replayedTailSeconds))"
     )
+    assemble(.taskRestart(at: Self.date(at: restartSeconds)), at: restartSeconds)
     try startRecognition(taskStartSeconds: restartSeconds - replayedTailSeconds)
     for buffer in tail.buffers {
       request?.append(buffer)
     }
   }
 
+  private static func languageCode(for localeIdentifier: String) -> String {
+    Locale(identifier: localeIdentifier).language.languageCode?.identifier ?? localeIdentifier
+  }
+
   private func handleCallback(_ callback: TranscribeCallbackEvent) {
     guard callback.generation == generation else { return }
     if let partialText = callback.partialText {
       pendingPartial = partialText
+      assemble(
+        .partial(text: partialText, at: Self.date(at: currentAudioSeconds)),
+        at: currentAudioSeconds
+      )
       if options.emitPartials
         && !partialText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
       {
@@ -446,6 +568,19 @@ private final class TranscribeRunner {
         confidence: final.confidence,
         interim: false,
         segments: final.segments
+      )
+      assemble(
+        .fragment(
+          segment: TranscriptSegment(
+            text: final.text,
+            confidence: final.confidence,
+            sourceLanguageCode: Self.languageCode(for: options.localeIdentifier),
+            source: .replay
+          ),
+          speaker: nil,
+          at: Self.date(at: final.endSeconds)
+        ),
+        at: final.endSeconds
       )
       pendingPartial = ""
       emittedFinal = true
@@ -526,6 +661,27 @@ private final class TranscribeRunner {
 
   private static func formatSegmentTime(_ value: Double) -> String {
     String(format: "%6.2f", value)
+  }
+}
+
+// why: the assembler's classify closure is (text, speakers) only, but the
+// continuation-window rule needs the transmission's endedAt. The runner sets
+// currentTime to the event timestamp immediately before each synchronous
+// process() call, which is exactly the open transmission's endedAt at classify
+// time. Single-threaded CLI — no concurrent access.
+private final class TransmissionClassifierClock: @unchecked Sendable {
+  var classifier: TransmissionClassifier
+  var currentTime = Date(timeIntervalSince1970: 0)
+
+  init(classifier: TransmissionClassifier) {
+    self.classifier = classifier
+  }
+
+  func classify(
+    text: String,
+    speakers: [SpeakerMatchDecision]
+  ) -> TransmissionClassification {
+    classifier.classify(text: text, speakers: speakers, endedAt: currentTime)
   }
 }
 
