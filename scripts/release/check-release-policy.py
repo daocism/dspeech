@@ -36,6 +36,9 @@ PRODUCTION_SOURCE_FORBIDDEN_MARKERS = [
 ]
 PRODUCTION_SOURCE_NETWORK_ALLOWLIST = {
     Path("Dspeech/Core/VoiceFilter/SpeakerModelPackInstaller.swift"): {"URLSession", "URLRequest"},
+    # User-initiated WhisperKit model download (ADR 0011): same explicit-download
+    # boundary class as the voice pack — pinned HF revision, local-only afterwards.
+    Path("Dspeech/Core/ASR/WhisperKitModelInstaller.swift"): {"URLSession", "URLRequest", "https://"},
 }
 
 
@@ -186,6 +189,19 @@ def check_model_pack_contract(state: CheckState) -> None:
         state.fail("Model manifest SHA-256 checksums must be unique")
 
 
+def check_whisperkit_model_installer_contract(state: CheckState) -> None:
+    path = ROOT / "Dspeech/Core/ASR/WhisperKitModelInstaller.swift"
+    text = read_text(path, state)
+    if not text:
+        return
+    if not re.search(r'static let pinnedRevision = "[0-9a-f]{40}"', text):
+        state.fail("WhisperKitModelInstaller must pin a full HF revision SHA")
+    if "pinnedDownloadURL(relativePath:" not in text or "huggingface.co" not in text:
+        state.fail("WhisperKitModelInstaller must keep the pinned download boundary explicit")
+    if '"https://' in text and "resolve/\\(pinnedRevision)" not in text:
+        state.fail("WhisperKitModelInstaller downloads must resolve through the pinned revision")
+
+
 def check_production_source_no_unexpected_network(state: CheckState) -> None:
     swift_root = ROOT / "Dspeech"
     for path in sorted(swift_root.rglob("*.swift")):
@@ -288,6 +304,7 @@ def source_checks(state: CheckState) -> None:
     check_project_package_reference(state)
     check_speaker_eval_package(state)
     check_model_pack_contract(state)
+    check_whisperkit_model_installer_contract(state)
     check_production_source_no_unexpected_network(state)
     check_source_privacy_manifest(state)
     check_app_store_listing_locales_have_app_catalog_locale(state)
