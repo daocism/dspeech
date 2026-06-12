@@ -255,7 +255,11 @@ struct ContentView: View {
               .padding(.trailing, isLandscape ? 16 : 18)
           }
         }
-        .overlay(alignment: .top) {
+        // why: bottom-anchored above the floating controls — the hint appears with the
+        // FIRST transmission card, which renders at the top; a top overlay sat on that
+        // card and obscured it (2026-06-12 visual review). Bottom space is empty at
+        // appearance time and sits next to the microphone the hint talks about.
+        .overlay(alignment: .bottom) {
           if liveViewModel.oneTimeNoAnchorHintVisible {
             NoAnchorTransmissionHint(
               text: String(
@@ -264,7 +268,7 @@ struct ContentView: View {
               ),
               dismiss: { liveViewModel.dismissNoAnchorHint() }
             )
-            .padding(.top, isLandscape ? 72 : 96)
+            .padding(.bottom, isLandscape ? 84 : 112)
             .padding(.horizontal, 18)
           }
         }

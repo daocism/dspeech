@@ -20,14 +20,25 @@ struct MainControlBar: View {
           .layoutPriority(1)
           .accessibilityIdentifier("app-title")
 
-        HStack(spacing: 8) {
-          PrivacyBadge(mode: privacyMode)
-          RouteHealthChip(health: routeHealth)
-        }
         // why: the privacy/route chips are mandatory cockpit chrome (ADR 0002) — they may
         // scale via their own minimumScaleFactor but must never be compressed into
-        // letter-wrap fragments by a neighboring hint bubble.
-        .fixedSize()
+        // letter-wrap fragments by a neighboring hint bubble. The original both-axes
+        // fixedSize made the column incompressible at accessibility type sizes and
+        // shoved the history/settings buttons off the right screen edge, and pure
+        // compression ellipsized the MIC chip (2026-06-12 visual review): side-by-side
+        // chips when they fit at intrinsic size, stacked vertically when they don't.
+        ViewThatFits(in: .horizontal) {
+          HStack(spacing: 8) {
+            PrivacyBadge(mode: privacyMode)
+            RouteHealthChip(health: routeHealth)
+          }
+          .fixedSize()
+          VStack(alignment: .leading, spacing: 6) {
+            PrivacyBadge(mode: privacyMode)
+            RouteHealthChip(health: routeHealth)
+          }
+          .fixedSize(horizontal: false, vertical: true)
+        }
       }
       .layoutPriority(2)
 
@@ -95,15 +106,29 @@ struct FloatingStartControls: View {
   let action: () -> Void
 
   var body: some View {
-    HStack(spacing: 12) {
-      if showHints {
-        HintBubble(text: String(localized: "Tap to start recognition"))
+    // why: at accessibility type sizes hint+button exceed the screen width and the
+    // overflow pushed the PRIMARY start button half off-screen (2026-06-12 visual
+    // review); ViewThatFits drops to a trailing-aligned vertical stack instead.
+    ViewThatFits(in: .horizontal) {
+      HStack(spacing: 12) {
+        hintIfNeeded
+        StartButton(isStopVisible: isStopVisible, disabled: disabled, action: action)
       }
-      StartButton(isStopVisible: isStopVisible, disabled: disabled, action: action)
+      VStack(alignment: .trailing, spacing: 10) {
+        hintIfNeeded
+        StartButton(isStopVisible: isStopVisible, disabled: disabled, action: action)
+      }
     }
     .frame(maxWidth: maxWidth ?? .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
     .padding(.trailing, isLandscape ? 16 : 18)
     .padding(.bottom, isLandscape ? 10 : 16)
+  }
+
+  @ViewBuilder
+  private var hintIfNeeded: some View {
+    if showHints {
+      HintBubble(text: String(localized: "Tap to start recognition"))
+    }
   }
 }
 

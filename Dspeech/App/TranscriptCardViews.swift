@@ -8,16 +8,19 @@ struct HintBubble: View {
 
   let text: String
   var pointer: Pointer = .trailing
+  @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
   // why: a hint must NEVER be laid out inline with contested chrome — squeezed, it
   // degrades into letter-soup or "На…" truncation (the 2026-06-11 visual-review defect).
   // It always renders at its own intrinsic size; callers place it as a floating overlay.
+  // At accessibility sizes the 2-line cap itself truncates — lift it and let the
+  // bubble grow vertically instead.
   private var bubbleText: some View {
     Text(text)
       .font(.subheadline.weight(.semibold))
       .foregroundStyle(.black)
       .multilineTextAlignment(.trailing)
-      .lineLimit(2)
+      .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
       .fixedSize(horizontal: false, vertical: true)
       .frame(maxWidth: 230, alignment: .trailing)
       .padding(.horizontal, 14)
@@ -128,11 +131,12 @@ struct NoAnchorTransmissionHint: View {
 
   var body: some View {
     HStack(alignment: .top, spacing: 8) {
+      // why: no line limit — a capped hint truncated mid-word at default type size
+      // (2026-06-12 visual review); fixedSize(vertical) grows the bubble instead.
       Text(text)
         .font(.subheadline.weight(.semibold))
         .foregroundStyle(.black)
         .multilineTextAlignment(.leading)
-        .lineLimit(3)
         .fixedSize(horizontal: false, vertical: true)
         .frame(maxWidth: 230, alignment: .leading)
 
@@ -151,7 +155,10 @@ struct NoAnchorTransmissionHint: View {
     .padding(.horizontal, 14)
     .padding(.vertical, 10)
     .background(.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    .fixedSize()
+    // why: vertical-only — both-axes fixedSize measured the wrapped text against an
+    // intrinsic single-line width and the background stayed 2 lines tall while the
+    // text drew 4 (2026-06-12 visual review).
+    .fixedSize(horizontal: false, vertical: true)
     .shadow(color: .black.opacity(0.25), radius: 6, y: 2)
     .transition(.opacity.combined(with: .scale(scale: 0.9)))
     .accessibilityIdentifier("no-anchor-hint")
