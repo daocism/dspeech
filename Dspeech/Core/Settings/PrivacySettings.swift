@@ -24,6 +24,7 @@ enum SettingsStorageIssue: Equatable, Sendable {
   case voiceFilterActiveSaveFailed
   case recognitionLocaleCorrupted
   case recognitionLocaleSaveFailed
+  case recognitionEngineCorrupted
   case translationEnabledCorrupted
   case translationTargetCorrupted
   case translationEnabledSaveFailed

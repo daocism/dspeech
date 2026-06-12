@@ -82,7 +82,7 @@ struct UserDefaultsRecognitionSettingsStorage: RecognitionSettingsStorage, @unch
     if let raw = defaults.string(forKey: Self.engineChoiceKey),
       TranscriptionEngineChoice(rawValue: raw) == nil
     {
-      return .recognitionLocaleCorrupted
+      return .recognitionEngineCorrupted
     }
     return nil
   }
