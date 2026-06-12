@@ -19,10 +19,16 @@ TransmissionClassifier (urgency/callsign/voice/honest-fallback), French phonetic
 layer, real-ASR harness `dspeech-replay transcribe` + `scripts/
 verify-primary-scenario.sh` (macOS on-device fr-FR; both fixtures = single coherent
 DISPLAYED blocks; callsign anchor + filter verified on real audio). Replay-tail: ON
-(empirical §2.2, loss > duplication). REMAINING: Phase B WhisperKit engine (+ADR 0011,
-engine picker, model download), stage 3 UI wiring (transmission cards + persistence per
-transmission + visual sweep + PR). mac24 env: fr dictation asset installed; CLI Speech
-needs run-loop pumping.
+(empirical §2.2, loss > duplication). **Phase B + Stage 3 LANDED** (@ `7aeecbd`, run-note
+`docs/run-notes/2026-06-12-core-semantics-rebuild-phase-b-stage3.md`): WhisperKit
+harness engine + ADR 0011 (apple default), LiveAudioCaptureConduit extraction,
+pinned-revision model installer + Settings engine picker, WhisperKit live engine
+(adapter-confined import, local-only load), transmission cards/persistence/filtered
+reasons/no-anchor hint in the app, 3 visual defects eye-caught & fixed (hint overlap,
+bubble clip, AX-XXXL header overflow). REMAINING: l10n fill for new strings (en-only),
+§4.4 BlackHole sim E2E (owner sudo), device latency check for WhisperKit live, owner
+hand-test = final gate. mac24 env: fr dictation asset installed; CLI Speech needs
+run-loop pumping; whisper model cache ~/.cache/dspeech-whisperkit.
 
 ## What we are building right now
 
