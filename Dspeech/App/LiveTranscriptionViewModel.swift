@@ -203,8 +203,16 @@ final class LiveTranscriptionViewModel {
     suppressedSegmentIDs.remove(id)
   }
 
+  func showFilteredTransmission(id: UUID) {
+    guard let index = filteredTransmissions.firstIndex(where: { $0.id == id }) else { return }
+    let transmission = filteredTransmissions.remove(at: index)
+    displayedTransmissions.append(transmission)
+  }
+
   func unhideAllSuppressedSegments() {
     suppressedSegmentIDs.removeAll()
+    displayedTransmissions.append(contentsOf: filteredTransmissions)
+    filteredTransmissions.removeAll()
   }
 
   func clearTranslations() {

@@ -90,7 +90,8 @@ final class DspeechUITests: XCTestCase {
   func testSeededSuppressedSegmentShowsReviewSheet() throws {
     let app = launchAppWithSeededSuppressedSegment()
 
-    let pill = app.buttons["filtered-count-pill"]
+    let pill = app.descendants(matching: .any)
+      .matching(identifier: "filtered-transmissions-pill").firstMatch
     XCTAssertTrue(pill.waitForExistence(timeout: 8))
     XCTAssertTrue(waitUntilHittable(pill))
     pill.tap()
@@ -98,7 +99,10 @@ final class DspeechUITests: XCTestCase {
     XCTAssertTrue(
       app.descendants(matching: .any)
         .matching(identifier: "filtered-review-sheet").firstMatch.waitForExistence(timeout: 4),
-      "filtered-count pill must open the suppressed-segment review sheet")
+      "filtered-transmissions pill must open the filtered-transmission review sheet")
+    XCTAssertTrue(
+      app.descendants(matching: .any)
+        .matching(identifier: "transmission-reason-badge").firstMatch.exists)
     XCTAssertTrue(app.buttons["show-suppressed-segment"].exists)
   }
 
@@ -190,10 +194,15 @@ final class DspeechUITests: XCTestCase {
     XCTAssertTrue(
       app.staticTexts["Tower N123AB cleared for takeoff"].waitForExistence(timeout: 8),
       "scripted final segment text must render")
+    let finalTransmission = app.descendants(matching: .any)
+      .matching(identifier: "transmission-card").firstMatch
     XCTAssertTrue(
-      app.staticTexts["96%"].waitForExistence(timeout: 4)
-        || app.staticTexts["VERIFY"].waitForExistence(timeout: 1),
-      "final card must expose either confidence or verification state")
+      finalTransmission.waitForExistence(timeout: 4),
+      "scripted final speech must render as a permanent transmission card")
+    XCTAssertTrue(
+      app.descendants(matching: .any)
+        .matching(identifier: "transmission-reason-badge").firstMatch.waitForExistence(timeout: 4),
+      "final card must expose the transmission classification reason")
 
     let clear = app.buttons["clear-button"]
     XCTAssertTrue(clear.waitForExistence(timeout: 4))
@@ -205,9 +214,7 @@ final class DspeechUITests: XCTestCase {
     clearView.tap()
 
     XCTAssertTrue(app.staticTexts["transcript-empty-state"].waitForExistence(timeout: 4))
-    let finalSegment = app.descendants(matching: .any)
-      .matching(identifier: "transcript-segment").firstMatch
-    XCTAssertTrue(waitUntilGone(finalSegment))
+    XCTAssertTrue(waitUntilGone(finalTransmission))
     XCTAssertTrue(waitUntilGone(partialCard))
   }
 
@@ -599,6 +606,7 @@ final class DspeechUITests: XCTestCase {
       "-dspeech.privacy.voicefilter.active.v1", "true",
       "-dspeech.onboarding.completed.v1", "true",
       "-dspeech.first-session.has-ever-started.v1", "false",
+      "-dspeech.transmission.no-anchor-hint-shown.v1", "false",
     ]
     app.launchArguments += extraArguments
     app.launch()
