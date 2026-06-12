@@ -53,14 +53,14 @@ struct TransmissionAssembler {
 
   private let config: TransmissionAssemblerConfig
   private let localeIdentifier: String
-  private let classify: @Sendable (String, [SpeakerMatchDecision]) -> TransmissionClassification
+  private let classify: (String, [SpeakerMatchDecision], Date) -> TransmissionClassification
   private var openTransmission: OpenTransmission?
 
   init(
     config: TransmissionAssemblerConfig,
     localeIdentifier: String,
     classify:
-      @escaping @Sendable (_ text: String, _ speakers: [SpeakerMatchDecision])
+      @escaping (_ text: String, _ speakers: [SpeakerMatchDecision], _ endedAt: Date)
       -> TransmissionClassification
   ) {
     self.config = config
@@ -144,11 +144,11 @@ struct TransmissionAssembler {
       return []
     }
 
-    current.text = current.text.isEmpty ? appendix : "\(current.text) \(appendix)"
-    current.segments.append(segment)
-    current.classification = classify(current.text, current.speakers)
     current.endedAt = at
     current.lastSpeechEvidenceAt = at
+    current.text = current.text.isEmpty ? appendix : "\(current.text) \(appendix)"
+    current.segments.append(segment)
+    current.classification = classify(current.text, current.speakers, current.endedAt)
     openTransmission = current
 
     let transmission = current.transmission()
@@ -166,7 +166,7 @@ struct TransmissionAssembler {
       endedAt: evidenceAt,
       text: "",
       segments: [],
-      classification: classify("", speakers),
+      classification: classify("", speakers, evidenceAt),
       speakers: speakers,
       lastSpeechEvidenceAt: evidenceAt,
       localeIdentifier: localeIdentifier

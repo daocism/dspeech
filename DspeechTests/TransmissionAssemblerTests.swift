@@ -192,7 +192,7 @@ struct TransmissionAssemblerTests {
 
   @Test func classificationUpgradeMidTransmissionEmitsUpdateWithAllSpeakers() {
     let classifiedInputs = Mutex([(String, [SpeakerMatchDecision])]())
-    var assembler = Self.makeAssembler { text, speakers in
+    var assembler = Self.makeAssembler { text, speakers, _ in
       classifiedInputs.withLock { $0.append((text, speakers)) }
       if text.localizedCaseInsensitiveContains("november one two three") {
         return TransmissionClassification.displayed(.callSignMatch)
@@ -216,6 +216,24 @@ struct TransmissionAssemblerTests {
     let lastClassifiedInput = classifiedInputs.withLock { $0.last }
     #expect(lastClassifiedInput?.0 == "continue straight ahead november one two three")
     #expect(lastClassifiedInput?.1 == [pilot, dispatcher])
+  }
+
+  @Test func classifyReceivesCurrentTransmissionEndedAt() {
+    let classifiedEndedAt = Mutex([Date]())
+    var assembler = Self.makeAssembler { _, _, endedAt in
+      classifiedEndedAt.withLock { $0.append(endedAt) }
+      return .filtered(.nonRelevant)
+    }
+
+    _ = assembler.process(.fragment(segment: Self.segment("contact tower"), speaker: nil, at: t0))
+    _ = assembler.process(
+      .fragment(
+        segment: Self.segment("one one eight decimal seven"), speaker: nil,
+        at: t0.addingTimeInterval(0.6)))
+
+    let endedAtValues = classifiedEndedAt.withLock { $0 }
+    #expect(endedAtValues.contains(t0))
+    #expect(endedAtValues.contains(t0.addingTimeInterval(0.6)))
   }
 
   @Test func duplicateFragmentEmitsNoUpdate() {
@@ -310,9 +328,10 @@ struct TransmissionAssemblerTests {
   }
 
   private static func makeAssembler(
-    classify: @escaping @Sendable (String, [SpeakerMatchDecision]) -> TransmissionClassification = {
-      _, _ in .filtered(.nonRelevant)
-    }
+    classify:
+      @escaping @Sendable (String, [SpeakerMatchDecision], Date) -> TransmissionClassification = {
+        _, _, _ in .filtered(.nonRelevant)
+      }
   ) -> TransmissionAssembler {
     TransmissionAssembler(config: .default, localeIdentifier: "en-US", classify: classify)
   }

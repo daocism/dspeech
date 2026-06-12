@@ -81,31 +81,25 @@ enum WhisperKitTranscribe {
   }
 }
 
-// why: same assembler+classifier wiring as the Apple path, fed from whisper
-// segments; kept as a class so the classify closure can reference the clock box.
 final class TranscriptionBlockCollector {
   private let options: TranscribeArguments
-  private let clock: TransmissionClassifierClock
   private var assembler: TransmissionAssembler
   private var closed: [Transmission] = []
 
   init(options: TranscribeArguments) {
     self.options = options
-    let clock = TransmissionClassifierClock(
-      classifier: TransmissionClassifier(
-        configuredCallSign: options.callSign.flatMap { CallSign(raw: $0) },
-        localeIdentifier: options.localeIdentifier,
-        voicePackActive: false
-      )
+    var classifier = TransmissionClassifier(
+      configuredCallSign: options.callSign.flatMap { CallSign(raw: $0) },
+      localeIdentifier: options.localeIdentifier,
+      voicePackActive: false
     )
-    self.clock = clock
     assembler = TransmissionAssembler(
       config: TransmissionAssemblerConfig(
         transmissionGapSeconds: options.transmissionGapSeconds
       ),
       localeIdentifier: options.localeIdentifier,
-      classify: { text, speakers in
-        clock.classify(text: text, speakers: speakers)
+      classify: { text, speakers, endedAt in
+        classifier.classify(text: text, speakers: speakers, endedAt: endedAt)
       }
     )
   }
@@ -122,10 +116,8 @@ final class TranscriptionBlockCollector {
     // times replay the live partial cadence: the transmission opens at the
     // segment's audio start and stays open through every spoken word.
     for wordStart in ([startSeconds] + wordStartTimes).sorted() {
-      clock.currentTime = Date(timeIntervalSince1970: wordStart)
       record(assembler.process(.partial(text: text, at: Date(timeIntervalSince1970: wordStart))))
     }
-    clock.currentTime = Date(timeIntervalSince1970: endSeconds)
     let updates = assembler.process(
       .fragment(
         segment: TranscriptSegment(
@@ -143,7 +135,6 @@ final class TranscriptionBlockCollector {
   }
 
   func finishAndPrint(totalSeconds: Double) {
-    clock.currentTime = Date(timeIntervalSince1970: totalSeconds)
     record(assembler.finish(at: Date(timeIntervalSince1970: totalSeconds)))
     let blocks = closed.filter { !$0.text.isEmpty }
     print(

@@ -253,33 +253,28 @@ private final class TranscribeRunner {
   private var replayTail = TranscribeReplayTail(maxDurationSeconds: 1.0, maxBufferCount: 96)
   private var nextRestartIndex = 0
   private var needsBenignRestart = false
-  private let classifierClock: TransmissionClassifierClock
   private var assembler: TransmissionAssembler
   private var closedTransmissions: [Transmission] = []
 
   init(options: TranscribeArguments) {
     self.options = options
-    let clock = TransmissionClassifierClock(
-      classifier: TransmissionClassifier(
-        configuredCallSign: options.callSign.flatMap { CallSign(raw: $0) },
-        localeIdentifier: options.localeIdentifier,
-        voicePackActive: false
-      )
+    var classifier = TransmissionClassifier(
+      configuredCallSign: options.callSign.flatMap { CallSign(raw: $0) },
+      localeIdentifier: options.localeIdentifier,
+      voicePackActive: false
     )
-    classifierClock = clock
     assembler = TransmissionAssembler(
       config: TransmissionAssemblerConfig(
         transmissionGapSeconds: options.transmissionGapSeconds
       ),
       localeIdentifier: options.localeIdentifier,
-      classify: { text, speakers in
-        clock.classify(text: text, speakers: speakers)
+      classify: { text, speakers, endedAt in
+        classifier.classify(text: text, speakers: speakers, endedAt: endedAt)
       }
     )
   }
 
-  private func assemble(_ input: TransmissionAssemblerInput, at seconds: Double) {
-    classifierClock.currentTime = Self.date(at: seconds)
+  private func assemble(_ input: TransmissionAssemblerInput) {
     for update in assembler.process(input) {
       record(update)
     }
@@ -292,7 +287,6 @@ private final class TranscribeRunner {
   }
 
   private func finishAssembly(totalSeconds: Double) {
-    classifierClock.currentTime = Self.date(at: totalSeconds)
     for update in assembler.finish(at: Self.date(at: totalSeconds)) {
       record(update)
     }
@@ -535,8 +529,7 @@ private final class TranscribeRunner {
           ),
           speaker: nil,
           at: Self.date(at: restartSeconds)
-        ),
-        at: restartSeconds
+        )
       )
       emittedFinal = true
       pendingPartial = ""
@@ -547,7 +540,7 @@ private final class TranscribeRunner {
     print(
       "EVENT restart  t=\(Self.formatTime(restartSeconds))  replayedTailSeconds=\(Self.formatTime(replayedTailSeconds))"
     )
-    assemble(.taskRestart(at: Self.date(at: restartSeconds)), at: restartSeconds)
+    assemble(.taskRestart(at: Self.date(at: restartSeconds)))
     try startRecognition(taskStartSeconds: restartSeconds - replayedTailSeconds)
     for buffer in tail.buffers {
       request?.append(buffer)
@@ -584,8 +577,7 @@ private final class TranscribeRunner {
       // assembler's open/keep-open instead.
       for segment in final.segments.sorted(by: { $0.startSeconds < $1.startSeconds }) {
         assemble(
-          .partial(text: final.text, at: Self.date(at: segment.startSeconds)),
-          at: segment.startSeconds
+          .partial(text: final.text, at: Self.date(at: segment.startSeconds))
         )
       }
       assemble(
@@ -598,8 +590,7 @@ private final class TranscribeRunner {
           ),
           speaker: nil,
           at: Self.date(at: final.endSeconds)
-        ),
-        at: final.endSeconds
+        )
       )
       pendingPartial = ""
       emittedFinal = true
@@ -691,27 +682,6 @@ private final class TranscribeRunner {
 
   private static func formatSegmentTime(_ value: Double) -> String {
     String(format: "%6.2f", value)
-  }
-}
-
-// why: the assembler's classify closure is (text, speakers) only, but the
-// continuation-window rule needs the transmission's endedAt. The runner sets
-// currentTime to the event timestamp immediately before each synchronous
-// process() call, which is exactly the open transmission's endedAt at classify
-// time. Single-threaded CLI — no concurrent access.
-final class TransmissionClassifierClock: @unchecked Sendable {
-  var classifier: TransmissionClassifier
-  var currentTime = Date(timeIntervalSince1970: 0)
-
-  init(classifier: TransmissionClassifier) {
-    self.classifier = classifier
-  }
-
-  func classify(
-    text: String,
-    speakers: [SpeakerMatchDecision]
-  ) -> TransmissionClassification {
-    classifier.classify(text: text, speakers: speakers, endedAt: currentTime)
   }
 }
 
