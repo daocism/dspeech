@@ -82,6 +82,7 @@ struct ContentView: View {
       engine: resolvedEngine,
       transcriptStore: persistentTranscriptStore,
       recognitionLocaleIdentifier: { recognitionSettings.activeLocaleIdentifier },
+      recognitionTransmissionGapSeconds: { recognitionSettings.transmissionGapSeconds },
       voiceFilter: filter,
       translator: LocalTranslationService(backend: AppleTranslationService()),
       translationTarget: { translationSettings.enabled ? translationSettings.targetLanguage : nil }

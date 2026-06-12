@@ -148,6 +148,32 @@ struct RecognitionSettingsTests {
     #expect(reloaded.engineChoice == .whisperKit)
   }
 
+  @MainActor @Test func transmissionGapDefaultsToThreePointFiveSeconds() {
+    let settings = RecognitionSettings(
+      storage: InMemoryRecognitionSettingsStorage(),
+      supportedLocales: supported,
+      preferredLanguages: ["en-US"])
+
+    #expect(settings.transmissionGapSeconds == 3.5)
+  }
+
+  @MainActor @Test func transmissionGapPersistsAndReloadsClampedValue() {
+    let storage = InMemoryRecognitionSettingsStorage()
+    let settings = RecognitionSettings(
+      storage: storage,
+      supportedLocales: supported,
+      preferredLanguages: ["en-US"])
+
+    settings.transmissionGapSeconds = 9
+
+    #expect(storage.transmissionGapSeconds == 6)
+    let reloaded = RecognitionSettings(
+      storage: storage,
+      supportedLocales: supported,
+      preferredLanguages: ["en-US"])
+    #expect(reloaded.transmissionGapSeconds == 6)
+  }
+
   @Test func userDefaultsEngineChoiceRoundTrip() throws {
     let suiteName = "dspeech.tests.recognition.\(UUID().uuidString)"
     let defaults = UserDefaults(suiteName: suiteName)!
@@ -292,6 +318,7 @@ private final class InMemoryRecognitionSettingsStorage: RecognitionSettingsStora
 {
   var stored: String?
   var engineChoice: TranscriptionEngineChoice?
+  var transmissionGapSeconds: TimeInterval?
   var failSaves = false
   func loadLocaleIdentifier() -> String? { stored }
   func saveLocaleIdentifier(_ identifier: String) throws {
@@ -302,6 +329,11 @@ private final class InMemoryRecognitionSettingsStorage: RecognitionSettingsStora
   func saveEngineChoice(_ choice: TranscriptionEngineChoice) throws {
     if failSaves { throw RecognitionSettingsTests.TestError.saveFailed }
     engineChoice = choice
+  }
+  func loadTransmissionGapSeconds() -> TimeInterval { transmissionGapSeconds ?? 3.5 }
+  func saveTransmissionGapSeconds(_ seconds: TimeInterval) throws {
+    if failSaves { throw RecognitionSettingsTests.TestError.saveFailed }
+    transmissionGapSeconds = seconds
   }
 }
 
