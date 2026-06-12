@@ -68,13 +68,14 @@ struct ContentView: View {
     #else
       let debugScriptedEngine: (any LiveTranscriptionEngine)? = nil
     #endif
+    let whisperKitInstaller = WhisperKitModelInstaller()
     let resolvedEngine =
       engine
       ?? debugScriptedEngine
-      ?? AppleSpeechLiveTranscriptionEngine(
-        localeProvider: { recognitionSettings.activeLocaleIdentifier },
-        bufferGate: VoiceFilterSpeechAudioBufferGate(pipeline: filter),
-        contextualCallSignProvider: { filter.callSign?.raw }
+      ?? Self.makeLiveTranscriptionEngine(
+        recognition: recognitionSettings,
+        voiceFilter: filter,
+        whisperKitInstaller: whisperKitInstaller
       )
     let translationSettings = TranslationSettings()
     let live = LiveTranscriptionViewModel(
@@ -109,6 +110,49 @@ struct ContentView: View {
   }
 
   private var liveViewModel: LiveTranscriptionViewModel { coordinator.live }
+
+  private static func makeLiveTranscriptionEngine(
+    recognition: RecognitionSettings,
+    voiceFilter: VoiceFilterPipeline,
+    whisperKitInstaller: WhisperKitModelInstaller
+  ) -> any LiveTranscriptionEngine {
+    switch recognition.engineChoice {
+    case .apple:
+      return makeAppleSpeechLiveTranscriptionEngine(
+        recognition: recognition,
+        voiceFilter: voiceFilter
+      )
+    case .whisperKit:
+      guard whisperKitInstaller.state.isInstalled,
+        whisperKitInstaller.installedModelFolderURL != nil
+      else {
+        DspeechLog.engine.error(
+          "whisperkit engine selected but local model is not installed; falling back to apple speech"
+        )
+        return makeAppleSpeechLiveTranscriptionEngine(
+          recognition: recognition,
+          voiceFilter: voiceFilter
+        )
+      }
+      DspeechLog.engine.info("whisperkit engine selected with installed local model")
+      return WhisperKitLiveTranscriptionEngine(
+        transcriber: WhisperKitTranscriberAdapter(),
+        installedModelFolderURL: { whisperKitInstaller.installedModelFolderURL },
+        localeProvider: { recognition.localeIdentifier ?? recognition.activeLocaleIdentifier }
+      )
+    }
+  }
+
+  private static func makeAppleSpeechLiveTranscriptionEngine(
+    recognition: RecognitionSettings,
+    voiceFilter: VoiceFilterPipeline
+  ) -> AppleSpeechLiveTranscriptionEngine {
+    AppleSpeechLiveTranscriptionEngine(
+      localeProvider: { recognition.activeLocaleIdentifier },
+      bufferGate: VoiceFilterSpeechAudioBufferGate(pipeline: voiceFilter),
+      contextualCallSignProvider: { voiceFilter.callSign?.raw }
+    )
+  }
 
   private var suppressedSegmentsForReview: [TranscriptSegment] {
     liveViewModel.segments.filter { liveViewModel.suppressedSegmentIDs.contains($0.id) }
