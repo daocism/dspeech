@@ -1,0 +1,35 @@
+{
+  "configurations" : [
+    {
+      "id" : "D2F1DFB2-A5D6-4007-9114-1798705C951A",
+      "name" : "Full",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:Dspeech.xcodeproj",
+      "identifier" : "A00000000000000000000012",
+      "name" : "Dspeech"
+    }
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:Dspeech.xcodeproj",
+        "identifier" : "A00000000000000000000013",
+        "name" : "DspeechTests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:Dspeech.xcodeproj",
+        "identifier" : "A00000000000000000000014",
+        "name" : "DspeechUITests"
+      }
+    }
+  ],
+  "version" : 1
+}
