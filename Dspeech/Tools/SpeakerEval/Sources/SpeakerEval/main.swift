@@ -53,6 +53,16 @@ let manager = DiarizerManager()
 manager.initialize(models: models)
 print("Models ready.\n" + String(repeating: "─", count: 64))
 
+// Calibration mode: `swift run SpeakerEval calibrate <corpus-dir> <voice-corpus.json>`
+if argumentPaths.first == "calibrate", argumentPaths.count >= 3 {
+  try runCalibration(
+    corpusDirectory: URL(fileURLWithPath: argumentPaths[1], isDirectory: true),
+    manifestPath: URL(fileURLWithPath: argumentPaths[2]),
+    manager: manager
+  )
+  exit(0)
+}
+
 var wholeClipEmbeddings: [(String, [Float])] = []
 var firstSegmentEmbedding: (clip: String, speaker: String, vector: [Float])?
 
