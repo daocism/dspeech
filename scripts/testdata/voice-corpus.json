@@ -1,5 +1,5 @@
 {
-  "comment": "Controlled real-audio core-test corpus. Single source of truth for the audio generator (generate-voice-corpus.sh: say -> 16kHz mono WAV, ffmpeg radio degradation + speaker overlap) and the real-ASR eval (run-asr-eval.py: runs the REAL WhisperKit/Apple engine, scores WER on actual output). Controller (Daniel) vs own-aircraft pilot (Samantha) vs other aircraft (Karen/Daniel). Own call-sign N123AB / 'Three Alpha Bravo' — its pilot readbacks must be FILTERED; controller + other-aircraft + urgency must be DISPLAYED. `text` is the exact spoken reference for WER. Each clip is also rendered as a `-radio` variant (VHF AM band-pass + noise) to test wild-condition robustness; `overlaps` mix two speakers to test separation under step-on.",
+  "comment": "Controlled real-audio core-test corpus. Single source of truth for the audio generator (generate-voice-corpus.sh: say -> 16kHz mono WAV, ffmpeg radio degradation + speaker overlap) and the real-ASR eval (run-asr-eval.py: runs the REAL WhisperKit/Apple engine, scores WER on actual output). Controller (Daniel) vs own-aircraft pilot (Samantha) vs other aircraft (Karen/Daniel). Own call-sign N123AB / 'Three Alpha Bravo'. Per ADR 0007 (phase-1 callsign-relevance): controller traffic addressed to our call-sign + urgency must be DISPLAYED; traffic addressed to OTHER aircraft (Speedbird/Lufthansa) must be SUPPRESSED; own pilot read-backs are filtered (phase-1 by the over-fusion of adjacent number groups, phase-2 by the voice model). `text` is the exact spoken reference for WER. Each clip is also rendered as a `-radio` variant (VHF AM band-pass + noise) to test wild-condition robustness; `overlaps` mix two speakers to test separation under step-on.",
   "locale": "en",
   "callsign": "N123AB",
   "ownCallsignSpoken": "Three Alpha Bravo",
@@ -56,14 +56,14 @@
       "role": "other-aircraft",
       "voice": "Karen",
       "text": "Speedbird Four Two, climb flight level three one zero",
-      "expectDisplayed": true
+      "expectDisplayed": false
     },
     {
       "id": "other-lufthansa-contact",
       "role": "other-aircraft",
       "voice": "Karen",
       "text": "Lufthansa Four Five Six, contact Munich Radar one two seven decimal eight",
-      "expectDisplayed": true
+      "expectDisplayed": false
     },
     {
       "id": "pilot-readback-clearance",
@@ -109,7 +109,7 @@
       "secondary": "pilot-readback-squawk",
       "offsetSeconds": 1.0,
       "text": "Speedbird Four Two, climb flight level three one zero",
-      "expectDisplayed": true
+      "expectDisplayed": false
     }
   ]
 }
