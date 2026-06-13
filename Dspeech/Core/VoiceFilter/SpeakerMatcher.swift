@@ -6,11 +6,21 @@ struct SpeakerMatchConfig: Equatable, Sendable, Codable {
   var separationMargin: Float
   var mixedSpeakerLowerBound: Float
 
+  // why: calibrated against the REAL FluidAudio WeSpeaker model over the controlled labeled
+  // corpus (2026-06-13, `swift run SpeakerEval calibrate tmp/voice-corpus
+  // scripts/testdata/voice-corpus.json`). Measured raw cosine (1 - FluidAudio cosineDistance):
+  //   SAME-voice  0.820 … 0.969 (mean 0.901)
+  //   CROSS-voice 0.095 … 0.599 (mean 0.233)
+  // A clean, wide gap (0.60 → 0.82). pilotMatchThreshold 0.72 sits safely ABOVE every observed
+  // cross-speaker score (never call another speaker the pilot) and BELOW every same-speaker
+  // score (always catch the pilot). separationMargin uses the available headroom. minQuality
+  // 0.25 correctly rejects noisy received-ATC embeddings (measured quality 0.137–0.204) so they
+  // fail open (shown) rather than mis-classify; the operator's own clean read-back clears it.
   static let `default` = SpeakerMatchConfig(
     minQuality: 0.25,
     pilotMatchThreshold: 0.72,
-    separationMargin: 0.05,
-    mixedSpeakerLowerBound: 0.62
+    separationMargin: 0.10,
+    mixedSpeakerLowerBound: 0.50
   )
 }
 
