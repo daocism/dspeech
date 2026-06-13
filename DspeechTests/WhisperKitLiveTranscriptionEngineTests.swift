@@ -90,6 +90,49 @@ struct WhisperKitLiveTranscriptionEngineTests {
     engine.stop()
   }
 
+  // why: THE 2026-06-13 device failure reproduced on the REAL live path — one mic press, several
+  // spoken transmissions separated by realistic (non-zero) gaps, must finalize as SEVERAL segments,
+  // not one rolling "dictaphone" line. The gaps carry a real device noise floor (RMS 0.03), the
+  // exact condition the old fixed-threshold segmenter mis-read as continuous speech. With the old
+  // absolute floor this stream produced no in-stream cuts at all; the adaptive segmenter closes
+  // each utterance at its trailing gap. Existing append tests used value:0 perfect silence and were
+  // blind to this — that is why it shipped.
+  @Test func continuousMultiUtteranceStreamWithRealisticGapsSegmentsEachTransmission() async {
+    let transcriber = FakeWhisperLiveTranscriber { samples, _ in
+      guard samples.contains(where: { $0 > 0.1 }) else { return [] }
+      return [
+        WhisperLiveSegment(
+          text: "transmission",
+          startSeconds: 0,
+          endSeconds: Double(samples.count) / 16_000,
+          avgLogProb: log(0.8)
+        )
+      ]
+    }
+    let engine = WhisperKitLiveTranscriptionEngine(
+      transcriber: transcriber,
+      installedModelFolderURL: { URL(fileURLWithPath: "/tmp/local-whisper", isDirectory: true) },
+      localeProvider: { "en-US" },
+      authorizer: SpyWhisperAuthorizer(microphoneAllowed: true)
+    )
+    let recorder = WhisperEventRecorder()
+    let collector = collect(engine.events(), into: recorder)
+    engine.primeListeningForTesting(acquireCapture: false)
+
+    // 3 transmissions (1.0s speech each) separated by 1.25s gaps at a realistic mic noise floor.
+    // Paced like a real flight (each transmission finalizes during the gap before the next
+    // arrives), which is exactly when the decode completes and the window closes.
+    for utterance in 1...3 {
+      engine.appendSamplesForTesting(Self.samples(count: 16_000, value: 0.3), sampleRate: 16_000)
+      engine.appendSamplesForTesting(Self.samples(count: 20_000, value: 0.03), sampleRate: 16_000)
+      #expect(
+        await waitForEvent({ await recorder.segments().count == utterance }),
+        "transmission \(utterance) must finalize as its own segment before the next arrives")
+    }
+    collector.cancel()
+    engine.stop()
+  }
+
   @Test func scriptedSamplesEmitGrowingPartialsThenFinalizeAndAdvanceWindow() async {
     let transcriber = FakeWhisperLiveTranscriber { samples, _ in
       let text =
