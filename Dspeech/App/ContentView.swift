@@ -722,8 +722,10 @@ struct ContentView: View {
           // why: floating controls (Start/mic, jump-to-live) overlay the scroll area;
           // a bottom content margin keeps transcript text from ever sliding UNDER them —
           // the audit's "potentially inaccessible text" class — at every scroll offset,
-          // not just after the last card.
-          .contentMargins(.bottom, 104, for: .scrollContent)
+          // not just after the last card. In the first-run hint state the cluster is taller
+          // (the "Tap to start" coachmark sits beside/above the mic), so reserve extra room
+          // or the last demo card renders under the bubble (2026-06-13 visual review).
+          .contentMargins(.bottom, showHints ? 168 : 104, for: .scrollContent)
           .scrollIndicators(.hidden)
           .coordinateSpace(name: "transcript-scroll")
           .background {
