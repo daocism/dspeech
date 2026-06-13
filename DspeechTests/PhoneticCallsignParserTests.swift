@@ -38,6 +38,42 @@ struct PhoneticCallsignParserTests {
     #expect(callsign?.normalized == "RA89077")
   }
 
+  @Test func parsesFrenchFullPhoneticCallsignWhenLocaleIsFrench() {
+    #expect(
+      PhoneticCallsignParser.parse(
+        "foxtrot golf oscar alpha bravo",
+        localeIdentifier: "fr-FR"
+      ) == "FGOAB")
+  }
+
+  @Test func parsesFrenchLettersAndDigitWordsWhenLocaleIsFrench() {
+    #expect(
+      PhoneticCallsignParser.parse(
+        "foxtrot golf oscar sept huit",
+        localeIdentifier: "fr"
+      ) == "FGO78")
+  }
+
+  @Test func foldsFrenchDigitDiacriticsWhenLocaleIsFrench() {
+    #expect(PhoneticCallsignParser.parse("zéro zero", localeIdentifier: "fr-FR") == "00")
+  }
+
+  @Test func parsesFrenchUniteVariantWhenLocaleIsFrench() {
+    #expect(PhoneticCallsignParser.parse("unité", localeIdentifier: "fr-FR") == "1")
+  }
+
+  @Test func ignoresFrenchDecimalSeparatorsWhenLocaleIsFrench() {
+    #expect(
+      PhoneticCallsignParser.parse(
+        "foxtrot décimale golf virgule oscar",
+        localeIdentifier: "fr-FR"
+      ) == "FGO")
+  }
+
+  @Test func frenchOnlyDigitWordsDoNotChangeDefaultLocalePath() {
+    #expect(PhoneticCallsignParser.parse("foxtrot sept huit") == "FSEPTHUIT")
+  }
+
   @Test func caseInsensitiveTokens() {
     #expect(PhoneticCallsignParser.parse("NOVEMBER One Two Three") == "N123")
   }
@@ -100,6 +136,24 @@ struct PhoneticCallsignParserTests {
     }
 
     print("PBT_CASE_COUNT phonetic-parser-roundtrip=600")
+    #expect(generatedCaseCount == 600)
+  }
+
+  @Test("should parse 600 generated French spoken registrations to compact equality")
+  func shouldParseGeneratedFrenchSpokenRegistrationsToCompactEquality() {
+    let generatedCaseCount = 600
+    var random = DeterministicParserRandom(seed: 0xD5_06_12_04)
+
+    for _ in 0..<generatedCaseCount {
+      let registration = Self.registration(random: &random)
+      let spoken = registration.map { Self.frenchSpokenToken(for: $0, random: &random) }
+        .joined(separator: " ")
+      #expect(
+        PhoneticCallsignParser.parse(spoken, localeIdentifier: "fr-FR")
+          == CallSign.normalize(registration))
+    }
+
+    print("PBT_CASE_COUNT phonetic-parser-fr-roundtrip=600")
     #expect(generatedCaseCount == 600)
   }
 
@@ -202,6 +256,53 @@ struct PhoneticCallsignParserTests {
     case "7": variants = ["Seven"]
     case "8": variants = ["Eight", "Ate"]
     case "9": variants = ["Nine", "Niner"]
+    default: variants = [String(character)]
+    }
+    return variants[random.int(in: 0...(variants.count - 1))]
+  }
+
+  private static func frenchSpokenToken(
+    for character: Character,
+    random: inout DeterministicParserRandom
+  ) -> String {
+    let variants: [String]
+    switch character {
+    case "A": variants = ["Alpha", "Alfa"]
+    case "B": variants = ["Bravo"]
+    case "C": variants = ["Charlie"]
+    case "D": variants = ["Delta"]
+    case "E": variants = ["Echo"]
+    case "F": variants = ["Foxtrot", "Fox"]
+    case "G": variants = ["Golf"]
+    case "H": variants = ["Hotel"]
+    case "I": variants = ["India"]
+    case "J": variants = ["Juliett", "Juliet"]
+    case "K": variants = ["Kilo"]
+    case "L": variants = ["Lima"]
+    case "M": variants = ["Mike"]
+    case "N": variants = ["November"]
+    case "O": variants = ["Oscar"]
+    case "P": variants = ["Papa"]
+    case "Q": variants = ["Quebec"]
+    case "R": variants = ["Romeo"]
+    case "S": variants = ["Sierra"]
+    case "T": variants = ["Tango"]
+    case "U": variants = ["Uniform"]
+    case "V": variants = ["Victor"]
+    case "W": variants = ["Whiskey", "Whisky"]
+    case "X": variants = ["Xray", "X-ray", "Ex-ray", "X ray"]
+    case "Y": variants = ["Yankee"]
+    case "Z": variants = ["Zulu"]
+    case "0": variants = ["Zéro", "Zero"]
+    case "1": variants = ["Un", "Unité"]
+    case "2": variants = ["Deux"]
+    case "3": variants = ["Trois"]
+    case "4": variants = ["Quatre"]
+    case "5": variants = ["Cinq"]
+    case "6": variants = ["Six"]
+    case "7": variants = ["Sept"]
+    case "8": variants = ["Huit"]
+    case "9": variants = ["Neuf"]
     default: variants = [String(character)]
     }
     return variants[random.int(in: 0...(variants.count - 1))]

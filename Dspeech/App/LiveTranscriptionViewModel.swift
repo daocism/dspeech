@@ -1,12 +1,37 @@
 import Foundation
 import Observation
 
+protocol NoAnchorHintStateStorage: Sendable {
+  func loadHasShownNoAnchorHint() -> Bool
+  func saveHasShownNoAnchorHint(_ hasShown: Bool)
+}
+
+struct UserDefaultsNoAnchorHintStateStorage: NoAnchorHintStateStorage, @unchecked Sendable {
+  static let hasShownKey = "dspeech.transmission.no-anchor-hint-shown.v1"
+
+  let defaults: UserDefaults
+
+  init(defaults: UserDefaults = .standard) {
+    self.defaults = defaults
+  }
+
+  func loadHasShownNoAnchorHint() -> Bool {
+    defaults.bool(forKey: Self.hasShownKey)
+  }
+
+  func saveHasShownNoAnchorHint(_ hasShown: Bool) {
+    defaults.set(hasShown, forKey: Self.hasShownKey)
+  }
+}
+
 @MainActor
 @Observable
 final class LiveTranscriptionViewModel {
   private static let visibleSegmentLimit = 500
 
   private(set) var segments: [TranscriptSegment] = []
+  private(set) var displayedTransmissions: [Transmission] = []
+  private(set) var filteredTransmissions: [Transmission] = []
   private(set) var partialText: String = ""
   private(set) var status: LiveTranscriptionStatus = .idle
   private(set) var filterIndicators: [UUID: ATCVoiceIndicator] = [:]
@@ -18,15 +43,22 @@ final class LiveTranscriptionViewModel {
   // started a real session it must never reappear over (or instead of) real content — the
   // "press Stop and the transcript turns back into demo" confusion.
   private(set) var hasEverStarted = false
+  var oneTimeNoAnchorHintVisible = false
 
   private let engine: any LiveTranscriptionEngine
   private let transcriptStore: (any TranscriptStoring)?
   private let recognitionLocaleIdentifier: @MainActor () -> String?
+  private let recognitionTransmissionGapSeconds: @MainActor () -> TimeInterval
   private let firstSessionStorage: any FirstSessionStateStorage
+  private let noAnchorHintStorage: any NoAnchorHintStateStorage
   private let voiceFilter: VoiceFilterPipeline?
   private let translator: (any TranslationService)?
   private let translationTarget: @MainActor () -> Locale.Language?
+  private let now: @MainActor () -> Date
+  private let transmissionTickNanoseconds: UInt64
   private var eventTask: Task<Void, Never>?
+  private var transmissionTickTask: Task<Void, Never>?
+  private var transmissionAssembler: TransmissionAssembler?
   private var translationTasks: [UUID: Task<Void, Never>] = [:]
   private var translationTaskTokens: [UUID: UUID] = [:]
   private var translationPreparationToken = UUID()
@@ -38,24 +70,34 @@ final class LiveTranscriptionViewModel {
   // language, defaulting to the device language (matches the device-language default policy).
   private var lastSourceLanguageCode = String(
     Locale.current.language.languageCode?.identifier ?? "en")
+  private var hasShownNoAnchorHint: Bool
 
   init(
     engine: any LiveTranscriptionEngine,
     transcriptStore: (any TranscriptStoring)? = nil,
     recognitionLocaleIdentifier: @escaping @MainActor () -> String? = { nil },
+    recognitionTransmissionGapSeconds: @escaping @MainActor () -> TimeInterval = { 3.5 },
     firstSessionStorage: any FirstSessionStateStorage = UserDefaultsFirstSessionStateStorage(),
+    noAnchorHintStorage: any NoAnchorHintStateStorage = UserDefaultsNoAnchorHintStateStorage(),
     voiceFilter: VoiceFilterPipeline? = nil,
     translator: (any TranslationService)? = nil,
-    translationTarget: @escaping @MainActor () -> Locale.Language? = { nil }
+    translationTarget: @escaping @MainActor () -> Locale.Language? = { nil },
+    now: @escaping @MainActor () -> Date = { Date() },
+    transmissionTickNanoseconds: UInt64 = 500_000_000
   ) {
     self.engine = engine
     self.transcriptStore = transcriptStore
     self.recognitionLocaleIdentifier = recognitionLocaleIdentifier
+    self.recognitionTransmissionGapSeconds = recognitionTransmissionGapSeconds
     self.firstSessionStorage = firstSessionStorage
+    self.noAnchorHintStorage = noAnchorHintStorage
     self.voiceFilter = voiceFilter
     self.translator = translator
     self.translationTarget = translationTarget
+    self.now = now
+    self.transmissionTickNanoseconds = transmissionTickNanoseconds
     self.hasEverStarted = firstSessionStorage.loadHasEverStarted()
+    self.hasShownNoAnchorHint = noAnchorHintStorage.loadHasShownNoAnchorHint()
   }
 
   var visibleSegments: [TranscriptSegment] {
@@ -121,8 +163,8 @@ final class LiveTranscriptionViewModel {
     let text = partialText.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !text.isEmpty else { return }
     partialText = ""
-    append(
-      segment: TranscriptSegment(
+    handleFinalSegment(
+      TranscriptSegment(
         text: text,
         confidence: 0,
         sourceLanguageCode: lastSourceLanguageCode,
@@ -131,10 +173,15 @@ final class LiveTranscriptionViewModel {
   }
 
   func reset() {
+    stopTransmissionTickLoop()
     endPersistenceSessionIfNeeded()
     mostRecentTranscriptSessionID = nil
     segments.removeAll()
+    displayedTransmissions.removeAll()
+    filteredTransmissions.removeAll()
+    transmissionAssembler = nil
     partialText = ""
+    oneTimeNoAnchorHintVisible = false
     filterIndicators.removeAll()
     suppressedSegmentIDs.removeAll()
     clearTranslations()
@@ -142,6 +189,10 @@ final class LiveTranscriptionViewModel {
 
   func dismissPersistenceFailure() {
     persistenceFailure = nil
+  }
+
+  func dismissNoAnchorHint() {
+    oneTimeNoAnchorHintVisible = false
   }
 
   func recordPersistenceUnavailable() {
@@ -152,8 +203,16 @@ final class LiveTranscriptionViewModel {
     suppressedSegmentIDs.remove(id)
   }
 
+  func showFilteredTransmission(id: UUID) {
+    guard let index = filteredTransmissions.firstIndex(where: { $0.id == id }) else { return }
+    let transmission = filteredTransmissions.remove(at: index)
+    displayedTransmissions.append(transmission)
+  }
+
   func unhideAllSuppressedSegments() {
     suppressedSegmentIDs.removeAll()
+    displayedTransmissions.append(contentsOf: filteredTransmissions)
+    filteredTransmissions.removeAll()
   }
 
   func clearTranslations() {
@@ -251,6 +310,91 @@ final class LiveTranscriptionViewModel {
     applyVoiceFilter(to: segment)
   }
 
+  private func handleFinalSegment(_ segment: TranscriptSegment) {
+    append(segment: segment)
+    guard segment.source == .liveATC,
+      status == .listening || activeTranscriptSessionID != nil
+    else {
+      return
+    }
+    processTransmissionInput(.fragment(segment: segment, speaker: nil, at: now()))
+  }
+
+  private func processTransmissionInput(_ input: TransmissionAssemblerInput) {
+    if transmissionAssembler == nil {
+      transmissionAssembler = makeTransmissionAssembler()
+    }
+    guard var assembler = transmissionAssembler else { return }
+    let updates = assembler.process(input)
+    transmissionAssembler = assembler
+    applyTransmissionUpdates(updates)
+  }
+
+  private func finishTransmissionAssembly(at date: Date) {
+    guard var assembler = transmissionAssembler else { return }
+    let updates = assembler.finish(at: date)
+    transmissionAssembler = assembler
+    applyTransmissionUpdates(updates)
+  }
+
+  private func makeTransmissionAssembler() -> TransmissionAssembler {
+    let localeIdentifier = recognitionLocaleIdentifier() ?? Locale.current.identifier
+    var classifier = TransmissionClassifier(
+      configuredCallSign: voiceFilter?.callSign,
+      localeIdentifier: localeIdentifier,
+      voicePackActive: voicePackActive
+    )
+    return TransmissionAssembler(
+      config: TransmissionAssemblerConfig(
+        transmissionGapSeconds: recognitionTransmissionGapSeconds()),
+      localeIdentifier: localeIdentifier,
+      classify: { text, speakers, endedAt in
+        classifier.classify(text: text, speakers: speakers, endedAt: endedAt)
+      }
+    )
+  }
+
+  private var voicePackActive: Bool {
+    guard let voiceFilter, voiceFilter.enabled, !voiceFilter.profiles.isEmpty else { return false }
+    if case .ready = voiceFilter.capability { return true }
+    return false
+  }
+
+  private func applyTransmissionUpdates(_ updates: [TransmissionUpdate]) {
+    for update in updates {
+      let transmission = update.transmission
+      upsertTransmission(transmission)
+      persist(transmissionUpdate: update)
+      maybeShowNoAnchorHint(for: transmission)
+    }
+  }
+
+  private func upsertTransmission(_ transmission: Transmission) {
+    displayedTransmissions.removeAll { $0.id == transmission.id }
+    filteredTransmissions.removeAll { $0.id == transmission.id }
+    guard !transmission.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+      return
+    }
+    switch transmission.classification {
+    case .displayed:
+      displayedTransmissions.append(transmission)
+    case .filtered:
+      filteredTransmissions.append(transmission)
+    }
+  }
+
+  private func maybeShowNoAnchorHint(for transmission: Transmission) {
+    guard case .displayed(.noAnchorConfigured) = transmission.classification,
+      voiceFilter?.callSign == nil,
+      !hasShownNoAnchorHint
+    else {
+      return
+    }
+    hasShownNoAnchorHint = true
+    noAnchorHintStorage.saveHasShownNoAnchorHint(true)
+    oneTimeNoAnchorHintVisible = true
+  }
+
   private var displayableSegments: [TranscriptSegment] {
     guard !suppressedSegmentIDs.isEmpty else { return segments }
     return segments.filter { !suppressedSegmentIDs.contains($0.id) }
@@ -289,25 +433,58 @@ final class LiveTranscriptionViewModel {
         switch event {
         case .partial(let text):
           self.partialText = text
+          self.processTransmissionInput(.partial(text: text, at: self.now()))
         case .segment(let segment):
-          self.append(segment: segment)
+          self.handleFinalSegment(segment)
+          self.partialText = ""
+        case .taskRestart:
+          // why: the engine has already committed the live partial as an interim
+          // segment; clearing here prevents the stale partial from lingering until
+          // the next task's first partial arrives.
+          self.processTransmissionInput(.taskRestart(at: self.now()))
           self.partialText = ""
         case .status(let newStatus):
           let oldStatus = self.status
           self.status = newStatus
           if oldStatus != .listening, newStatus == .listening {
+            self.transmissionAssembler = self.makeTransmissionAssembler()
             self.beginPersistenceSessionIfNeeded()
+            self.startTransmissionTickLoop()
           }
           if newStatus == .stopped {
+            self.finishTransmissionAssembly(at: self.now())
+            self.stopTransmissionTickLoop()
             self.partialText = ""
             self.endPersistenceSessionIfNeeded()
           }
           if case .failed = newStatus {
+            self.finishTransmissionAssembly(at: self.now())
+            self.stopTransmissionTickLoop()
             self.endPersistenceSessionIfNeeded()
           }
         }
       }
     }
+  }
+
+  private func startTransmissionTickLoop() {
+    transmissionTickTask?.cancel()
+    transmissionTickTask = Task { @MainActor [weak self] in
+      while !Task.isCancelled {
+        guard let self else { return }
+        try? await Task.sleep(nanoseconds: self.transmissionTickNanoseconds)
+        guard !Task.isCancelled else { return }
+        guard var assembler = self.transmissionAssembler else { continue }
+        let updates = assembler.tick(now: self.now())
+        self.transmissionAssembler = assembler
+        self.applyTransmissionUpdates(updates)
+      }
+    }
+  }
+
+  private func stopTransmissionTickLoop() {
+    transmissionTickTask?.cancel()
+    transmissionTickTask = nil
   }
 
   private func beginPersistenceSessionIfNeeded() {
@@ -336,6 +513,29 @@ final class LiveTranscriptionViewModel {
     guard let sessionID = activeTranscriptSessionID ?? fallbackSessionID else { return }
     do {
       try transcriptStore.append(segment, to: sessionID)
+    } catch {
+      recordPersistenceFailure()
+    }
+  }
+
+  private func persist(transmissionUpdate update: TransmissionUpdate) {
+    let transmission = update.transmission
+    guard !transmission.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+      let transcriptStore
+    else {
+      return
+    }
+    if activeTranscriptSessionID == nil, status == .listening {
+      beginPersistenceSessionIfNeeded()
+    }
+    guard let sessionID = activeTranscriptSessionID else { return }
+    do {
+      switch update {
+      case .opened, .updated:
+        try transcriptStore.updateOpen(transmission, in: sessionID)
+      case .closed:
+        try transcriptStore.append(transmission, to: sessionID)
+      }
     } catch {
       recordPersistenceFailure()
     }
@@ -371,6 +571,17 @@ final class LiveTranscriptionViewModel {
         source: .demo
       )
       segments = [segment]
+      filteredTransmissions = [
+        Transmission(
+          id: segment.id,
+          startedAt: segment.startedAt,
+          endedAt: segment.startedAt,
+          text: segment.text,
+          segments: [segment],
+          classification: .filtered(.addressedToOther),
+          localeIdentifier: "en-US"
+        )
+      ]
       filterIndicators = [segment.id: .otherTrafficSuppressed]
       suppressedSegmentIDs = [segment.id]
       // why: in-memory only — persisting the flag from a UI-test seed would leak

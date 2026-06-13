@@ -9,6 +9,16 @@ Canonical registry: `/home/user/projects/MyInfra/config/project-workspaces/proje
 
 ## Current phase
 
+2026-06-12: **Core-semantics rebuild** — see docs/PLAN-2026-06-12.md +
+docs/SPEC-2026-06-12-core-semantics-rebuild.md (owner-approved). PR #3 merged but was
+false-ready (D-1 text loss at restarts, D-2 inverted filter semantics). Definition of
+done is now the real-audio harness over DspeechTests/Fixtures/ATC/*.wav. Tooling for the
+session: XcodeBuildMCP + sosumi (.mcp.json), serena (settings.local.json).
+
+## Previous phase (2026-06-11, superseded)
+
+
+
 2026-06-11: **Production-readiness remediation** on `fix/production-readiness-2026-06-11`.
 64-agent ultra-review (163+7 findings) → `docs/SPEC-2026-06-11-production-readiness.md`
 (14 WPs, decisions D1-D5, ADR 0009/0010). Waves 1-3 LANDED and green (659 unit + 27 UI,

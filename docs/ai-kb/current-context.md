@@ -2,6 +2,34 @@
 
 > Rolling 1-page pointer. Updated by `knowledge-curator` after every substantive run.
 
+## READ FIRST (2026-06-12)
+
+PR #3 "production-ready" was FALSE-READY: first human use broke the core flow (text
+replaced at silence boundaries; filter semantics inverted vs owner intent). Incident +
+self-retro: global memory `feedback_primary_scenario_proof`. The binding work now:
+`docs/PLAN-2026-06-12.md` → `docs/SPEC-2026-06-12-core-semantics-rebuild.md`
+(dispatcher-only durable transmission blocks, real-audio harness on the French ATC
+fixtures, WhisperKit phase). Do not trust the previous "ready" claims below.
+
+**Phase A LANDED** (`feat/core-semantics-rebuild` @ `47bc870`, suites green, harness
+gate passed, run-note `docs/run-notes/2026-06-12-core-semantics-rebuild-phase-a.md`):
+D-1 fixed (interim commit at every task boundary + .taskRestart marker), pure
+TransmissionAssembler (gap-glued whole transmissions, overlap-merge), D-2 semantics via
+TransmissionClassifier (urgency/callsign/voice/honest-fallback), French phonetics
+layer, real-ASR harness `dspeech-replay transcribe` + `scripts/
+verify-primary-scenario.sh` (macOS on-device fr-FR; both fixtures = single coherent
+DISPLAYED blocks; callsign anchor + filter verified on real audio). Replay-tail: ON
+(empirical §2.2, loss > duplication). **Phase B + Stage 3 LANDED** (@ `7aeecbd`, run-note
+`docs/run-notes/2026-06-12-core-semantics-rebuild-phase-b-stage3.md`): WhisperKit
+harness engine + ADR 0011 (apple default), LiveAudioCaptureConduit extraction,
+pinned-revision model installer + Settings engine picker, WhisperKit live engine
+(adapter-confined import, local-only load), transmission cards/persistence/filtered
+reasons/no-anchor hint in the app, 3 visual defects eye-caught & fixed (hint overlap,
+bubble clip, AX-XXXL header overflow). REMAINING: l10n fill for new strings (en-only),
+§4.4 BlackHole sim E2E (owner sudo), device latency check for WhisperKit live, owner
+hand-test = final gate. mac24 env: fr dictation asset installed; CLI Speech needs
+run-loop pumping; whisper model cache ~/.cache/dspeech-whisperkit.
+
 ## What we are building right now
 
 Native iOS 26+ SwiftUI app: receive-only cockpit/ATC live transcription, on-device only,

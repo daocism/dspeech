@@ -8,16 +8,19 @@ struct HintBubble: View {
 
   let text: String
   var pointer: Pointer = .trailing
+  @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
   // why: a hint must NEVER be laid out inline with contested chrome — squeezed, it
   // degrades into letter-soup or "На…" truncation (the 2026-06-11 visual-review defect).
   // It always renders at its own intrinsic size; callers place it as a floating overlay.
+  // At accessibility sizes the 2-line cap itself truncates — lift it and let the
+  // bubble grow vertically instead.
   private var bubbleText: some View {
     Text(text)
       .font(.subheadline.weight(.semibold))
       .foregroundStyle(.black)
       .multilineTextAlignment(.trailing)
-      .lineLimit(2)
+      .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
       .fixedSize(horizontal: false, vertical: true)
       .frame(maxWidth: 230, alignment: .trailing)
       .padding(.horizontal, 14)
@@ -66,37 +69,39 @@ struct InputLevelBar: View {
   }
 }
 
-struct SuppressedSegmentsReviewSheet: View {
-  let segments: [TranscriptSegment]
-  let indicator: (TranscriptSegment) -> ATCVoiceIndicator?
-  let showSegment: (TranscriptSegment) -> Void
+struct FilteredTransmissionsReviewSheet: View {
+  let transmissions: [Transmission]
+  let showTransmission: (Transmission) -> Void
   @Environment(\.dismiss) private var dismiss
 
   var body: some View {
     NavigationStack {
       List {
-        if segments.isEmpty {
+        if transmissions.isEmpty {
           ContentUnavailableView(
-            String(localized: "No filtered speech"),
+            String(localized: "No filtered transmissions"),
             systemImage: "line.3.horizontal.decrease.circle",
-            description: Text(String(localized: "All transcript segments are visible."))
+            description: Text(String(localized: "All filtered transmissions are already visible."))
           )
         } else {
-          ForEach(segments) { segment in
+          ForEach(transmissions) { transmission in
             HStack(alignment: .firstTextBaseline, spacing: 12) {
               VStack(alignment: .leading, spacing: 6) {
-                Text(reasonLabel(for: indicator(segment)))
+                Text(transmissionReasonLabel(for: transmission.classification))
                   .font(.caption.weight(.semibold))
+                  .lineLimit(1)
+                  .minimumScaleFactor(0.75)
                   .foregroundStyle(.yellow)
-                Text(segment.text)
+                  .accessibilityIdentifier("transmission-reason-badge")
+                Text(transmission.text)
                   .font(.body.monospaced())
-                Text(segment.startedAt.formatted(date: .omitted, time: .standard))
+                Text(transmission.startedAt.formatted(date: .omitted, time: .standard))
                   .font(.caption.monospacedDigit())
                   .foregroundStyle(.secondary)
               }
               Spacer(minLength: 0)
               Button(String(localized: "Show")) {
-                showSegment(segment)
+                showTransmission(transmission)
               }
               .buttonStyle(.bordered)
               .controlSize(.regular)
@@ -118,28 +123,45 @@ struct SuppressedSegmentsReviewSheet: View {
     .accessibilityIdentifier("filtered-review-sheet")
     .preferredColorScheme(.dark)
   }
+}
 
-  private func reasonLabel(for indicator: ATCVoiceIndicator?) -> String {
-    switch indicator {
-    case .pilotSuppressed:
-      return String(localized: "Pilot")
-    case .otherTrafficSuppressed:
-      return String(localized: "Other traffic")
-    case .noiseOrTooShortSuppressed:
-      return String(localized: "Noise")
-    case .dispatcherAddressedOwnCallSign:
-      return String(localized: "Own callsign")
-    case .dispatcherContinuation:
-      return String(localized: "Continuation")
-    case .probableDispatcher:
-      return String(localized: "Dispatcher")
-    case .mixedSpeakerCandidate:
-      return String(localized: "Mixed speaker")
-    case .filterOff:
-      return String(localized: "Filter off")
-    default:
-      return String(localized: "Filtered")
+struct NoAnchorTransmissionHint: View {
+  let text: String
+  let dismiss: () -> Void
+
+  var body: some View {
+    HStack(alignment: .top, spacing: 8) {
+      // why: no line limit — a capped hint truncated mid-word at default type size
+      // (2026-06-12 visual review); fixedSize(vertical) grows the bubble instead.
+      Text(text)
+        .font(.subheadline.weight(.semibold))
+        .foregroundStyle(.black)
+        .multilineTextAlignment(.leading)
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: 230, alignment: .leading)
+
+      Button {
+        dismiss()
+      } label: {
+        Image(systemName: "xmark")
+          .font(.caption.weight(.bold))
+          .foregroundStyle(.black.opacity(0.78))
+          .frame(width: 28, height: 28)
+      }
+      .buttonStyle(.plain)
+      .accessibilityIdentifier("no-anchor-hint-dismiss")
+      .accessibilityLabel(String(localized: "Dismiss"))
     }
+    .padding(.horizontal, 14)
+    .padding(.vertical, 10)
+    .background(.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    // why: vertical-only — both-axes fixedSize measured the wrapped text against an
+    // intrinsic single-line width and the background stayed 2 lines tall while the
+    // text drew 4 (2026-06-12 visual review).
+    .fixedSize(horizontal: false, vertical: true)
+    .shadow(color: .black.opacity(0.25), radius: 6, y: 2)
+    .transition(.opacity.combined(with: .scale(scale: 0.9)))
+    .accessibilityIdentifier("no-anchor-hint")
   }
 }
 
@@ -181,6 +203,102 @@ struct PartialTranscriptCard: View {
         .stroke(.cyan.opacity(0.35), lineWidth: 1)
     }
     .accessibilityIdentifier("partial-transcript")
+  }
+}
+
+struct TransmissionTranscriptCard: View {
+  let transmission: Transmission
+  let isLandscape: Bool
+  @State private var expanded = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      badgeRow
+      Text(transmission.text)
+        .font(.system(isLandscape ? .title2 : .title, design: .monospaced).weight(.semibold))
+        .foregroundStyle(.white)
+        .frame(maxWidth: .infinity, alignment: .leading)
+      if expanded { detailRow }
+    }
+    .padding(.horizontal, 14)
+    .padding(.vertical, 12)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(
+      Color(red: 0.07, green: 0.08, blue: 0.10),
+      in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+    )
+    .overlay {
+      RoundedRectangle(cornerRadius: 18, style: .continuous)
+        .stroke(.white.opacity(0.10), lineWidth: 1)
+    }
+    .contentShape(Rectangle())
+    .onTapGesture { withAnimation(.easeInOut(duration: 0.15)) { expanded.toggle() } }
+    .overlay(alignment: .topLeading) {
+      Color.clear
+        .frame(width: 1, height: 1)
+        .accessibilityElement()
+        .accessibilityIdentifier("transmission-card")
+        .accessibilityLabel(String(localized: "Transmission"))
+    }
+  }
+
+  private var badgeRow: some View {
+    HStack(spacing: 8) {
+      Text(localeChipText)
+        .font(.caption.monospaced().weight(.bold))
+        .lineLimit(1)
+        .minimumScaleFactor(0.75)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 3)
+        .background(.white.opacity(0.12), in: Capsule())
+
+      Text(transmissionReasonLabel(for: transmission.classification))
+        .font(.caption.monospaced().weight(.bold))
+        .lineLimit(1)
+        .minimumScaleFactor(0.75)
+        .foregroundStyle(reasonColor)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 3)
+        .background(reasonColor.opacity(0.14), in: Capsule())
+        .accessibilityIdentifier("transmission-reason-badge")
+
+      Spacer(minLength: 0)
+    }
+  }
+
+  private var detailRow: some View {
+    HStack(spacing: 14) {
+      Label(
+        transmission.startedAt.formatted(date: .omitted, time: .standard),
+        systemImage: "clock")
+      if transmission.endedAt > transmission.startedAt {
+        Text(transmission.endedAt.formatted(date: .omitted, time: .standard))
+      }
+      Spacer(minLength: 0)
+    }
+    .font(.caption.monospacedDigit())
+    .foregroundStyle(.white.opacity(0.85))
+    .accessibilityIdentifier("transmission-details")
+  }
+
+  private var reasonColor: Color {
+    switch transmission.classification {
+    case .displayed(.callSignMatch), .displayed(.continuationOfRecentCall):
+      return .cyan
+    case .displayed(.noAnchorConfigured), .displayed(.insufficientEvidence):
+      return .yellow
+    case .displayed(.urgencyBroadcast):
+      return .red
+    case .displayed(.nonPilotVoice):
+      return .green
+    case .filtered:
+      return .yellow
+    }
+  }
+
+  private var localeChipText: String {
+    Locale.Language(identifier: transmission.localeIdentifier).languageCode?.identifier.uppercased()
+      ?? transmission.localeIdentifier.uppercased()
   }
 }
 
@@ -298,5 +416,42 @@ struct TranscriptSegmentCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityIdentifier("transcript-translation")
     }
+  }
+}
+
+private func transmissionReasonLabel(for classification: TransmissionClassification) -> String {
+  switch classification {
+  case .displayed(let reason):
+    return displayReasonLabel(for: reason)
+  case .filtered(let reason):
+    return filterReasonLabel(for: reason)
+  }
+}
+
+private func displayReasonLabel(for reason: TransmissionDisplayReason) -> String {
+  switch reason {
+  case .callSignMatch:
+    return String(localized: "Own callsign")
+  case .urgencyBroadcast:
+    return String(localized: "Urgent broadcast")
+  case .nonPilotVoice:
+    return String(localized: "Dispatcher voice")
+  case .noAnchorConfigured:
+    return String(localized: "No callsign")
+  case .insufficientEvidence:
+    return String(localized: "Likely relevant")
+  case .continuationOfRecentCall:
+    return String(localized: "Follow-up call")
+  }
+}
+
+private func filterReasonLabel(for reason: TransmissionFilterReason) -> String {
+  switch reason {
+  case .pilotVoice:
+    return String(localized: "Pilot voice")
+  case .addressedToOther:
+    return String(localized: "Addressed to other aircraft")
+  case .nonRelevant:
+    return String(localized: "Not relevant")
   }
 }

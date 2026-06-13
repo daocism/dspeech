@@ -68,19 +68,21 @@ struct ContentView: View {
     #else
       let debugScriptedEngine: (any LiveTranscriptionEngine)? = nil
     #endif
+    let whisperKitInstaller = WhisperKitModelInstaller()
     let resolvedEngine =
       engine
       ?? debugScriptedEngine
-      ?? AppleSpeechLiveTranscriptionEngine(
-        localeProvider: { recognitionSettings.activeLocaleIdentifier },
-        bufferGate: VoiceFilterSpeechAudioBufferGate(pipeline: filter),
-        contextualCallSignProvider: { filter.callSign?.raw }
+      ?? Self.makeLiveTranscriptionEngine(
+        recognition: recognitionSettings,
+        voiceFilter: filter,
+        whisperKitInstaller: whisperKitInstaller
       )
     let translationSettings = TranslationSettings()
     let live = LiveTranscriptionViewModel(
       engine: resolvedEngine,
       transcriptStore: persistentTranscriptStore,
       recognitionLocaleIdentifier: { recognitionSettings.activeLocaleIdentifier },
+      recognitionTransmissionGapSeconds: { recognitionSettings.transmissionGapSeconds },
       voiceFilter: filter,
       translator: LocalTranslationService(backend: AppleTranslationService()),
       translationTarget: { translationSettings.enabled ? translationSettings.targetLanguage : nil }
@@ -110,28 +112,71 @@ struct ContentView: View {
 
   private var liveViewModel: LiveTranscriptionViewModel { coordinator.live }
 
-  private var suppressedSegmentsForReview: [TranscriptSegment] {
-    liveViewModel.segments.filter { liveViewModel.suppressedSegmentIDs.contains($0.id) }
+  private static func makeLiveTranscriptionEngine(
+    recognition: RecognitionSettings,
+    voiceFilter: VoiceFilterPipeline,
+    whisperKitInstaller: WhisperKitModelInstaller
+  ) -> any LiveTranscriptionEngine {
+    switch recognition.engineChoice {
+    case .apple:
+      return makeAppleSpeechLiveTranscriptionEngine(
+        recognition: recognition,
+        voiceFilter: voiceFilter
+      )
+    case .whisperKit:
+      guard whisperKitInstaller.state.isInstalled,
+        whisperKitInstaller.installedModelFolderURL != nil
+      else {
+        DspeechLog.engine.error(
+          "whisperkit engine selected but local model is not installed; falling back to apple speech"
+        )
+        return makeAppleSpeechLiveTranscriptionEngine(
+          recognition: recognition,
+          voiceFilter: voiceFilter
+        )
+      }
+      DspeechLog.engine.info("whisperkit engine selected with installed local model")
+      return WhisperKitLiveTranscriptionEngine(
+        transcriber: WhisperKitTranscriberAdapter(),
+        installedModelFolderURL: { whisperKitInstaller.installedModelFolderURL },
+        localeProvider: { recognition.localeIdentifier ?? recognition.activeLocaleIdentifier }
+      )
+    }
+  }
+
+  private static func makeAppleSpeechLiveTranscriptionEngine(
+    recognition: RecognitionSettings,
+    voiceFilter: VoiceFilterPipeline
+  ) -> AppleSpeechLiveTranscriptionEngine {
+    AppleSpeechLiveTranscriptionEngine(
+      localeProvider: { recognition.activeLocaleIdentifier },
+      bufferGate: VoiceFilterSpeechAudioBufferGate(pipeline: voiceFilter),
+      contextualCallSignProvider: { voiceFilter.callSign?.raw }
+    )
+  }
+
+  private var filteredTransmissionsForReview: [Transmission] {
+    liveViewModel.filteredTransmissions
   }
 
   private var canClearTranscriptView: Bool {
-    !liveViewModel.segments.isEmpty || !liveViewModel.partialText.isEmpty
+    !liveViewModel.segments.isEmpty || !liveViewModel.displayedTransmissions.isEmpty
+      || !liveViewModel.filteredTransmissions.isEmpty || !liveViewModel.partialText.isEmpty
   }
 
   private var readableContentMaxWidth: CGFloat {
     horizontalSizeClass == .regular ? 720 : .infinity
   }
 
-  private var transcriptSegmentsForDisplay: [TranscriptSegment] {
-    let liveSegments = liveViewModel.visibleSegments
+  private var demoTranscriptSegmentsForDisplay: [TranscriptSegment] {
     // why: the demo transcript is a first-run illustration ONLY — show it solely before the
     // first Start, never over real content and never again after a real session (the
     // "press Stop and my transcript turns back into demo" bug).
-    guard liveSegments.isEmpty,
+    guard liveViewModel.visibleSegments.isEmpty,
       liveViewModel.partialText.isEmpty,
       !liveViewModel.hasEverStarted
     else {
-      return liveSegments
+      return []
     }
     return TranscriptDemoViewModel.demo.segments
   }
@@ -210,6 +255,23 @@ struct ContentView: View {
               .padding(.trailing, isLandscape ? 16 : 18)
           }
         }
+        // why: bottom-anchored above the floating controls — the hint appears with the
+        // FIRST transmission card, which renders at the top; a top overlay sat on that
+        // card and obscured it (2026-06-12 visual review). Bottom space is empty at
+        // appearance time and sits next to the microphone the hint talks about.
+        .overlay(alignment: .bottom) {
+          if liveViewModel.oneTimeNoAnchorHintVisible {
+            NoAnchorTransmissionHint(
+              text: String(
+                localized:
+                  "Without a callsign, the filter passes all non-pilot transmissions. Tap the microphone to set it by voice."
+              ),
+              dismiss: { liveViewModel.dismissNoAnchorHint() }
+            )
+            .padding(.bottom, isLandscape ? 84 : 112)
+            .padding(.horizontal, 18)
+          }
+        }
 
         // why: Start + Clear/error float over the transcript (no opaque footer strip);
         // the transcript fills the full height and scrolls its content clear of them.
@@ -257,10 +319,9 @@ struct ContentView: View {
       }
     }
     .sheet(isPresented: $showSuppressedReview) {
-      SuppressedSegmentsReviewSheet(
-        segments: suppressedSegmentsForReview,
-        indicator: { liveViewModel.indicator(for: $0) },
-        showSegment: { liveViewModel.unhideSuppressedSegment(id: $0.id) }
+      FilteredTransmissionsReviewSheet(
+        transmissions: filteredTransmissionsForReview,
+        showTransmission: { liveViewModel.showFilteredTransmission(id: $0.id) }
       )
     }
     .confirmationDialog(
@@ -418,7 +479,7 @@ struct ContentView: View {
 
   @ViewBuilder
   private func filteredCountPill() -> some View {
-    let count = liveViewModel.suppressedSegmentIDs.count
+    let count = liveViewModel.filteredTransmissions.count
     if count > 0 {
       HStack {
         Button {
@@ -430,6 +491,7 @@ struct ContentView: View {
           )
           .font(.caption.weight(.semibold))
           .lineLimit(1)
+          .minimumScaleFactor(0.75)
           .fixedSize()
           .foregroundStyle(.yellow)
           .padding(.horizontal, 12)
@@ -440,8 +502,8 @@ struct ContentView: View {
           }
         }
         .buttonStyle(.plain)
-        .accessibilityIdentifier("filtered-count-pill")
-        .accessibilityLabel(String(localized: "\(count) filtered segments"))
+        .accessibilityIdentifier("filtered-transmissions-pill")
+        .accessibilityLabel(String(localized: "\(count) filtered transmissions"))
         Spacer(minLength: 0)
       }
     }
@@ -584,8 +646,9 @@ struct ContentView: View {
 
   @ViewBuilder
   private func transcriptArea(isLandscape: Bool) -> some View {
-    let displayedSegments = transcriptSegmentsForDisplay
-    if displayedSegments.isEmpty && liveViewModel.partialText.isEmpty {
+    let demoSegments = demoTranscriptSegmentsForDisplay
+    let displayedTransmissions = liveViewModel.displayedTransmissions
+    if demoSegments.isEmpty && displayedTransmissions.isEmpty && liveViewModel.partialText.isEmpty {
       VStack {
         Spacer()
         Text(emptyStateText)
@@ -604,10 +667,16 @@ struct ContentView: View {
         ZStack(alignment: .bottom) {
           ScrollView {
             LazyVStack(alignment: .leading, spacing: isLandscape ? 10 : 12) {
-              ForEach(displayedSegments) { segment in
+              ForEach(demoSegments) { segment in
                 TranscriptSegmentCard(
                   segment: segment,
                   translatedText: glossText(for: segment),
+                  isLandscape: isLandscape
+                )
+              }
+              ForEach(displayedTransmissions) { transmission in
+                TransmissionTranscriptCard(
+                  transmission: transmission,
                   isLandscape: isLandscape
                 )
               }
@@ -658,7 +727,10 @@ struct ContentView: View {
           .onAppear {
             scrollTranscriptToLive(proxy, animated: false)
           }
-          .onChange(of: displayedSegments.map(\.id)) { _, _ in
+          .onChange(of: demoSegments.map(\.id)) { _, _ in
+            scrollTranscriptToLive(proxy)
+          }
+          .onChange(of: displayedTransmissions.map(\.id)) { _, _ in
             scrollTranscriptToLive(proxy)
           }
           .onChange(of: liveViewModel.partialText) { _, _ in
@@ -708,6 +780,7 @@ struct ContentView: View {
   private var showHints: Bool {
     liveViewModel.status == .idle && !dynamicTypeSize.isAccessibilitySize
       && !liveViewModel.hasEverStarted && liveViewModel.segments.isEmpty
+      && liveViewModel.displayedTransmissions.isEmpty && liveViewModel.filteredTransmissions.isEmpty
   }
 
   private func toggleListening() async {

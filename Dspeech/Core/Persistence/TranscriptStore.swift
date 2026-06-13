@@ -18,9 +18,12 @@ protocol TranscriptStoring {
   @discardableResult
   func beginSession(localeIdentifier: String) throws -> TranscriptSessionSummary
   func append(_ segment: TranscriptSegment, to sessionID: UUID) throws
+  func updateOpen(_ transmission: Transmission, in sessionID: UUID) throws
+  func append(_ transmission: Transmission, to sessionID: UUID) throws
   func endSession(_ sessionID: UUID) throws
   func sessions() throws -> [TranscriptSessionSummary]
   func segments(in sessionID: UUID) throws -> [TranscriptSegment]
+  func transmissions(in sessionID: UUID) throws -> [Transmission]
   func deleteSession(_ sessionID: UUID) throws
   func exportText(for sessionID: UUID) throws -> String
 }
@@ -51,6 +54,8 @@ final class FileTranscriptStore: TranscriptStoring {
   private static let transcriptDirectoryName = "Transcripts"
   private static let summaryFileName = "summary.json"
   private static let segmentsFileName = "segments.jsonl"
+  private static let transmissionsFileName = "transmissions.jsonl"
+  private static let openTransmissionFileName = "open-transmission.json"
   private static let newline = Data([0x0A])
 
   private let rootDirectory: URL
@@ -58,7 +63,8 @@ final class FileTranscriptStore: TranscriptStoring {
   private let now: () -> Date
   private let encoder: JSONEncoder
   private let decoder: JSONDecoder
-  private var appendHandles: [UUID: FileHandle] = [:]
+  private var segmentAppendHandles: [UUID: FileHandle] = [:]
+  private var transmissionAppendHandles: [UUID: FileHandle] = [:]
   private var corruptIDs: [UUID] = []
 
   init(
@@ -94,7 +100,7 @@ final class FileTranscriptStore: TranscriptStoring {
     try createDirectoryWithProtection(at: sessionDirectory)
     try writeSummary(summary)
     try createSegmentsFileIfMissing(for: summary.id)
-    _ = try appendHandle(for: summary.id)
+    _ = try segmentAppendHandle(for: summary.id)
     DspeechLog.persistence.info(
       "transcript session began id=\(summary.id.uuidString, privacy: .public) locale=\(localeIdentifier, privacy: .public)"
     )
@@ -105,7 +111,7 @@ final class FileTranscriptStore: TranscriptStoring {
     do {
       try ensureSessionExists(sessionID)
       let line = try encodeSegmentLine(segment)
-      let handle = try appendHandle(for: sessionID)
+      let handle = try segmentAppendHandle(for: sessionID)
       try handle.write(contentsOf: line)
       try handle.write(contentsOf: Self.newline)
       try handle.synchronize()
@@ -119,13 +125,57 @@ final class FileTranscriptStore: TranscriptStoring {
     }
   }
 
+  func updateOpen(_ transmission: Transmission, in sessionID: UUID) throws {
+    do {
+      try ensureSessionExists(sessionID)
+      let data = try encodeTransmissionLine(transmission)
+      let fileURL = openTransmissionURL(for: sessionID)
+      try data.write(to: fileURL, options: .atomic)
+      try applyProtection(to: fileURL)
+    } catch let error as TranscriptStoreError {
+      logAppendFailure(sessionID: sessionID, error: error)
+      throw error
+    } catch {
+      let wrapped = TranscriptStoreError.ioFailure(error.localizedDescription)
+      logAppendFailure(sessionID: sessionID, error: wrapped)
+      throw wrapped
+    }
+  }
+
+  func append(_ transmission: Transmission, to sessionID: UUID) throws {
+    do {
+      try ensureSessionExists(sessionID)
+      try createTransmissionsFileIfMissing(for: sessionID)
+      let line = try encodeTransmissionLine(transmission)
+      let handle = try transmissionAppendHandle(for: sessionID)
+      try handle.write(contentsOf: line)
+      try handle.write(contentsOf: Self.newline)
+      try handle.synchronize()
+      try removeOpenTransmissionIfPresent(for: sessionID)
+    } catch let error as TranscriptStoreError {
+      logAppendFailure(sessionID: sessionID, error: error)
+      throw error
+    } catch {
+      let wrapped = TranscriptStoreError.ioFailure(error.localizedDescription)
+      logAppendFailure(sessionID: sessionID, error: wrapped)
+      throw wrapped
+    }
+  }
+
   func endSession(_ sessionID: UUID) throws {
     var summary = try readSummary(for: sessionID)
-    if let handle = appendHandles[sessionID] {
+    if let handle = segmentAppendHandles[sessionID] {
+      try handle.synchronize()
+    }
+    if let handle = transmissionAppendHandles[sessionID] {
       try handle.synchronize()
     }
     summary.endedAt = now()
-    summary.segmentCount = try segments(in: sessionID).count
+    let storedTransmissions = try transmissions(in: sessionID)
+    summary.segmentCount =
+      storedTransmissions.isEmpty
+      ? try legacySegments(in: sessionID).count
+      : storedTransmissions.count
     try writeSummary(summary)
     try closeAppendHandle(for: sessionID)
     DspeechLog.persistence.info(
@@ -179,6 +229,49 @@ final class FileTranscriptStore: TranscriptStoring {
   }
 
   func segments(in sessionID: UUID) throws -> [TranscriptSegment] {
+    let storedTransmissions = try transmissions(in: sessionID)
+    if !storedTransmissions.isEmpty {
+      return storedTransmissions.map(Self.segment(from:))
+    }
+    return try legacySegments(in: sessionID)
+  }
+
+  func transmissions(in sessionID: UUID) throws -> [Transmission] {
+    try ensureSessionExists(sessionID)
+    var loaded: [Transmission] = []
+    if fileManager.fileExists(atPath: transmissionsURL(for: sessionID).path) {
+      let data: Data
+      do {
+        data = try Data(contentsOf: transmissionsURL(for: sessionID))
+      } catch {
+        throw TranscriptStoreError.ioFailure(error.localizedDescription)
+      }
+      loaded.append(contentsOf: try decodeTransmissionLines(data, sessionID: sessionID))
+    }
+    if fileManager.fileExists(atPath: openTransmissionURL(for: sessionID).path) {
+      let data: Data
+      do {
+        data = try Data(contentsOf: openTransmissionURL(for: sessionID))
+      } catch {
+        throw TranscriptStoreError.ioFailure(error.localizedDescription)
+      }
+      do {
+        let open = try decoder.decode(Transmission.self, from: data)
+        if !loaded.contains(where: { $0.id == open.id }) {
+          loaded.append(open)
+        }
+      } catch {
+        throw TranscriptStoreError.decodingFailure(
+          sessionID: sessionID,
+          line: nil,
+          underlyingDescription: error.localizedDescription
+        )
+      }
+    }
+    return loaded
+  }
+
+  private func legacySegments(in sessionID: UUID) throws -> [TranscriptSegment] {
     try ensureSessionExists(sessionID)
     let fileURL = segmentsURL(for: sessionID)
     let data: Data
@@ -205,8 +298,16 @@ final class FileTranscriptStore: TranscriptStoring {
 
   func exportText(for sessionID: UUID) throws -> String {
     let summary = try readSummary(for: sessionID)
-    let lines = try segments(in: sessionID).map { segment in
-      "\(Self.timeString(from: segment.startedAt))  \(segment.text)"
+    let transmissionRows = try transmissions(in: sessionID)
+    let lines: [String]
+    if !transmissionRows.isEmpty {
+      lines = transmissionRows.map { transmission in
+        "\(Self.timeString(from: transmission.startedAt))  \(transmission.text)"
+      }
+    } else {
+      lines = try legacySegments(in: sessionID).map { segment in
+        "\(Self.timeString(from: segment.startedAt))  \(segment.text)"
+      }
     }
     return
       ([
@@ -284,6 +385,33 @@ final class FileTranscriptStore: TranscriptStoring {
     return deduped
   }
 
+  private static func segment(from transmission: Transmission) -> TranscriptSegment {
+    let sourceLanguageCode =
+      transmission.segments.first?.sourceLanguageCode
+      ?? Locale(identifier: transmission.localeIdentifier).language.languageCode?.identifier
+      ?? transmission.localeIdentifier
+    let source = transmission.segments.first?.source ?? .liveATC
+    let confidenceValues = transmission.segments.map(\.confidence).filter { $0 > 0 }
+    let confidence =
+      confidenceValues.isEmpty
+      ? 0
+      : confidenceValues.reduce(0, +) / Double(confidenceValues.count)
+    return TranscriptSegment(
+      id: transmission.id,
+      startedAt: transmission.startedAt,
+      text: transmission.text,
+      confidence: confidence,
+      sourceLanguageCode: sourceLanguageCode,
+      source: source,
+      isStopCommittedPlaceholder: transmission.segments.contains {
+        $0.isStopCommittedPlaceholder
+      },
+      isInterimRestartCommit: transmission.segments.contains {
+        $0.isInterimRestartCommit
+      }
+    )
+  }
+
   private func sessionDirectory(for sessionID: UUID) -> URL {
     rootDirectory.appendingPathComponent(sessionID.uuidString, isDirectory: true)
   }
@@ -296,6 +424,16 @@ final class FileTranscriptStore: TranscriptStoring {
   private func segmentsURL(for sessionID: UUID) -> URL {
     sessionDirectory(for: sessionID)
       .appendingPathComponent(Self.segmentsFileName, isDirectory: false)
+  }
+
+  private func transmissionsURL(for sessionID: UUID) -> URL {
+    sessionDirectory(for: sessionID)
+      .appendingPathComponent(Self.transmissionsFileName, isDirectory: false)
+  }
+
+  private func openTransmissionURL(for sessionID: UUID) -> URL {
+    sessionDirectory(for: sessionID)
+      .appendingPathComponent(Self.openTransmissionFileName, isDirectory: false)
   }
 
   private func ensureSessionExists(_ sessionID: UUID) throws {
@@ -323,6 +461,18 @@ final class FileTranscriptStore: TranscriptStoring {
     }
     guard fileManager.createFile(atPath: fileURL.path, contents: Data()) else {
       throw TranscriptStoreError.ioFailure("Could not create segments file for \(sessionID)")
+    }
+    try applyProtection(to: fileURL)
+  }
+
+  private func createTransmissionsFileIfMissing(for sessionID: UUID) throws {
+    let fileURL = transmissionsURL(for: sessionID)
+    guard !fileManager.fileExists(atPath: fileURL.path) else {
+      try applyProtection(to: fileURL)
+      return
+    }
+    guard fileManager.createFile(atPath: fileURL.path, contents: Data()) else {
+      throw TranscriptStoreError.ioFailure("Could not create transmissions file for \(sessionID)")
     }
     try applyProtection(to: fileURL)
   }
@@ -391,6 +541,14 @@ final class FileTranscriptStore: TranscriptStoring {
     }
   }
 
+  private func encodeTransmissionLine(_ transmission: Transmission) throws -> Data {
+    do {
+      return try encoder.encode(transmission)
+    } catch {
+      throw TranscriptStoreError.encodingFailure(error.localizedDescription)
+    }
+  }
+
   private func decodeSegmentLines(_ data: Data, sessionID: UUID) throws -> [TranscriptSegment] {
     guard !data.isEmpty else {
       return []
@@ -421,8 +579,38 @@ final class FileTranscriptStore: TranscriptStoring {
     return segments
   }
 
-  private func appendHandle(for sessionID: UUID) throws -> FileHandle {
-    if let handle = appendHandles[sessionID] {
+  private func decodeTransmissionLines(_ data: Data, sessionID: UUID) throws -> [Transmission] {
+    guard !data.isEmpty else {
+      return []
+    }
+
+    let endsWithNewline = data.last == Self.newline.first
+    let lines = data.split(separator: Self.newline[0], omittingEmptySubsequences: false)
+    var transmissions: [Transmission] = []
+    transmissions.reserveCapacity(lines.count)
+
+    for (index, line) in lines.enumerated() {
+      if line.isEmpty && index == lines.count - 1 && endsWithNewline {
+        continue
+      }
+      do {
+        transmissions.append(try decoder.decode(Transmission.self, from: Data(line)))
+      } catch {
+        if index == lines.count - 1 && !endsWithNewline {
+          continue
+        }
+        throw TranscriptStoreError.decodingFailure(
+          sessionID: sessionID,
+          line: index + 1,
+          underlyingDescription: error.localizedDescription
+        )
+      }
+    }
+    return transmissions
+  }
+
+  private func segmentAppendHandle(for sessionID: UUID) throws -> FileHandle {
+    if let handle = segmentAppendHandles[sessionID] {
       return handle
     }
 
@@ -434,7 +622,27 @@ final class FileTranscriptStore: TranscriptStoring {
     do {
       let handle = try FileHandle(forWritingTo: fileURL)
       try handle.seekToEnd()
-      appendHandles[sessionID] = handle
+      segmentAppendHandles[sessionID] = handle
+      return handle
+    } catch {
+      throw TranscriptStoreError.ioFailure(error.localizedDescription)
+    }
+  }
+
+  private func transmissionAppendHandle(for sessionID: UUID) throws -> FileHandle {
+    if let handle = transmissionAppendHandles[sessionID] {
+      return handle
+    }
+
+    let fileURL = transmissionsURL(for: sessionID)
+    guard fileManager.fileExists(atPath: fileURL.path) else {
+      throw TranscriptStoreError.ioFailure("Transmissions file is missing for \(sessionID)")
+    }
+
+    do {
+      let handle = try FileHandle(forWritingTo: fileURL)
+      try handle.seekToEnd()
+      transmissionAppendHandles[sessionID] = handle
       return handle
     } catch {
       throw TranscriptStoreError.ioFailure(error.localizedDescription)
@@ -442,12 +650,25 @@ final class FileTranscriptStore: TranscriptStoring {
   }
 
   private func closeAppendHandle(for sessionID: UUID) throws {
-    guard let handle = appendHandles.removeValue(forKey: sessionID) else {
-      return
+    let handles = [
+      segmentAppendHandles.removeValue(forKey: sessionID),
+      transmissionAppendHandles.removeValue(forKey: sessionID),
+    ].compactMap { $0 }
+    for handle in handles {
+      do {
+        try handle.synchronize()
+        try handle.close()
+      } catch {
+        throw TranscriptStoreError.ioFailure(error.localizedDescription)
+      }
     }
+  }
+
+  private func removeOpenTransmissionIfPresent(for sessionID: UUID) throws {
+    let fileURL = openTransmissionURL(for: sessionID)
+    guard fileManager.fileExists(atPath: fileURL.path) else { return }
     do {
-      try handle.synchronize()
-      try handle.close()
+      try fileManager.removeItem(at: fileURL)
     } catch {
       throw TranscriptStoreError.ioFailure(error.localizedDescription)
     }

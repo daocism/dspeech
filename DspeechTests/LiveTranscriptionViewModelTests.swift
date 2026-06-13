@@ -62,13 +62,17 @@ struct LiveTranscriptionViewModelTests {
     }
   }
 
-  private func makeSegment(_ text: String, confidence: Double = 0.9) -> TranscriptSegment {
+  private func makeSegment(
+    _ text: String,
+    confidence: Double = 0.9,
+    source: TranscriptSegment.Source = .liveATC
+  ) -> TranscriptSegment {
     TranscriptSegment(
       text: text,
       translatedText: nil,
       confidence: confidence,
       sourceLanguageCode: "en",
-      source: .liveATC
+      source: source
     )
   }
 
@@ -100,11 +104,32 @@ struct LiveTranscriptionViewModelTests {
     func saveHasEverStarted(_ hasEverStarted: Bool) { stored = hasEverStarted }
   }
 
+  final class NoAnchorHintMemoryStorage: NoAnchorHintStateStorage, @unchecked Sendable {
+    var stored: Bool
+
+    init(stored: Bool = false) {
+      self.stored = stored
+    }
+
+    func loadHasShownNoAnchorHint() -> Bool { stored }
+    func saveHasShownNoAnchorHint(_ hasShown: Bool) { stored = hasShown }
+  }
+
+  final class ManualClock: @unchecked Sendable {
+    var value: Date
+
+    init(_ value: Date) {
+      self.value = value
+    }
+  }
+
   struct StoreFailure: Error, Equatable {}
 
   final class FakeTranscriptStore: TranscriptStoring {
     var beginLocaleIdentifiers: [String] = []
     var appendedSegments: [(sessionID: UUID, segment: TranscriptSegment)] = []
+    var openTransmissions: [(sessionID: UUID, transmission: Transmission)] = []
+    var appendedTransmissions: [(sessionID: UUID, transmission: Transmission)] = []
     var endedSessionIDs: [UUID] = []
     var beginError: StoreFailure?
     var appendError: StoreFailure?
@@ -128,6 +153,16 @@ struct LiveTranscriptionViewModelTests {
       appendedSegments.append((sessionID, segment))
     }
 
+    func updateOpen(_ transmission: Transmission, in sessionID: UUID) throws {
+      if let appendError { throw appendError }
+      openTransmissions.append((sessionID, transmission))
+    }
+
+    func append(_ transmission: Transmission, to sessionID: UUID) throws {
+      if let appendError { throw appendError }
+      appendedTransmissions.append((sessionID, transmission))
+    }
+
     func endSession(_ sessionID: UUID) throws {
       if let endError { throw endError }
       endedSessionIDs.append(sessionID)
@@ -135,6 +170,7 @@ struct LiveTranscriptionViewModelTests {
 
     func sessions() throws -> [TranscriptSessionSummary] { [] }
     func segments(in sessionID: UUID) throws -> [TranscriptSegment] { [] }
+    func transmissions(in sessionID: UUID) throws -> [Transmission] { [] }
     func deleteSession(_ sessionID: UUID) throws {}
     func exportText(for sessionID: UUID) throws -> String { "" }
   }
@@ -192,6 +228,110 @@ struct LiveTranscriptionViewModelTests {
     #expect(vm.segments.first?.text == "Descend and maintain three thousand.")
     #expect(vm.segments.first?.source == .liveATC)
     #expect(vm.partialText.isEmpty)
+  }
+
+  @Test func segmentEventAppendsDisplayedTransmissionAndClearsPartial() async {
+    let engine = FakeEngine()
+    let vm = LiveTranscriptionViewModel(engine: engine)
+    await vm.start()
+    engine.push(.partial("descend and"))
+    await wait(for: { vm.partialText == "descend and" })
+
+    engine.push(.segment(makeSegment("Descend and maintain three thousand.")))
+    await wait(for: { vm.displayedTransmissions.count == 1 })
+
+    #expect(vm.displayedTransmissions.first?.text == "Descend and maintain three thousand.")
+    #expect(vm.displayedTransmissions.first?.classification == .displayed(.noAnchorConfigured))
+    #expect(vm.filteredTransmissions.isEmpty)
+    #expect(vm.partialText.isEmpty)
+  }
+
+  @Test func taskRestartProcessesAssemblerWithoutClosingTransmission() async {
+    let engine = FakeEngine()
+    let vm = LiveTranscriptionViewModel(engine: engine)
+    await vm.start()
+    engine.push(.segment(makeSegment("Maintain present heading")))
+    await wait(for: { vm.displayedTransmissions.count == 1 })
+
+    engine.push(.taskRestart)
+    engine.push(.segment(makeSegment("and climb flight level two zero zero")))
+    await wait(for: {
+      vm.displayedTransmissions.first?.text
+        == "Maintain present heading and climb flight level two zero zero"
+    })
+
+    #expect(vm.displayedTransmissions.count == 1)
+  }
+
+  @Test func tickLoopClosesOpenTransmissionAfterConfiguredGap() async {
+    let engine = FakeEngine()
+    let store = FakeTranscriptStore()
+    let clock = ManualClock(Date(timeIntervalSince1970: 1_000))
+    let vm = LiveTranscriptionViewModel(
+      engine: engine,
+      transcriptStore: store,
+      recognitionTransmissionGapSeconds: { 2 },
+      now: { clock.value },
+      transmissionTickNanoseconds: 10_000_000
+    )
+    await vm.start()
+    engine.push(.segment(makeSegment("Cleared to land runway two seven")))
+    await wait(for: { store.openTransmissions.count == 1 })
+
+    clock.value = clock.value.addingTimeInterval(2.1)
+    await wait(for: { store.appendedTransmissions.count == 1 })
+
+    #expect(
+      store.appendedTransmissions.first?.transmission.text == "Cleared to land runway two seven")
+  }
+
+  @Test func transmissionMovesFromFilteredToDisplayedWhenCallSignArrivesMidBlock() async {
+    let engine = FakeEngine()
+    let storage = VoiceFilterMemoryStorage()
+    storage.enabled = true
+    storage.callSign = CallSign(raw: "N123AB")
+    let pipeline = VoiceFilterPipeline(
+      identifier: UnavailableLocalSpeakerIdentifier(),
+      storage: storage
+    )
+    let vm = LiveTranscriptionViewModel(engine: engine, voiceFilter: pipeline)
+    await vm.start()
+
+    engine.push(.segment(makeSegment("continue straight ahead")))
+    await wait(for: { vm.filteredTransmissions.count == 1 })
+    engine.push(.segment(makeSegment("N123AB contact tower one one eight decimal seven")))
+    await wait(for: { vm.displayedTransmissions.count == 1 && vm.filteredTransmissions.isEmpty })
+
+    #expect(
+      vm.displayedTransmissions.first?.text
+        == "continue straight ahead N123AB contact tower one one eight decimal seven")
+    #expect(vm.displayedTransmissions.first?.classification == .displayed(.callSignMatch))
+  }
+
+  @Test func noAnchorHintShowsOnceAcrossViewModels() async {
+    let storage = NoAnchorHintMemoryStorage()
+    let firstEngine = FakeEngine()
+    let first = LiveTranscriptionViewModel(
+      engine: firstEngine,
+      noAnchorHintStorage: storage
+    )
+    await first.start()
+    firstEngine.push(.segment(makeSegment("Descend and maintain three thousand")))
+    await wait(for: { first.oneTimeNoAnchorHintVisible })
+    #expect(storage.stored)
+
+    first.dismissNoAnchorHint()
+    #expect(!first.oneTimeNoAnchorHintVisible)
+
+    let secondEngine = FakeEngine()
+    let second = LiveTranscriptionViewModel(
+      engine: secondEngine,
+      noAnchorHintStorage: storage
+    )
+    await second.start()
+    secondEngine.push(.segment(makeSegment("Contact tower one one eight decimal seven")))
+    await wait(for: { second.displayedTransmissions.count == 1 })
+    #expect(!second.oneTimeNoAnchorHintVisible)
   }
 
   @Test func voiceFilterSuppressesNonMatchingCallSignSegments() async {
@@ -403,6 +543,24 @@ struct LiveTranscriptionViewModelTests {
     #expect(appended.sessionID == store.endedSessionIDs.first)
   }
 
+  @Test func persistenceUpdatesOpenAndAppendsClosedTransmissionOnStop() async throws {
+    let engine = FakeEngine()
+    let store = FakeTranscriptStore()
+    let vm = LiveTranscriptionViewModel(engine: engine, transcriptStore: store)
+    await vm.start()
+
+    engine.push(.segment(makeSegment("Cleared to land runway two seven")))
+    await wait(for: { store.openTransmissions.count == 1 })
+    vm.stop()
+    await wait(for: { store.appendedTransmissions.count == 1 && store.endedSessionIDs.count == 1 })
+
+    let open = try #require(store.openTransmissions.first)
+    let closed = try #require(store.appendedTransmissions.first)
+    #expect(open.sessionID == closed.sessionID)
+    #expect(closed.sessionID == store.endedSessionIDs.first)
+    #expect(closed.transmission.text == "Cleared to land runway two seven")
+  }
+
   @Test func persistenceSkipsDemoSegments() async {
     let engine = FakeEngine()
     let store = FakeTranscriptStore()
@@ -541,7 +699,7 @@ struct LiveTranscriptionViewModelTests {
     await vm.start()
 
     for index in 0..<10_050 {
-      engine.push(.segment(makeSegment("Transmission \(index)")))
+      engine.push(.segment(makeSegment("Transmission \(index)", source: .demo)))
     }
     #expect(await wait(for: { vm.segments.count == 10_050 }))
 

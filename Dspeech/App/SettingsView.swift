@@ -35,6 +35,7 @@ struct SettingsView: View {
   // standard AppleLanguages override, which iOS applies on the next launch -- the clean
   // in-app language switch, no bundle swizzling.
   @State private var appLanguage: String = Self.currentAppLanguagePickerTag()
+  @State private var whisperKitInstaller = WhisperKitModelInstaller()
 
   private static let appLanguages: [(code: String, name: String)] = [
     ("", String(localized: "System")),
@@ -245,8 +246,29 @@ struct SettingsView: View {
               .fixedSize(horizontal: false, vertical: true)
             }
           }
-          LabeledContent(String(localized: "ASR model"), value: String(localized: "Apple Speech"))
           LabeledContent(String(localized: "Mode"), value: privacy.mode.displayName)
+        }
+        Section {
+          Picker(String(localized: "Engine"), selection: $recognition.engineChoice) {
+            ForEach(TranscriptionEngineChoice.allCases) { choice in
+              Text(choice.displayName).tag(choice)
+            }
+          }
+          .accessibilityIdentifier("recognition-engine-picker")
+          if shouldShowWhisperKitModelRows {
+            whisperKitModelContent
+          }
+        } header: {
+          Text(String(localized: "Recognition engine"))
+        } footer: {
+          Text(
+            String(
+              localized:
+                "Apple Speech stays active until the WhisperKit model is installed locally. Model downloads happen only when you tap Download."
+            )
+          )
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .fixedSize(horizontal: false, vertical: true)
         }
         Section {
           Toggle(String(localized: "On-device translation"), isOn: $translation.enabled)
@@ -358,6 +380,130 @@ struct SettingsView: View {
         targetCode: option.code) != nil
     else { return option.displayName }
     return String(localized: "\(option.displayName) (current speech language)")
+  }
+
+  private var shouldShowWhisperKitModelRows: Bool {
+    recognition.engineChoice == .whisperKit || whisperKitInstaller.state.isInstalled
+  }
+
+  @ViewBuilder
+  private var whisperKitModelContent: some View {
+    switch whisperKitInstaller.state {
+    case .absent:
+      whisperKitAbsentContent
+    case .downloading(let progress):
+      whisperKitDownloadingContent(progress)
+    case .installed(let model):
+      whisperKitInstalledContent(model)
+    case .failed(let failure):
+      whisperKitFailedContent(failure)
+    }
+  }
+
+  private var whisperKitAbsentContent: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      whisperKitStatusRow(
+        title: String(localized: "Model not installed"),
+        detail: String(localized: "Required download") + ": "
+          + byteString(WhisperKitModelInstaller.expectedModelSizeBytes)
+      )
+      if recognition.engineChoice == .whisperKit {
+        Text(
+          String(
+            localized:
+              "Download the model before using WhisperKit. Until then, Dspeech falls back to Apple Speech."
+          )
+        )
+        .font(.footnote)
+        .foregroundStyle(.orange)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .fixedSize(horizontal: false, vertical: true)
+      }
+      Button {
+        Task { await whisperKitInstaller.install() }
+      } label: {
+        Label(
+          String(localized: "Download WhisperKit model") + " ("
+            + byteString(WhisperKitModelInstaller.expectedModelSizeBytes) + ")",
+          systemImage: "arrow.down.circle.fill"
+        )
+      }
+      .buttonStyle(.borderedProminent)
+      .accessibilityIdentifier("whisperkit-model-download")
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  private func whisperKitDownloadingContent(_ progress: WhisperKitModelDownloadProgress)
+    -> some View
+  {
+    VStack(alignment: .leading, spacing: 8) {
+      whisperKitStatusRow(
+        title: String(localized: "Downloading model"),
+        detail: "\(progress.percentComplete)% · \(byteString(progress.totalBytes))"
+      )
+      ProgressView(value: progress.fractionComplete)
+      Label(
+        String(localized: "Downloading") + " \(progress.percentComplete)%",
+        systemImage: "arrow.down.circle.fill"
+      )
+      .font(.footnote.weight(.medium))
+      .foregroundStyle(.secondary)
+      .accessibilityIdentifier("whisperkit-model-download")
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  private func whisperKitInstalledContent(_ model: WhisperKitInstalledModel) -> some View {
+    VStack(alignment: .leading, spacing: 8) {
+      whisperKitStatusRow(
+        title: String(localized: "Model installed"),
+        detail: "\(model.name) · \(byteString(model.sizeBytes))"
+      )
+      Button(String(localized: "Delete WhisperKit model")) {
+        Task { await whisperKitInstaller.deleteInstalledModel() }
+      }
+      .buttonStyle(.bordered)
+      .tint(.red)
+      .accessibilityIdentifier("whisperkit-model-delete")
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  private func whisperKitFailedContent(_ failure: WhisperKitModelInstallFailure) -> some View {
+    VStack(alignment: .leading, spacing: 8) {
+      whisperKitStatusRow(
+        title: String(localized: "Model install failed"),
+        detail: failure.userSafeReason
+      )
+      if failure.isRetryable {
+        Button(String(localized: "Retry WhisperKit download")) {
+          Task { await whisperKitInstaller.install() }
+        }
+        .buttonStyle(.bordered)
+        .accessibilityIdentifier("whisperkit-model-download")
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  private func whisperKitStatusRow(title: String, detail: String) -> some View {
+    VStack(alignment: .leading, spacing: 2) {
+      Text(title)
+        .font(.body.weight(.medium))
+      Text(detail)
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .accessibilityElement(children: .combine)
+    .accessibilityIdentifier("whisperkit-model-status")
+  }
+
+  private func byteString(_ bytes: Int64) -> String {
+    ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
   }
 }
 

@@ -16,6 +16,7 @@ struct TranscriptSegment: Identifiable, Equatable, Sendable, Codable {
     case sourceLanguageCode
     case source
     case isStopCommittedPlaceholder
+    case isInterimRestartCommit
   }
 
   let id: UUID
@@ -26,6 +27,7 @@ struct TranscriptSegment: Identifiable, Equatable, Sendable, Codable {
   let sourceLanguageCode: String
   let source: Source
   let isStopCommittedPlaceholder: Bool
+  let isInterimRestartCommit: Bool
 
   init(
     id: UUID = UUID(),
@@ -35,7 +37,8 @@ struct TranscriptSegment: Identifiable, Equatable, Sendable, Codable {
     confidence: Double,
     sourceLanguageCode: String,
     source: Source,
-    isStopCommittedPlaceholder: Bool = false
+    isStopCommittedPlaceholder: Bool = false,
+    isInterimRestartCommit: Bool = false
   ) {
     self.id = id
     self.startedAt = startedAt
@@ -45,10 +48,11 @@ struct TranscriptSegment: Identifiable, Equatable, Sendable, Codable {
     self.sourceLanguageCode = sourceLanguageCode
     self.source = source
     self.isStopCommittedPlaceholder = isStopCommittedPlaceholder
+    self.isInterimRestartCommit = isInterimRestartCommit
   }
 
   var requiresVerification: Bool {
-    isStopCommittedPlaceholder || confidence < 0.82
+    isStopCommittedPlaceholder || isInterimRestartCommit || confidence < 0.82
   }
 
   init(from decoder: Decoder) throws {
@@ -71,6 +75,8 @@ struct TranscriptSegment: Identifiable, Equatable, Sendable, Codable {
     source = decodedSource
     isStopCommittedPlaceholder =
       try container.decodeIfPresent(Bool.self, forKey: .isStopCommittedPlaceholder) ?? false
+    isInterimRestartCommit =
+      try container.decodeIfPresent(Bool.self, forKey: .isInterimRestartCommit) ?? false
   }
 
   func encode(to encoder: Encoder) throws {
@@ -83,5 +89,6 @@ struct TranscriptSegment: Identifiable, Equatable, Sendable, Codable {
     try container.encode(sourceLanguageCode, forKey: .sourceLanguageCode)
     try container.encode(source.rawValue, forKey: .source)
     try container.encode(isStopCommittedPlaceholder, forKey: .isStopCommittedPlaceholder)
+    try container.encode(isInterimRestartCommit, forKey: .isInterimRestartCommit)
   }
 }

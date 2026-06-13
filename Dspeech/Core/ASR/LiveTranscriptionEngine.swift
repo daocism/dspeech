@@ -12,6 +12,10 @@ enum LiveTranscriptionStatus: Equatable, Sendable {
 enum LiveTranscriptionEvent: Sendable {
   case partial(String)
   case segment(TranscriptSegment)
+  // why: emitted at every recognition-task boundary (benign restart, config rebuild,
+  // availability blip) so the assembler can distinguish a task recycle from silence
+  // and apply overlap-merge to the replayed audio's re-transcription.
+  case taskRestart
   case status(LiveTranscriptionStatus)
 }
 

@@ -19,9 +19,29 @@ enum RecognitionLocaleAvailabilityState: Equatable, Sendable {
   case unavailable
 }
 
+enum TranscriptionEngineChoice: String, Codable, Sendable, CaseIterable, Identifiable {
+  case apple
+  case whisperKit
+
+  var id: String { rawValue }
+
+  var displayName: String {
+    switch self {
+    case .apple:
+      return String(localized: "Apple Speech")
+    case .whisperKit:
+      return String(localized: "WhisperKit")
+    }
+  }
+}
+
 protocol RecognitionSettingsStorage: Sendable {
   func loadLocaleIdentifier() -> String?
   func saveLocaleIdentifier(_ identifier: String) throws
+  func loadEngineChoice() -> TranscriptionEngineChoice
+  func saveEngineChoice(_ choice: TranscriptionEngineChoice) throws
+  func loadTransmissionGapSeconds() -> TimeInterval
+  func saveTransmissionGapSeconds(_ seconds: TimeInterval) throws
   func loadIssue() -> SettingsStorageIssue?
 }
 
@@ -31,6 +51,8 @@ extension RecognitionSettingsStorage {
 
 struct UserDefaultsRecognitionSettingsStorage: RecognitionSettingsStorage, @unchecked Sendable {
   static let localeKey = "dspeech.recognition.locale.v1"
+  static let engineChoiceKey = "dspeech.recognition.engine.v1"
+  static let transmissionGapSecondsDefaultsName = "dspeech.recognition.transmission-gap-seconds.v1"
 
   let defaults: UserDefaults
 
@@ -44,6 +66,44 @@ struct UserDefaultsRecognitionSettingsStorage: RecognitionSettingsStorage, @unch
 
   func saveLocaleIdentifier(_ identifier: String) throws {
     defaults.set(identifier, forKey: Self.localeKey)
+  }
+
+  func loadEngineChoice() -> TranscriptionEngineChoice {
+    guard let raw = defaults.string(forKey: Self.engineChoiceKey),
+      let choice = TranscriptionEngineChoice(rawValue: raw)
+    else {
+      return .apple
+    }
+    return choice
+  }
+
+  func saveEngineChoice(_ choice: TranscriptionEngineChoice) throws {
+    defaults.set(choice.rawValue, forKey: Self.engineChoiceKey)
+  }
+
+  func loadTransmissionGapSeconds() -> TimeInterval {
+    let stored = defaults.double(forKey: Self.transmissionGapSecondsDefaultsName)
+    guard stored > 0 else { return 3.5 }
+    return Self.clampedTransmissionGapSeconds(stored)
+  }
+
+  func saveTransmissionGapSeconds(_ seconds: TimeInterval) throws {
+    defaults.set(
+      Self.clampedTransmissionGapSeconds(seconds),
+      forKey: Self.transmissionGapSecondsDefaultsName)
+  }
+
+  func loadIssue() -> SettingsStorageIssue? {
+    if let raw = defaults.string(forKey: Self.engineChoiceKey),
+      TranscriptionEngineChoice(rawValue: raw) == nil
+    {
+      return .recognitionEngineCorrupted
+    }
+    return nil
+  }
+
+  private static func clampedTransmissionGapSeconds(_ seconds: TimeInterval) -> TimeInterval {
+    min(6, max(2, seconds))
   }
 }
 
@@ -155,6 +215,34 @@ final class RecognitionSettings {
     }
   }
 
+  var engineChoice: TranscriptionEngineChoice {
+    didSet {
+      guard engineChoice != oldValue else { return }
+      do {
+        try storage.saveEngineChoice(engineChoice)
+        storageIssue = nil
+      } catch {
+        storageIssue = .recognitionLocaleSaveFailed
+      }
+    }
+  }
+
+  var transmissionGapSeconds: TimeInterval {
+    didSet {
+      let clamped = Self.clampedTransmissionGapSeconds(transmissionGapSeconds)
+      if transmissionGapSeconds != clamped {
+        transmissionGapSeconds = clamped
+      }
+      guard clamped != oldValue else { return }
+      do {
+        try storage.saveTransmissionGapSeconds(clamped)
+        storageIssue = nil
+      } catch {
+        storageIssue = .recognitionLocaleSaveFailed
+      }
+    }
+  }
+
   var selectedDisplayName: String {
     guard let localeIdentifier else {
       return String(localized: "No recognition language available")
@@ -179,6 +267,9 @@ final class RecognitionSettings {
       displayLocale: displayLocale
     )
     self.localeAvailabilityState = .loading
+    self.engineChoice = storage.loadEngineChoice()
+    self.transmissionGapSeconds = Self.clampedTransmissionGapSeconds(
+      storage.loadTransmissionGapSeconds())
     let storedIdentifier = storage.loadLocaleIdentifier()
     self.localeIdentifier = RecognitionLocaleCatalog.resolve(
       stored: storedIdentifier,
@@ -233,5 +324,9 @@ final class RecognitionSettings {
     // happened to finish last.
     guard generation == downloadStateGeneration else { return }
     selectedNeedsDownload = !downloaded
+  }
+
+  private static func clampedTransmissionGapSeconds(_ seconds: TimeInterval) -> TimeInterval {
+    min(6, max(2, seconds))
   }
 }

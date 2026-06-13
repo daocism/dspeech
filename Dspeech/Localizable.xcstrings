@@ -282,6 +282,17 @@
         }
       }
     },
+    "%lld filtered transmissions": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld filtered transmissions"
+          }
+        }
+      }
+    },
     "%lld segments - %@": {
       "localizations": {
         "en": {
@@ -989,6 +1000,28 @@
         }
       }
     },
+    "All filtered transmissions are already visible.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All filtered transmissions are already visible."
+          }
+        }
+      }
+    },
+    "Addressed to other aircraft": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Addressed to other aircraft"
+          }
+        }
+      }
+    },
     "Another recording task is using the microphone. Stop it before starting live transcription.": {
       "localizations": {
         "de": {
@@ -1197,6 +1230,215 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "Apple Speech"
+          }
+        }
+      }
+    },
+    "Apple Speech stays active until the WhisperKit model is installed locally. Model downloads happen only when you tap Download.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Speech stays active until the WhisperKit model is installed locally. Model downloads happen only when you tap Download."
+          }
+        }
+      }
+    },
+    "Couldn't delete the WhisperKit model from the device. The device reported a storage or file-access error. Try again later.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't delete the WhisperKit model from the device. The device reported a storage or file-access error. Try again later."
+          }
+        }
+      }
+    },
+    "Couldn't download the WhisperKit model because the network request failed. Check your connection and try again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't download the WhisperKit model because the network request failed. Check your connection and try again."
+          }
+        }
+      }
+    },
+    "Couldn't install the WhisperKit model on this device.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't install the WhisperKit model on this device."
+          }
+        }
+      }
+    },
+    "Delete WhisperKit model": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete WhisperKit model"
+          }
+        }
+      }
+    },
+    "Download the model before using WhisperKit. Until then, Dspeech falls back to Apple Speech.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download the model before using WhisperKit. Until then, Dspeech falls back to Apple Speech."
+          }
+        }
+      }
+    },
+    "Download WhisperKit model": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download WhisperKit model"
+          }
+        }
+      }
+    },
+    "Downloading": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Downloading"
+          }
+        }
+      }
+    },
+    "Downloading model": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Downloading model"
+          }
+        }
+      }
+    },
+    "Engine": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Engine"
+          }
+        }
+      }
+    },
+    "Model install failed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Model install failed"
+          }
+        }
+      }
+    },
+    "Model installed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Model installed"
+          }
+        }
+      }
+    },
+    "Recognition engine": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recognition engine"
+          }
+        }
+      }
+    },
+    "Required download": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Required download"
+          }
+        }
+      }
+    },
+    "Retry WhisperKit download": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retry WhisperKit download"
+          }
+        }
+      }
+    },
+    "The saved WhisperKit model state is corrupted. Continue with Apple Speech and re-download the model if needed.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The saved WhisperKit model state is corrupted. Continue with Apple Speech and re-download the model if needed."
+          }
+        }
+      }
+    },
+    "The WhisperKit model download was cancelled.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The WhisperKit model download was cancelled."
+          }
+        }
+      }
+    },
+    "There isn't enough device storage to install the WhisperKit model. Free storage and try again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "There isn't enough device storage to install the WhisperKit model. Free storage and try again."
+          }
+        }
+      }
+    },
+    "WhisperKit": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "WhisperKit"
           }
         }
       }
@@ -5297,6 +5539,17 @@
         }
       }
     },
+    "Dispatcher voice": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dispatcher voice"
+          }
+        }
+      }
+    },
     "Done": {
       "extractionState": "manual",
       "localizations": {
@@ -6212,6 +6465,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "已筛选"
+          }
+        }
+      }
+    },
+    "Follow-up call": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Follow-up call"
           }
         }
       }
@@ -8198,6 +8462,28 @@
         }
       }
     },
+    "No filtered transmissions": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No filtered transmissions"
+          }
+        }
+      }
+    },
+    "No callsign": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No callsign"
+          }
+        }
+      }
+    },
     "No input": {
       "extractionState": "manual",
       "localizations": {
@@ -9186,6 +9472,28 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "没有合适的采集源。"
+          }
+        }
+      }
+    },
+    "Not relevant": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not relevant"
+          }
+        }
+      }
+    },
+    "Likely relevant": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Likely relevant"
           }
         }
       }
@@ -10245,6 +10553,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "飞行员"
+          }
+        }
+      }
+    },
+    "Pilot voice": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pilot voice"
           }
         }
       }
@@ -13934,6 +14253,17 @@
         }
       }
     },
+    "Transmission": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transmission"
+          }
+        }
+      }
+    },
     "The iOS audio service restarted. Recording paused — check the input and start again.": {
       "extractionState": "manual",
       "localizations": {
@@ -17540,6 +17870,28 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "未设置呼号时，过滤会放行所有非飞行员片段。点击麦克风以通过语音设置。"
+          }
+        }
+      }
+    },
+    "Without a callsign, the filter passes all non-pilot transmissions. Tap the microphone to set it by voice.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Without a callsign, the filter passes all non-pilot transmissions. Tap the microphone to set it by voice."
+          }
+        }
+      }
+    },
+    "Urgent broadcast": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Urgent broadcast"
           }
         }
       }

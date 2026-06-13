@@ -113,6 +113,79 @@ struct TranscriptStoreTests {
         """)
   }
 
+  @Test func appendingClosedTransmissionWritesTransmissionHistory() throws {
+    let root = try Self.makeRoot()
+    defer { Self.removeRoot(root) }
+    let store = try FileTranscriptStore(rootDirectory: root) { Date(timeIntervalSince1970: 0) }
+    let summary = try store.beginSession(localeIdentifier: "en-US")
+    let legacySegment = Self.segment(
+      id: UUID(uuidString: "00000000-0000-0000-0000-000000000208")!,
+      startedAt: Date(timeIntervalSince1970: 7),
+      text: "Legacy fragment")
+    let transmission = Self.transmission(
+      id: UUID(uuidString: "00000000-0000-0000-0000-000000000209")!,
+      startedAt: Date(timeIntervalSince1970: 5),
+      endedAt: Date(timeIntervalSince1970: 9),
+      text: "Cleared to land runway two seven")
+
+    try store.append(legacySegment, to: summary.id)
+    try store.append(transmission, to: summary.id)
+
+    #expect(try store.transmissions(in: summary.id) == [transmission])
+    #expect(try store.segments(in: summary.id).map(\.text) == [transmission.text])
+    #expect(
+      try store.exportText(for: summary.id)
+        == """
+        Dspeech transcript  1970-01-01  en-US
+        00:00:05  Cleared to land runway two seven
+        """)
+  }
+
+  @Test func openTransmissionIsRecoveredOnceAndRemovedAfterClose() throws {
+    let root = try Self.makeRoot()
+    defer { Self.removeRoot(root) }
+    let store = try FileTranscriptStore(rootDirectory: root)
+    let summary = try store.beginSession(localeIdentifier: "fr-FR")
+    let open = Self.transmission(
+      id: UUID(uuidString: "00000000-0000-0000-0000-000000000210")!,
+      startedAt: Date(timeIntervalSince1970: 3),
+      endedAt: Date(timeIntervalSince1970: 4),
+      text: "Fox Papa unité deux trois contactez tour")
+
+    try store.updateOpen(open, in: summary.id)
+    #expect(try store.transmissions(in: summary.id) == [open])
+
+    let closed = Self.transmission(
+      id: open.id,
+      startedAt: open.startedAt,
+      endedAt: Date(timeIntervalSince1970: 5),
+      text: "Fox Papa unité deux trois contactez tour")
+    try store.append(closed, to: summary.id)
+
+    #expect(try store.transmissions(in: summary.id) == [closed])
+  }
+
+  @Test func legacySegmentOnlyExportStillWorksWithoutTransmissionFiles() throws {
+    let root = try Self.makeRoot()
+    defer { Self.removeRoot(root) }
+    let store = try FileTranscriptStore(rootDirectory: root) { Date(timeIntervalSince1970: 0) }
+    let summary = try store.beginSession(localeIdentifier: "en-US")
+    let segment = Self.segment(
+      id: UUID(uuidString: "00000000-0000-0000-0000-000000000211")!,
+      startedAt: Date(timeIntervalSince1970: 21),
+      text: "Contact tower")
+
+    try store.append(segment, to: summary.id)
+
+    #expect(try store.transmissions(in: summary.id).isEmpty)
+    #expect(
+      try store.exportText(for: summary.id)
+        == """
+        Dspeech transcript  1970-01-01  en-US
+        00:00:21  Contact tower
+        """)
+  }
+
   @Test func stopPlaceholderOnlySessionSurvivesHistoryRead() throws {
     let root = try Self.makeRoot()
     defer { Self.removeRoot(root) }
@@ -269,6 +342,28 @@ struct TranscriptStoreTests {
       sourceLanguageCode: "en",
       source: .liveATC,
       isStopCommittedPlaceholder: isStopCommittedPlaceholder
+    )
+  }
+
+  private static func transmission(
+    id: UUID,
+    startedAt: Date,
+    endedAt: Date,
+    text: String
+  ) -> Transmission {
+    Transmission(
+      id: id,
+      startedAt: startedAt,
+      endedAt: endedAt,
+      text: text,
+      segments: [
+        Self.segment(
+          id: id,
+          startedAt: startedAt,
+          text: text)
+      ],
+      classification: .displayed(.callSignMatch),
+      localeIdentifier: "en-US"
     )
   }
 

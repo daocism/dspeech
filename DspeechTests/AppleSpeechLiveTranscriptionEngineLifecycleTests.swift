@@ -314,6 +314,204 @@ struct AppleSpeechLiveTranscriptionEngineLifecycleTests {
     collector.cancel()
   }
 
+  @Test func restartBoundaryCommitsPendingPartialBeforeTaskRestart() async {
+    let engine = AppleSpeechLiveTranscriptionEngine(
+      localeProvider: { "fr-FR" },
+      requireOnDeviceModel: false,
+      skipPermissionRequests: true,
+      audioSession: SpyLiveAudioSession()
+    )
+    let recorder = EventRecorder()
+    let collector = collect(engine.events(), into: recorder)
+    engine.primeListeningForTesting(acquireCapture: false)
+    engine.installRecognitionCallbackConduitForTesting(generation: 31)
+
+    engine.emitRecognitionCallbackForTesting(
+      generation: 31,
+      event: .partial("  autorise atterrissage piste deux sept  "),
+      isFinal: false,
+      hasResult: true
+    )
+    #expect(await waitForEvent({ await recorder.partialTexts().count == 1 }))
+
+    engine.simulateRecognitionRestartBoundaryForTesting()
+
+    #expect(await waitForEvent({ await recorder.interimRestartSegments().count == 1 }))
+    let events = await recorder.recordedEvents()
+    let committed = await recorder.interimRestartSegments().first
+    #expect(committed?.text == "autorise atterrissage piste deux sept")
+    #expect(committed?.confidence == 0)
+    #expect(committed?.sourceLanguageCode == "fr")
+    #expect(committed?.source == .liveATC)
+    #expect(indexOfInterimSegment(in: events) < indexOfTaskRestart(in: events))
+    collector.cancel()
+  }
+
+  @Test func realFinalClearsPendingPartialBeforeNextRestartBoundary() async {
+    let engine = AppleSpeechLiveTranscriptionEngine(
+      requireOnDeviceModel: false,
+      skipPermissionRequests: true,
+      audioSession: SpyLiveAudioSession()
+    )
+    let recorder = EventRecorder()
+    let collector = collect(engine.events(), into: recorder)
+    engine.installRecognitionCallbackConduitForTesting(generation: 32)
+    let final = TranscriptSegment(
+      text: "November one two three cleared to land",
+      confidence: 0.92,
+      sourceLanguageCode: "en",
+      source: .liveATC
+    )
+
+    engine.emitRecognitionCallbackForTesting(
+      generation: 32,
+      event: .partial("November one two three"),
+      isFinal: false,
+      hasResult: true
+    )
+    engine.emitRecognitionCallbackForTesting(
+      generation: 32,
+      event: .segment(final),
+      isFinal: true,
+      hasResult: true
+    )
+    #expect(await waitForEvent({ await recorder.segmentTexts().contains(final.text) }))
+
+    engine.simulateRecognitionRestartBoundaryForTesting()
+
+    #expect(await waitForEvent({ await recorder.hasTaskRestart() }))
+    #expect(await recorder.interimRestartSegments().isEmpty)
+    #expect(await recorder.segmentTexts() == [final.text])
+    collector.cancel()
+  }
+
+  @Test func whitespacePartialDoesNotCommitAtRestartBoundary() async {
+    let engine = AppleSpeechLiveTranscriptionEngine(
+      requireOnDeviceModel: false,
+      skipPermissionRequests: true,
+      audioSession: SpyLiveAudioSession()
+    )
+    let recorder = EventRecorder()
+    let collector = collect(engine.events(), into: recorder)
+    engine.installRecognitionCallbackConduitForTesting(generation: 33)
+
+    engine.emitRecognitionCallbackForTesting(
+      generation: 33,
+      event: .partial(" \n\t "),
+      isFinal: false,
+      hasResult: true
+    )
+    #expect(await waitForEvent({ await recorder.partialTexts().count == 1 }))
+
+    engine.simulateRecognitionRestartBoundaryForTesting()
+
+    #expect(await waitForEvent({ await recorder.hasTaskRestart() }))
+    #expect(await recorder.interimRestartSegments().isEmpty)
+    collector.cancel()
+  }
+
+  @Test func terminalFailureCommitsPendingPartialBeforeFailedStatus() async {
+    let engine = AppleSpeechLiveTranscriptionEngine(
+      localeProvider: { "fr-FR" },
+      requireOnDeviceModel: false,
+      skipPermissionRequests: true,
+      audioSession: SpyLiveAudioSession()
+    )
+    let recorder = EventRecorder()
+    let collector = collect(engine.events(), into: recorder)
+    engine.primeListeningForTesting(acquireCapture: true)
+    engine.installRecognitionCallbackConduitForTesting(generation: 34)
+
+    engine.emitRecognitionCallbackForTesting(
+      generation: 34,
+      event: .partial("contactez approche sur un deux trois décimale quatre"),
+      isFinal: false,
+      hasResult: true
+    )
+    #expect(await waitForEvent({ await recorder.partialTexts().count == 1 }))
+
+    engine.simulateRecognizerAvailabilityChangeForTesting(false)
+
+    #expect(await waitForEvent({ await recorder.failedStatuses().count == 1 }))
+    let events = await recorder.recordedEvents()
+    let committed = await recorder.interimRestartSegments().first
+    #expect(committed?.text == "contactez approche sur un deux trois décimale quatre")
+    #expect(indexOfInterimSegment(in: events) < indexOfFailedStatus(in: events))
+    collector.cancel()
+  }
+
+  @Test func emittedSegmentsAreAppendOnlyAcrossPartialsFinalsAndRestarts() async {
+    let engine = AppleSpeechLiveTranscriptionEngine(
+      requireOnDeviceModel: false,
+      skipPermissionRequests: true,
+      audioSession: SpyLiveAudioSession()
+    )
+    let recorder = EventRecorder()
+    let collector = collect(engine.events(), into: recorder)
+    engine.installRecognitionCallbackConduitForTesting(generation: 35)
+
+    engine.emitRecognitionCallbackForTesting(
+      generation: 35,
+      event: .partial("November one two three"),
+      isFinal: false,
+      hasResult: true
+    )
+    #expect(await waitForEvent({ await recorder.partialTexts().count == 1 }))
+    engine.simulateRecognitionRestartBoundaryForTesting()
+    engine.installRecognitionCallbackConduitForTesting(generation: 36)
+    engine.emitRecognitionCallbackForTesting(
+      generation: 36,
+      event: .partial("November one two three descend"),
+      isFinal: false,
+      hasResult: true
+    )
+    engine.emitRecognitionCallbackForTesting(
+      generation: 36,
+      event: .segment(
+        TranscriptSegment(
+          text: "November one two three descend flight level eight zero",
+          confidence: 0.94,
+          sourceLanguageCode: "en",
+          source: .liveATC
+        )),
+      isFinal: true,
+      hasResult: true
+    )
+    #expect(await waitForEvent({ await recorder.segmentTexts().count == 2 }))
+    engine.simulateRecognitionRestartBoundaryForTesting()
+
+    let segmentTexts = await recorder.segmentTexts()
+    #expect(segmentTexts.map(\.count) == segmentTexts.map(\.count).sorted())
+    #expect(segmentTexts.first == "November one two three")
+    #expect(segmentTexts.last == "November one two three descend flight level eight zero")
+    #expect(await recorder.recordedEvents().allSatisfy { $0.isAppendOnlyTranscriptEvent })
+    collector.cancel()
+  }
+
+  @Test func disabledReplayTailSkipsCaptureStorageAndRecognitionInstallReplay() {
+    let enabledEngine = AppleSpeechLiveTranscriptionEngine(
+      requireOnDeviceModel: false,
+      skipPermissionRequests: true,
+      replayTailEnabled: true,
+      audioSession: SpyLiveAudioSession()
+    )
+    let disabledEngine = AppleSpeechLiveTranscriptionEngine(
+      requireOnDeviceModel: false,
+      skipPermissionRequests: true,
+      replayTailEnabled: false,
+      audioSession: SpyLiveAudioSession()
+    )
+    let buffer = makeReplayTailTestBuffer()
+
+    enabledEngine.appendReplayTailBufferForTesting(buffer, sampleCount: 1_600, sampleRate: 16_000)
+    disabledEngine.appendReplayTailBufferForTesting(buffer, sampleCount: 1_600, sampleRate: 16_000)
+
+    #expect(enabledEngine.replayTailBufferCountForTesting() == 1)
+    #expect(enabledEngine.recognitionInstallReplayTailBufferCountForTesting() == 1)
+    #expect(disabledEngine.replayTailBufferCountForTesting() == 0)
+    #expect(disabledEngine.recognitionInstallReplayTailBufferCountForTesting() == 0)
+  }
+
   @Test func startFailsWhenCaptureSessionIsBusy() async {
     let arbiter = AudioCaptureArbiter()
     #expect(arbiter.acquire(.callsignDictation))
@@ -411,6 +609,38 @@ struct AppleSpeechLiveTranscriptionEngineLifecycleTests {
     }
     return await predicate()
   }
+
+  private func collect(
+    _ events: AsyncStream<LiveTranscriptionEvent>,
+    into recorder: EventRecorder
+  ) -> Task<Void, Never> {
+    Task { @MainActor in
+      for await event in events {
+        await recorder.record(event)
+      }
+    }
+  }
+
+  private func indexOfInterimSegment(in events: [LiveTranscriptionEvent]) -> Int {
+    events.firstIndex {
+      if case .segment(let segment) = $0 { return segment.isInterimRestartCommit }
+      return false
+    } ?? Int.max
+  }
+
+  private func indexOfTaskRestart(in events: [LiveTranscriptionEvent]) -> Int {
+    events.firstIndex {
+      if case .taskRestart = $0 { return true }
+      return false
+    } ?? Int.max
+  }
+
+  private func indexOfFailedStatus(in events: [LiveTranscriptionEvent]) -> Int {
+    events.firstIndex {
+      if case .status(.failed) = $0 { return true }
+      return false
+    } ?? Int.max
+  }
 }
 
 private actor EventRecorder {
@@ -420,9 +650,22 @@ private actor EventRecorder {
     events.append(event)
   }
 
+  func recordedEvents() -> [LiveTranscriptionEvent] {
+    events
+  }
+
   func segmentTexts() -> [String] {
     events.compactMap {
       if case .segment(let segment) = $0 { return segment.text }
+      return nil
+    }
+  }
+
+  func interimRestartSegments() -> [TranscriptSegment] {
+    events.compactMap {
+      if case .segment(let segment) = $0, segment.isInterimRestartCommit {
+        return segment
+      }
       return nil
     }
   }
@@ -433,6 +676,37 @@ private actor EventRecorder {
       return nil
     }
   }
+
+  func hasTaskRestart() -> Bool {
+    events.contains {
+      if case .taskRestart = $0 { return true }
+      return false
+    }
+  }
+
+  func failedStatuses() -> [LiveTranscriptionStatus] {
+    events.compactMap {
+      if case .status(let status) = $0, case .failed = status { return status }
+      return nil
+    }
+  }
+}
+
+extension LiveTranscriptionEvent {
+  fileprivate var isAppendOnlyTranscriptEvent: Bool {
+    switch self {
+    case .partial, .segment, .taskRestart, .status:
+      return true
+    }
+  }
+}
+
+private func makeReplayTailTestBuffer() -> AVAudioPCMBuffer {
+  let format = AVAudioFormat(
+    commonFormat: .pcmFormatFloat32, sampleRate: 16_000, channels: 1, interleaved: false)!
+  let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 1_600)!
+  buffer.frameLength = 1_600
+  return buffer
 }
 
 @MainActor
