@@ -206,8 +206,22 @@ struct CallSign: Equatable, Hashable, Sendable, Codable {
       return true
     }
     return decodedRuns(in: text, localeIdentifier: localeIdentifier).contains { run in
-      candidates.contains { run.contains($0) }
+      candidates.contains { Self.runMatchesFullCallSign(run, candidate: $0) }
     }
+  }
+
+  // why: the full call-sign must match a decoded run that EQUALS it, or that begins with it
+  // followed by a DIGIT — our own read-backs append numbers (squawk/altitude/heading) that the
+  // recognizer often fuses onto the call-sign with no word break ("N123AB" + "27" -> "N123AB27").
+  // A bare substring match wrongly displayed traffic addressed to ANOTHER aircraft whose decoded
+  // run merely contains ours (our call-sign embedded mid/suffix, e.g. "DN2AB9" for own N2AB, or
+  // extended by more phonetic letters, e.g. "N2ABC"). Our own call-sign always starts its run
+  // (a non-decodable word breaks the run before it), so requiring prefix+digit never hides own.
+  private static func runMatchesFullCallSign(_ run: String, candidate: String) -> Bool {
+    if run == candidate { return true }
+    guard run.hasPrefix(candidate) else { return false }
+    let next = run.index(run.startIndex, offsetBy: candidate.count)
+    return run[next].isNumber
   }
 
   // why: abbreviated tails ("3AB" for N123AB) must match only a COMPLETE spoken run, never
