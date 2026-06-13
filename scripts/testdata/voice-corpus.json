@@ -1,0 +1,115 @@
+{
+  "comment": "Controlled real-audio core-test corpus. Single source of truth for the audio generator (generate-voice-corpus.sh: say -> 16kHz mono WAV, ffmpeg radio degradation + speaker overlap) and the real-ASR eval (run-asr-eval.py: runs the REAL WhisperKit/Apple engine, scores WER on actual output). Controller (Daniel) vs own-aircraft pilot (Samantha) vs other aircraft (Karen/Daniel). Own call-sign N123AB / 'Three Alpha Bravo' — its pilot readbacks must be FILTERED; controller + other-aircraft + urgency must be DISPLAYED. `text` is the exact spoken reference for WER. Each clip is also rendered as a `-radio` variant (VHF AM band-pass + noise) to test wild-condition robustness; `overlaps` mix two speakers to test separation under step-on.",
+  "locale": "en",
+  "callsign": "N123AB",
+  "ownCallsignSpoken": "Three Alpha Bravo",
+  "thresholds": {
+    "cleanMaxAvgWER": 0.20,
+    "radioMaxAvgWER": 0.55,
+    "minClassificationAccuracy": 0.80
+  },
+  "clips": [
+    {
+      "id": "disp-clearance",
+      "role": "controller",
+      "voice": "Daniel",
+      "text": "November One Two Three Alpha Bravo, cleared for takeoff, runway two seven",
+      "expectDisplayed": true
+    },
+    {
+      "id": "disp-descend",
+      "role": "controller",
+      "voice": "Daniel",
+      "text": "November One Two Three Alpha Bravo, descend and maintain three thousand",
+      "expectDisplayed": true
+    },
+    {
+      "id": "disp-heading",
+      "role": "controller",
+      "voice": "Daniel",
+      "text": "Three Alpha Bravo, turn left heading two seven zero",
+      "expectDisplayed": true
+    },
+    {
+      "id": "disp-contact-tower",
+      "role": "controller",
+      "voice": "Daniel",
+      "text": "Three Alpha Bravo, contact tower one one eight decimal seven",
+      "expectDisplayed": true
+    },
+    {
+      "id": "disp-taxi-holdshort",
+      "role": "controller",
+      "voice": "Daniel",
+      "text": "November One Two Three Alpha Bravo, taxi to runway two seven via Alpha, hold short runway three two",
+      "expectDisplayed": true
+    },
+    {
+      "id": "disp-squawk",
+      "role": "controller",
+      "voice": "Daniel",
+      "text": "Three Alpha Bravo, squawk four six two one",
+      "expectDisplayed": true
+    },
+    {
+      "id": "other-speedbird-climb",
+      "role": "other-aircraft",
+      "voice": "Karen",
+      "text": "Speedbird Four Two, climb flight level three one zero",
+      "expectDisplayed": true
+    },
+    {
+      "id": "other-lufthansa-contact",
+      "role": "other-aircraft",
+      "voice": "Karen",
+      "text": "Lufthansa Four Five Six, contact Munich Radar one two seven decimal eight",
+      "expectDisplayed": true
+    },
+    {
+      "id": "pilot-readback-clearance",
+      "role": "own-pilot",
+      "voice": "Samantha",
+      "text": "Cleared for takeoff runway two seven, Three Alpha Bravo",
+      "expectDisplayed": false
+    },
+    {
+      "id": "pilot-readback-taxi",
+      "role": "own-pilot",
+      "voice": "Samantha",
+      "text": "Taxi to runway two seven via Alpha, hold short runway three two, Three Alpha Bravo",
+      "expectDisplayed": false
+    },
+    {
+      "id": "pilot-readback-squawk",
+      "role": "own-pilot",
+      "voice": "Samantha",
+      "text": "Squawk four six two one, Three Alpha Bravo",
+      "expectDisplayed": false
+    },
+    {
+      "id": "pilot-mayday",
+      "role": "own-pilot",
+      "voice": "Samantha",
+      "text": "Mayday, Mayday, Mayday, November One Two Three Alpha Bravo, engine failure",
+      "expectDisplayed": true
+    }
+  ],
+  "overlaps": [
+    {
+      "id": "overlap-controller-over-pilot",
+      "primary": "disp-clearance",
+      "secondary": "pilot-readback-clearance",
+      "offsetSeconds": 0.8,
+      "text": "November One Two Three Alpha Bravo, cleared for takeoff, runway two seven",
+      "expectDisplayed": true
+    },
+    {
+      "id": "overlap-two-aircraft",
+      "primary": "other-speedbird-climb",
+      "secondary": "pilot-readback-squawk",
+      "offsetSeconds": 1.0,
+      "text": "Speedbird Four Two, climb flight level three one zero",
+      "expectDisplayed": true
+    }
+  ]
+}
