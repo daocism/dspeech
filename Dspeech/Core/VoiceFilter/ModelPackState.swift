@@ -9,12 +9,17 @@ import Foundation
 // speaker path (VoiceFilterPipeline.routeBeforeTranscription / classify) fails open to .nonPilot,
 // so the uncalibrated thresholds are never exercised in production.
 enum VoiceFilterFeatureFlag {
-  // why: gated by an explicit launch argument in ALL build configurations (not auto-on in DEBUG)
-  // so the accessibility audit and every default launch exercise the SAME production surface that
-  // ships — the phase-1 callsign filter without the model-pack download/enrollment. The model-pack
-  // feature tests opt in with `-dspeech.voicefilter.diarization.enable`; Release never passes it.
+  // why: ADR 0008's acceptance gates are met in-tree (real FluidAudioSpeakerIdentifier wired only
+  // when the pack is installed; persisted state machine with round-trip test; download/import UX
+  // with size disclosure, progress, cancel, retry, delete; network-deny integration test green on
+  // the simulator; offline replay lane green in CI; 256-dim embedding asserted; live-state
+  // capability copy) and the match thresholds are calibrated from real FluidAudio measurements — so
+  // phase-2 speaker classification now ships ON by default. It stays SAFE by default: with no
+  // installed pack and no enrolled pilot the pre-ASR speaker path fails open to .nonPilot (nothing
+  // is suppressed) until the user explicitly downloads the pack and enrols a voice.
+  // `-dspeech.voicefilter.diarization.disable` forces it off (test kill switch / safety override).
   static let speakerDiarizationEnabled: Bool =
-    CommandLine.arguments.contains("-dspeech.voicefilter.diarization.enable")
+    !CommandLine.arguments.contains("-dspeech.voicefilter.diarization.disable")
 }
 
 struct ModelPackAcquisition: Equatable, Sendable, Codable {
