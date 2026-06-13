@@ -42,7 +42,11 @@ final class WhisperKitLiveTranscriptionEngine: LiveTranscriptionEngine {
   private let localeProvider: @MainActor () -> String?
   private let authorizer: any LiveSpeechAuthorizing
   private let audioConduit: LiveAudioCaptureConduit
-  private var activeLocaleIdentifier = "en-US"
+  // why: WhisperKit is multilingual and treats the locale purely as an OPTIONAL
+  // language hint (nil → auto-detect). Unlike Apple Speech it ships no per-language
+  // on-device asset, so it must run even when no Apple dictation locale exists.
+  private var activeLocaleIdentifier: String?
+  private static let deviceLanguageCode = Locale.current.language.languageCode?.identifier ?? "en"
   private var lifecycleGeneration = 0
   private var eventContinuations: [UUID: AsyncStream<LiveTranscriptionEvent>.Continuation] = [:]
   private var consumeTask: Task<Void, Never>?
@@ -106,11 +110,11 @@ final class WhisperKitLiveTranscriptionEngine: LiveTranscriptionEngine {
       status = .failed("whisperkit-model-not-installed")
       return
     }
-    guard let localeIdentifier = localeProvider() else {
-      status = .failed("recognition-locale-unavailable")
-      return
-    }
-    activeLocaleIdentifier = localeIdentifier
+    // why: a nil locale is NOT a failure for WhisperKit — it means "no language
+    // hint, auto-detect". The provider returns nil whenever the user has no Apple
+    // on-device dictation locale; blocking here made the selectable WhisperKit
+    // engine unusable in exactly that case (its whole reason to exist).
+    activeLocaleIdentifier = localeProvider()
 
     do {
       try await transcriber.loadModel(folderURL: modelFolderURL)
@@ -289,7 +293,8 @@ final class WhisperKitLiveTranscriptionEngine: LiveTranscriptionEngine {
     let segment = TranscriptSegment(
       text: text,
       confidence: Self.confidence(from: segments),
-      sourceLanguageCode: Self.sourceLanguageCode(for: snapshot.localeIdentifier),
+      sourceLanguageCode: Self.sourceLanguageCode(for: snapshot.localeIdentifier)
+        ?? Self.deviceLanguageCode,
       source: .liveATC
     )
     emit(.segment(segment))
@@ -375,18 +380,22 @@ final class WhisperKitLiveTranscriptionEngine: LiveTranscriptionEngine {
     return text.trimmingCharacters(in: .whitespacesAndNewlines)
   }
 
-  private static func sourceLanguageCode(for localeIdentifier: String) -> String {
-    Locale(identifier: localeIdentifier).language.languageCode?.identifier ?? localeIdentifier
+  // why: nil locale → nil language code (whisper auto-detects); callers that need a
+  // concrete language tag for a stored/displayed segment fall back to the device language.
+  private static func sourceLanguageCode(for localeIdentifier: String?) -> String? {
+    guard let localeIdentifier else { return nil }
+    return Locale(identifier: localeIdentifier).language.languageCode?.identifier
+      ?? localeIdentifier
   }
 
   private static func interimRestartSegment(
     text: String,
-    localeIdentifier: String
+    localeIdentifier: String?
   ) -> TranscriptSegment {
     TranscriptSegment(
       text: text,
       confidence: 0,
-      sourceLanguageCode: sourceLanguageCode(for: localeIdentifier),
+      sourceLanguageCode: sourceLanguageCode(for: localeIdentifier) ?? deviceLanguageCode,
       source: .liveATC,
       isInterimRestartCommit: true
     )
@@ -493,7 +502,7 @@ private struct WhisperDecodeSnapshot: Sendable {
   let samples: [Float]
   let windowStartAbsoluteSample: Int64
   let windowSampleCount: Int
-  let localeIdentifier: String
+  let localeIdentifier: String?
 }
 
 private enum WhisperLiveEngineError: LocalizedError {

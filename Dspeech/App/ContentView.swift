@@ -198,6 +198,12 @@ struct ContentView: View {
   private var emptyStateText: String {
     switch liveViewModel.status {
     case .idle, .stopped, .failed:
+      // why: the on-device-locale readiness check is Apple-Speech-specific. WhisperKit
+      // is multilingual and has no Apple per-language asset, so its idle screen must NOT
+      // claim "no recognition languages" — that gate only applies to the Apple engine.
+      if recognition.engineChoice == .whisperKit {
+        return idleInviteText
+      }
       // why: before the first Start, reflect whether on-device recognition is actually ready —
       // tapping Start while locales are still loading otherwise fails with a misleading
       // "no language" error. The specific failure detail renders in the bottom error banner.
@@ -351,6 +357,14 @@ struct ContentView: View {
     .task {
       await recognition.refreshCapableLocales()
       if translation.enabled { updateTranslationConfig() }
+      #if DEBUG
+        // why: headless E2E seam — lets an automated real-audio run (fixture piped
+        // into the simulator mic) start the live engine without a GUI tap. DEBUG-only;
+        // a release build can never auto-arm the microphone.
+        if CommandLine.arguments.contains("-dspeech.e2e.autostart-listening") {
+          await liveViewModel.start()
+        }
+      #endif
     }
     .onDisappear {
       coordinator.endObservingRouteChanges()

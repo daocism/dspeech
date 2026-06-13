@@ -33,6 +33,48 @@ struct WhisperKitLiveTranscriptionEngineTests {
     #expect(await transcriber.loadedFolders().isEmpty)
   }
 
+  // why: regression — WhisperKit must START with a nil locale (no Apple on-device
+  // dictation language present), not fail with "recognition-locale-unavailable".
+  // The nil flows to the transcriber as "no language hint → auto-detect". This is
+  // the exact defect the real-audio simulator run surfaced that 659 green tests missed.
+  @Test func startWithNilLocaleListensAndDecodesWithoutLanguageHint() async {
+    let transcriber = FakeWhisperLiveTranscriber { samples, _ in
+      [
+        WhisperLiveSegment(
+          text: "bonjour",
+          startSeconds: 0,
+          endSeconds: Double(samples.count) / 16_000,
+          avgLogProb: log(0.7)
+        )
+      ]
+    }
+    let engine = WhisperKitLiveTranscriptionEngine(
+      transcriber: transcriber,
+      installedModelFolderURL: { URL(fileURLWithPath: "/tmp/local-whisper", isDirectory: true) },
+      localeProvider: { nil },
+      audioSession: SpyWhisperAudioSession(),
+      authorizer: SpyWhisperAuthorizer(microphoneAllowed: true)
+    )
+
+    await engine.start()
+
+    #expect(engine.status == .listening)
+    #expect(await transcriber.loadedFolders().count == 1)
+
+    let recorder = WhisperEventRecorder()
+    let collector = collect(engine.events(), into: recorder)
+    engine.appendSamplesForTesting(Self.samples(count: 16_000, value: 0.2), sampleRate: 16_000)
+    engine.appendSamplesForTesting(Self.samples(count: 16_000, value: 0), sampleRate: 16_000)
+    #expect(await waitForEvent({ await recorder.segments().count == 1 }))
+    let decodeLanguages = await transcriber.decodeRequests().map(\.languageCode)
+    #expect(
+      decodeLanguages.allSatisfy { $0 == nil }, "nil locale must decode with no language hint")
+    // the stored segment still carries a concrete language tag (device fallback)
+    #expect(await recorder.segments().first?.sourceLanguageCode.isEmpty == false)
+    collector.cancel()
+    engine.stop()
+  }
+
   @Test func scriptedSamplesEmitGrowingPartialsThenFinalizeAndAdvanceWindow() async {
     let transcriber = FakeWhisperLiveTranscriber { samples, _ in
       let text =
