@@ -16,6 +16,7 @@ Usage:
                   [--categories clean,radio,overlap] [--manifest <json>]
 """
 import argparse
+import hashlib
 import json
 import re
 import subprocess
@@ -24,6 +25,7 @@ from collections import defaultdict
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+CACHE_DIR = REPO_ROOT / "tmp" / "asr-cache"
 TRANSMISSION_RE = re.compile(r"\[(DISPLAYED|FILTERED)\s[^\]]*\]\s+«(.*?)»")
 _NUM = {
     "zero": "0", "oh": "0", "o": "0", "one": "1", "two": "2", "three": "3", "four": "4",
@@ -74,6 +76,25 @@ def wer(reference: str, hypothesis: str) -> float:
 
 
 def transcribe(audio: Path, locale: str, callsign: str, engine: str) -> tuple[str, bool, bool]:
+    # why: WhisperKit/Apple output is deterministic for a given audio+engine+locale+callsign,
+    # but each decode costs seconds. Cache by content hash so iterating on the DOWNSTREAM
+    # classification/normalization logic does not re-run the engine on unchanged audio.
+    key = hashlib.sha256(
+        audio.read_bytes() + f"|{engine}|{locale}|{callsign}".encode()
+    ).hexdigest()[:16]
+    cache_file = CACHE_DIR / f"{key}.json"
+    if cache_file.exists():
+        cached = json.loads(cache_file.read_text())
+        return cached["text"], cached["displayed"], cached["any_block"]
+    text, displayed, any_block = _transcribe_uncached(audio, locale, callsign, engine)
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    cache_file.write_text(json.dumps({"text": text, "displayed": displayed, "any_block": any_block}))
+    return text, displayed, any_block
+
+
+def _transcribe_uncached(
+    audio: Path, locale: str, callsign: str, engine: str
+) -> tuple[str, bool, bool]:
     result = subprocess.run(
         [
             "swift", "run", "--package-path", str(REPO_ROOT / "Dspeech/Tools/ReplayKit"),
