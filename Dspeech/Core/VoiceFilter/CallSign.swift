@@ -121,7 +121,29 @@ struct CallSign: Equatable, Hashable, Sendable, Codable {
         index += 1
       }
     }
-    return words
+    // why: the recognizer frequently fuses a digit run and the following phonetic letter into
+    // one token ("123ALPHA", "3ALPHA") instead of separate words. Left whole, such a token
+    // decodes to nil and breaks the call-sign run mid-assembly, so a controller clearance to our
+    // own aircraft is wrongly suppressed. Splitting at letter<->digit boundaries lets each part
+    // decode; it only ever ADDS decodes (a homogeneous token is unchanged), never removes a match.
+    return words.flatMap(Self.splitAtAlphaDigitBoundaries)
+  }
+
+  private static func splitAtAlphaDigitBoundaries(_ word: String) -> [String] {
+    var parts: [String] = []
+    var current = ""
+    var currentIsDigit: Bool?
+    for character in word {
+      let isDigit = character.isNumber
+      if let previousIsDigit = currentIsDigit, previousIsDigit != isDigit, !current.isEmpty {
+        parts.append(current)
+        current = ""
+      }
+      current.append(character)
+      currentIsDigit = isDigit
+    }
+    if !current.isEmpty { parts.append(current) }
+    return parts
   }
 
   private static func decodedRuns(in text: String, localeIdentifier: String?) -> [String] {
