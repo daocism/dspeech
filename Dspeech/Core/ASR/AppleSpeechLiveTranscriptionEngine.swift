@@ -339,6 +339,10 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     )
 
     taskGeneration += 1
+    // why: a fresh recognition task starts a new audio timeline; drop any speaker decision
+    // carried over from the previous task so a stale classification can never be stamped onto
+    // the first segment of the new task (which may re-transcribe replayed tail audio).
+    lastBufferSpeaker = nil
     let generation = taskGeneration
     let sourceLanguageCode = Self.sourceLanguageCode(for: activeLocaleIdentifier)
     let callbackContinuation = installRecognitionCallbackConduit(generation: generation)
@@ -435,6 +439,13 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
       // that produced the segment; the voice filter uses it to suppress the operator's own voice.
       if case .segment(let segment, _) = event {
         emit(.segment(segment, speaker: lastBufferSpeaker))
+        // why: CONSUME the classification once it is applied. A buffer's speaker decision is
+        // valid only for the segment it produced; leaving it set would let a stale `.pilot`
+        // from a finished read-back bleed onto the NEXT segment — e.g. a controller clearance
+        // whose ASR final arrives before its own audio is classified — and wrongly suppress it.
+        // After consuming, a later segment with no fresh classification gets nil => fail-open
+        // (shown). Never hide a controller clearance on a stale decision. (Adversarial review.)
+        lastBufferSpeaker = nil
       } else {
         emit(event)
       }
