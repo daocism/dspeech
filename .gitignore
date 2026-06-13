@@ -14,3 +14,10 @@ tmp/
 !DspeechTests/Fixtures/
 !DspeechTests/Fixtures/**
 *.xcresult
+
+# local real-ATC eval run history (machine-specific; replay via --seed, not this log)
+scripts/testdata/atc-runs.log.jsonl
+
+# Python bytecode (test-harness imports)
+__pycache__/
+*.pyc
