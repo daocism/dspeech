@@ -63,6 +63,19 @@ if argumentPaths.first == "calibrate", argumentPaths.count >= 3 {
   exit(0)
 }
 
+// Voice-separation gate mode (runs the REAL shipping classify path):
+// `swift run SpeakerEval gate <enroll.wav> <chunk.wav> <injectStart> <injectEnd>`
+if argumentPaths.first == "gate", argumentPaths.count >= 5 {
+  try await runGate(
+    enrollURL: URL(fileURLWithPath: argumentPaths[1]),
+    chunkURL: URL(fileURLWithPath: argumentPaths[2]),
+    injectStart: Double(argumentPaths[3]) ?? 0,
+    injectEnd: Double(argumentPaths[4]) ?? 0,
+    manager: manager
+  )
+  exit(0)
+}
+
 var wholeClipEmbeddings: [(String, [Float])] = []
 var firstSegmentEmbedding: (clip: String, speaker: String, vector: [Float])?
 
