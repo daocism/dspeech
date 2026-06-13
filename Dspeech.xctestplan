@@ -26,16 +26,8 @@
     {
       "skippedTests" : [
         "AccessibilityAuditUITests",
-        "DspeechUITests\/testCorruptModelPackStateShowsContinueWithoutPath()",
-        "DspeechUITests\/testCorruptVoiceFilterStorageShowsRecoveryBanner()",
-        "DspeechUITests\/testSeededSuppressedSegmentShowsReviewSheet()",
         "DspeechUITests\/testSettingsExposesOnDeviceTranslationControls()",
-        "DspeechUITests\/testSettingsShowsNoOnDeviceRecognitionLocaleState()",
-        "DspeechUITests\/testSpeakerClassificationToggleAppearsOnlyWithDiarizationFlag()",
-        "DspeechUITests\/testVoiceFilterAcquisitionShowsPercentText()",
-        "DspeechUITests\/testVoiceFilterActiveKillSwitchDefaultsOnAndCanTurnOffWhenDiarizationEnabled()",
-        "DspeechUITests\/testVoiceFilterModelPackDownloadCTAIsEnabledAndStartsAcquisition()",
-        "DspeechUITests\/testVoiceFilterRetryButtonIsEnabledForRetryableFailure()"
+        "DspeechUITests\/testSettingsShowsNoOnDeviceRecognitionLocaleState()"
       ],
       "target" : {
         "containerPath" : "container:Dspeech.xcodeproj",
