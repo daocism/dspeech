@@ -211,6 +211,50 @@ struct WhisperKitLiveTranscriptionEngineTests {
     collector.cancel()
   }
 
+  // why: phase 2 — the WhisperKit engine classifies the segment's OWN window audio through the
+  // injected voice-filter gate and stamps the resulting speaker decision onto the final segment
+  // event (the VM then suppresses the operator's own read-backs). The gate is consulted only for
+  // FINAL decodes, on the exact window samples that produced the segment.
+  @Test func finalSegmentCarriesGateSpeakerClassification() async {
+    let transcriber = FakeWhisperLiveTranscriber { samples, _ in
+      [
+        WhisperLiveSegment(
+          text: "cleared for takeoff",
+          startSeconds: 0,
+          endSeconds: Double(samples.count) / 16_000,
+          avgLogProb: log(0.7)
+        )
+      ]
+    }
+    let gate = StubSpeakerGate(speaker: .pilot(slot: .primary, score: 0.95))
+    let engine = WhisperKitLiveTranscriptionEngine(
+      transcriber: transcriber,
+      installedModelFolderURL: { URL(fileURLWithPath: "/tmp/local-whisper", isDirectory: true) },
+      localeProvider: { "en-US" },
+      bufferGate: gate
+    )
+    let recorder = WhisperEventRecorder()
+    let collector = collect(engine.events(), into: recorder)
+    engine.primeListeningForTesting(acquireCapture: false)
+
+    engine.appendSamplesForTesting(Self.samples(count: 16_000, value: 0.2), sampleRate: 16_000)
+    engine.appendSamplesForTesting(Self.samples(count: 16_000, value: 0), sampleRate: 16_000)
+    #expect(await waitForEvent({ await recorder.segments().count == 1 }))
+
+    let speaker = await recorder.lastSegmentSpeaker()
+    guard case .pilot = speaker else {
+      Issue.record(
+        "final segment must carry the gate's pilot classification, got \(String(describing: speaker))"
+      )
+      collector.cancel()
+      engine.stop()
+      return
+    }
+    #expect(!gate.routedSampleCounts.isEmpty)
+    collector.cancel()
+    engine.stop()
+  }
+
   @Test func confidenceMappingUsesExpAverageLogProbClampedToUnitRange() {
     #expect(
       abs(WhisperKitLiveTranscriptionEngine.confidence(fromAverageLogProb: log(0.25)) - 0.25)
@@ -291,11 +335,33 @@ private actor WhisperEventRecorder {
     segments().filter(\.isInterimRestartCommit)
   }
 
+  func lastSegmentSpeaker() -> SpeakerMatchDecision? {
+    for event in events.reversed() {
+      if case .segment(_, let speaker) = event { return speaker }
+    }
+    return nil
+  }
+
   func failedStatuses() -> [LiveTranscriptionStatus] {
     events.compactMap {
       if case .status(let status) = $0, case .failed = status { return status }
       return nil
     }
+  }
+}
+
+@MainActor
+private final class StubSpeakerGate: SpeechAudioBufferGate {
+  let speaker: SpeakerMatchDecision?
+  private(set) var routedSampleCounts: [Int] = []
+
+  init(speaker: SpeakerMatchDecision?) {
+    self.speaker = speaker
+  }
+
+  func route(samples: [Float], sampleRate: Double) async throws -> GatedAudioRouting {
+    routedSampleCounts.append(samples.count)
+    return GatedAudioRouting(routing: .transcribe(reason: .nonPilotVoice), speaker: speaker)
   }
 }
 

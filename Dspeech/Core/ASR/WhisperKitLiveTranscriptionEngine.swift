@@ -42,6 +42,10 @@ final class WhisperKitLiveTranscriptionEngine: LiveTranscriptionEngine {
   private let localeProvider: @MainActor () -> String?
   private let authorizer: any LiveSpeechAuthorizing
   private let audioConduit: LiveAudioCaptureConduit
+  // why: voice-filter speaker classifier. WhisperKit holds the exact window audio per segment,
+  // so it classifies that window directly at the FINAL decode (more precise than the Apple
+  // engine's per-buffer tracking, and no staleness race). nil => no voice filter (fail-open).
+  private let bufferGate: (any SpeechAudioBufferGate)?
   // why: WhisperKit is multilingual and treats the locale purely as an OPTIONAL
   // language hint (nil → auto-detect). Unlike Apple Speech it ships no per-language
   // on-device asset, so it must run even when no Apple dictation locale exists.
@@ -65,13 +69,15 @@ final class WhisperKitLiveTranscriptionEngine: LiveTranscriptionEngine {
     localeProvider: @escaping @MainActor () -> String?,
     arbiter: AudioCaptureArbiter = .shared,
     audioSession: any LiveAudioSessionManaging = SystemLiveAudioSession(),
-    authorizer: any LiveSpeechAuthorizing = AppleLiveSpeechAuthorizer()
+    authorizer: any LiveSpeechAuthorizing = AppleLiveSpeechAuthorizer(),
+    bufferGate: (any SpeechAudioBufferGate)? = nil
   ) {
     self.transcriber = transcriber
     self.installedModelFolderURL = installedModelFolderURL
     self.localeProvider = localeProvider
     self.authorizer = authorizer
     self.audioConduit = LiveAudioCaptureConduit(arbiter: arbiter, audioSession: audioSession)
+    self.bufferGate = bufferGate
   }
 
   func events() -> AsyncStream<LiveTranscriptionEvent> {
@@ -241,16 +247,35 @@ final class WhisperKitLiveTranscriptionEngine: LiveTranscriptionEngine {
       } catch {
         result = .failure(error)
       }
-      await MainActor.run { [weak self] in
-        self?.handleDecodeCompletion(result, snapshot: snapshot, generation: generation)
-      }
+      await self?.completeDecode(result, snapshot: snapshot, generation: generation)
     }
+  }
+
+  // why: hop back to the MainActor so the segment's OWN window audio can be classified through
+  // the (non-Sendable, MainActor) voice-filter gate BEFORE finalizing — final decodes only. The
+  // await keeps the synchronous window/advance bookkeeping in handleDecodeCompletion intact and
+  // `isDecodeInFlight` stays true throughout, so no new decode interleaves. A thrown/absent
+  // classifier yields nil => fail-open (shown): a missing speaker decision never suppresses.
+  private func completeDecode(
+    _ result: Result<[WhisperLiveSegment], Error>,
+    snapshot: WhisperDecodeSnapshot,
+    generation: Int
+  ) async {
+    guard lifecycleGeneration == generation else { return }
+    var speaker: SpeakerMatchDecision?
+    if snapshot.purpose == .final, case .success = result, let bufferGate {
+      speaker =
+        (try? await bufferGate.route(
+          samples: snapshot.samples, sampleRate: Self.targetSampleRate))?.speaker
+    }
+    handleDecodeCompletion(result, snapshot: snapshot, generation: generation, speaker: speaker)
   }
 
   private func handleDecodeCompletion(
     _ result: Result<[WhisperLiveSegment], Error>,
     snapshot: WhisperDecodeSnapshot,
-    generation: Int
+    generation: Int,
+    speaker: SpeakerMatchDecision?
   ) {
     guard lifecycleGeneration == generation else { return }
     isDecodeInFlight = false
@@ -261,7 +286,7 @@ final class WhisperKitLiveTranscriptionEngine: LiveTranscriptionEngine {
       case .partial:
         emitPartial(segments)
       case .final:
-        emitFinal(segments, snapshot: snapshot)
+        emitFinal(segments, snapshot: snapshot, speaker: speaker)
       }
     case .failure(let error):
       emitPendingPartialForFailure()
@@ -284,7 +309,10 @@ final class WhisperKitLiveTranscriptionEngine: LiveTranscriptionEngine {
     emit(.partial(text))
   }
 
-  private func emitFinal(_ segments: [WhisperLiveSegment], snapshot: WhisperDecodeSnapshot) {
+  private func emitFinal(
+    _ segments: [WhisperLiveSegment], snapshot: WhisperDecodeSnapshot,
+    speaker: SpeakerMatchDecision?
+  ) {
     defer {
       pendingRecognitionPartial.clear()
       advanceWindow(dropping: snapshot.windowSampleCount)
@@ -297,7 +325,7 @@ final class WhisperKitLiveTranscriptionEngine: LiveTranscriptionEngine {
         ?? Self.deviceLanguageCode,
       source: .liveATC
     )
-    emit(.segment(segment, speaker: nil))
+    emit(.segment(segment, speaker: speaker))
   }
 
   private func advanceWindow(dropping sampleCount: Int) {

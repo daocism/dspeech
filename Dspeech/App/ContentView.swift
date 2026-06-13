@@ -139,7 +139,8 @@ struct ContentView: View {
       return WhisperKitLiveTranscriptionEngine(
         transcriber: WhisperKitTranscriberAdapter(),
         installedModelFolderURL: { whisperKitInstaller.installedModelFolderURL },
-        localeProvider: { recognition.localeIdentifier ?? recognition.activeLocaleIdentifier }
+        localeProvider: { recognition.localeIdentifier ?? recognition.activeLocaleIdentifier },
+        bufferGate: VoiceFilterSpeechAudioBufferGate(pipeline: voiceFilter)
       )
     }
   }
