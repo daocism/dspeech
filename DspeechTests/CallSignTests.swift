@@ -442,4 +442,22 @@ struct CallSignTests {
     }
     return keys
   }
+
+  // why: regression — the full call-sign must match a run that EQUALS it or is it followed by a
+  // DIGIT (own read-back number). It must NOT match traffic addressed to ANOTHER aircraft whose
+  // decoded run merely contains ours embedded (mid/suffix) or extended by more phonetic letters.
+  // Found by adversarial review 2026-06-13.
+  @Test func ownCallSignFollowedByReadbackDigitsMatches() throws {
+    let cs = try #require(CallSign(raw: "N123AB"))
+    #expect(cs.matches(in: "November one two three alpha bravo two seven"))
+    #expect(cs.matches(in: "November one two three alpha bravo, descend three thousand"))
+  }
+
+  @Test func otherAircraftContainingOwnCallSignDoesNotMatch() throws {
+    let cs = try #require(CallSign(raw: "N2AB"))
+    // ours embedded mid-run (Delta November Two Alpha Bravo Niner == DN2AB9)
+    #expect(!cs.matches(in: "Delta November two alpha bravo niner, descend two thousand"))
+    // ours extended by another phonetic letter (November Two Alpha Bravo Charlie == N2ABC)
+    #expect(!cs.matches(in: "November two alpha bravo charlie, contact tower"))
+  }
 }
