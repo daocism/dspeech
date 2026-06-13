@@ -245,6 +245,14 @@ struct ContentView: View {
           )
           bannerStack()
           filteredCountPill()
+          // why: reserve real layout space (outside the auto-scrolling transcript) for the
+          // first-run "Settings are here" coachmark that floats under the gear, so the first
+          // transcript card renders BELOW it. A scroll content inset did not work — the
+          // transcript auto-scrolls to the latest card, carrying any top inset off-screen,
+          // so the bubble kept obscuring the first card's text + ⋮ button (2026-06-13 review).
+          if showHints {
+            Color.clear.frame(height: isLandscape ? 40 : 56)
+          }
           transcriptArea(isLandscape: isLandscape)
         }
         .frame(maxWidth: readableContentMaxWidth, maxHeight: .infinity, alignment: .top)
