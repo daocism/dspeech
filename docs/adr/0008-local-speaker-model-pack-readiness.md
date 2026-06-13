@@ -80,3 +80,32 @@ Negative / known limitations:
 - FluidAudio (Apache-2.0, Swift/CoreML VAD + diarization + speaker embedding; SPM `https://github.com/FluidInference/FluidAudio.git`; first-use HuggingFace download; `ModelRegistry.baseURL` override): https://github.com/FluidInference/FluidAudio
 - Apple `SFSpeechRecognizer.supportsOnDeviceRecognition` (on-device requires recognizer support, else network): https://developer.apple.com/documentation/Speech/SFSpeechRecognizer/supportsOnDeviceRecognition
 - Internal: ADR 0002, ADR 0004, ADR 0007; `docs/research/2026-05-21-local-atc-speaker-filter.md`; `docs/eval/local-speaker-model-pack-validation.md`
+
+## 2026-06-13 update — phase-2 enabled by default (shippable behind its toggle)
+
+The acceptance gates above are met in-tree, so `VoiceFilterFeatureFlag.speakerDiarizationEnabled`
+now defaults **on** (was gated behind `-dspeech.voicefilter.diarization.enable`, which Release
+never passed). `-dspeech.voicefilter.diarization.disable` is the new test/safety kill switch.
+
+Gate evidence:
+
+- **Real backend, install-gated** (line 47): `FluidAudioSpeakerIdentifier` is built only when the
+  pack is `installed`/`verified` via `FluidAudioBackendBuilder`; `absent`/`failed`/`disabled` keep
+  `UnavailableLocalSpeakerIdentifier`.
+- **Persisted state machine + round-trip test** (line 48), **download/import UX** (line 49),
+  **256-dim embedding assertion** (line 52), **live-state capability copy** (line 53): present and
+  covered by `DspeechTests` + the `DspeechUITests` voice-filter tests, which are now un-skipped in
+  `Dspeech.xctestplan` so they gate on every PR/main run (the feature ships, so its tests gate).
+- **Network-deny integration test green on the simulator** (line 50): `ReplayKitNetworkDenyTests`.
+- **Offline replay lane green** (line 51): the "Offline ATC voice-filter replay eval" CI lane.
+- **Thresholds calibrated** from real FluidAudio measurements (`SpeakerMatchConfig.default`), plus a
+  real-ATC host harness (`scripts/testdata/run-atc-eval.py`) proving the safety property — across a
+  rotating cohort, real out-of-window ATC segments that reached the cosine comparator were **never**
+  classified `.pilot` (no controller suppressed), with void controls and a comparator-reached floor
+  guarding against a vacuous pass.
+
+Safety posture is unchanged for a fresh install: with no installed pack and no enrolled pilot the
+pre-ASR speaker path fails open to `.nonPilot` — nothing is suppressed until the user explicitly
+downloads the pack and enrols a voice. The badge contract (line 41) is untouched. The App Store /
+TestFlight submission gate (line 55, ADR 0006, CLAUDE.md rule 6 — explicit Andrei sign-off) remains
+in force and is **not** satisfied by this change.

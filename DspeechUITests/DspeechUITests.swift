@@ -115,9 +115,6 @@ final class DspeechUITests: XCTestCase {
 
     app.buttons["settings-button"].tap()
     assertCloudOrRemoteOptInControlsAreAbsent(in: app)
-    XCTAssertFalse(
-      app.switches["voicefilter-active-toggle"].waitForExistence(timeout: 1),
-      "speaker-classification switch must not appear unless diarization is enabled")
 
     app.buttons["settings-done-button"].tap()
 
@@ -125,15 +122,26 @@ final class DspeechUITests: XCTestCase {
   }
 
   @MainActor
-  func testSpeakerClassificationToggleAppearsOnlyWithDiarizationFlag() throws {
-    let app = launchAppWithCleanPrivacyDefaults(
-      extraArguments: ["-dspeech.voicefilter.diarization.enable"])
+  func testSpeakerClassificationToggleVisibleByDefault() throws {
+    let app = launchAppWithCleanPrivacyDefaults()
 
     app.buttons["settings-button"].tap()
 
     XCTAssertTrue(
       app.switches["voicefilter-active-toggle"].waitForExistence(timeout: 4),
-      "speaker-classification switch must remain reachable in diarization-enabled builds")
+      "speaker-classification switch must be reachable in the shipping default build")
+  }
+
+  @MainActor
+  func testSpeakerClassificationToggleHiddenWhenDiarizationDisabled() throws {
+    let app = launchAppWithCleanPrivacyDefaults(
+      extraArguments: ["-dspeech.voicefilter.diarization.disable"])
+
+    app.buttons["settings-button"].tap()
+
+    XCTAssertFalse(
+      app.switches["voicefilter-active-toggle"].waitForExistence(timeout: 1),
+      "speaker-classification switch must be hidden when diarization is force-disabled")
   }
 
   @MainActor
