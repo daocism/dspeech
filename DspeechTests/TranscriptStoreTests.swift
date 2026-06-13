@@ -3,8 +3,47 @@ import Testing
 
 @testable import Dspeech
 
+// why: data-at-rest protection is a device-enforced feature the Simulator does not honour, so we
+// cannot read the attribute back; instead we spy the exact setAttributes calls the store makes and
+// assert it REQUESTS completeUntilFirstUserAuthentication for every file/dir it creates.
+private final class ProtectionSpyFileManager: FileManager, @unchecked Sendable {
+  private(set) var protectionCalls: [(path: String, protection: FileProtectionType?)] = []
+  override func setAttributes(
+    _ attributes: [FileAttributeKey: Any], ofItemAtPath path: String
+  ) throws {
+    protectionCalls.append((path, attributes[.protectionKey] as? FileProtectionType))
+    try super.setAttributes(attributes, ofItemAtPath: path)
+  }
+}
+
 @MainActor
 struct TranscriptStoreTests {
+  @Test func sessionFilesUseCompleteUntilFirstUserAuthenticationProtection() throws {
+    let root = try Self.makeRoot()
+    defer { Self.removeRoot(root) }
+    let spy = ProtectionSpyFileManager()
+    let store = try FileTranscriptStore(rootDirectory: root, fileManager: spy) {
+      Date(timeIntervalSince1970: 100)
+    }
+
+    let summary = try store.beginSession(localeIdentifier: "en-US")
+    for segment in Self.segments() {
+      try store.append(segment, to: summary.id)
+    }
+    try store.endSession(summary.id)
+
+    #expect(
+      !spy.protectionCalls.isEmpty,
+      "store must apply data-at-rest protection to the files it creates")
+    let unprotected = spy.protectionCalls.filter {
+      $0.protection != .completeUntilFirstUserAuthentication
+    }
+    #expect(
+      unprotected.isEmpty,
+      "transcript files must use completeUntilFirstUserAuthentication; unprotected: \(unprotected.map(\.path))"
+    )
+  }
+
   @Test func roundTripPersistsSummaryAndSegments() throws {
     let root = try Self.makeRoot()
     defer { Self.removeRoot(root) }
