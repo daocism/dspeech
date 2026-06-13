@@ -249,7 +249,7 @@ struct WhisperKitLiveTranscriptionEngineTests {
 
   private func indexOfInterimSegment(in events: [LiveTranscriptionEvent]) -> Int {
     events.firstIndex {
-      if case .segment(let segment) = $0 { return segment.isInterimRestartCommit }
+      if case .segment(let segment, _) = $0 { return segment.isInterimRestartCommit }
       return false
     } ?? Int.max
   }
@@ -282,7 +282,7 @@ private actor WhisperEventRecorder {
 
   func segments() -> [TranscriptSegment] {
     events.compactMap {
-      if case .segment(let segment) = $0 { return segment }
+      if case .segment(let segment, _) = $0 { return segment }
       return nil
     }
   }

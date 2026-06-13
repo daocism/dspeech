@@ -295,7 +295,7 @@ struct AppleSpeechLiveTranscriptionEngineLifecycleTests {
 
     engine.emitRecognitionCallbackForTesting(
       generation: 7,
-      event: .segment(final),
+      event: .segment(final, speaker: nil),
       isFinal: true,
       hasResult: true
     )
@@ -371,7 +371,7 @@ struct AppleSpeechLiveTranscriptionEngineLifecycleTests {
     )
     engine.emitRecognitionCallbackForTesting(
       generation: 32,
-      event: .segment(final),
+      event: .segment(final, speaker: nil),
       isFinal: true,
       hasResult: true
     )
@@ -473,7 +473,7 @@ struct AppleSpeechLiveTranscriptionEngineLifecycleTests {
           confidence: 0.94,
           sourceLanguageCode: "en",
           source: .liveATC
-        )),
+        ), speaker: nil),
       isFinal: true,
       hasResult: true
     )
@@ -623,7 +623,7 @@ struct AppleSpeechLiveTranscriptionEngineLifecycleTests {
 
   private func indexOfInterimSegment(in events: [LiveTranscriptionEvent]) -> Int {
     events.firstIndex {
-      if case .segment(let segment) = $0 { return segment.isInterimRestartCommit }
+      if case .segment(let segment, _) = $0 { return segment.isInterimRestartCommit }
       return false
     } ?? Int.max
   }
@@ -656,14 +656,14 @@ private actor EventRecorder {
 
   func segmentTexts() -> [String] {
     events.compactMap {
-      if case .segment(let segment) = $0 { return segment.text }
+      if case .segment(let segment, _) = $0 { return segment.text }
       return nil
     }
   }
 
   func interimRestartSegments() -> [TranscriptSegment] {
     events.compactMap {
-      if case .segment(let segment) = $0, segment.isInterimRestartCommit {
+      if case .segment(let segment, _) = $0, segment.isInterimRestartCommit {
         return segment
       }
       return nil

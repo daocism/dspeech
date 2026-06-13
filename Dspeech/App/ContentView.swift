@@ -874,7 +874,7 @@ private struct TranscriptViewportHeightPreferenceKey: PreferenceKey {
               confidence: 0.96,
               sourceLanguageCode: "en",
               source: .liveATC
-            )))
+            ), speaker: nil))
         self.transition(to: .stopped)
       }
     }
