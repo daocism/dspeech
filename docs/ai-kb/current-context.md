@@ -2,6 +2,41 @@
 
 > Rolling 1-page pointer. Updated by `knowledge-curator` after every substantive run.
 
+## READ FIRST (2026-06-13)
+
+Testing reoriented per owner: the **simulator is for visual UI review only** (page
+screenshots, look for clipping/overlap/wraps), and the **real testing effort is core
+function on real audio** (transcription + dispatcher/own-readback/other-aircraft
+separation). Landed on `main`:
+
+- **Test-plan split** (PR #5): default `Dspeech.xctestplan` = unit + core UI flows +
+  `ScreenshotSmokeTests` page captures; the accessibility / Dynamic-Type / multi-locale
+  sweeps moved to `DspeechFull.xctestplan` behind a manual `workflow_dispatch` CI lane
+  (`AccessibilityAuditUITests` + secondary voice-filter/translation UI tests deferred while
+  core is built). CI `tests` job runs core only.
+- **Real-ASR core eval** (PR #5): `scripts/testdata/` — `voice-corpus.json` (controller /
+  own-pilot / other-aircraft, multiple call-signs), `generate-voice-corpus.sh` (`say` →
+  16kHz mono WAV + ffmpeg VHF-radio degradation + speaker overlap; audio gitignored under
+  `tmp/`), `run-asr-eval.py` (runs the REAL WhisperKit/Apple engine, ATC-number-normalized
+  WER + classification per clean/radio/overlap). This REPLACES trust in the synthetic
+  `dspeech-replay` replay-eval, which scores ground-truth-text-through-a-gate with a fake
+  amplitude speaker substitute (meaningless WER 0.000). It surfaced: transcription is good
+  (clean WER 0.18, radio 0.21) but classification was wrong (58%) due to a real decode bug.
+- **WhisperKit optional locale** (PR #5): nil recognition locale = auto-detect hint, not a
+  `recognition-locale-unavailable` failure (the engine was unusable without an Apple
+  on-device dictation locale). + DEBUG `-dspeech.e2e.autostart-listening` headless seam.
+- **Call-sign decode robust to ASR-fused tokens** (PR #6): `CallSign.phoneticWords` now
+  splits at letter↔digit boundaries, so "123ALPHA"/"3ALPHA" mush no longer breaks call-sign
+  assembly — a controller clearance to OUR aircraft is no longer wrongly suppressed.
+  Verified via the real-engine eval: clean classification **58% → 92%**. ReplayKit's
+  `CallSign.swift` is a symlink to `Dspeech/Core/VoiceFilter/CallSign.swift`.
+
+REMAINING: (1) residual ASR mis-hearing "Alpha Bravo" → "ABA" (fuzzy-match, lower ROI);
+(2) UI screenshot visual review pending local iOS-26.5 simulator runtime install (Xcode
+updated to 26.5 on reboot; `xcodebuild -downloadPlatform iOS`). Pilot-readback filtering
+remains ADR-0007 phase-2 (FluidAudio voice model). Owner standing goal: keep developing →
+pushing → CI builds → App-Store-shippable; never asked about git/WIP mechanics.
+
 ## READ FIRST (2026-06-12)
 
 PR #3 "production-ready" was FALSE-READY: first human use broke the core flow (text
