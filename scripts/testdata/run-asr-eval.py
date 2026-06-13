@@ -26,6 +26,12 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CACHE_DIR = REPO_ROOT / "tmp" / "asr-cache"
+# why: the cached value is the FULL `transcribe` output (transcription AND classification),
+# so the cache must invalidate whenever the engine/classifier/call-sign Swift changes — else a
+# code change would be "verified" against stale results. Fold a hash of the ReplayKit sources
+# into the cache key so any edit there busts the cache automatically.
+_SRC = sorted((REPO_ROOT / "Dspeech/Tools/ReplayKit/Sources/DspeechReplayKit").glob("*.swift"))
+MODULE_HASH = hashlib.sha256(b"".join(p.read_bytes() for p in _SRC)).hexdigest()[:12]
 TRANSMISSION_RE = re.compile(r"\[(DISPLAYED|FILTERED)\s[^\]]*\]\s+«(.*?)»")
 _NUM = {
     "zero": "0", "oh": "0", "o": "0", "one": "1", "two": "2", "three": "3", "four": "4",
@@ -80,7 +86,7 @@ def transcribe(audio: Path, locale: str, callsign: str, engine: str) -> tuple[st
     # but each decode costs seconds. Cache by content hash so iterating on the DOWNSTREAM
     # classification/normalization logic does not re-run the engine on unchanged audio.
     key = hashlib.sha256(
-        audio.read_bytes() + f"|{engine}|{locale}|{callsign}".encode()
+        audio.read_bytes() + f"|{engine}|{locale}|{callsign}|{MODULE_HASH}".encode()
     ).hexdigest()[:16]
     cache_file = CACHE_DIR / f"{key}.json"
     if cache_file.exists():
