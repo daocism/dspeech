@@ -34,6 +34,9 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
   private let contextualCallSignProvider: @MainActor () -> String?
   private var activeLocaleIdentifier = "en-US"
   private let bufferGate: (any SpeechAudioBufferGate)?
+  // why: the most recent speaker classification from the pre-ASR gate, stamped onto the
+  // segment it produced so the post-ASR voice-filter can suppress the operator's own voice.
+  private var lastBufferSpeaker: SpeakerMatchDecision?
   private var recognizer: SFSpeechRecognizer?
   private var request: SFSpeechAudioBufferRecognitionRequest?
   private var task: SFSpeechRecognitionTask?
@@ -367,7 +370,10 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
               sourceLanguageCode: sourceLanguageCode,
               source: .liveATC
             )
-            event = .segment(segment)
+            // why: speaker is MainActor state; the callback is @Sendable/off-actor, so the
+            // segment is stamped with lastBufferSpeaker when this event is consumed on the
+            // MainActor conduit (see emit path), not here.
+            event = .segment(segment, speaker: nil)
           }
           isFinal = true
           DspeechLog.engine.info("recognition task callback final=true")
@@ -422,7 +428,17 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
       restartLoopGuard.recordResult()
     }
     pendingRecognitionPartial.record(event: callback.event, isFinal: callback.isFinal)
-    if let event = callback.event { emit(event) }
+    if let event = callback.event {
+      // why: stamp the most-recent pre-ASR speaker classification onto the final segment here
+      // on the MainActor (the recognition callback that built the event is off-actor and could
+      // not read it). For a single-speaker ATC transmission this is the speaker of the audio
+      // that produced the segment; the voice filter uses it to suppress the operator's own voice.
+      if case .segment(let segment, _) = event {
+        emit(.segment(segment, speaker: lastBufferSpeaker))
+      } else {
+        emit(event)
+      }
+    }
     if callback.isFinal || callback.failure != nil {
       handleTermination(failure: callback.failure)
     }
@@ -497,7 +513,9 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     -> PreTranscriptionRoutingDecision
   {
     guard let bufferGate else { return .transcribe(reason: .classifierUnavailable) }
-    let decision = try await bufferGate.route(samples: samples, sampleRate: sampleRate)
+    let gated = try await bufferGate.route(samples: samples, sampleRate: sampleRate)
+    lastBufferSpeaker = gated.speaker
+    let decision = gated.routing
     switch decision {
     case .transcribe(let reason):
       DspeechLog.engine.debug(
@@ -535,7 +553,10 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
 
   private func emitPendingPartialForRecognitionBoundary() {
     guard let text = pendingRecognitionPartial.takeTrimmedText() else { return }
-    emit(.segment(Self.interimRestartSegment(text: text, localeIdentifier: activeLocaleIdentifier)))
+    emit(
+      .segment(
+        Self.interimRestartSegment(text: text, localeIdentifier: activeLocaleIdentifier),
+        speaker: lastBufferSpeaker))
   }
 
   @discardableResult

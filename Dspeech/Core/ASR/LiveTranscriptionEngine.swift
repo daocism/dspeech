@@ -11,7 +11,11 @@ enum LiveTranscriptionStatus: Equatable, Sendable {
 
 enum LiveTranscriptionEvent: Sendable {
   case partial(String)
-  case segment(TranscriptSegment)
+  // why: the speaker decision is the REAL FluidAudio classification of the audio that
+  // produced this segment (nil when no voice pack / no gate). It rides the event rather
+  // than TranscriptSegment so the persisted transcript model stays unchanged; the view
+  // model feeds it into the voice-filter gate to suppress the operator's own read-backs.
+  case segment(TranscriptSegment, speaker: SpeakerMatchDecision?)
   // why: emitted at every recognition-task boundary (benign restart, config rebuild,
   // availability blip) so the assembler can distinguish a task recycle from silence
   // and apply overlap-merge to the replayed audio's re-transcription.
@@ -84,7 +88,7 @@ protocol LiveTranscriptionEngine: AnyObject {
                 confidence: confidence,
                 sourceLanguageCode: sourceLanguageCode,
                 source: .liveATC
-              )))
+              ), speaker: nil))
         case .status(let status):
           transition(to: status)
         }
@@ -105,15 +109,23 @@ protocol LiveTranscriptionEngine: AnyObject {
   }
 #endif
 
+// why: carries BOTH the pre-ASR routing decision and the speaker classification of the
+// buffer. The engine keeps the speaker to stamp onto the resulting segment so the post-ASR
+// voice-filter gate can suppress the operator's own read-backs (ADR 0007 phase 2).
+struct GatedAudioRouting: Sendable {
+  let routing: PreTranscriptionRoutingDecision
+  let speaker: SpeakerMatchDecision?
+}
+
 @MainActor
 protocol SpeechAudioBufferGate: AnyObject {
-  func route(samples: [Float], sampleRate: Double) async throws -> PreTranscriptionRoutingDecision
+  func route(samples: [Float], sampleRate: Double) async throws -> GatedAudioRouting
 }
 
 @MainActor
 final class AlwaysTranscribeSpeechAudioBufferGate: SpeechAudioBufferGate {
-  func route(samples: [Float], sampleRate: Double) async throws -> PreTranscriptionRoutingDecision {
-    .transcribe(reason: .filterDisabled)
+  func route(samples: [Float], sampleRate: Double) async throws -> GatedAudioRouting {
+    GatedAudioRouting(routing: .transcribe(reason: .filterDisabled), speaker: nil)
   }
 }
 
@@ -125,15 +137,16 @@ final class VoiceFilterSpeechAudioBufferGate: SpeechAudioBufferGate {
     self.pipeline = pipeline
   }
 
-  func route(samples: [Float], sampleRate: Double) async throws -> PreTranscriptionRoutingDecision {
+  func route(samples: [Float], sampleRate: Double) async throws -> GatedAudioRouting {
     let speaker: SpeakerMatchDecision
     do {
       speaker = try await pipeline.classify(samples: samples, sampleRate: sampleRate)
     } catch {
       // why: fail open — a thrown classifier (absent/disabled pack, unavailable
       // identifier, capture failure) must never silently drop ATC audio before ASR.
-      return .transcribe(reason: .classifierUnavailable)
+      return GatedAudioRouting(routing: .transcribe(reason: .classifierUnavailable), speaker: nil)
     }
-    return pipeline.routeBeforeTranscription(speaker: speaker)
+    return GatedAudioRouting(
+      routing: pipeline.routeBeforeTranscription(speaker: speaker), speaker: speaker)
   }
 }

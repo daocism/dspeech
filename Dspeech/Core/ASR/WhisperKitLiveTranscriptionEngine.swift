@@ -297,7 +297,7 @@ final class WhisperKitLiveTranscriptionEngine: LiveTranscriptionEngine {
         ?? Self.deviceLanguageCode,
       source: .liveATC
     )
-    emit(.segment(segment))
+    emit(.segment(segment, speaker: nil))
   }
 
   private func advanceWindow(dropping sampleCount: Int) {
@@ -333,7 +333,10 @@ final class WhisperKitLiveTranscriptionEngine: LiveTranscriptionEngine {
 
   private func emitPendingPartialForFailure() {
     guard let text = pendingRecognitionPartial.takeTrimmedText() else { return }
-    emit(.segment(Self.interimRestartSegment(text: text, localeIdentifier: activeLocaleIdentifier)))
+    emit(
+      .segment(
+        Self.interimRestartSegment(text: text, localeIdentifier: activeLocaleIdentifier),
+        speaker: nil))
   }
 
   private func emit(_ event: LiveTranscriptionEvent) {

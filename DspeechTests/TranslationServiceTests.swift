@@ -242,7 +242,7 @@ struct TranslationServiceTests {
     private static func requireSegment(
       _ event: LiveTranscriptionEvent?
     ) throws -> TranscriptSegment {
-      guard case .segment(let segment) = try #require(event) else {
+      guard case .segment(let segment, _) = try #require(event) else {
         Issue.record("expected segment")
         throw TestExpectationFailure()
       }

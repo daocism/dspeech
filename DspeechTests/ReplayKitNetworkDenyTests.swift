@@ -371,7 +371,7 @@ struct ReplayKitNetworkDenyTests {
     let route = try await gate.route(samples: samples, sampleRate: buffer.format.sampleRate)
 
     #expect(engine.status == .idle)
-    guard case .transcribe = route else {
+    guard case .transcribe = route.routing else {
       Issue.record("Pre-ASR routing may never discard audio; got \(route)")
       return
     }

@@ -2359,7 +2359,7 @@ struct SpeechAudioBufferGateTests {
         identifier: ScriptedIdentifier(decision: .pilot(slot: .primary, score: 1.0))
       )
     )
-    let route = try await gate.route(samples: [0.1, 0.2, 0.1, 0.2], sampleRate: 16_000)
+    let route = (try await gate.route(samples: [0.1, 0.2, 0.1, 0.2], sampleRate: 16_000)).routing
     #expect(route == .transcribe(reason: .pilotVoice))
   }
 
@@ -2372,7 +2372,7 @@ struct SpeechAudioBufferGateTests {
     let (appended, appendContinuation) = AsyncStream<Int>.makeStream()
     let router = SerialBufferRouter<Int>(
       classify: { samples, sampleRate in
-        try await gate.route(samples: samples, sampleRate: sampleRate)
+        (try await gate.route(samples: samples, sampleRate: sampleRate)).routing
       },
       append: { appendContinuation.yield($0) }
     )
@@ -2390,7 +2390,7 @@ struct SpeechAudioBufferGateTests {
         identifier: ScriptedIdentifier(decision: .nonPilot(bestPilotScore: 0.1))
       )
     )
-    let route = try await gate.route(samples: [0.1, 0.2, 0.1, 0.2], sampleRate: 16_000)
+    let route = (try await gate.route(samples: [0.1, 0.2, 0.1, 0.2], sampleRate: 16_000)).routing
     #expect(route == .transcribe(reason: .nonPilotVoice))
   }
 
@@ -2400,7 +2400,7 @@ struct SpeechAudioBufferGateTests {
         identifier: ScriptedIdentifier(decision: .mixed(bestPilotScore: 0.62))
       )
     )
-    let route = try await gate.route(samples: [0.1, 0.2, 0.1, 0.2], sampleRate: 16_000)
+    let route = (try await gate.route(samples: [0.1, 0.2, 0.1, 0.2], sampleRate: 16_000)).routing
     #expect(route == .transcribe(reason: .mixedOrLowConfidence))
   }
 
@@ -2410,7 +2410,7 @@ struct SpeechAudioBufferGateTests {
         identifier: ScriptedIdentifier(decision: .insufficientSpeech)
       )
     )
-    let route = try await gate.route(samples: [0.0, 0.0, 0.0, 0.0], sampleRate: 16_000)
+    let route = (try await gate.route(samples: [0.0, 0.0, 0.0, 0.0], sampleRate: 16_000)).routing
     #expect(route == .transcribe(reason: .insufficientSpeech))
   }
 
@@ -2424,7 +2424,7 @@ struct SpeechAudioBufferGateTests {
       modelPackStorage: InMemoryModelPackStorage(.installed(Self.installedPack()))
     )
     let gate = VoiceFilterSpeechAudioBufferGate(pipeline: pipeline)
-    let route = try await gate.route(samples: [0.1, 0.2, 0.1, 0.2], sampleRate: 16_000)
+    let route = (try await gate.route(samples: [0.1, 0.2, 0.1, 0.2], sampleRate: 16_000)).routing
     #expect(route == .transcribe(reason: .filterDisabled))
   }
 
@@ -2439,7 +2439,7 @@ struct SpeechAudioBufferGateTests {
       voiceFilterActive: { false }
     )
     let gate = VoiceFilterSpeechAudioBufferGate(pipeline: pipeline)
-    let route = try await gate.route(samples: [0.1, 0.2, 0.1, 0.2], sampleRate: 16_000)
+    let route = (try await gate.route(samples: [0.1, 0.2, 0.1, 0.2], sampleRate: 16_000)).routing
     #expect(route == .transcribe(reason: .filterDisabled))
   }
 
@@ -2453,7 +2453,7 @@ struct SpeechAudioBufferGateTests {
       modelPackStorage: InMemoryModelPackStorage(.installed(Self.installedPack()))
     )
     let gate = VoiceFilterSpeechAudioBufferGate(pipeline: pipeline)
-    let route = try await gate.route(samples: [0.1, 0.2, 0.1, 0.2], sampleRate: 16_000)
+    let route = (try await gate.route(samples: [0.1, 0.2, 0.1, 0.2], sampleRate: 16_000)).routing
     #expect(route == .transcribe(reason: .noPilotProfile))
   }
 
@@ -2464,7 +2464,7 @@ struct SpeechAudioBufferGateTests {
         pack: .absent
       )
     )
-    let route = try await gate.route(samples: [0.1, 0.2, 0.1, 0.2], sampleRate: 16_000)
+    let route = (try await gate.route(samples: [0.1, 0.2, 0.1, 0.2], sampleRate: 16_000)).routing
     #expect(route == .transcribe(reason: .classifierUnavailable))
   }
 
@@ -2475,7 +2475,7 @@ struct SpeechAudioBufferGateTests {
         pack: .disabled(Self.installedPack())
       )
     )
-    let route = try await gate.route(samples: [0.1, 0.2, 0.1, 0.2], sampleRate: 16_000)
+    let route = (try await gate.route(samples: [0.1, 0.2, 0.1, 0.2], sampleRate: 16_000)).routing
     #expect(route == .transcribe(reason: .classifierUnavailable))
   }
 
@@ -2483,7 +2483,7 @@ struct SpeechAudioBufferGateTests {
     let gate = VoiceFilterSpeechAudioBufferGate(
       pipeline: Self.enabledPipeline(identifier: UnavailableLocalSpeakerIdentifier())
     )
-    let route = try await gate.route(samples: [0.1, 0.2, 0.1, 0.2], sampleRate: 16_000)
+    let route = (try await gate.route(samples: [0.1, 0.2, 0.1, 0.2], sampleRate: 16_000)).routing
     #expect(route == .transcribe(reason: .classifierUnavailable))
   }
 
@@ -2496,13 +2496,13 @@ struct SpeechAudioBufferGateTests {
         )
       )
     )
-    let route = try await gate.route(samples: [0.1, 0.2, 0.1, 0.2], sampleRate: 16_000)
+    let route = (try await gate.route(samples: [0.1, 0.2, 0.1, 0.2], sampleRate: 16_000)).routing
     #expect(route == .transcribe(reason: .classifierUnavailable))
   }
 
   @Test func alwaysTranscribeGateNeverDiscards() async throws {
     let gate = AlwaysTranscribeSpeechAudioBufferGate()
-    let route = try await gate.route(samples: [0.1, 0.2], sampleRate: 16_000)
+    let route = (try await gate.route(samples: [0.1, 0.2], sampleRate: 16_000)).routing
     if case .transcribe = route {
     } else {
       Issue.record("always-transcribe gate must never discard, got \(route)")

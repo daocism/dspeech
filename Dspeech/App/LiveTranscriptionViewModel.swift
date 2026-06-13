@@ -163,13 +163,16 @@ final class LiveTranscriptionViewModel {
     let text = partialText.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !text.isEmpty else { return }
     partialText = ""
+    // why: a Stop-commit of the in-flight partial has no settled speaker classification;
+    // pass nil so the gate fails open (shows it) rather than risk suppressing a real call.
     handleFinalSegment(
       TranscriptSegment(
         text: text,
         confidence: 0,
         sourceLanguageCode: lastSourceLanguageCode,
         source: .liveATC,
-        isStopCommittedPlaceholder: true))
+        isStopCommittedPlaceholder: true),
+      speaker: nil)
   }
 
   func reset() {
@@ -285,7 +288,7 @@ final class LiveTranscriptionViewModel {
     }
   }
 
-  private func append(segment: TranscriptSegment) {
+  private func append(segment: TranscriptSegment, speaker: SpeakerMatchDecision?) {
     if !segment.sourceLanguageCode.isEmpty { lastSourceLanguageCode = segment.sourceLanguageCode }
     let segmentToPersist: TranscriptSegment
     let replacementPersistenceSessionID: UUID?
@@ -307,17 +310,17 @@ final class LiveTranscriptionViewModel {
     }
     persist(segment: segmentToPersist, fallbackSessionID: replacementPersistenceSessionID)
     maybeTranslate(segment)
-    applyVoiceFilter(to: segment)
+    applyVoiceFilter(to: segment, speaker: speaker)
   }
 
-  private func handleFinalSegment(_ segment: TranscriptSegment) {
-    append(segment: segment)
+  private func handleFinalSegment(_ segment: TranscriptSegment, speaker: SpeakerMatchDecision?) {
+    append(segment: segment, speaker: speaker)
     guard segment.source == .liveATC,
       status == .listening || activeTranscriptSessionID != nil
     else {
       return
     }
-    processTransmissionInput(.fragment(segment: segment, speaker: nil, at: now()))
+    processTransmissionInput(.fragment(segment: segment, speaker: speaker, at: now()))
   }
 
   private func processTransmissionInput(_ input: TransmissionAssemblerInput) {
@@ -400,14 +403,15 @@ final class LiveTranscriptionViewModel {
     return segments.filter { !suppressedSegmentIDs.contains($0.id) }
   }
 
-  private func applyVoiceFilter(to segment: TranscriptSegment) {
+  private func applyVoiceFilter(to segment: TranscriptSegment, speaker: SpeakerMatchDecision?) {
     guard let pipeline = voiceFilter, pipeline.enabled else { return }
-    // Phase 1 (ADR 0007): no real speaker classifier — treat every segment as
-    // non-pilot so the callsign-relevance gate (ATCTranscriptGate) can decide.
-    // Phase 2 will replace `.nonPilot` with the FluidAudio-backed classifier output.
+    // Phase 2 (ADR 0007): use the REAL FluidAudio speaker classification of the audio that
+    // produced this segment when available; fall back to `.nonPilot` (fail-open: show) when
+    // no voice pack/profile is active so the call-sign-relevance gate alone decides — never
+    // suppress on missing speaker info.
     let decision = pipeline.decide(
       text: segment.text,
-      speaker: .nonPilot(bestPilotScore: 0),
+      speaker: speaker ?? .nonPilot(bestPilotScore: 0),
       timestamp: segment.startedAt
     )
     filterIndicators[segment.id] = decision.indicator
@@ -434,8 +438,8 @@ final class LiveTranscriptionViewModel {
         case .partial(let text):
           self.partialText = text
           self.processTransmissionInput(.partial(text: text, at: self.now()))
-        case .segment(let segment):
-          self.handleFinalSegment(segment)
+        case .segment(let segment, let speaker):
+          self.handleFinalSegment(segment, speaker: speaker)
           self.partialText = ""
         case .taskRestart:
           // why: the engine has already committed the live partial as an interim

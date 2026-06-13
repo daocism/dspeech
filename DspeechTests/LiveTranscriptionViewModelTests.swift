@@ -223,7 +223,7 @@ struct LiveTranscriptionViewModelTests {
     await vm.start()
     engine.push(.partial("descend and"))
     await wait(for: { vm.partialText == "descend and" })
-    engine.push(.segment(makeSegment("Descend and maintain three thousand.")))
+    engine.push(.segment(makeSegment("Descend and maintain three thousand."), speaker: nil))
     await wait(for: { vm.segments.count == 1 })
     #expect(vm.segments.first?.text == "Descend and maintain three thousand.")
     #expect(vm.segments.first?.source == .liveATC)
@@ -237,7 +237,7 @@ struct LiveTranscriptionViewModelTests {
     engine.push(.partial("descend and"))
     await wait(for: { vm.partialText == "descend and" })
 
-    engine.push(.segment(makeSegment("Descend and maintain three thousand.")))
+    engine.push(.segment(makeSegment("Descend and maintain three thousand."), speaker: nil))
     await wait(for: { vm.displayedTransmissions.count == 1 })
 
     #expect(vm.displayedTransmissions.first?.text == "Descend and maintain three thousand.")
@@ -250,11 +250,11 @@ struct LiveTranscriptionViewModelTests {
     let engine = FakeEngine()
     let vm = LiveTranscriptionViewModel(engine: engine)
     await vm.start()
-    engine.push(.segment(makeSegment("Maintain present heading")))
+    engine.push(.segment(makeSegment("Maintain present heading"), speaker: nil))
     await wait(for: { vm.displayedTransmissions.count == 1 })
 
     engine.push(.taskRestart)
-    engine.push(.segment(makeSegment("and climb flight level two zero zero")))
+    engine.push(.segment(makeSegment("and climb flight level two zero zero"), speaker: nil))
     await wait(for: {
       vm.displayedTransmissions.first?.text
         == "Maintain present heading and climb flight level two zero zero"
@@ -275,7 +275,7 @@ struct LiveTranscriptionViewModelTests {
       transmissionTickNanoseconds: 10_000_000
     )
     await vm.start()
-    engine.push(.segment(makeSegment("Cleared to land runway two seven")))
+    engine.push(.segment(makeSegment("Cleared to land runway two seven"), speaker: nil))
     await wait(for: { store.openTransmissions.count == 1 })
 
     clock.value = clock.value.addingTimeInterval(2.1)
@@ -297,15 +297,43 @@ struct LiveTranscriptionViewModelTests {
     let vm = LiveTranscriptionViewModel(engine: engine, voiceFilter: pipeline)
     await vm.start()
 
-    engine.push(.segment(makeSegment("continue straight ahead")))
+    engine.push(.segment(makeSegment("continue straight ahead"), speaker: nil))
     await wait(for: { vm.filteredTransmissions.count == 1 })
-    engine.push(.segment(makeSegment("N123AB contact tower one one eight decimal seven")))
+    engine.push(
+      .segment(makeSegment("N123AB contact tower one one eight decimal seven"), speaker: nil))
     await wait(for: { vm.displayedTransmissions.count == 1 && vm.filteredTransmissions.isEmpty })
 
     #expect(
       vm.displayedTransmissions.first?.text
         == "continue straight ahead N123AB contact tower one one eight decimal seven")
     #expect(vm.displayedTransmissions.first?.classification == .displayed(.callSignMatch))
+  }
+
+  // why: phase 2 (ADR 0007) — the REAL FluidAudio speaker decision now rides the segment event.
+  // A segment classified as the operator's OWN voice must be suppressed even when its text carries
+  // the configured call-sign (a read-back) — the exact case phase 1's text-only gate could not
+  // distinguish. A controller (non-pilot) segment with the same call-sign stays shown.
+  @Test func ownPilotVoiceReadbackIsSuppressedEvenWithMatchingCallSign() async {
+    let engine = FakeEngine()
+    let storage = VoiceFilterMemoryStorage()
+    storage.enabled = true
+    storage.callSign = CallSign(raw: "N123AB")
+    let pipeline = VoiceFilterPipeline(
+      identifier: UnavailableLocalSpeakerIdentifier(),
+      storage: storage
+    )
+    let vm = LiveTranscriptionViewModel(engine: engine, voiceFilter: pipeline)
+    await vm.start()
+
+    let pilotReadback = makeSegment("November one two three alpha bravo cleared for takeoff")
+    engine.push(.segment(pilotReadback, speaker: .pilot(slot: .primary, score: 0.95)))
+    await wait(for: { vm.indicator(for: pilotReadback) == .pilotSuppressed })
+    #expect(vm.indicator(for: pilotReadback) == .pilotSuppressed)
+
+    let controller = makeSegment("November one two three alpha bravo descend three thousand")
+    engine.push(.segment(controller, speaker: .nonPilot(bestPilotScore: 0.1)))
+    await wait(for: { vm.indicator(for: controller) != nil })
+    #expect(vm.indicator(for: controller) != .pilotSuppressed)
   }
 
   @Test func noAnchorHintShowsOnceAcrossViewModels() async {
@@ -316,7 +344,7 @@ struct LiveTranscriptionViewModelTests {
       noAnchorHintStorage: storage
     )
     await first.start()
-    firstEngine.push(.segment(makeSegment("Descend and maintain three thousand")))
+    firstEngine.push(.segment(makeSegment("Descend and maintain three thousand"), speaker: nil))
     await wait(for: { first.oneTimeNoAnchorHintVisible })
     #expect(storage.stored)
 
@@ -329,7 +357,8 @@ struct LiveTranscriptionViewModelTests {
       noAnchorHintStorage: storage
     )
     await second.start()
-    secondEngine.push(.segment(makeSegment("Contact tower one one eight decimal seven")))
+    secondEngine.push(
+      .segment(makeSegment("Contact tower one one eight decimal seven"), speaker: nil))
     await wait(for: { second.displayedTransmissions.count == 1 })
     #expect(!second.oneTimeNoAnchorHintVisible)
   }
@@ -346,7 +375,7 @@ struct LiveTranscriptionViewModelTests {
     let vm = LiveTranscriptionViewModel(engine: engine, voiceFilter: pipeline)
     await vm.start()
 
-    engine.push(.segment(makeSegment("United 247 contact ground point niner")))
+    engine.push(.segment(makeSegment("United 247 contact ground point niner"), speaker: nil))
     await wait(for: { vm.segments.count == 1 && vm.visibleSegments.isEmpty })
 
     #expect(vm.segments.count == 1)
@@ -371,7 +400,7 @@ struct LiveTranscriptionViewModelTests {
     let vm = LiveTranscriptionViewModel(engine: engine, voiceFilter: pipeline)
     await vm.start()
 
-    engine.push(.segment(makeSegment("N123AB descend and maintain three thousand")))
+    engine.push(.segment(makeSegment("N123AB descend and maintain three thousand"), speaker: nil))
     await wait(for: { vm.visibleSegments.count == 1 })
 
     #expect(vm.visibleSegments.first?.text == "N123AB descend and maintain three thousand")
@@ -439,7 +468,8 @@ struct LiveTranscriptionViewModelTests {
     #expect(vm.segments.first?.confidence == 0)
     #expect(vm.segments.first?.isStopCommittedPlaceholder == true)
     // …then the recognizer's real final for the SAME utterance arrives a beat later.
-    engine.push(.segment(makeSegment("November one two three alpha bravo", confidence: 0.91)))
+    engine.push(
+      .segment(makeSegment("November one two three alpha bravo", confidence: 0.91), speaker: nil))
     await wait(for: { (vm.segments.first?.confidence ?? 0) > 0 })
     #expect(vm.segments.count == 1)
     #expect(vm.segments.first?.confidence == 0.91)
@@ -456,7 +486,8 @@ struct LiveTranscriptionViewModelTests {
     await wait(for: { vm.segments.count == 1 })
     #expect(vm.segments.first?.isStopCommittedPlaceholder == true)
 
-    engine.push(.segment(makeSegment("November one two three alpha bravo", confidence: 0)))
+    engine.push(
+      .segment(makeSegment("November one two three alpha bravo", confidence: 0), speaker: nil))
     await wait(for: { vm.segments.first?.isStopCommittedPlaceholder == false })
 
     #expect(vm.segments.count == 1)
@@ -467,10 +498,12 @@ struct LiveTranscriptionViewModelTests {
     let engine = FakeEngine()
     let vm = LiveTranscriptionViewModel(engine: engine)
     await vm.start()
-    engine.push(.segment(makeSegment("November one two three alpha bravo", confidence: 0)))
+    engine.push(
+      .segment(makeSegment("November one two three alpha bravo", confidence: 0), speaker: nil))
     await wait(for: { vm.segments.count == 1 })
 
-    engine.push(.segment(makeSegment("November one two three alpha bravo", confidence: 0.91)))
+    engine.push(
+      .segment(makeSegment("November one two three alpha bravo", confidence: 0.91), speaker: nil))
     await wait(for: { vm.segments.count == 2 })
 
     #expect(vm.segments.count == 2)
@@ -486,7 +519,8 @@ struct LiveTranscriptionViewModelTests {
     vm.stop()
     await wait(for: { vm.segments.count == 1 })
     // a DIFFERENT final must not overwrite the placeholder
-    engine.push(.segment(makeSegment("cleared for takeoff runway two seven", confidence: 0.9)))
+    engine.push(
+      .segment(makeSegment("cleared for takeoff runway two seven", confidence: 0.9), speaker: nil))
     await wait(for: { vm.segments.count == 2 })
     #expect(vm.segments.count == 2)
   }
@@ -532,7 +566,7 @@ struct LiveTranscriptionViewModelTests {
     #expect(await wait(for: { store.beginLocaleIdentifiers == ["fr-FR"] }))
 
     let segment = makeSegment("Descend and maintain three thousand.")
-    engine.push(.segment(segment))
+    engine.push(.segment(segment, speaker: nil))
     #expect(await wait(for: { store.appendedSegments.count == 1 }))
 
     vm.stop()
@@ -549,7 +583,7 @@ struct LiveTranscriptionViewModelTests {
     let vm = LiveTranscriptionViewModel(engine: engine, transcriptStore: store)
     await vm.start()
 
-    engine.push(.segment(makeSegment("Cleared to land runway two seven")))
+    engine.push(.segment(makeSegment("Cleared to land runway two seven"), speaker: nil))
     await wait(for: { store.openTransmissions.count == 1 })
     vm.stop()
     await wait(for: { store.appendedTransmissions.count == 1 && store.endedSessionIDs.count == 1 })
@@ -573,7 +607,7 @@ struct LiveTranscriptionViewModelTests {
       source: .demo
     )
 
-    engine.push(.segment(demo))
+    engine.push(.segment(demo, speaker: nil))
     #expect(await wait(for: { vm.segments.count == 1 }))
 
     #expect(store.appendedSegments.isEmpty)
@@ -606,7 +640,8 @@ struct LiveTranscriptionViewModelTests {
 
     vm.stop()
     await wait(for: { vm.segments.count == 1 && vm.status == .stopped })
-    engine.push(.segment(makeSegment("November one two three alpha bravo", confidence: 0.91)))
+    engine.push(
+      .segment(makeSegment("November one two three alpha bravo", confidence: 0.91), speaker: nil))
     await wait(for: { store.appendedSegments.count == 2 })
 
     #expect(vm.segments.count == 1)
@@ -625,7 +660,7 @@ struct LiveTranscriptionViewModelTests {
     let vm = LiveTranscriptionViewModel(engine: engine, transcriptStore: store)
     await vm.start()
 
-    engine.push(.segment(makeSegment("Maintain present heading.")))
+    engine.push(.segment(makeSegment("Maintain present heading."), speaker: nil))
     #expect(await wait(for: { vm.segments.count == 1 && vm.persistenceFailure != nil }))
 
     #expect(vm.visibleSegments.count == 1)
@@ -684,8 +719,8 @@ struct LiveTranscriptionViewModelTests {
     let engine = FakeEngine()
     let vm = LiveTranscriptionViewModel(engine: engine)
     await vm.start()
-    engine.push(.segment(makeSegment("one")))
-    engine.push(.segment(makeSegment("two")))
+    engine.push(.segment(makeSegment("one"), speaker: nil))
+    engine.push(.segment(makeSegment("two"), speaker: nil))
     engine.push(.partial("partial three"))
     await wait(for: { vm.segments.count == 2 && vm.partialText == "partial three" })
     vm.reset()
@@ -699,7 +734,7 @@ struct LiveTranscriptionViewModelTests {
     await vm.start()
 
     for index in 0..<10_050 {
-      engine.push(.segment(makeSegment("Transmission \(index)", source: .demo)))
+      engine.push(.segment(makeSegment("Transmission \(index)", source: .demo), speaker: nil))
     }
     #expect(await wait(for: { vm.segments.count == 10_050 }))
 
@@ -721,8 +756,8 @@ struct LiveTranscriptionViewModelTests {
     let vm = LiveTranscriptionViewModel(engine: engine, voiceFilter: pipeline)
     await vm.start()
 
-    engine.push(.segment(makeSegment("United 247 contact ground point niner")))
-    engine.push(.segment(makeSegment("Delta 45 monitor tower")))
+    engine.push(.segment(makeSegment("United 247 contact ground point niner"), speaker: nil))
+    engine.push(.segment(makeSegment("Delta 45 monitor tower"), speaker: nil))
     #expect(await wait(for: { vm.suppressedSegmentIDs.count == 2 }))
     let hiddenID = try #require(vm.segments.first?.id)
 
@@ -745,8 +780,8 @@ struct LiveTranscriptionViewModelTests {
     let vm = LiveTranscriptionViewModel(engine: engine, voiceFilter: pipeline)
     await vm.start()
 
-    engine.push(.segment(makeSegment("United 247 contact ground point niner")))
-    engine.push(.segment(makeSegment("Delta 45 monitor tower")))
+    engine.push(.segment(makeSegment("United 247 contact ground point niner"), speaker: nil))
+    engine.push(.segment(makeSegment("Delta 45 monitor tower"), speaker: nil))
     #expect(await wait(for: { vm.suppressedSegmentIDs.count == 2 }))
     let first = try #require(vm.segments.first)
 
@@ -874,7 +909,7 @@ struct LiveTranscriptionViewModelTests {
     let vm = translatingVM(engine: engine, backend: backend, target: "ru")
     await vm.start()
     let seg = makeSegment("Descend")
-    engine.push(.segment(seg))
+    engine.push(.segment(seg, speaker: nil))
     #expect(await wait(for: { vm.translationFailure == expected }))
     #expect(vm.translations[seg.id] == nil)
   }
@@ -886,7 +921,7 @@ struct LiveTranscriptionViewModelTests {
     let vm = translatingVM(engine: engine, backend: backend, target: "ru")
     await vm.start()
     let seg = makeSegment("Descend and maintain three thousand")
-    engine.push(.segment(seg))
+    engine.push(.segment(seg, speaker: nil))
     #expect(await wait(for: { vm.translations[seg.id] == "Снижайтесь до трёх тысяч" }))
     #expect(backend.translateCallCount == 1)
   }
@@ -897,7 +932,7 @@ struct LiveTranscriptionViewModelTests {
     let vm = translatingVM(engine: engine, backend: backend, target: "en")
     await vm.start()
     let seg = makeSegment("Descend and maintain three thousand")
-    engine.push(.segment(seg))
+    engine.push(.segment(seg, speaker: nil))
     await wait(for: { vm.segments.count == 1 })
     engine.push(.partial("translation barrier after same-source segment"))
     #expect(await wait(for: { vm.partialText == "translation barrier after same-source segment" }))
@@ -911,7 +946,7 @@ struct LiveTranscriptionViewModelTests {
     let vm = translatingVM(engine: engine, backend: backend, target: nil)
     await vm.start()
     let seg = makeSegment("Descend")
-    engine.push(.segment(seg))
+    engine.push(.segment(seg, speaker: nil))
     await wait(for: { vm.segments.count == 1 })
     engine.push(.partial("translation barrier after disabled segment"))
     #expect(await wait(for: { vm.partialText == "translation barrier after disabled segment" }))
@@ -928,7 +963,7 @@ struct LiveTranscriptionViewModelTests {
     let vm = translatingVM(engine: engine, backend: backend, target: "ru")
     await vm.start()
     let seg = makeSegment("Descend")
-    engine.push(.segment(seg))
+    engine.push(.segment(seg, speaker: nil))
     #expect(await wait(for: { vm.translationFailure == expected }))
     #expect(vm.translationUnavailable)
     #expect(vm.translations[seg.id] == nil)
@@ -976,13 +1011,13 @@ struct LiveTranscriptionViewModelTests {
     backend.translateError = .engineFailure("first-failure")
     let vm = translatingVM(engine: engine, backend: backend, target: "ru")
     await vm.start()
-    engine.push(.segment(makeSegment("Descend")))
+    engine.push(.segment(makeSegment("Descend"), speaker: nil))
     #expect(await wait(for: { vm.translationFailure == .engineFailure("first-failure") }))
 
     backend.translateError = nil
     backend.translationResult = "перевод"
     let recovered = makeSegment("Maintain three thousand")
-    engine.push(.segment(recovered))
+    engine.push(.segment(recovered, speaker: nil))
 
     #expect(await wait(for: { vm.translations[recovered.id] == "перевод" }))
     #expect(vm.translationFailure == nil)
@@ -994,7 +1029,7 @@ struct LiveTranscriptionViewModelTests {
     backend.translateError = .engineFailure("failure")
     let vm = translatingVM(engine: engine, backend: backend, target: "ru")
     await vm.start()
-    engine.push(.segment(makeSegment("Descend")))
+    engine.push(.segment(makeSegment("Descend"), speaker: nil))
     #expect(await wait(for: { vm.translationFailure == .engineFailure("failure") }))
 
     vm.clearTranslations()
@@ -1047,7 +1082,7 @@ struct LiveTranscriptionViewModelTests {
     let vm = translatingVM(engine: engine, backend: backend, target: "ru")
     await vm.start()
     let seg = makeSegment("Descend")
-    engine.push(.segment(seg))
+    engine.push(.segment(seg, speaker: nil))
     await wait(for: { vm.translations[seg.id] == "перевод" })
     vm.reset()
     #expect(vm.translations.isEmpty)
@@ -1061,7 +1096,7 @@ struct LiveTranscriptionViewModelTests {
     let vm = translatingVM(engine: engine, backend: backend, target: "ru")
     await vm.start()
     let seg = makeSegment("Descend")
-    engine.push(.segment(seg))
+    engine.push(.segment(seg, speaker: nil))
     #expect(await wait(for: { vm.translations[seg.id] == "перевод" }))
     let firstCount = backend.translateCallCount
     backend.translationResult = "новый перевод"
@@ -1076,7 +1111,7 @@ struct LiveTranscriptionViewModelTests {
     let vm = translatingVM(engine: engine, backend: backend, target: "ru")
     await vm.start()
     let seg = makeSegment("Descend")
-    engine.push(.segment(seg))
+    engine.push(.segment(seg, speaker: nil))
     // the translation task is in-flight, suspended inside translate before it writes
     #expect(await wait(for: { backend.translateCallCount == 1 }))
     #expect(vm.translations[seg.id] == nil)
