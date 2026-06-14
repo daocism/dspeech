@@ -375,15 +375,35 @@ final class LiveTranscriptionViewModel {
   private func upsertTransmission(_ transmission: Transmission) {
     displayedTransmissions.removeAll { $0.id == transmission.id }
     filteredTransmissions.removeAll { $0.id == transmission.id }
-    guard !transmission.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+    let display = compactingCallSign(in: transmission)
+    guard !display.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
       return
     }
-    switch transmission.classification {
+    switch display.classification {
     case .displayed:
-      displayedTransmissions.append(transmission)
+      displayedTransmissions.append(display)
     case .filtered:
-      filteredTransmissions.append(transmission)
+      filteredTransmissions.append(display)
     }
+  }
+
+  // why: DISPLAY the operator's own call sign as the compact registration ("A123B"), not its
+  // spoken ICAO phonetics ("Alpha 1 2 3 Bravo"). Detection/classification still runs on the raw
+  // transcript (in the assembler), so this only changes what the pilot reads on the card.
+  private func compactingCallSign(in transmission: Transmission) -> Transmission {
+    guard let callSign = voiceFilter?.callSign else { return transmission }
+    let compacted = callSign.compacted(
+      in: transmission.text, localeIdentifier: transmission.localeIdentifier)
+    guard compacted != transmission.text else { return transmission }
+    return Transmission(
+      id: transmission.id,
+      startedAt: transmission.startedAt,
+      endedAt: transmission.endedAt,
+      text: compacted,
+      segments: transmission.segments,
+      classification: transmission.classification,
+      localeIdentifier: transmission.localeIdentifier
+    )
   }
 
   private func maybeShowNoAnchorHint(for transmission: Transmission) {
