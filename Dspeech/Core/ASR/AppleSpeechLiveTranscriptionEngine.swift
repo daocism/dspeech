@@ -470,7 +470,10 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
 
   private func handleRecognitionCallback(_ callback: RecognitionCallbackEvent) {
     guard taskGeneration == callback.generation else { return }
-    if callback.hasResult || callback.event != nil {
+    // why: reset the death-spiral ceiling only on a COMMITTED final segment — proof the recognizer
+    // produced a real utterance. A flood of (possibly re-emitted) partials must not be able to mask a
+    // genuine restart loop. The 10s window self-limits anyway, so this only tightens, never loosens.
+    if callback.isFinal, callback.event != nil {
       restartLoopGuard.recordResult()
     }
     pendingRecognitionPartial.record(event: callback.event, isFinal: callback.isFinal)
