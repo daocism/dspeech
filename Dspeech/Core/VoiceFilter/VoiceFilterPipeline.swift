@@ -237,6 +237,16 @@ final class VoiceFilterPipeline {
     )
   }
 
+  // why: deleting the model pack must also wipe enrolled voice prints — personal voice data must not
+  // survive on disk (and silently return on reinstall) after the user removed the feature that uses
+  // it (2026-06-14 audit, privacy/data-retention).
+  func removeAllCrewMembers() {
+    guard !profiles.isEmpty else { return }
+    profiles = []
+    storage.deleteAllProfiles()
+    DspeechLog.voiceFilter.info("crew enrollment removed all reason=pack-deleted")
+  }
+
   func decide(
     text: String,
     speaker: SpeakerMatchDecision,
