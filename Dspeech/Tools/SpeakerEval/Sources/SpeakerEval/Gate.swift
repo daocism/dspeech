@@ -19,7 +19,7 @@ private func fluidModelDir() -> URL {
 
 private func describe(_ decision: SpeakerMatchDecision) -> (kind: String, score: Double) {
   switch decision {
-  case .pilot(_, let score): return ("pilot", Double(score))
+  case .pilot(let score): return ("pilot", Double(score))
   case .nonPilot(let best): return ("nonPilot", Double(best))
   case .mixed(let best): return ("mixed", Double(best))
   case .insufficientSpeech: return ("insufficientSpeech", 0)
@@ -51,7 +51,7 @@ func runGate(
   let profile: PilotVoiceProfile
   do {
     let vp = try await identifier.enroll(samples: enrollSamples, sampleRate: 16000)
-    profile = PilotVoiceProfile(slot: .primary, label: "test-pilot", voicePrint: vp)
+    profile = PilotVoiceProfile(label: "test-pilot", voicePrint: vp)
     out["enrollQuality"] = Double(SpeakerAudioPreprocessing.voicedQuality(enrollSamples))
   } catch {
     out["enrollError"] = "\(error)"

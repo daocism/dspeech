@@ -46,14 +46,12 @@ struct VoicePrintVector: Equatable, Sendable, Codable {
   }
 }
 
+// why: a variable-length crew roster, not a fixed 2-slot pair — the cockpit may have any number of
+// people on headsets and the pilot adds/removes them at will (2026-06-14 request). Each enrolled
+// voice is its own profile keyed by `id`; `label` is its display name. Decoding tolerates pre-roster
+// JSON that still carries a `slot` key (Codable ignores unknown keys), so no migration is needed.
 struct PilotVoiceProfile: Identifiable, Equatable, Sendable, Codable {
-  enum Slot: Int, Codable, Sendable, CaseIterable {
-    case primary = 0
-    case secondary = 1
-  }
-
   let id: UUID
-  let slot: Slot
   let label: String
   let voicePrint: VoicePrintVector
   let enrolledAt: Date
@@ -61,14 +59,12 @@ struct PilotVoiceProfile: Identifiable, Equatable, Sendable, Codable {
 
   init(
     id: UUID = UUID(),
-    slot: Slot,
     label: String,
     voicePrint: VoicePrintVector,
     enrolledAt: Date = .now,
     spokenCallSign: CallSign? = nil
   ) {
     self.id = id
-    self.slot = slot
     self.label = label
     self.voicePrint = voicePrint
     self.enrolledAt = enrolledAt
@@ -86,7 +82,10 @@ enum PilotVoiceEnrollmentState: Equatable, Sendable {
 }
 
 enum SpeakerMatchDecision: Equatable, Sendable {
-  case pilot(slot: PilotVoiceProfile.Slot, score: Float)
+  // why: which specific crew member matched is not surfaced anywhere — the filter only needs
+  // "this is one of our enrolled own-side voices". Carrying just the score keeps the decision
+  // independent of the (now variable-length) roster and removes dead identity payload.
+  case pilot(score: Float)
   case nonPilot(bestPilotScore: Float)
   case mixed(bestPilotScore: Float)
   case insufficientSpeech

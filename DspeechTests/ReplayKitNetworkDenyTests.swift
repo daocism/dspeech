@@ -220,7 +220,6 @@ struct ReplayKitNetworkDenyTests {
 
   private static func makePipeline() -> VoiceFilterPipeline {
     let profile = PilotVoiceProfile(
-      slot: .primary,
       label: "Captain",
       voicePrint: VoicePrintVector(values: [1, 0, 0, 0], quality: 0.95),
       enrolledAt: Date(timeIntervalSince1970: 748_137_600),

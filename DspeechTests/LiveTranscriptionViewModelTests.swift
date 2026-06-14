@@ -326,7 +326,7 @@ struct LiveTranscriptionViewModelTests {
     await vm.start()
 
     let pilotReadback = makeSegment("November one two three alpha bravo cleared for takeoff")
-    engine.push(.segment(pilotReadback, speaker: .pilot(slot: .primary, score: 0.95)))
+    engine.push(.segment(pilotReadback, speaker: .pilot(score: 0.95)))
     await wait(for: { vm.indicator(for: pilotReadback) == .pilotSuppressed })
     #expect(vm.indicator(for: pilotReadback) == .pilotSuppressed)
 

@@ -1,5 +1,12 @@
 import SwiftUI
 
+// why: enrollment targets a member of the variable-length crew roster — either an existing profile
+// (re-record, keep its id) or a brand-new one (append). Replaces the old fixed primary/secondary slot.
+enum CrewEnrollmentTarget: Equatable {
+  case existing(UUID)
+  case new
+}
+
 struct VoiceFilterSettingsSection: View {
   let pipeline: VoiceFilterPipeline
   let onDisabled: () -> Void
@@ -10,7 +17,10 @@ struct VoiceFilterSettingsSection: View {
   @State private var storageIssues: [VoiceFilterStorageIssue]
   @State private var dictation = CallsignDictationService()
   @State private var recorder = VoiceEnrollmentRecorder()
-  @State private var recordingSlot: PilotVoiceProfile.Slot?
+  // why: SwiftUI mirror of pipeline.profiles (the pipeline is not @Observable). Re-assigned after
+  // every enroll/remove so the dynamic crew list re-renders.
+  @State private var crewProfiles: [PilotVoiceProfile]
+  @State private var recordingTarget: CrewEnrollmentTarget?
   @State private var enrollMessage: String?
   private let installer: SpeakerModelPackInstaller
 
@@ -30,6 +40,7 @@ struct VoiceFilterSettingsSection: View {
       }
     )
     _storageIssues = State(initialValue: pipeline.storageIssues)
+    _crewProfiles = State(initialValue: pipeline.profiles)
   }
 
   private var identifierAvailable: Bool {
@@ -209,7 +220,7 @@ struct VoiceFilterSettingsSection: View {
 
   private func stopTransientCapture() {
     dictation.stop()
-    recordingSlot = nil
+    recordingTarget = nil
     Task { @MainActor in
       await recorder.stop()
     }
@@ -227,50 +238,67 @@ struct VoiceFilterSettingsSection: View {
     }
   }
 
-  private func enrollSubtitle(for slot: PilotVoiceProfile.Slot) -> String {
-    if recordingSlot == slot {
-      return String(localized: "Recording -- speak for a few seconds, then tap Stop.")
-    }
-    if !identifierAvailable {
-      return String(localized: "Recording becomes available once the recognizer is connected.")
-    }
-    if pipeline.enrolledSlots.contains(slot) {
-      return String(localized: "Voice sample recorded. Record again to update it.")
-    }
-    return String(localized: "Record a voice sample for recognition.")
+  private func crewDisplayName(index: Int) -> String {
+    String(localized: "Crew \(index + 1)")
   }
 
-  private func toggleEnrollment(slot: PilotVoiceProfile.Slot) async {
-    if recordingSlot == slot {
-      let result = await recorder.stop()
-      recordingSlot = nil
-      guard let result else {
-        enrollMessage = String(localized: "Recording failed -- try again.")
-        return
-      }
-      do {
-        _ = try await pipeline.enrollPilot(
-          slot: slot,
-          label: pilotStorageLabel(for: slot),
-          samples: result.samples,
-          sampleRate: result.sampleRate
-        )
-        enrollMessage = String(localized: "Voice saved for \(pilotShortName(for: slot)).")
-      } catch LocalSpeakerIdentifierError.insufficientSpeech {
-        enrollMessage = String(localized: "Too quiet or too short -- record a clearer sample.")
-      } catch {
-        enrollMessage = String(localized: "Couldn't save the voice sample. Try again.")
-      }
+  private func crewRowSubtitle(isRecording: Bool) -> String {
+    if isRecording {
+      return String(
+        localized: "Recording -- keep speaking for about 4 seconds, then tap Stop.")
+    }
+    return String(localized: "Voice sample recorded. Re-record to update it.")
+  }
+
+  private func toggleEnrollment(target: CrewEnrollmentTarget) async {
+    if recordingTarget == target {
+      await finishEnrollment(target: target)
       return
     }
-
     enrollMessage = nil
-    recordingSlot = slot
+    recordingTarget = target
     await recorder.start()
     if !recorder.isRecording {
-      recordingSlot = nil
+      recordingTarget = nil
       enrollMessage = recorder.unavailableReason ?? String(localized: "Couldn't start recording.")
     }
+  }
+
+  private func finishEnrollment(target: CrewEnrollmentTarget) async {
+    let result = await recorder.stop()
+    recordingTarget = nil
+    guard let result else {
+      // why: surface the recorder's ACTUAL reason (e.g. "speak for at least 4 seconds") instead of
+      // a generic "recording failed" — the generic message is what made enrollment look broken.
+      enrollMessage =
+        recorder.unavailableReason ?? String(localized: "Recording failed -- try again.")
+      return
+    }
+    let replacingID: UUID?
+    if case .existing(let id) = target { replacingID = id } else { replacingID = nil }
+    do {
+      let profile = try await pipeline.enrollCrewMember(
+        replacing: replacingID,
+        label: crewDisplayName(index: crewProfiles.count),
+        samples: result.samples,
+        sampleRate: result.sampleRate
+      )
+      crewProfiles = pipeline.profiles
+      let name =
+        crewProfiles.firstIndex(where: { $0.id == profile.id }).map { crewDisplayName(index: $0) }
+        ?? profile.label
+      enrollMessage = String(localized: "Voice saved for \(name).")
+    } catch LocalSpeakerIdentifierError.insufficientSpeech {
+      enrollMessage = String(localized: "Too quiet or too short -- record a clearer sample.")
+    } catch {
+      enrollMessage = String(localized: "Couldn't save the voice sample. Try again.")
+    }
+  }
+
+  private func removeCrewMember(id: UUID) {
+    pipeline.removeCrewMember(id: id)
+    crewProfiles = pipeline.profiles
+    enrollMessage = nil
   }
 
   private var absentContent: some View {
@@ -374,7 +402,7 @@ struct VoiceFilterSettingsSection: View {
       if !identifierAvailable {
         VStack(alignment: .leading, spacing: 6) {
           Label(
-            String(localized: "Pilot slot unavailable"),
+            String(localized: "Voice recording unavailable"),
             systemImage: "exclamationmark.triangle.fill"
           )
           .font(.subheadline.weight(.semibold))
@@ -393,33 +421,7 @@ struct VoiceFilterSettingsSection: View {
         .accessibilityIdentifier("voicefilter-capability-banner")
       }
 
-      ForEach(PilotVoiceProfile.Slot.allCases, id: \.rawValue) { slot in
-        HStack(alignment: .firstTextBaseline) {
-          VStack(alignment: .leading, spacing: 2) {
-            Text(pilotTitle(for: slot))
-              .font(.body.weight(.medium))
-            Text(enrollSubtitle(for: slot))
-              .font(.footnote)
-              .foregroundStyle(.secondary)
-              .frame(maxWidth: .infinity, alignment: .leading)
-              .fixedSize(horizontal: false, vertical: true)
-          }
-          Spacer()
-          Button(
-            recordingSlot == slot ? String(localized: "Stop") : String(localized: "Record voice")
-          ) {
-            Task { await toggleEnrollment(slot: slot) }
-          }
-          .disabled(!identifierAvailable || (recordingSlot != nil && recordingSlot != slot))
-          .buttonStyle(.bordered)
-          .tint(recordingSlot == slot ? .red : nil)
-          .accessibilityIdentifier(
-            slot == .primary
-              ? "voicefilter-enroll-pilot1"
-              : "voicefilter-enroll-pilot2"
-          )
-        }
-      }
+      crewRosterContent
 
       if let enrollMessage {
         Text(enrollMessage)
@@ -502,18 +504,86 @@ struct VoiceFilterSettingsSection: View {
     .accessibilityIdentifier("voicefilter-modelpack-disabled")
   }
 
-  private func pilotStorageLabel(for slot: PilotVoiceProfile.Slot) -> String {
-    slot == .primary ? "Pilot 1" : "Pilot 2"
+  @ViewBuilder
+  private var crewRosterContent: some View {
+    ForEach(Array(crewProfiles.enumerated()), id: \.element.id) { index, profile in
+      crewRow(index: index, profile: profile)
+    }
+    if recordingTarget == .new {
+      // why: a transient row for the in-progress new member; the profile only exists once recording
+      // succeeds, so until then it has no id to key on.
+      crewRow(index: crewProfiles.count, profile: nil)
+    }
+    Button {
+      Task { await toggleEnrollment(target: .new) }
+    } label: {
+      HStack(spacing: 6) {
+        Image(systemName: "plus.circle.fill")
+        Text(String(localized: "Add crew member"))
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+      .font(.subheadline.weight(.semibold))
+    }
+    .buttonStyle(.bordered)
+    .tint(.cyan)
+    .disabled(!identifierAvailable || recordingTarget != nil)
+    .accessibilityIdentifier("voicefilter-add-crew")
+
+    if crewProfiles.isEmpty, recordingTarget == nil {
+      Text(
+        String(
+          localized:
+            "No crew voices yet. Add each person on the headset so their transmissions can be told apart from ATC."
+        )
+      )
+      .font(.footnote)
+      .foregroundStyle(.secondary)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .fixedSize(horizontal: false, vertical: true)
+    }
   }
 
-  private func pilotShortName(for slot: PilotVoiceProfile.Slot) -> String {
-    slot == .primary ? String(localized: "Pilot 1") : String(localized: "Pilot 2")
-  }
-
-  private func pilotTitle(for slot: PilotVoiceProfile.Slot) -> String {
-    slot == .primary
-      ? String(localized: "Pilot 1 (Captain)")
-      : String(localized: "Pilot 2 (First Officer)")
+  @ViewBuilder
+  private func crewRow(index: Int, profile: PilotVoiceProfile?) -> some View {
+    let target: CrewEnrollmentTarget = profile.map { .existing($0.id) } ?? .new
+    let isRecordingThis = recordingTarget == target
+    HStack(alignment: .firstTextBaseline, spacing: 8) {
+      VStack(alignment: .leading, spacing: 2) {
+        Text(crewDisplayName(index: index))
+          .font(.body.weight(.medium))
+          .lineLimit(1)
+          .minimumScaleFactor(0.7)
+        Text(crewRowSubtitle(isRecording: isRecordingThis))
+          .font(.footnote)
+          .foregroundStyle(.secondary)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+      Spacer(minLength: 4)
+      Button(isRecordingThis ? String(localized: "Stop") : String(localized: "Re-record")) {
+        Task { await toggleEnrollment(target: target) }
+      }
+      .buttonStyle(.bordered)
+      .tint(isRecordingThis ? .red : nil)
+      .disabled(!identifierAvailable || (recordingTarget != nil && !isRecordingThis))
+      .accessibilityIdentifier("voicefilter-enroll-crew-\(index)")
+      if let profile {
+        Button {
+          removeCrewMember(id: profile.id)
+        } label: {
+          Image(systemName: "minus.circle.fill")
+            .font(.system(size: 22))
+            .foregroundStyle(.red)
+            .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(recordingTarget != nil)
+        .accessibilityIdentifier("voicefilter-remove-crew-\(index)")
+        .accessibilityLabel(String(localized: "Remove \(crewDisplayName(index: index))"))
+      }
+    }
   }
 
   private func byteString(_ bytes: Int64) -> String {

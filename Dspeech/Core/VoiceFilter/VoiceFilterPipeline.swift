@@ -136,10 +136,6 @@ final class VoiceFilterPipeline {
     }
   }
 
-  var enrolledSlots: Set<PilotVoiceProfile.Slot> {
-    Set(profiles.map(\.slot))
-  }
-
   func setEnabled(_ flag: Bool) {
     enabled = flag
     storage.saveEnabled(flag)
@@ -182,15 +178,19 @@ final class VoiceFilterPipeline {
     )
   }
 
-  func enrollPilot(
-    slot: PilotVoiceProfile.Slot,
+  // why: one entry point for both adding a new crew member and re-recording an existing one. When
+  // `replacing` names an enrolled profile its voice print is refreshed in place (id + display label
+  // preserved); otherwise a new crew member is appended. The roster is variable length — any number
+  // of cockpit voices can be enrolled and removed (2026-06-14 request).
+  func enrollCrewMember(
+    replacing id: UUID? = nil,
     label: String,
     samples: [Float],
     sampleRate: Double,
     spokenCallSign rawCallSign: String? = nil
   ) async throws -> PilotVoiceProfile {
     DspeechLog.voiceFilter.info(
-      "pilot enrollment requested slot=\(slot.rawValue, privacy: .public) samples=\(samples.count, privacy: .public) sampleRate=\(sampleRate, privacy: .public)"
+      "crew enrollment requested replacing=\(id != nil, privacy: .public) samples=\(samples.count, privacy: .public) sampleRate=\(sampleRate, privacy: .public)"
     )
     try requireInstalledModelPack()
     let vector: VoicePrintVector
@@ -198,36 +198,42 @@ final class VoiceFilterPipeline {
       vector = try await identifier.enroll(samples: samples, sampleRate: sampleRate)
     } catch {
       DspeechLog.voiceFilter.error(
-        "pilot enrollment failed slot=\(slot.rawValue, privacy: .public) error=\(error.localizedDescription)"
+        "crew enrollment failed error=\(error.localizedDescription)"
       )
       throw error
     }
-    let spokenCallSign = rawCallSign.flatMap(CallSign.init(raw:))
-    let profile = PilotVoiceProfile(
-      slot: slot,
-      label: label,
-      voicePrint: vector,
-      spokenCallSign: spokenCallSign
-    )
-    profiles.removeAll { $0.slot == slot }
-    profiles.append(profile)
+    let parsedCallSign = rawCallSign.flatMap(CallSign.init(raw:))
+    let profile: PilotVoiceProfile
+    if let id, let index = profiles.firstIndex(where: { $0.id == id }) {
+      let existing = profiles[index]
+      profile = PilotVoiceProfile(
+        id: existing.id,
+        label: existing.label,
+        voicePrint: vector,
+        spokenCallSign: parsedCallSign ?? existing.spokenCallSign
+      )
+      profiles[index] = profile
+    } else {
+      profile = PilotVoiceProfile(label: label, voicePrint: vector, spokenCallSign: parsedCallSign)
+      profiles.append(profile)
+    }
     storage.saveProfiles(profiles)
-    if let spokenCallSign {
-      callSign = spokenCallSign
-      gate.configuredCallSign = spokenCallSign
-      storage.saveCallSign(spokenCallSign)
+    if let parsedCallSign {
+      callSign = parsedCallSign
+      gate.configuredCallSign = parsedCallSign
+      storage.saveCallSign(parsedCallSign)
     }
     DspeechLog.voiceFilter.info(
-      "pilot enrollment succeeded slot=\(slot.rawValue, privacy: .public) vectorDimension=\(vector.dimension, privacy: .public)"
+      "crew enrollment succeeded replaced=\(id != nil, privacy: .public) totalProfiles=\(self.profiles.count, privacy: .public) vectorDimension=\(vector.dimension, privacy: .public)"
     )
     return profile
   }
 
-  func removePilot(slot: PilotVoiceProfile.Slot) {
-    profiles.removeAll { $0.slot == slot }
+  func removeCrewMember(id: UUID) {
+    profiles.removeAll { $0.id == id }
     storage.saveProfiles(profiles)
     DspeechLog.voiceFilter.info(
-      "pilot enrollment removed slot=\(slot.rawValue, privacy: .public) remainingProfiles=\(self.profiles.count, privacy: .public)"
+      "crew enrollment removed remainingProfiles=\(self.profiles.count, privacy: .public)"
     )
   }
 
