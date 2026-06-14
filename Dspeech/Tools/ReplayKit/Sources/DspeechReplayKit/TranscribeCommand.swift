@@ -269,9 +269,11 @@ private final class TranscribeRunner {
   // self-finalizes on a pause, so the engine must DETECT the speech gap and recycle the request —
   // exactly what a continuous live mic needs (the 2026-06-14 "one card forever" device report).
   private let silenceSegmenter: EnergySilenceSegmenter?
+  private let callSign: CallSign?
 
   init(options: TranscribeArguments) {
     self.options = options
+    callSign = options.callSign.flatMap { CallSign(raw: $0) }
     silenceSegmenter =
       options.silenceRestart
       ? EnergySilenceSegmenter(minSpeechSeconds: 0.3, minSilenceSeconds: 1.0, maxWindowSeconds: 18)
@@ -321,8 +323,11 @@ private final class TranscribeRunner {
     }
     for transmission in blocks {
       let kind = transmission.classification.isDisplayed ? "DISPLAYED" : "FILTERED "
+      let text =
+        callSign?.compacted(in: transmission.text, localeIdentifier: options.localeIdentifier)
+        ?? transmission.text
       print(
-        "[\(kind) \(Self.formatClock(transmission.startedAt))-\(Self.formatClock(transmission.endedAt))] «\(transmission.text)»  (reason: \(Self.describe(transmission.classification)))"
+        "[\(kind) \(Self.formatClock(transmission.startedAt))-\(Self.formatClock(transmission.endedAt))] «\(text)»  (reason: \(Self.describe(transmission.classification)))"
       )
     }
   }

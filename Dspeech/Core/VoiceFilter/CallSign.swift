@@ -270,4 +270,92 @@ struct CallSign: Equatable, Hashable, Sendable, Codable {
       localeIdentifier: localeIdentifier
     )
   }
+
+  // why: DISPLAY normalization. On frequency the operator's own call sign is spoken (and
+  // transcribed) in ICAO phonetics — "Alpha one two three Bravo" / "Alpha 1 2 3 Bravo" — but a
+  // pilot reads the registration "A123B". This rewrites EACH spoken occurrence of THIS call sign
+  // to its compact form, leaving the rest of the transmission untouched. Pure: a function of
+  // (text, call sign, locale). Digits already render as numerals from the recognizer.
+  func compacted(in text: String, localeIdentifier: String? = nil) -> String {
+    guard normalized.count >= 2 else { return text }
+    let usesFrench = Self.isFrenchLocale(localeIdentifier)
+    let tokens = Self.decodableTokens(in: text, usesFrench: usesFrench)
+    var replacements: [(Range<String.Index>, String)] = []
+    var index = tokens.startIndex
+    while index < tokens.endIndex {
+      guard tokens[index].decoded != nil else {
+        index += 1
+        continue
+      }
+      var combined = ""
+      var matchEnd: Int?
+      var cursor = index
+      while cursor < tokens.endIndex, let decoded = tokens[cursor].decoded {
+        combined += decoded
+        if combined == normalized {
+          matchEnd = cursor
+          break
+        }
+        if combined.count >= normalized.count { break }
+        cursor += 1
+      }
+      if let matchEnd {
+        replacements.append(
+          (tokens[index].range.lowerBound..<tokens[matchEnd].range.upperBound, normalized))
+        index = matchEnd + 1
+      } else {
+        index += 1
+      }
+    }
+    guard !replacements.isEmpty else { return text }
+    var result = text
+    for (range, replacement) in replacements.reversed() {
+      result.replaceSubrange(range, with: replacement)
+    }
+    return result
+  }
+
+  private struct DecodableToken {
+    let decoded: String?
+    let range: Range<String.Index>
+  }
+
+  private static func decodableTokens(in text: String, usesFrench: Bool) -> [DecodableToken] {
+    var raw: [(folded: String, range: Range<String.Index>)] = []
+    var start: String.Index?
+    var index = text.startIndex
+    while index < text.endIndex {
+      let isWord = text[index].isLetter || text[index].isNumber
+      if isWord, start == nil { start = index }
+      if !isWord, let begin = start {
+        raw.append((Self.fold(String(text[begin..<index])), begin..<index))
+        start = nil
+      }
+      index = text.index(after: index)
+    }
+    if let begin = start {
+      raw.append((Self.fold(String(text[begin..<text.endIndex])), begin..<text.endIndex))
+    }
+    // why: the recognizer writes "X-ray" as two tokens "X" "RAY"; merge so it decodes to "X".
+    var merged: [(folded: String, range: Range<String.Index>)] = []
+    var cursor = 0
+    while cursor < raw.count {
+      if raw[cursor].folded == "X", cursor + 1 < raw.count, raw[cursor + 1].folded == "RAY" {
+        merged.append(("XRAY", raw[cursor].range.lowerBound..<raw[cursor + 1].range.upperBound))
+        cursor += 2
+      } else {
+        merged.append(raw[cursor])
+        cursor += 1
+      }
+    }
+    return merged.map {
+      DecodableToken(
+        decoded: Self.decode(token: $0.folded, usesFrench: usesFrench), range: $0.range)
+    }
+  }
+
+  private static func fold(_ text: String) -> String {
+    text.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: posixLocale)
+      .uppercased()
+  }
 }

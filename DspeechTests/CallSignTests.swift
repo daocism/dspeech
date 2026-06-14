@@ -169,6 +169,37 @@ struct CallSignTests {
     #expect(cs.matches(in: "United 247 contact ground point niner") == false)
   }
 
+  @Test func compactsSpokenCallSignToRegistration() throws {
+    let cs = try #require(CallSign(raw: "A123B"))
+    #expect(cs.compacted(in: "Alpha one two three Bravo") == "A123B")
+    #expect(cs.compacted(in: "Alpha 1 2 3 Bravo") == "A123B")
+    #expect(cs.compacted(in: "Alpha 123 Bravo") == "A123B")
+  }
+
+  @Test func compactsCallSignInsideLongerTransmission() throws {
+    let cs = try #require(CallSign(raw: "A123B"))
+    #expect(
+      cs.compacted(in: "Tower Alpha 1 2 3 Bravo descend four thousand")
+        == "Tower A123B descend four thousand")
+    // trailing read-back digits (heading/squawk) stay separate; only the call sign compacts
+    #expect(cs.compacted(in: "Alpha 1 2 3 Bravo squawk 7000") == "A123B squawk 7000")
+  }
+
+  @Test func compactsEveryOccurrenceAndLeavesOtherTextUntouched() throws {
+    let cs = try #require(CallSign(raw: "A123B"))
+    #expect(
+      cs.compacted(in: "Alpha 1 2 3 Bravo, roger, Alpha 1 2 3 Bravo") == "A123B, roger, A123B")
+    #expect(cs.compacted(in: "Cleared for takeoff") == "Cleared for takeoff")
+    #expect(cs.compacted(in: "November Oscar Papa Quebec") == "November Oscar Papa Quebec")
+  }
+
+  @Test func compactsLetterOnlyAndXRayCallSigns() throws {
+    let abc = try #require(CallSign(raw: "ABC"))
+    #expect(abc.compacted(in: "Alpha bravo Charlie Delta Echo") == "ABC Delta Echo")
+    let xyz = try #require(CallSign(raw: "XYZ"))
+    #expect(xyz.compacted(in: "report X-ray Yankee Zulu") == "report XYZ")
+  }
+
   @Test func phoneticExpansionCoversFullAlphabet() throws {
     let cs = try #require(CallSign(raw: "ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
     #expect(
