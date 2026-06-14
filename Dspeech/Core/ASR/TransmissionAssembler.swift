@@ -41,7 +41,9 @@ struct TransmissionAssembler {
       Transmission(
         id: id,
         startedAt: startedAt,
-        endedAt: overrideEndedAt ?? endedAt,
+        // why: never let an interim restart commit / out-of-order evidence produce endedAt < startedAt
+        // (a crossed-timestamp card, 2026-06-14 audit). A transmission can't end before it began.
+        endedAt: max(startedAt, overrideEndedAt ?? endedAt),
         text: text,
         segments: segments,
         classification: classification,
