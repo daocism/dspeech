@@ -139,7 +139,10 @@ struct UserDefaultsWhisperKitModelStateStorage: WhisperKitModelStateStorage, @un
       let data = try JSONEncoder().encode(persisted)
       defaults.set(data, forKey: Self.stateKey)
     } catch {
-      return
+      // why: the protocol is non-throwing, but a persistence failure must not vanish silently — at
+      // least leave a diagnostic trail (the installed state may then fail to survive relaunch).
+      DspeechLog.engine.error(
+        "whisperkit model state save failed error=\(error.localizedDescription, privacy: .public)")
     }
   }
 

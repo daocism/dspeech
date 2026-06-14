@@ -211,9 +211,7 @@ final class CallsignDictationService {
     DspeechLog.engine.info("callsign dictation cleanup started")
     activeSessionID = nil
     let deactivateSession = releaseCaptureLease()
-    if captureStarted {
-      audioCapture.stop(deactivateSession: deactivateSession)
-    } else if captureStartAttempted {
+    if captureStarted || captureStartAttempted {
       audioCapture.stop(deactivateSession: deactivateSession)
     }
     captureStarted = false

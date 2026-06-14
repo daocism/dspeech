@@ -256,7 +256,6 @@ private final class TranscribeRunner {
   private var fedSampleCount = 0
   private var sampleRate = 0.0
   private var pendingPartial = ""
-  private var emittedFinal = false
   private var endAudioSent = false
   private var completed = false
   private var failure: TranscribeASRFailure?
@@ -568,7 +567,6 @@ private final class TranscribeRunner {
           at: Self.date(at: restartSeconds)
         )
       )
-      emittedFinal = true
       pendingPartial = ""
     }
     let tail = options.replayTailEnabled ? replayTail.snapshot() : TranscribeReplayTailSnapshot()
@@ -630,7 +628,6 @@ private final class TranscribeRunner {
         )
       )
       pendingPartial = ""
-      emittedFinal = true
       if endAudioSent { completed = true }
     }
     if let callbackFailure = callback.failure {

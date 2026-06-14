@@ -213,14 +213,6 @@ struct VoiceFilterSettingsSection: View {
     modelPackAcquisition.setState(state)
   }
 
-  private func startDownload() {
-    modelPackAcquisition.startDownload()
-  }
-
-  private func cancelDownload() {
-    modelPackAcquisition.cancelDownload()
-  }
-
   private func stopTransientCapture() {
     dictation.stop()
     recordingTarget = nil
@@ -329,7 +321,7 @@ struct VoiceFilterSettingsSection: View {
       .frame(maxWidth: .infinity, alignment: .leading)
       .fixedSize(horizontal: false, vertical: true)
       Button {
-        startDownload()
+        modelPackAcquisition.startDownload()
       } label: {
         HStack(spacing: 6) {
           Image(systemName: "arrow.down.circle.fill")
@@ -380,7 +372,7 @@ struct VoiceFilterSettingsSection: View {
           .foregroundStyle(.secondary)
       }
       Button(String(localized: "Cancel")) {
-        cancelDownload()
+        modelPackAcquisition.cancelDownload()
       }
       .buttonStyle(.bordered)
       .accessibilityIdentifier("voicefilter-modelpack-cancel")
@@ -463,7 +455,7 @@ struct VoiceFilterSettingsSection: View {
         .fixedSize(horizontal: false, vertical: true)
       if failure.isRetryable {
         Button(String(localized: "Retry download")) {
-          startDownload()
+          modelPackAcquisition.startDownload()
         }
         .buttonStyle(.bordered)
         .accessibilityIdentifier("voicefilter-modelpack-retry")

@@ -68,8 +68,6 @@ struct ContentView: View {
       if CommandLine.arguments.contains("-dspeech.uitest.seed-crew") {
         filter.seedCrewForTesting(count: 2)
       }
-    #endif
-    #if DEBUG
       let debugScriptedEngine: (any LiveTranscriptionEngine)? =
         RenderStableScriptedLiveTranscriptionEngine.makeFromLaunchArguments()
     #else
@@ -802,14 +800,10 @@ struct ContentView: View {
     }
   }
 
-  // why: launch-time hints show only in the pristine idle state (before the first
-  // Start), so they grab attention once and never nag after the user has used the app.
-  // why: the coachmark hint bubbles are first-run nice-to-haves; at accessibility text sizes
-  // they can't fit beside the floating controls without clipping, so suppress them there.
-  // why: the hint bubbles are FIRST-RUN nudges for an empty cockpit. Shown over content
-  // they cover real controls (the "Tap to start" bubble sits exactly on the Clear button —
-  // an obscured-hit-region defect), so any prior session or any on-screen segments retire
-  // them.
+  // why: launch coachmark hints show ONLY in the pristine first-run idle state — never after the
+  // first Start, never with any prior/visible content (the bubbles cover real controls, e.g. the
+  // "Tap to start" bubble lands on Clear — an obscured-hit-region defect), and never at accessibility
+  // text sizes (they clip beside the floating controls). The guard below encodes all those conditions.
   private var showHints: Bool {
     liveViewModel.status == .idle && !dynamicTypeSize.isAccessibilitySize
       && !liveViewModel.hasEverStarted && liveViewModel.segments.isEmpty

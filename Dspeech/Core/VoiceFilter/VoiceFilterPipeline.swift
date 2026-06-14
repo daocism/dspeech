@@ -19,7 +19,6 @@ final class VoiceFilterPipeline {
   private let backendBuilder: (any LocalSpeakerBackendBuilder)?
   private let storage: VoiceFilterStorage
   private let modelPackStorage: ModelPackStateStorage
-  private let matchConfig: SpeakerMatchConfig
   private let voiceFilterActive: @MainActor () -> Bool
   private var gate: ATCTranscriptGate
 
@@ -34,14 +33,12 @@ final class VoiceFilterPipeline {
     backendBuilder: (any LocalSpeakerBackendBuilder)? = nil,
     storage: VoiceFilterStorage = UserDefaultsVoiceFilterStorage(),
     modelPackStorage: ModelPackStateStorage = UserDefaultsModelPackStateStorage(),
-    matchConfig: SpeakerMatchConfig = .default,
     voiceFilterActive: @escaping @MainActor () -> Bool = { true }
   ) {
     self.identifier = identifier
     self.backendBuilder = backendBuilder
     self.storage = storage
     self.modelPackStorage = modelPackStorage
-    self.matchConfig = matchConfig
     self.voiceFilterActive = voiceFilterActive
     let snapshot = storage.loadSnapshot()
     self.profiles = snapshot.profiles
@@ -269,10 +266,9 @@ final class VoiceFilterPipeline {
   ) -> VoiceFilterDecision {
     let relevance: ATCRelevanceDecision
     let indicator: ATCVoiceIndicator
-    if ATCTranscriptGate.containsUrgencyBroadcast(in: text) {
-      relevance = gate.evaluate(text: text, speaker: speaker, timestamp: timestamp)
-      indicator = Self.indicator(for: speaker, relevance: relevance)
-    } else if enabled {
+    // why: an urgency broadcast (mayday/pan-pan) is ALWAYS evaluated and shown, even with the filter
+    // off; otherwise the gate runs only when the filter is enabled. Both share the same evaluation.
+    if ATCTranscriptGate.containsUrgencyBroadcast(in: text) || enabled {
       relevance = gate.evaluate(text: text, speaker: speaker, timestamp: timestamp)
       indicator = Self.indicator(for: speaker, relevance: relevance)
     } else {

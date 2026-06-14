@@ -68,8 +68,7 @@ final class LiveTranscriptionViewModel {
   private var persistenceUnavailableForCurrentSession = false
   // why: a Stop-committed partial has no language of its own; reuse the last real segment's
   // language, defaulting to the device language (matches the device-language default policy).
-  private var lastSourceLanguageCode = String(
-    Locale.current.language.languageCode?.identifier ?? "en")
+  private var lastSourceLanguageCode = Locale.current.language.languageCode?.identifier ?? "en"
   private var hasShownNoAnchorHint: Bool
 
   init(

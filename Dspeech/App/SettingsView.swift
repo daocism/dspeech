@@ -449,7 +449,7 @@ struct SettingsView: View {
       )
       .font(.footnote.weight(.medium))
       .foregroundStyle(.secondary)
-      .accessibilityIdentifier("whisperkit-model-download")
+      .accessibilityIdentifier("whisperkit-model-downloading")
     }
     .frame(maxWidth: .infinity, alignment: .leading)
   }
@@ -481,7 +481,7 @@ struct SettingsView: View {
           Task { await whisperKitInstaller.install() }
         }
         .buttonStyle(.bordered)
-        .accessibilityIdentifier("whisperkit-model-download")
+        .accessibilityIdentifier("whisperkit-model-retry")
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
