@@ -46,6 +46,14 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
   // cancelled task can never flip the live session's state.
   private var taskGeneration = 0
   private var router: UtteranceWindowRouter<AVAudioPCMBuffer>?
+  // why: SFSpeech `.dictation` NEVER self-finalizes on a pause, so a continuous live mic produced
+  // one ever-growing transcription that never split into cards ("пишет лайв в одно сообщение вечно",
+  // 2026-06-14 device report). This DRIVES finalization: an adaptive noise-floor VAD detects the
+  // speech gap (works against a real mic's noise floor, not just digital silence) and recycles the
+  // recognition request per utterance, so each transmission finalizes into its own card. Validated
+  // on real audio (speech + 3s noisy pauses) via `dspeech-replay transcribe --silence-restart on`.
+  private let utteranceBoundaryDetector = EnergySilenceSegmenter(
+    minSpeechSeconds: 0.3, minSilenceSeconds: 1.0, maxWindowSeconds: 18)
   private var recognizerAvailabilityDelegate: LiveRecognizerAvailabilityDelegate?
   private var recognitionCallbackContinuation: AsyncStream<RecognitionCallbackEvent>.Continuation?
   private var recognitionCallbackTask: Task<Void, Never>?
@@ -323,6 +331,9 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
   private func installRecognition(recognizer: SFSpeechRecognizer) {
     teardownRecognitionCallbackConduit()
     pendingRecognitionPartial.clear()
+    // why: each recognition request covers ONE utterance — reset the boundary detector so the next
+    // utterance's gap is measured from a clean state (covers both first start and every recycle).
+    utteranceBoundaryDetector.reset()
     let request = SFSpeechAudioBufferRecognitionRequest()
     request.shouldReportPartialResults = true
     request.requiresOnDeviceRecognition = Self.liveRequestsRequireOnDeviceRecognition
@@ -548,13 +559,26 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
         sampleRate: captured.sampleRate
       )
     }
-    guard let router else {
+    if let router {
+      // why: empty samples (non-float buffer) fail open to ASR while keeping FIFO
+      // order with classified buffers ahead of and behind it in the serial router.
+      router.submit(captured.buffer, samples: captured.samples, sampleRate: captured.sampleRate)
+    } else {
       request?.append(captured.buffer)
-      return
     }
-    // why: empty samples (non-float buffer) fail open to ASR while keeping FIFO
-    // order with classified buffers ahead of and behind it in the serial router.
-    router.submit(captured.buffer, samples: captured.samples, sampleRate: captured.sampleRate)
+    // why: recycle the recognition request at each detected utterance boundary so each transmission
+    // finalizes into its own card — SFSpeech `.dictation` will not do this on its own. The boundary
+    // is detected RELATIVE to the floating noise floor, so a real mic's room tone during a pause is
+    // correctly read as silence (not speech).
+    guard let recognizer, !captured.samples.isEmpty else { return }
+    switch utteranceBoundaryDetector.update(
+      block: captured.samples, sampleRate: captured.sampleRate)
+    {
+    case .accumulate:
+      break
+    case .cutAfterSilence, .cutAtMaxWindow:
+      restartRecognition(recognizer: recognizer)
+    }
   }
 
   private func emitRecognitionTaskBoundaryRestart() {
