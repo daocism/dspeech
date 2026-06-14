@@ -76,7 +76,7 @@ final class LiveTranscriptionViewModel {
     engine: any LiveTranscriptionEngine,
     transcriptStore: (any TranscriptStoring)? = nil,
     recognitionLocaleIdentifier: @escaping @MainActor () -> String? = { nil },
-    recognitionTransmissionGapSeconds: @escaping @MainActor () -> TimeInterval = { 3.5 },
+    recognitionTransmissionGapSeconds: @escaping @MainActor () -> TimeInterval = { 2.0 },
     firstSessionStorage: any FirstSessionStateStorage = UserDefaultsFirstSessionStateStorage(),
     noAnchorHintStorage: any NoAnchorHintStateStorage = UserDefaultsNoAnchorHintStateStorage(),
     voiceFilter: VoiceFilterPipeline? = nil,
