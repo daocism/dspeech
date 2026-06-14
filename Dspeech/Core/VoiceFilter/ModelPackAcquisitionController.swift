@@ -9,6 +9,21 @@ protocol ModelPackInstalling: Sendable {
 
 extension SpeakerModelPackInstaller: ModelPackInstalling {}
 
+// why: an acquisition attempt can only END as installed or failed — never absent/acquiring/disabled.
+// Narrowing finish()'s input to these two makes the illegal terminal states unrepresentable instead
+// of dead switch arms, so the compiler enforces the contract.
+enum ModelPackAcquisitionFinality: Equatable, Sendable {
+  case installed(InstalledModelPack)
+  case failed(ModelPackFailure)
+
+  var state: ModelPackState {
+    switch self {
+    case .installed(let pack): return .installed(pack)
+    case .failed(let failure): return .failed(failure)
+    }
+  }
+}
+
 @MainActor
 @Observable
 final class ModelPackAcquisitionController {
@@ -86,12 +101,12 @@ final class ModelPackAcquisitionController {
     )
   }
 
-  private func finish(with finalState: ModelPackState, for attemptID: UUID) {
+  private func finish(with finality: ModelPackAcquisitionFinality, for attemptID: UUID) {
     guard currentAttemptID == attemptID else { return }
     currentAttemptID = nil
     downloadTask = nil
-    transition(to: finalState)
-    switch finalState {
+    transition(to: finality.state)
+    switch finality {
     case .installed(let pack):
       DspeechLog.modelPack.info(
         "model pack acquisition succeeded identifier=\(pack.identifier, privacy: .public) version=\(pack.version, privacy: .public) bytes=\(pack.sizeBytes, privacy: .public)"
@@ -100,14 +115,6 @@ final class ModelPackAcquisitionController {
       DspeechLog.modelPack.error(
         "model pack acquisition finished failed kind=\(failure.kind.rawValue, privacy: .public) retryable=\(failure.isRetryable, privacy: .public)"
       )
-    case .absent:
-      DspeechLog.modelPack.info("model pack acquisition finished state=absent")
-    case .acquiring(let acquisition):
-      DspeechLog.modelPack.info(
-        "model pack acquisition finished state=acquiring phase=\(acquisition.phase.rawValue, privacy: .public)"
-      )
-    case .disabled:
-      DspeechLog.modelPack.info("model pack acquisition finished state=disabled")
     }
   }
 

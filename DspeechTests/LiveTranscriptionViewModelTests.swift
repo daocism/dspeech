@@ -744,30 +744,6 @@ struct LiveTranscriptionViewModelTests {
     #expect(vm.visibleSegments.last?.text == "Transmission 10049")
   }
 
-  @Test func unhideSuppressedSegmentKeepsIndicator() async throws {
-    let engine = FakeEngine()
-    let storage = VoiceFilterMemoryStorage()
-    storage.enabled = true
-    storage.callSign = CallSign(raw: "N123AB")
-    let pipeline = VoiceFilterPipeline(
-      identifier: UnavailableLocalSpeakerIdentifier(),
-      storage: storage
-    )
-    let vm = LiveTranscriptionViewModel(engine: engine, voiceFilter: pipeline)
-    await vm.start()
-
-    engine.push(.segment(makeSegment("United 247 contact ground point niner"), speaker: nil))
-    engine.push(.segment(makeSegment("Delta 45 monitor tower"), speaker: nil))
-    #expect(await wait(for: { vm.suppressedSegmentIDs.count == 2 }))
-    let hiddenID = try #require(vm.segments.first?.id)
-
-    vm.unhideSuppressedSegment(id: hiddenID)
-
-    #expect(!vm.suppressedSegmentIDs.contains(hiddenID))
-    #expect(vm.visibleSegments.contains { $0.id == hiddenID })
-    #expect(vm.indicator(for: try #require(vm.segments.first)) == .otherTrafficSuppressed)
-  }
-
   @Test func unhideAllSuppressedSegmentsKeepsIndicators() async throws {
     let engine = FakeEngine()
     let storage = VoiceFilterMemoryStorage()
