@@ -293,11 +293,19 @@ struct VoiceEnrollmentRecorderTests {
     seconds: Double,
     sampleRate: Double = 16_000
   ) -> [Float] {
-    let count = Int((seconds * sampleRate).rounded())
-    return (0..<count).map { index in
-      let phase = Double(index % 64) / 64
-      return Float(sin(phase * 2 * .pi) * 0.08)
+    // why: the adaptive noise-floor VAD scores speech RELATIVE to the recent-minimum RMS, so a
+    // constant-amplitude tone reads as steady noise and is never counted as speech. Real speech is
+    // amplitude-modulated: prepend one quiet frame to seed a low floor, then a louder voiced carrier
+    // that clears 2x the floor and counts toward the required voiced duration.
+    let leadCount = Int((0.02 * sampleRate).rounded())
+    let voicedCount = Int((seconds * sampleRate).rounded())
+    let quiet = (0..<leadCount).map { index -> Float in
+      Float(sin(Double(index % 64) / 64 * 2 * .pi) * 0.0005)
     }
+    let voiced = (0..<voicedCount).map { index -> Float in
+      Float(sin(Double(index % 64) / 64 * 2 * .pi) * 0.08)
+    }
+    return quiet + voiced
   }
 
   private static func silence(seconds: Double, sampleRate: Double = 16_000) -> [Float] {
