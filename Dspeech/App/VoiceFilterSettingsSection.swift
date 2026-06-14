@@ -181,6 +181,9 @@ struct VoiceFilterSettingsSection: View {
         storageIssues = pipeline.storageIssues
         enabled = pipeline.enabled
         callsignDraft = pipeline.callSign?.raw ?? ""
+        // why: clearStorageIssues wipes profiles when they were corrupted — re-sync the mirror so
+        // the crew roster doesn't keep showing ghost rows that no longer exist in the pipeline.
+        crewProfiles = pipeline.profiles
       }
       .buttonStyle(.bordered)
       .accessibilityIdentifier("voicefilter-storage-recovery")

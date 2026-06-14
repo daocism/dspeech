@@ -256,9 +256,7 @@ struct SpeakerMatcherTests {
         if case .pilot = multiProfileDecision {
           // expected: best (primary, score 1.0) clears the threshold => own-side crew
         } else {
-          Issue.record(
-            "expected pilot with a second profile (cos=\(secondCosine)), got "
-              + "\(multiProfileDecision)")
+          Issue.record("expected pilot (cos=\(secondCosine)) got \(multiProfileDecision)")
         }
       }
 
