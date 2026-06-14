@@ -10,6 +10,11 @@ struct ATCTranscriptGateConfig: Equatable, Sendable, Codable {
   )
 }
 
+// why: the SEGMENT-layer relevance gate — runs per ASR segment (one speaker) and drives
+// suppressedSegmentIDs. Voice-first: a pilot is suppressed BEFORE the callsign is checked, so the
+// crew never re-reads its own transmissions. This intentionally DIVERGES from the card-layer
+// TransmissionClassifier (content-first: own callsign is shown even from a pilot). The asymmetry
+// is pinned by VoiceFilterDivergenceTests; flipping either decision order is a product decision.
 struct ATCTranscriptGate: Sendable {
   var config: ATCTranscriptGateConfig
   var configuredCallSign: CallSign?

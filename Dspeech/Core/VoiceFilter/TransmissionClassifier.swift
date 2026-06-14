@@ -6,6 +6,11 @@ struct TransmissionClassifierConfig: Equatable, Sendable {
   static let `default` = TransmissionClassifierConfig(continuationWindowSeconds: 8)
 }
 
+// why: the CARD-layer relevance classifier — runs per assembled transmission (many speakers) and
+// drives displayed/filtered cards. Content-first: the configured callsign is matched BEFORE voice
+// classification, so a transmission naming your aircraft is shown even if a pilot spoke it. This
+// intentionally DIVERGES from the segment-layer ATCTranscriptGate (voice-first: pilot suppressed).
+// The asymmetry is pinned by VoiceFilterDivergenceTests; see its header.
 struct TransmissionClassifier: Sendable {
   var config: TransmissionClassifierConfig
   var configuredCallSign: CallSign?
