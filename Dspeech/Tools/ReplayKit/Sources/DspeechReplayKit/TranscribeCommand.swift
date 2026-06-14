@@ -41,6 +41,7 @@ struct TranscribeArguments: Sendable {
   let emitPartials: Bool
   let transmissionGapSeconds: Double
   let engine: String
+  let silenceRestart: Bool
 
   static func parse(_ arguments: [String]) throws -> TranscribeArguments {
     var audioURL: URL?
@@ -52,6 +53,7 @@ struct TranscribeArguments: Sendable {
     var emitPartials = true
     var transmissionGapSeconds = 3.5
     var engine = "apple"
+    var silenceRestart = false
     var index = 0
 
     while index < arguments.count {
@@ -112,6 +114,12 @@ struct TranscribeArguments: Sendable {
           )
         }
         engine = arguments[index]
+      case "--silence-restart":
+        index += 1
+        guard index < arguments.count, let value = ToggleArgument(arguments[index]) else {
+          throw ReplayKitError.invalidArguments("Invalid value for --silence-restart")
+        }
+        silenceRestart = value.isOn
       case "--help", "-h":
         throw ReplayKitError.invalidArguments(TranscribeCommand.usage)
       default:
@@ -134,7 +142,8 @@ struct TranscribeArguments: Sendable {
       chunkSeconds: chunkSeconds,
       emitPartials: emitPartials,
       transmissionGapSeconds: transmissionGapSeconds,
-      engine: engine
+      engine: engine,
+      silenceRestart: silenceRestart
     )
   }
 }
@@ -199,6 +208,7 @@ private final class SpeechAuthorizationGate: @unchecked Sendable {
 private struct TranscribeAudioChunk {
   let buffer: AVAudioPCMBuffer
   let sampleCount: Int
+  let samples: [Float]
 }
 
 private struct TranscribeSegmentLine: Sendable {
@@ -255,9 +265,17 @@ private final class TranscribeRunner {
   private var needsBenignRestart = false
   private var assembler: TransmissionAssembler
   private var closedTransmissions: [Transmission] = []
+  // why: emulate the live engine's silence-driven recognition restart. SFSpeech .dictation never
+  // self-finalizes on a pause, so the engine must DETECT the speech gap and recycle the request —
+  // exactly what a continuous live mic needs (the 2026-06-14 "one card forever" device report).
+  private let silenceSegmenter: EnergySilenceSegmenter?
 
   init(options: TranscribeArguments) {
     self.options = options
+    silenceSegmenter =
+      options.silenceRestart
+      ? EnergySilenceSegmenter(minSpeechSeconds: 0.3, minSilenceSeconds: 1.0, maxWindowSeconds: 18)
+      : nil
     var classifier = TransmissionClassifier(
       configuredCallSign: options.callSign.flatMap { CallSign(raw: $0) },
       localeIdentifier: options.localeIdentifier,
@@ -355,6 +373,15 @@ private final class TranscribeRunner {
     for chunk in chunks {
       appendChunk(chunk)
       await pace(seconds: options.chunkSeconds)
+      if let segmenter = silenceSegmenter {
+        switch segmenter.update(block: chunk.samples, sampleRate: sampleRate) {
+        case .accumulate:
+          break
+        case .cutAfterSilence, .cutAtMaxWindow:
+          segmenter.reset()
+          try simulateRestart()
+        }
+      }
       while nextRestartIndex < options.restartSeconds.count
         && currentAudioSeconds >= options.restartSeconds[nextRestartIndex]
       {
@@ -412,7 +439,10 @@ private final class TranscribeRunner {
       audio.samples.withUnsafeBufferPointer { source in
         channel.update(from: source.baseAddress!.advanced(by: cursor), count: count)
       }
-      chunks.append(TranscribeAudioChunk(buffer: buffer, sampleCount: count))
+      chunks.append(
+        TranscribeAudioChunk(
+          buffer: buffer, sampleCount: count,
+          samples: Array(audio.samples[cursor..<(cursor + count)])))
       cursor += count
     }
     return chunks
