@@ -276,7 +276,9 @@ private final class TranscribeRunner {
     callSign = options.callSign.flatMap { CallSign(raw: $0) }
     silenceSegmenter =
       options.silenceRestart
-      ? EnergySilenceSegmenter(minSpeechSeconds: 0.3, minSilenceSeconds: 1.0, maxWindowSeconds: 18)
+      ? EnergySilenceSegmenter(
+        minSpeechSeconds: 0.3, minSilenceSeconds: 1.0, maxWindowSeconds: 18,
+        requireSpeechForMaxWindow: true)
       : nil
     var classifier = TransmissionClassifier(
       configuredCallSign: options.callSign.flatMap { CallSign(raw: $0) },

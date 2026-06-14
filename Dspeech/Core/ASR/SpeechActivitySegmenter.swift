@@ -43,12 +43,20 @@ final class EnergySilenceSegmenter: SpeechActivitySegmenter {
   private let speechRatio: Float
   private let absoluteFloor: Float
   private let noiseFloorCap: Float
+  // why: when true, the max-window cap fires ONLY after real speech opened the window. The
+  // utterance-boundary detector that recycles the live recognition request must never cut on a
+  // window of pure silence — otherwise a long inter-transmission pause churns the SFSpeech request
+  // every maxWindow seconds (recreating tasks endlessly, destabilising on-device recognition so the
+  // next real utterance dictates then vanishes, 2026-06-14 device report). The pre-ASR router keeps
+  // the default (false): its max-window is a latency ceiling that must flush silence windows too.
+  private let requireSpeechForMaxWindow: Bool
   private let state = Mutex(State())
 
   init(
     minSpeechSeconds: Double,
     minSilenceSeconds: Double,
     maxWindowSeconds: Double,
+    requireSpeechForMaxWindow: Bool = false,
     // why: the noise floor is the minimum RMS over this trailing window — long enough to
     // span an inter-transmission gap, short enough to track a changing cabin ambient.
     noiseWindowSeconds: Double = 2.0,
@@ -69,6 +77,7 @@ final class EnergySilenceSegmenter: SpeechActivitySegmenter {
     self.speechRatio = max(speechRatio, 1)
     self.absoluteFloor = max(absoluteFloor, 0)
     self.noiseFloorCap = max(noiseFloorCap, max(absoluteFloor, 0))
+    self.requireSpeechForMaxWindow = requireSpeechForMaxWindow
   }
 
   func update(block: [Float], sampleRate: Double) -> SegmentationDecision {
@@ -86,7 +95,13 @@ final class EnergySilenceSegmenter: SpeechActivitySegmenter {
       let noiseFloor = min(state.recentRMS.map(\.rms).min() ?? rms, noiseFloorCap)
       let isSpeech = rms > max(absoluteFloor, noiseFloor * speechRatio)
 
-      state.windowSeconds += blockSeconds
+      // why: for the boundary detector (requireSpeechForMaxWindow) the max-window cap measures the
+      // SPEECH region — a long leading silence must not pre-load windowSeconds and trip a cut the
+      // instant speech resumes after a pause. The default (router) path keeps counting silence so
+      // its latency-ceiling flush still fires on silence-only windows.
+      if !requireSpeechForMaxWindow || isSpeech || state.speechSeconds > 0 {
+        state.windowSeconds += blockSeconds
+      }
       if isSpeech {
         state.speechSeconds += blockSeconds
         state.trailingSilenceSeconds = 0
@@ -100,7 +115,12 @@ final class EnergySilenceSegmenter: SpeechActivitySegmenter {
       {
         return .cutAfterSilence
       }
-      if state.windowSeconds >= maxWindowSeconds {
+      // why: the max-window cap bounds a CONTINUOUS-SPEECH region so it can't grow unbounded. With
+      // requireSpeechForMaxWindow it must therefore see real speech first — a window of pure silence
+      // is not an over-long utterance and must not trigger a cut/restart.
+      if state.windowSeconds >= maxWindowSeconds,
+        !requireSpeechForMaxWindow || state.speechSeconds >= minSpeechSeconds
+      {
         return .cutAtMaxWindow
       }
       return .accumulate

@@ -53,7 +53,8 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
   // recognition request per utterance, so each transmission finalizes into its own card. Validated
   // on real audio (speech + 3s noisy pauses) via `dspeech-replay transcribe --silence-restart on`.
   private let utteranceBoundaryDetector = EnergySilenceSegmenter(
-    minSpeechSeconds: 0.3, minSilenceSeconds: 1.0, maxWindowSeconds: 18)
+    minSpeechSeconds: 0.3, minSilenceSeconds: 1.0, maxWindowSeconds: 18,
+    requireSpeechForMaxWindow: true)
   private var recognizerAvailabilityDelegate: LiveRecognizerAvailabilityDelegate?
   private var recognitionCallbackContinuation: AsyncStream<RecognitionCallbackEvent>.Continuation?
   private var recognitionCallbackTask: Task<Void, Never>?
