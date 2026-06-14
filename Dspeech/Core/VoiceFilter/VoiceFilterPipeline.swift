@@ -247,6 +247,21 @@ final class VoiceFilterPipeline {
     DspeechLog.voiceFilter.info("crew enrollment removed all reason=pack-deleted")
   }
 
+  #if DEBUG
+    // why: UI-test seam — render the crew roster (name + Re-record + delete rows) in its ENABLED
+    // state (available identifier) for the accessibility audit, without a real model or enrollment.
+    func seedCrewForTesting(count: Int) {
+      identifier = UITestAvailableSpeakerIdentifier()
+      profiles = (0..<max(0, count)).map { index in
+        var values = [Float](repeating: 0, count: 256)
+        values[index % 256] = 1
+        return PilotVoiceProfile(
+          label: "Crew \(index + 1)",
+          voicePrint: VoicePrintVector(values: values, quality: 0.9))
+      }
+    }
+  #endif
+
   func decide(
     text: String,
     speaker: SpeakerMatchDecision,
@@ -390,3 +405,20 @@ final class VoiceFilterPipeline {
     }
   }
 }
+
+#if DEBUG
+  // why: UI-test-only available identifier so the crew roster renders ENABLED for the accessibility
+  // audit (the real FluidAudio identifier is unavailable on the Simulator). Never used in Release.
+  private struct UITestAvailableSpeakerIdentifier: LocalSpeakerIdentifier {
+    let availability: LocalSpeakerIdentifierAvailability = .available
+    let embeddingDimension = 256
+    func enroll(samples: [Float], sampleRate: Double) async throws -> VoicePrintVector {
+      VoicePrintVector(values: Array(repeating: Float(0.1), count: 256), quality: 0.9)
+    }
+    func classify(
+      samples: [Float], sampleRate: Double, profiles: [PilotVoiceProfile]
+    ) async throws -> SpeakerMatchDecision {
+      .nonPilot(bestPilotScore: 0)
+    }
+  }
+#endif

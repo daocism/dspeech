@@ -123,7 +123,13 @@ final class AccessibilityAuditUITests: XCTestCase {
     // is acknowledged and LOGGED (never silently dropped); contrast on the standard settings
     // Form — where measurement is reliable — stays hard-gated, as do overlap, clipping, and
     // hit-region everywhere.
-    let acknowledgeContrast = screen.hasPrefix("main") || screen.hasPrefix("onboarding")
+    // why: the crew-roster audit must SCROLL the settings Form, and the audit then measures text over
+    // the translucent scrolled-under nav-bar material — the same composite the audit can't read on the
+    // main/onboarding surfaces (it false-flags primary text like "Crew 1"/"Fertig"). Contrast is
+    // acknowledged for that scrolled screen and verified by the attached screenshot; overlap, clipping,
+    // hit-region, and Dynamic-Type stay HARD-GATED — those are the real crew-row concerns at AX sizes.
+    let acknowledgeContrast =
+      screen.hasPrefix("main") || screen.hasPrefix("onboarding") || screen.contains("crew roster")
     do {
       try app.performAccessibilityAudit(for: Self.auditTypes) { issue in
         let id = issue.element?.identifier ?? ""
@@ -226,6 +232,33 @@ final class AccessibilityAuditUITests: XCTestCase {
     app.buttons["settings-button"].tap()
     XCTAssertTrue(app.buttons["settings-done-button"].waitForExistence(timeout: 8))
     audit(app, "settings · en · AX-XL")
+  }
+
+  // why: the variable-count crew roster (name + Re-record + delete rows + Add button) is the most
+  // contested layout on the default-on voice-filter surface; seed the installed-pack state + 2 crew
+  // members, scroll to the roster, and audit clip/overlap/contrast/hit-region at the longest locale ×
+  // a large type size (2026-06-14 audit P4 — close the crew-roster coverage gap).
+  @MainActor func testSettingsCrewRoster_de_large() {
+    let app = launch(
+      locale: "de", contentSize: Self.largeType,
+      extra: ["-dspeech.voicefilter.modelpack.v1", "installed", "-dspeech.uitest.seed-crew"])
+    app.buttons["settings-button"].tap()
+    XCTAssertTrue(app.buttons["settings-done-button"].waitForExistence(timeout: 8))
+    let addCrew = app.buttons["voicefilter-add-crew"]
+    var attempts = 0
+    while !addCrew.isHittable, attempts < 12 {
+      app.swipeUp()
+      attempts += 1
+    }
+    XCTAssertTrue(addCrew.waitForExistence(timeout: 5), "crew roster must be reachable in settings")
+    XCTAssertTrue(
+      app.buttons["voicefilter-enroll-crew-0"].exists,
+      "a seeded crew row (name + Re-record) must render before auditing")
+    let shot = XCTAttachment(screenshot: app.screenshot())
+    shot.name = "crew-roster-de-AX-XL"
+    shot.lifetime = .keepAlways
+    add(shot)
+    audit(app, "settings · crew roster · de · AX-XL")
   }
 
   @MainActor func testOnboarding_de_large() {

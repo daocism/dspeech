@@ -63,6 +63,13 @@ struct ContentView: View {
       )
     }
     #if DEBUG
+      // why: UI-test seam — seed the crew roster so the accessibility audit can sweep the
+      // name+Re-record+delete rows on the installed-pack settings surface.
+      if CommandLine.arguments.contains("-dspeech.uitest.seed-crew") {
+        filter.seedCrewForTesting(count: 2)
+      }
+    #endif
+    #if DEBUG
       let debugScriptedEngine: (any LiveTranscriptionEngine)? =
         RenderStableScriptedLiveTranscriptionEngine.makeFromLaunchArguments()
     #else
