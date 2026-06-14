@@ -107,9 +107,9 @@ struct VoiceFilterSettingsSection: View {
         if !parsed.isEmpty { callsignDraft = parsed }
       }
 
-      // why: the FluidAudio speaker-diarization pack download + pilot enrollment ship only when
-      // ADR 0008's eval lanes are green (gated off by default in Release). The phase-1 callsign
-      // filter above (ADR 0007) is always available.
+      // why: the FluidAudio speaker-diarization pack download + crew enrollment (ADR 0008) ship ON by
+      // default now that the eval lanes are green; `-dspeech.voicefilter.diarization.disable` forces
+      // them off. The phase-1 callsign filter above (ADR 0007) is always available.
       if VoiceFilterFeatureFlag.speakerDiarizationEnabled {
         modelPackContent
       }
@@ -235,6 +235,10 @@ struct VoiceFilterSettingsSection: View {
       try await Task.detached {
         try installer.uninstall(pack)
       }.value
+      // why: wipe enrolled voice prints together with the model — don't leave personal voice data on
+      // disk after the user deleted the feature that uses it (2026-06-14 audit).
+      pipeline.removeAllCrewMembers()
+      crewProfiles = pipeline.profiles
       transition(to: .absent)
     } catch {
       transition(to: .failed(modelPackDeleteFailure(for: error)))
