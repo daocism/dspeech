@@ -83,7 +83,9 @@ struct UserDefaultsRecognitionSettingsStorage: RecognitionSettingsStorage, @unch
 
   func loadTransmissionGapSeconds() -> TimeInterval {
     let stored = defaults.double(forKey: Self.transmissionGapSecondsDefaultsName)
-    guard stored > 0 else { return 3.5 }
+    // why: 2.0 matches the TransmissionAssembler tuning — 3.5 (the old value) merged close-together
+    // ATC exchanges into one card on a CLEAN install where the user never set this (2026-06-14 audit).
+    guard stored > 0 else { return 2.0 }
     return Self.clampedTransmissionGapSeconds(stored)
   }
 

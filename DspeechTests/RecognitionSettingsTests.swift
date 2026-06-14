@@ -154,7 +154,7 @@ struct RecognitionSettingsTests {
       supportedLocales: supported,
       preferredLanguages: ["en-US"])
 
-    #expect(settings.transmissionGapSeconds == 3.5)
+    #expect(settings.transmissionGapSeconds == 2.0)
   }
 
   @MainActor @Test func transmissionGapPersistsAndReloadsClampedValue() {
@@ -330,7 +330,7 @@ private final class InMemoryRecognitionSettingsStorage: RecognitionSettingsStora
     if failSaves { throw RecognitionSettingsTests.TestError.saveFailed }
     engineChoice = choice
   }
-  func loadTransmissionGapSeconds() -> TimeInterval { transmissionGapSeconds ?? 3.5 }
+  func loadTransmissionGapSeconds() -> TimeInterval { transmissionGapSeconds ?? 2.0 }
   func saveTransmissionGapSeconds(_ seconds: TimeInterval) throws {
     if failSaves { throw RecognitionSettingsTests.TestError.saveFailed }
     transmissionGapSeconds = seconds
