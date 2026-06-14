@@ -89,6 +89,17 @@ struct SpeechActivitySegmenterTests {
         == .cutAtMaxWindow)
   }
 
+  @Test func subMinSpeechNoiseBurstThenLongSilenceStillCutsAtMaxWindow() {
+    // why: a 0.2s burst (< minSpeechSeconds 0.3) opens the window but never satisfies cutAfterSilence;
+    // the max-window cap must still close it during the trailing silence, otherwise the detector
+    // sticks forever (which would re-create the post-silence vanish). Gate is speechSeconds > 0.
+    let segmenter = makeBoundarySegmenter()
+    _ = segmenter.update(block: block(seconds: 0.2, amplitude: 0.5), sampleRate: Self.sampleRate)
+    #expect(
+      segmenter.update(block: block(seconds: 1.5, amplitude: 0.0), sampleRate: Self.sampleRate)
+        == .cutAtMaxWindow)
+  }
+
   @Test func speechAfterLongSilenceCutsAtTrailingSilenceNotDiscarded() {
     // the post-silence utterance: long silence (no cut), then speech, then a trailing pause closes
     // the utterance cleanly via cutAfterSilence — the boundary the assembler turns into a card.

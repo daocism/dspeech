@@ -115,11 +115,14 @@ final class EnergySilenceSegmenter: SpeechActivitySegmenter {
       {
         return .cutAfterSilence
       }
-      // why: the max-window cap bounds a CONTINUOUS-SPEECH region so it can't grow unbounded. With
-      // requireSpeechForMaxWindow it must therefore see real speech first — a window of pure silence
-      // is not an over-long utterance and must not trigger a cut/restart.
+      // why: the max-window cap bounds the region that started accruing once speech opened the
+      // window, so it can't grow unbounded. With requireSpeechForMaxWindow it must have seen SOME
+      // speech (speechSeconds > 0) — a window of pure silence is not an over-long utterance and must
+      // not cut. NB: gate on > 0, NOT >= minSpeechSeconds: a sub-minSpeech noise burst still opens
+      // the window (windowSeconds accrues), so the cap must be able to close it, otherwise neither
+      // cutAfterSilence (needs minSpeech) nor cutAtMaxWindow would ever fire and the detector sticks.
       if state.windowSeconds >= maxWindowSeconds,
-        !requireSpeechForMaxWindow || state.speechSeconds >= minSpeechSeconds
+        !requireSpeechForMaxWindow || state.speechSeconds > 0
       {
         return .cutAtMaxWindow
       }
