@@ -25,6 +25,26 @@ struct AppleSpeechLiveTranscriptionEngineLifecycleTests {
     #expect(engine.status == .failed("speech-permission-denied"))
   }
 
+  @Test func permissionRequestTimesOutWhenAuthorizationNeverResolves() async {
+    // why: the corrupted-TCC hang — the speech request never resolves. The watchdog must fail the
+    // start with a clear slug instead of parking at .requestingPermission forever.
+    let authorizer = SuspendedLiveSpeechAuthorizer()
+    let engine = AppleSpeechLiveTranscriptionEngine(
+      requireOnDeviceModel: false,
+      permissionTimeoutSeconds: 0.2,
+      authorizer: authorizer
+    )
+    let startTask = Task { @MainActor in await engine.start() }
+
+    #expect(await wait(for: { authorizer.speechRequestCount == 1 }))
+    #expect(await wait(for: { engine.status == .failed("permission-request-timed-out") }))
+
+    // the late callback must not revive the superseded start
+    authorizer.resolveSpeech(true)
+    await startTask.value
+    #expect(engine.status == .failed("permission-request-timed-out"))
+  }
+
   @Test func stopDuringSpeechAuthorizationKeepsStoppedAfterLateDenial() async {
     let authorizer = SuspendedLiveSpeechAuthorizer()
     let engine = AppleSpeechLiveTranscriptionEngine(

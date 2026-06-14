@@ -296,6 +296,7 @@ private struct LiveFailureBanner: View {
 
   private var canOpenSettings: Bool {
     error == "speech-permission-denied" || error == "microphone-permission-denied"
+      || error == "permission-request-timed-out"
   }
 
   var body: some View {

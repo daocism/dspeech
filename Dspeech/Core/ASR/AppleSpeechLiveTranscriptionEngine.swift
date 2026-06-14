@@ -79,6 +79,12 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
   // why: test seam — lets a Simulator test drive the audio-capture path without the
   // permission prompt (which would hang a non-UI test). Production always requests.
   private let skipPermissionRequests: Bool
+  // why: a watchdog ceiling on the permission phase. If a corrupted-TCC state never resolves the
+  // speech/mic request, start() would otherwise sit at .requestingPermission forever; after this many
+  // seconds it fails with a clear, Settings-pointing message instead of an infinite "Requesting
+  // access". Generous (60s) so a real first-run prompt the user is reading never false-fires; this is
+  // a UX watchdog, exempt from the long-timeout default. Configurable for fast tests.
+  private let permissionTimeoutSeconds: Double
   private let authorizer: any LiveSpeechAuthorizing
   private let audioConduit: LiveAudioCaptureConduit
 
@@ -91,6 +97,7 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     requireOnDeviceModel: Bool = true,
     skipPermissionRequests: Bool = false,
     replayTailEnabled: Bool = true,
+    permissionTimeoutSeconds: Double = 60,
     authorizer: any LiveSpeechAuthorizing = AppleLiveSpeechAuthorizer(),
     arbiter: AudioCaptureArbiter = .shared,
     audioSession: any LiveAudioSessionManaging = SystemLiveAudioSession()
@@ -101,6 +108,7 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     self.requireOnDeviceModel = requireOnDeviceModel
     self.skipPermissionRequests = skipPermissionRequests
     self.replayTailEnabled = replayTailEnabled
+    self.permissionTimeoutSeconds = max(0, permissionTimeoutSeconds)
     self.authorizer = authorizer
     self.audioConduit = LiveAudioCaptureConduit(arbiter: arbiter, audioSession: audioSession)
   }
@@ -131,6 +139,22 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     lifecycleGeneration += 1
     let generation = lifecycleGeneration
     status = .requestingPermission
+
+    // why: watchdog — a corrupted-TCC permission request can never resolve, leaving start() parked at
+    // .requestingPermission forever (the recurring "Requesting access" hang). After the ceiling, if
+    // THIS start is still requesting permission, fail with a clear, recoverable message. The late
+    // (possibly never-arriving) permission callback is harmless: its isCurrentStartup(generation)
+    // checks fail once status left .requestingPermission, so it can't revive a superseded start.
+    let permissionTimeout = permissionTimeoutSeconds
+    if permissionTimeout > 0 {
+      Task { @MainActor [weak self] in
+        try? await Task.sleep(for: .seconds(permissionTimeout))
+        guard let self, self.lifecycleGeneration == generation, self.status == .requestingPermission
+        else { return }
+        DspeechLog.engine.error("live transcription start failed slug=permission-request-timed-out")
+        self.status = .failed("permission-request-timed-out")
+      }
+    }
 
     if !skipPermissionRequests {
       let speechAuthorized = await authorizer.requestSpeechAuthorization()
@@ -296,7 +320,13 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
           guard let self else { return .transcribe(reason: .classifierUnavailable) }
           return try await self.routeSamples(samples, sampleRate: sampleRate)
         },
-        append: { [weak self] buffer in self?.request?.append(buffer) }
+        append: { [weak self] buffer, generation in
+          // why: drop a classified buffer whose recognition request was already recycled at an
+          // utterance boundary while it classified off-actor — appending it would bleed the previous
+          // transmission's audio into the next card's request (adversarial-audit HIGH, 2026-06-14).
+          guard let self, self.taskGeneration == generation else { return }
+          self.request?.append(buffer)
+        }
       )
     } else {
       router = nil
@@ -563,7 +593,9 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     if let router {
       // why: empty samples (non-float buffer) fail open to ASR while keeping FIFO
       // order with classified buffers ahead of and behind it in the serial router.
-      router.submit(captured.buffer, samples: captured.samples, sampleRate: captured.sampleRate)
+      router.submit(
+        captured.buffer, samples: captured.samples, sampleRate: captured.sampleRate,
+        generation: taskGeneration)
     } else {
       request?.append(captured.buffer)
     }
