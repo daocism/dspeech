@@ -400,7 +400,6 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
       }
       let event: LiveTranscriptionEvent?
       let isFinal: Bool
-      let hasResult = result != nil
       if let result {
         let raw = result.bestTranscription.formattedString
         if result.isFinal {
@@ -436,8 +435,7 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
           generation: generation,
           event: event,
           isFinal: isFinal,
-          failure: failure,
-          hasResult: hasResult
+          failure: failure
         ))
     }
     for buffer in replayTailEnabled ? replayTail.buffers : [] {
@@ -470,10 +468,10 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
 
   private func handleRecognitionCallback(_ callback: RecognitionCallbackEvent) {
     guard taskGeneration == callback.generation else { return }
-    // why: reset the death-spiral ceiling only on a COMMITTED final segment — proof the recognizer
-    // produced a real utterance. A flood of (possibly re-emitted) partials must not be able to mask a
-    // genuine restart loop. The 10s window self-limits anyway, so this only tightens, never loosens.
-    if callback.isFinal, callback.event != nil {
+    // why: reset the death-spiral ceiling whenever the recognizer proves it is alive — any clean
+    // final, empty or not (see shouldResetRestartGuard). Partials and failures do not reset, so a
+    // genuine restart loop is still caught, but empty post-silence/noise finals can't falsely kill it.
+    if Self.shouldResetRestartGuard(isFinal: callback.isFinal, failure: callback.failure) {
       restartLoopGuard.recordResult()
     }
     pendingRecognitionPartial.record(event: callback.event, isFinal: callback.isFinal)
@@ -707,16 +705,14 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
       generation: Int,
       event: LiveTranscriptionEvent?,
       isFinal: Bool,
-      failure: ASRFailure? = nil,
-      hasResult: Bool
+      failure: ASRFailure? = nil
     ) {
       recognitionCallbackContinuation?.yield(
         RecognitionCallbackEvent(
           generation: generation,
           event: event,
           isFinal: isFinal,
-          failure: failure,
-          hasResult: hasResult
+          failure: failure
         ))
     }
 
