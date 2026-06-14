@@ -12,7 +12,11 @@ final class VoiceEnrollmentRecorder {
     case unavailable(String)
   }
 
-  static let targetSeconds: Double = 6
+  // why: the minimum VOICED-speech floor for a usable embedding. 6s was onerous for a short
+  // callsign and silently failed enrollment (the UI showed only a generic error); 4s still yields a
+  // robust WeSpeaker embedding given the wide same/cross-voice margin (0.78–0.83 vs 0.15–0.23) and
+  // a longer recording still uses every captured sample. The real reason is now surfaced in the UI.
+  static let targetSeconds: Double = 4
 
   private(set) var status: Status = .idle {
     didSet {
