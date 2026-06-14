@@ -4,12 +4,16 @@ struct TransmissionAssemblerConfig: Equatable, Sendable {
   var transmissionGapSeconds: TimeInterval
   var overlapMergeMinWords: Int
 
+  // why: 2.0s matches the cadence of real ATC — transmissions are separated by ~1-2s, and the
+  // gap timer only advances on NEW speech content (not re-emitted partials), so an in-transmission
+  // pause of a beat does not split. 3.5s was long enough that close-together exchanges merged into
+  // one card (2026-06-14 device report). Clamped to [2,6]; user-configurable.
   static let `default` = TransmissionAssemblerConfig(
-    transmissionGapSeconds: 3.5,
+    transmissionGapSeconds: 2.0,
     overlapMergeMinWords: 2
   )
 
-  init(transmissionGapSeconds: TimeInterval = 3.5, overlapMergeMinWords: Int = 2) {
+  init(transmissionGapSeconds: TimeInterval = 2.0, overlapMergeMinWords: Int = 2) {
     self.transmissionGapSeconds = min(6, max(2, transmissionGapSeconds))
     self.overlapMergeMinWords = max(1, overlapMergeMinWords)
   }
@@ -55,6 +59,10 @@ struct TransmissionAssembler {
   private let localeIdentifier: String
   private let classify: (String, [SpeakerMatchDecision], Date) -> TransmissionClassification
   private var openTransmission: OpenTransmission?
+  // why: the last partial text seen for the open transmission. Apple SFSpeech re-emits the same
+  // growing transcription continuously (including during a pause), so only a CHANGED partial is
+  // evidence of ongoing speech; a re-emit at the same text must not refresh the silence-gap timer.
+  private var lastPartialText = ""
 
   init(
     config: TransmissionAssemblerConfig,
@@ -72,13 +80,19 @@ struct TransmissionAssembler {
     switch input {
     case .partial(let text, let at):
       var updates = closeIfGapReached(now: at)
-      guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return updates }
+      let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+      guard !trimmed.isEmpty else { return updates }
       if openTransmission == nil {
+        lastPartialText = trimmed
         openTransmission = makeOpenTransmission(startedAt: at, evidenceAt: at, speakers: [])
         if let transmission = openTransmission?.transmission() {
           updates.append(.opened(transmission))
         }
-      } else {
+      } else if trimmed != lastPartialText {
+        // why: only NEW speech content keeps the transmission alive. A re-emitted unchanged partial
+        // during a pause is silence, not speech — refreshing the gap timer on it kept the whole
+        // flight as ONE card ("one line, doesn't segment", 2026-06-14 device report).
+        lastPartialText = trimmed
         openTransmission?.lastSpeechEvidenceAt = at
         openTransmission?.endedAt = at
       }
@@ -187,6 +201,7 @@ struct TransmissionAssembler {
     endedAt: Date
   ) -> TransmissionUpdate {
     openTransmission = nil
+    lastPartialText = ""
     return .closed(current.transmission(endedAt: endedAt))
   }
 

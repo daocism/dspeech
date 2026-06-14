@@ -47,6 +47,46 @@ struct TransmissionAssemblerTests {
     #expect(assembler.tick(now: t0.addingTimeInterval(4)) == [])
   }
 
+  @Test func reEmittedUnchangedPartialsDoNotKeepOneCardAliveAcrossASilenceGap() {
+    // why: THE 2026-06-14 device report ("one line, doesn't segment"). Apple SFSpeech re-emits the
+    // same growing transcription continuously, INCLUDING during a pause. The assembler refreshed
+    // the gap timer on every partial, so the silence gap never elapsed and the whole flight stayed
+    // ONE card. Two spoken transmissions separated by a real pause MUST become TWO cards.
+    var assembler = Self.makeAssembler()
+    var opened = 0
+    func apply(_ updates: [TransmissionUpdate]) {
+      opened += updates.filter { if case .opened = $0 { return true } else { return false } }.count
+    }
+    // transmission 1
+    apply(assembler.process(.partial(text: "alpha one two three bravo", at: t0)))
+    apply(
+      assembler.process(
+        .fragment(
+          segment: Self.segment("Alpha one two three bravo runway zero three"), speaker: nil,
+          at: t0.addingTimeInterval(1))))
+    // PAUSE: SFSpeech re-emits the SAME cumulative partial — must NOT keep the card alive.
+    apply(
+      assembler.process(
+        .partial(
+          text: "Alpha one two three bravo runway zero three", at: t0.addingTimeInterval(1.5)))
+    )
+    apply(
+      assembler.process(
+        .partial(
+          text: "Alpha one two three bravo runway zero three", at: t0.addingTimeInterval(2.5)))
+    )
+    apply(assembler.tick(now: t0.addingTimeInterval(3.6)))  // gap elapsed since last NEW word (1.5)
+    // transmission 2 (fresh content after the pause)
+    apply(
+      assembler.process(
+        .fragment(
+          segment: Self.segment("Tower ready for departure"), speaker: nil,
+          at: t0.addingTimeInterval(3.8))))
+
+    #expect(
+      opened == 2, "two transmissions separated by a pause must be two cards, not one rolling line")
+  }
+
   @Test func closesOldTransmissionBeforeOpeningLateFragment() {
     var assembler = Self.makeAssembler()
     _ = assembler.process(
@@ -254,13 +294,13 @@ struct TransmissionAssemblerTests {
 
     #expect(
       assembler.process(
-        .partial(text: "descend two thousand report established", at: t0.addingTimeInterval(2)))
+        .partial(text: "descend two thousand report established", at: t0.addingTimeInterval(1)))
         == [])
-    #expect(assembler.tick(now: t0.addingTimeInterval(4)) == [])
+    #expect(assembler.tick(now: t0.addingTimeInterval(2.5)) == [])
 
     let updates = assembler.process(
       .fragment(
-        segment: Self.segment("report established"), speaker: nil, at: t0.addingTimeInterval(4.2)))
+        segment: Self.segment("report established"), speaker: nil, at: t0.addingTimeInterval(2.7)))
     let updated = Self.requireUpdated(updates)
     #expect(updated.text == "descend two thousand report established")
   }
@@ -272,7 +312,7 @@ struct TransmissionAssemblerTests {
     #expect(
       TransmissionAssemblerConfig(transmissionGapSeconds: 12, overlapMergeMinWords: 2)
         .transmissionGapSeconds == 6)
-    #expect(TransmissionAssemblerConfig.default.transmissionGapSeconds == 3.5)
+    #expect(TransmissionAssemblerConfig.default.transmissionGapSeconds == 2.0)
     #expect(TransmissionAssemblerConfig.default.overlapMergeMinWords == 2)
   }
 
