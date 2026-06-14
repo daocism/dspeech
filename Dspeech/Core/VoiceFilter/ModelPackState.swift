@@ -257,6 +257,21 @@ struct UserDefaultsModelPackStateStorage: ModelPackStateStorage, @unchecked Send
             bytesReceived: 6_300_000,
             totalBytes: 15_000_000
           ))
+      case "installed":
+        // why: UI-test seam — drives the installed-pack settings surface (crew roster) for the
+        // accessibility audit. The fake localModelPath does not exist, so the recognizer stays
+        // unavailable (rows render but disabled) — which is all the layout/clip/contrast audit needs.
+        return .installed(
+          InstalledModelPack(
+            identifier: "uitest-pack",
+            version: "1.0",
+            embeddingDimension: 256,
+            checksumSHA256: String(repeating: "a", count: 64),
+            source: "uitest",
+            sizeBytes: 15_000_000,
+            installedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            localModelPath: "uitest-nonexistent"
+          ))
       case "failedPermanent":
         return .failed(
           ModelPackFailure(
