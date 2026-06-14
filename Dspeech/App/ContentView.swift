@@ -302,7 +302,10 @@ struct ContentView: View {
           maxWidth: readableContentMaxWidth,
           showHints: showHints,
           isStopVisible: liveViewModel.canStopCurrentSession,
-          disabled: liveViewModel.status == .requestingPermission
+          // why: NEVER disable the control while permission is being requested — that left the pilot
+          // stranded on a stuck "Requesting access" with no escape (2026-06-14). It shows Stop during
+          // .requestingPermission (canStopCurrentSession), and a tap routes to stop()/abort.
+          disabled: false
         ) {
           Task { await toggleListening() }
         }

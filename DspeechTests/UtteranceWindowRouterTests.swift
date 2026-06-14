@@ -125,7 +125,7 @@ struct UtteranceWindowRouterTests {
           }
           return generated.routingDecisions[token] ?? .transcribe(reason: .nonPilotVoice)
         },
-        append: { appended.append($0) }
+        append: { b, _ in appended.append(b) }
       )
 
       for token in generated.tokens {
@@ -165,7 +165,7 @@ struct UtteranceWindowRouterTests {
     let router = UtteranceWindowRouter<Int>(
       segmenter: segmenter,
       classify: Self.gatedClassify(gate: gate, decisions: [1: .transcribe(reason: .nonPilotVoice)]),
-      append: { appendContinuation.yield($0) }
+      append: { b, _ in appendContinuation.yield(b) }
     )
 
     // Large blocks: under the old fixed-count rule these would have cut after
@@ -205,7 +205,7 @@ struct UtteranceWindowRouterTests {
           3: .transcribe(reason: .nonPilotVoice),
         ]
       ),
-      append: { appendContinuation.yield($0) }
+      append: { b, _ in appendContinuation.yield(b) }
     )
 
     router.submit(1, samples: Self.samples(token: 1, count: 6), sampleRate: 16_000)
@@ -245,7 +245,7 @@ struct UtteranceWindowRouterTests {
           3: .transcribe(reason: .nonPilotVoice),
         ]
       ),
-      append: { appendContinuation.yield($0) }
+      append: { b, _ in appendContinuation.yield(b) }
     )
 
     router.submit(1, samples: Self.samples(token: 1, count: 6), sampleRate: 16_000)
@@ -278,7 +278,7 @@ struct UtteranceWindowRouterTests {
     let router = UtteranceWindowRouter<Int>(
       segmenter: segmenter,
       classify: Self.gatedClassify(gate: gate, decisions: [1: .transcribe(reason: .nonPilotVoice)]),
-      append: { appendContinuation.yield($0) }
+      append: { b, _ in appendContinuation.yield(b) }
     )
 
     router.submit(1, samples: Self.samples(token: 1, count: 6), sampleRate: 16_000)
@@ -310,7 +310,7 @@ struct UtteranceWindowRouterTests {
           3: .transcribe(reason: .nonPilotVoice),
         ]
       ),
-      append: { appendContinuation.yield($0) }
+      append: { b, _ in appendContinuation.yield(b) }
     )
 
     router.submit(1, samples: Self.samples(token: 1, count: 6), sampleRate: 16_000)
@@ -339,7 +339,7 @@ struct UtteranceWindowRouterTests {
     let router = UtteranceWindowRouter<Int>(
       segmenter: segmenter,
       classify: Self.gatedClassify(gate: gate, decisions: [1: .discard(reason: .pilotVoice)]),
-      append: { appendContinuation.yield($0) }
+      append: { b, _ in appendContinuation.yield(b) }
     )
 
     router.submit(1, samples: Self.samples(token: 1, count: 4), sampleRate: 16_000)
@@ -365,7 +365,7 @@ struct UtteranceWindowRouterTests {
     let router = UtteranceWindowRouter<Int>(
       segmenter: segmenter,
       classify: Self.gatedClassify(gate: gate, decisions: [1: .discard(reason: .pilotVoice)]),
-      append: { appendContinuation.yield($0) }
+      append: { b, _ in appendContinuation.yield(b) }
     )
 
     router.submit(1, samples: [], sampleRate: 16_000)
@@ -384,7 +384,7 @@ struct UtteranceWindowRouterTests {
     let router = UtteranceWindowRouter<Int>(
       segmenter: segmenter,
       classify: Self.gatedClassify(gate: gate, decisions: [1: .discard(reason: .pilotVoice)]),
-      append: { appendContinuation.yield($0) }
+      append: { b, _ in appendContinuation.yield(b) }
     )
 
     router.submit(1, samples: Self.samples(token: 1, count: 4), sampleRate: 0)
@@ -412,7 +412,7 @@ struct UtteranceWindowRouterTests {
           3: .transcribe(reason: .nonPilotVoice),
         ]
       ),
-      append: { appendContinuation.yield($0) }
+      append: { b, _ in appendContinuation.yield(b) }
     )
 
     router.submit(1, samples: Self.samples(token: 1, count: 4), sampleRate: 16_000)
@@ -437,7 +437,7 @@ struct UtteranceWindowRouterTests {
     let router = UtteranceWindowRouter<Int>(
       segmenter: segmenter,
       classify: Self.gatedClassify(gate: gate, decisions: [:], errorTokens: [1]),
-      append: { appendContinuation.yield($0) }
+      append: { b, _ in appendContinuation.yield(b) }
     )
 
     router.submit(1, samples: Self.samples(token: 1, count: 6), sampleRate: 16_000)
@@ -469,7 +469,7 @@ struct UtteranceWindowRouterTests {
           3: .transcribe(reason: .nonPilotVoice),
         ]
       ),
-      append: { appendContinuation.yield($0) }
+      append: { b, _ in appendContinuation.yield(b) }
     )
 
     router.submit(1, samples: Self.samples(token: 1, count: 4), sampleRate: 16_000)
@@ -501,7 +501,7 @@ struct UtteranceWindowRouterTests {
         segmenter: segmenter,
         classify: Self.gatedClassify(
           gate: gate, decisions: [1: .transcribe(reason: .nonPilotVoice)]),
-        append: { _ in appended() }
+        append: { _, _ in appended() }
       )
 
       router.finish()
@@ -510,6 +510,22 @@ struct UtteranceWindowRouterTests {
 
       for _ in 0..<100 { await Task.yield() }
     }
+  }
+
+  @Test("should thread the submit generation through to the append sink")
+  func threadsSubmitGenerationToAppendSink() async {
+    let (appended, appendContinuation) = AsyncStream<(Int, Int)>.makeStream()
+    let segmenter = ScriptedSegmenter([7: .cutAfterSilence])
+    let router = UtteranceWindowRouter<Int>(
+      segmenter: segmenter,
+      classify: { _, _ in .transcribe(reason: .nonPilotVoice) },
+      append: { buffer, generation in appendContinuation.yield((buffer, generation)) }
+    )
+    router.submit(7, samples: Self.samples(token: 7, count: 6), sampleRate: 16_000, generation: 42)
+    var iterator = appended.makeAsyncIterator()
+    let first = await iterator.next()
+    #expect(first?.0 == 7)
+    #expect(first?.1 == 42)
   }
 
   @Test("should fail open an in-flight cut window before a pending tail on finish")
@@ -523,7 +539,7 @@ struct UtteranceWindowRouterTests {
     let router = UtteranceWindowRouter<Int>(
       segmenter: segmenter,
       classify: Self.gatedClassify(gate: gate, decisions: [1: .discard(reason: .pilotVoice)]),
-      append: { appendContinuation.yield($0) }
+      append: { b, _ in appendContinuation.yield(b) }
     )
 
     // Window A is cut and starts classifying. Window B is only a pending tail

@@ -15,6 +15,12 @@ enum RecognitionFailureText {
     if rawCode == "microphone-permission-denied" {
       return String(localized: "No microphone access. Allow it in iPhone Settings.")
     }
+    if rawCode == "permission-request-timed-out" {
+      return String(
+        localized:
+          "Couldn't get microphone and speech access. Check the permissions in iPhone Settings, then tap Start again."
+      )
+    }
     if rawCode == "recognizer-unavailable" {
       return String(
         localized:
