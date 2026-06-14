@@ -148,7 +148,7 @@ struct RecognitionSettingsTests {
     #expect(reloaded.engineChoice == .whisperKit)
   }
 
-  @MainActor @Test func transmissionGapDefaultsToThreePointFiveSeconds() {
+  @MainActor @Test func transmissionGapDefaultsToTwoSeconds() {
     let settings = RecognitionSettings(
       storage: InMemoryRecognitionSettingsStorage(),
       supportedLocales: supported,

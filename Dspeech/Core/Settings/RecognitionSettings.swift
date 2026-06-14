@@ -2,6 +2,12 @@ import Foundation
 import Observation
 import Speech
 
+// why: the [2,6]s transmission-gap clamp is one domain rule — a single source shared by the storage
+// struct and the settings model (it was duplicated verbatim in each).
+private func clampTransmissionGapSeconds(_ seconds: TimeInterval) -> TimeInterval {
+  min(6, max(2, seconds))
+}
+
 // why: the live ASR locale must be user-selectable. ATC is conducted in the local
 // language (French in France, etc.), so a hardcoded en-US recognizer returns garbage
 // or empty transcripts for non-English audio. The locale is validated against the
@@ -86,12 +92,12 @@ struct UserDefaultsRecognitionSettingsStorage: RecognitionSettingsStorage, @unch
     // why: 2.0 matches the TransmissionAssembler tuning — 3.5 (the old value) merged close-together
     // ATC exchanges into one card on a CLEAN install where the user never set this (2026-06-14 audit).
     guard stored > 0 else { return 2.0 }
-    return Self.clampedTransmissionGapSeconds(stored)
+    return clampTransmissionGapSeconds(stored)
   }
 
   func saveTransmissionGapSeconds(_ seconds: TimeInterval) throws {
     defaults.set(
-      Self.clampedTransmissionGapSeconds(seconds),
+      clampTransmissionGapSeconds(seconds),
       forKey: Self.transmissionGapSecondsDefaultsName)
   }
 
@@ -102,10 +108,6 @@ struct UserDefaultsRecognitionSettingsStorage: RecognitionSettingsStorage, @unch
       return .recognitionEngineCorrupted
     }
     return nil
-  }
-
-  private static func clampedTransmissionGapSeconds(_ seconds: TimeInterval) -> TimeInterval {
-    min(6, max(2, seconds))
   }
 }
 
@@ -231,7 +233,7 @@ final class RecognitionSettings {
 
   var transmissionGapSeconds: TimeInterval {
     didSet {
-      let clamped = Self.clampedTransmissionGapSeconds(transmissionGapSeconds)
+      let clamped = clampTransmissionGapSeconds(transmissionGapSeconds)
       if transmissionGapSeconds != clamped {
         transmissionGapSeconds = clamped
       }
@@ -270,7 +272,7 @@ final class RecognitionSettings {
     )
     self.localeAvailabilityState = .loading
     self.engineChoice = storage.loadEngineChoice()
-    self.transmissionGapSeconds = Self.clampedTransmissionGapSeconds(
+    self.transmissionGapSeconds = clampTransmissionGapSeconds(
       storage.loadTransmissionGapSeconds())
     let storedIdentifier = storage.loadLocaleIdentifier()
     self.localeIdentifier = RecognitionLocaleCatalog.resolve(
@@ -326,9 +328,5 @@ final class RecognitionSettings {
     // happened to finish last.
     guard generation == downloadStateGeneration else { return }
     selectedNeedsDownload = !downloaded
-  }
-
-  private static func clampedTransmissionGapSeconds(_ seconds: TimeInterval) -> TimeInterval {
-    min(6, max(2, seconds))
   }
 }

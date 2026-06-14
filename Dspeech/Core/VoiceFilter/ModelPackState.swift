@@ -131,10 +131,6 @@ enum ModelPackState: Equatable, Sendable, Codable {
     }
   }
 
-  var allowsEnrollment: Bool {
-    isInstalled
-  }
-
   var capabilityReason: String {
     switch self {
     case .absent:

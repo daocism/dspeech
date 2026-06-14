@@ -39,7 +39,7 @@ struct TransmissionAssemblerTests {
     let segment = Self.segment("Line up and wait")
     _ = assembler.process(.fragment(segment: segment, speaker: nil, at: t0))
 
-    let updates = assembler.tick(now: t0.addingTimeInterval(3.5))
+    let updates = assembler.tick(now: t0.addingTimeInterval(2.1))
 
     let closed = Self.requireClosed(updates)
     #expect(closed.text == "Line up and wait")

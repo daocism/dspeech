@@ -67,6 +67,4 @@ final class AudioCaptureArbiter {
     )
     return true
   }
-
-  var isLiveCaptureActive: Bool { activeClient == .liveTranscription }
 }

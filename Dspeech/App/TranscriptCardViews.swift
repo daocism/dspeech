@@ -194,14 +194,7 @@ struct PartialTranscriptCard: View {
     .padding(.horizontal, 14)
     .padding(.vertical, 12)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background(
-      Color(red: 0.07, green: 0.08, blue: 0.10),
-      in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-    )
-    .overlay {
-      RoundedRectangle(cornerRadius: 18, style: .continuous)
-        .stroke(.cyan.opacity(0.35), lineWidth: 1)
-    }
+    .transcriptCardChrome(stroke: .cyan.opacity(0.35))
     .accessibilityIdentifier("partial-transcript")
   }
 }
@@ -223,14 +216,7 @@ struct TransmissionTranscriptCard: View {
     .padding(.horizontal, 14)
     .padding(.vertical, 12)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background(
-      Color(red: 0.07, green: 0.08, blue: 0.10),
-      in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-    )
-    .overlay {
-      RoundedRectangle(cornerRadius: 18, style: .continuous)
-        .stroke(.white.opacity(0.10), lineWidth: 1)
-    }
+    .transcriptCardChrome(stroke: .white.opacity(0.10))
     .contentShape(Rectangle())
     .onTapGesture { withAnimation(.easeInOut(duration: 0.15)) { expanded.toggle() } }
     .overlay(alignment: .topLeading) {
@@ -320,14 +306,7 @@ struct TranscriptSegmentCard: View {
     .padding(.horizontal, 14)
     .padding(.vertical, 12)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background(
-      Color(red: 0.07, green: 0.08, blue: 0.10),
-      in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-    )
-    .overlay {
-      RoundedRectangle(cornerRadius: 18, style: .continuous)
-        .stroke(.white.opacity(0.10), lineWidth: 1)
-    }
+    .transcriptCardChrome(stroke: .white.opacity(0.10))
     .contentShape(Rectangle())
     .onTapGesture { withAnimation(.easeInOut(duration: 0.15)) { expanded.toggle() } }
     .accessibilityIdentifier("transcript-segment")
@@ -453,5 +432,26 @@ private func filterReasonLabel(for reason: TransmissionFilterReason) -> String {
     return String(localized: "Addressed to other aircraft")
   case .nonRelevant:
     return String(localized: "Not relevant")
+  }
+}
+
+private enum TranscriptCardChrome {
+  static let background = Color(red: 0.07, green: 0.08, blue: 0.10)
+  static let cornerRadius: CGFloat = 18
+}
+
+extension View {
+  // why: the transcript-card chrome (dark fill + rounded rect + 1pt stroke) was copy-pasted across
+  // PartialTranscriptCard / TransmissionTranscriptCard / TranscriptSegmentCard; one modifier keeps the
+  // shared look from drifting. Only the stroke color differs per card.
+  fileprivate func transcriptCardChrome(stroke: Color) -> some View {
+    background(
+      TranscriptCardChrome.background,
+      in: RoundedRectangle(cornerRadius: TranscriptCardChrome.cornerRadius, style: .continuous)
+    )
+    .overlay {
+      RoundedRectangle(cornerRadius: TranscriptCardChrome.cornerRadius, style: .continuous)
+        .stroke(stroke, lineWidth: 1)
+    }
   }
 }

@@ -182,13 +182,6 @@ final class VoiceEnrollmentRecorder {
     )
   }
 
-  private static func formattedSeconds(_ value: Double) -> String {
-    if value.rounded() == value {
-      return String(Int(value))
-    }
-    return String(format: "%.1f", value)
-  }
-
   private func beginCapture(sessionID: UUID) throws {
     let (captureStream, audioContinuation) = AsyncStream<VoiceEnrollmentCapturedSamples>.makeStream(
       bufferingPolicy: .unbounded

@@ -22,10 +22,6 @@ final class CaptureCoordinator {
 
   var canStart: Bool { !routeMonitor.blocksStart }
 
-  var captureSourceLabel: String { routeMonitor.health.displayLabel }
-  var captureSourceShortLabel: String { routeMonitor.health.shortLabel }
-  var primaryInputName: String? { routeMonitor.primaryInputName }
-
   var routeBanner: String? {
     if let failure = routeMonitor.routePreparationFailure {
       return failure.userFacingMessage
