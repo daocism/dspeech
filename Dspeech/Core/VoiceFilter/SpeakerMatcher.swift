@@ -3,7 +3,6 @@ import Foundation
 struct SpeakerMatchConfig: Equatable, Sendable, Codable {
   var minQuality: Float
   var pilotMatchThreshold: Float
-  var separationMargin: Float
   var mixedSpeakerLowerBound: Float
 
   // why: calibrated against the REAL FluidAudio WeSpeaker model over the controlled labeled
@@ -12,14 +11,14 @@ struct SpeakerMatchConfig: Equatable, Sendable, Codable {
   //   SAME-voice  0.820 … 0.969 (mean 0.901)
   //   CROSS-voice 0.095 … 0.599 (mean 0.233)
   // A clean, wide gap (0.60 → 0.82). pilotMatchThreshold 0.72 sits safely ABOVE every observed
-  // cross-speaker score (never call another speaker the pilot) and BELOW every same-speaker
-  // score (always catch the pilot). separationMargin uses the available headroom. minQuality
-  // 0.25 correctly rejects noisy received-ATC embeddings (measured quality 0.137–0.204) so they
-  // fail open (shown) rather than mis-classify; the operator's own clean read-back clears it.
+  // cross-speaker score (never call another speaker crew) and BELOW every same-speaker score
+  // (always catch enrolled crew). A confident match to ANY enrolled profile means own-side crew —
+  // the whole roster is own-side, so no second-best separation is needed. minQuality 0.25 correctly
+  // rejects noisy received-ATC embeddings (measured quality 0.137–0.204) so they fail open (shown)
+  // rather than mis-classify; the operator's own clean read-back clears it.
   static let `default` = SpeakerMatchConfig(
     minQuality: 0.25,
     pilotMatchThreshold: 0.72,
-    separationMargin: 0.10,
     mixedSpeakerLowerBound: 0.50
   )
 }
@@ -51,28 +50,24 @@ enum SpeakerMatcher {
     guard !profiles.isEmpty else {
       return .nonPilot(bestPilotScore: 0)
     }
-    var scored: [(slot: PilotVoiceProfile.Slot, score: Float)] = []
+    var scores: [Float] = []
     for profile in profiles {
       guard profile.voicePrint.values.count == candidate.values.count else { continue }
-      let score = cosineSimilarity(candidate.values, profile.voicePrint.values)
-      scored.append((profile.slot, score))
+      scores.append(cosineSimilarity(candidate.values, profile.voicePrint.values))
     }
-    guard !scored.isEmpty else {
+    guard let bestScore = scores.max() else {
       return .nonPilot(bestPilotScore: 0)
     }
-    scored.sort { $0.score > $1.score }
-    let best = scored[0]
-    let secondBest = scored.count > 1 ? scored[1].score : -Float.infinity
-    let confidentlySeparated = (best.score - secondBest) >= config.separationMargin
-    if best.score >= config.pilotMatchThreshold {
-      if scored.count == 1 || confidentlySeparated {
-        return .pilot(slot: best.slot, score: best.score)
-      }
-      return .mixed(bestPilotScore: best.score)
+    // why: ALL enrolled profiles are own-side crew, so a confident match to ANY of them means
+    // "our crew spoke" — there is no need to separate it from the second-best (which is just
+    // another crew member). A score above the threshold (calibrated well above every observed
+    // cross-speaker score) is enough to suppress as own-side.
+    if bestScore >= config.pilotMatchThreshold {
+      return .pilot(score: bestScore)
     }
-    if best.score >= config.mixedSpeakerLowerBound {
-      return .mixed(bestPilotScore: best.score)
+    if bestScore >= config.mixedSpeakerLowerBound {
+      return .mixed(bestPilotScore: bestScore)
     }
-    return .nonPilot(bestPilotScore: best.score)
+    return .nonPilot(bestPilotScore: bestScore)
   }
 }

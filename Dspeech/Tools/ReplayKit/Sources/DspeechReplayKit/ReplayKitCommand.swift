@@ -388,7 +388,6 @@ struct ReplayEvaluator: Sendable {
   @MainActor
   private static func makePipeline() -> VoiceFilterPipeline {
     let profile = PilotVoiceProfile(
-      slot: .primary,
       label: "Replay Pilot",
       voicePrint: VoicePrintVector(values: [1, 0, 0, 0], quality: 0.95),
       enrolledAt: Date(timeIntervalSince1970: 748_137_600),

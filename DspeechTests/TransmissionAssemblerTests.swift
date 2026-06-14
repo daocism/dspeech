@@ -239,7 +239,7 @@ struct TransmissionAssemblerTests {
       }
       return TransmissionClassification.filtered(.nonRelevant)
     }
-    let pilot = SpeakerMatchDecision.pilot(slot: .primary, score: 0.91)
+    let pilot = SpeakerMatchDecision.pilot(score: 0.91)
     let dispatcher = SpeakerMatchDecision.nonPilot(bestPilotScore: 0.12)
     _ = assembler.process(
       .fragment(segment: Self.segment("continue straight ahead"), speaker: pilot, at: t0))

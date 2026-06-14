@@ -12,13 +12,12 @@ struct SpeakerMatcherTests {
   }
 
   private static func profile(
-    _ slot: PilotVoiceProfile.Slot,
-    _ values: [Float]
+    _ values: [Float],
+    label: String = "Crew"
   ) -> PilotVoiceProfile {
     PilotVoiceProfile(
       id: UUID(),
-      slot: slot,
-      label: slot == .primary ? "Captain" : "First Officer",
+      label: label,
       voicePrint: vector(values),
       enrolledAt: Date(timeIntervalSince1970: 0)
     )
@@ -51,7 +50,7 @@ struct SpeakerMatcherTests {
     let cand = Self.vector([1, 0, 0, 0], quality: 0.1)
     let decision = SpeakerMatcher.match(
       candidate: cand,
-      profiles: [Self.profile(.primary, [1, 0, 0, 0])]
+      profiles: [Self.profile([1, 0, 0, 0])]
     )
     #expect(decision == .insufficientSpeech)
   }
@@ -72,27 +71,26 @@ struct SpeakerMatcherTests {
 
   @Test func onePilotAboveThresholdMatches() {
     let cand = Self.vector([0.95, 0.31, 0, 0])
-    let profiles = [Self.profile(.primary, [1, 0.3, 0, 0])]
+    let profiles = [Self.profile([1, 0.3, 0, 0])]
     let decision = SpeakerMatcher.match(candidate: cand, profiles: profiles)
-    if case .pilot(let slot, let score) = decision {
-      #expect(slot == .primary)
+    if case .pilot(let score) = decision {
       #expect(score > 0.99)
     } else {
       Issue.record("expected pilot, got \(decision)")
     }
   }
 
-  @Test func pilotThresholdBoundaryReturnsPilotWhenSeparated() {
+  @Test func pilotThresholdBoundaryReturnsPilot() {
     let config = SpeakerMatchConfig.default
     let cand = Self.vector(Self.unitVector(cosineAgainstXAxis: config.pilotMatchThreshold))
     let profiles = [
-      Self.profile(.primary, [1, 0]),
-      Self.profile(.secondary, [-1, 0]),
+      Self.profile([1, 0]),
+      Self.profile([-1, 0]),
     ]
 
     let decision = SpeakerMatcher.match(candidate: cand, profiles: profiles, config: config)
-    if case .pilot(let slot, _) = decision {
-      #expect(slot == .primary)
+    if case .pilot = decision {
+      // expected: a score at the threshold is own-side crew
     } else {
       Issue.record("expected pilot at threshold boundary, got \(decision)")
     }
@@ -100,7 +98,7 @@ struct SpeakerMatcherTests {
 
   @Test func onePilotBelowThresholdIsNonPilot() {
     let cand = Self.vector([0.2, 1.0, 0, 0])
-    let profiles = [Self.profile(.primary, [1.0, 0.1, 0, 0])]
+    let profiles = [Self.profile([1.0, 0.1, 0, 0])]
     let decision = SpeakerMatcher.match(candidate: cand, profiles: profiles)
     if case .nonPilot(let score) = decision {
       #expect(score < 0.72)
@@ -112,7 +110,7 @@ struct SpeakerMatcherTests {
   @Test func mixedLowerBoundBoundaryReturnsMixedBelowPilotThreshold() {
     let config = SpeakerMatchConfig.default
     let cand = Self.vector(Self.unitVector(cosineAgainstXAxis: config.mixedSpeakerLowerBound))
-    let profiles = [Self.profile(.primary, [1, 0])]
+    let profiles = [Self.profile([1, 0])]
 
     let decision = SpeakerMatcher.match(candidate: cand, profiles: profiles, config: config)
     if case .mixed(let score) = decision {
@@ -122,25 +120,27 @@ struct SpeakerMatcherTests {
     }
   }
 
-  @Test func twoPilotMatchesClosestSlot() {
+  @Test func confidentMatchToAnyCrewMemberIsPilot() {
+    // why: every enrolled profile is own-side crew, so a confident match to the CLOSEST one means
+    // crew — the second-best (another crew member) is irrelevant to the own-vs-ATC decision.
     let cand = Self.vector([0, 1.0, 0.05, 0])
     let profiles = [
-      Self.profile(.primary, [1, 0, 0, 0]),
-      Self.profile(.secondary, [0, 1, 0, 0]),
+      Self.profile([1, 0, 0, 0]),
+      Self.profile([0, 1, 0, 0]),
     ]
     let decision = SpeakerMatcher.match(candidate: cand, profiles: profiles)
-    if case .pilot(let slot, _) = decision {
-      #expect(slot == .secondary)
+    if case .pilot(let score) = decision {
+      #expect(score > 0.99)
     } else {
-      Issue.record("expected secondary pilot, got \(decision)")
+      Issue.record("expected pilot, got \(decision)")
     }
   }
 
-  @Test func twoPilotAmbiguousFallsBackToMixedCandidate() {
+  @Test func belowThresholdBestIsMixedCandidate() {
     let cand = Self.vector([0.71, 0.71, 0, 0])
     let profiles = [
-      Self.profile(.primary, [1, 0, 0, 0]),
-      Self.profile(.secondary, [0, 1, 0, 0]),
+      Self.profile([1, 0, 0, 0]),
+      Self.profile([0, 1, 0, 0]),
     ]
     let decision = SpeakerMatcher.match(candidate: cand, profiles: profiles)
     if case .mixed(let score) = decision {
@@ -150,46 +150,31 @@ struct SpeakerMatcherTests {
     }
   }
 
-  @Test func separationMarginBoundaryIsInclusive() {
+  @Test func confidentMatchStaysPilotEvenWithASecondCloseProfile() {
+    // why: with the separation gate removed, two enrolled crew members whose voice prints are close
+    // BOTH resolve to pilot when the best score clears the threshold — there is no own-side member
+    // who should be shown just because another own-side member sounds similar.
     let config = SpeakerMatchConfig.default
     let cand = Self.vector([1, 0])
-    let primary = Self.profile(.primary, [1, 0])
-    let secondaryAtMargin = Self.profile(
-      .secondary,
-      Self.unitVector(cosineAgainstXAxis: 1 - config.separationMargin)
-    )
-    let secondaryInsideMargin = Self.profile(
-      .secondary,
-      Self.unitVector(cosineAgainstXAxis: 1 - config.separationMargin / 2)
-    )
-
-    let atMargin = SpeakerMatcher.match(
-      candidate: cand,
-      profiles: [primary, secondaryAtMargin],
-      config: config
-    )
-    if case .pilot(let slot, _) = atMargin {
-      #expect(slot == .primary)
-    } else {
-      Issue.record("expected pilot at separation-margin boundary, got \(atMargin)")
-    }
-
-    let insideMargin = SpeakerMatcher.match(
-      candidate: cand,
-      profiles: [primary, secondaryInsideMargin],
-      config: config
-    )
-    if case .mixed(let score) = insideMargin {
-      #expect(score >= config.pilotMatchThreshold)
-    } else {
-      Issue.record("expected mixed inside separation margin, got \(insideMargin)")
+    let primary = Self.profile([1, 0])
+    for cosine in [Float(0.99), Float(0.95), Float(0.80)] {
+      let secondClose = Self.profile(Self.unitVector(cosineAgainstXAxis: cosine))
+      let decision = SpeakerMatcher.match(
+        candidate: cand,
+        profiles: [primary, secondClose],
+        config: config
+      )
+      if case .pilot = decision {
+        // expected
+      } else {
+        Issue.record("expected pilot with a close second profile (cos=\(cosine)), got \(decision)")
+      }
     }
   }
 
   @Test func dimensionMismatchProfileIsSkipped() {
     let cand = Self.vector([1, 0, 0, 0])
     let wrong = PilotVoiceProfile(
-      slot: .primary,
       label: "wrong-dim",
       voicePrint: VoicePrintVector(values: [1, 0], quality: 0.9)
     )
@@ -206,7 +191,7 @@ struct SpeakerMatcherTests {
     for _ in 0..<generatedCaseCount {
       let config = random.config()
       let qualityAboveFloor = min(Float(1), config.minQuality + 0.05)
-      let primary = Self.profile(.primary, [1, 0])
+      let primary = Self.profile([1, 0])
 
       let pilotScore = random.float(
         in: min(Float(0.999), config.pilotMatchThreshold + 0.005)...0.999)
@@ -216,8 +201,7 @@ struct SpeakerMatcherTests {
         profiles: [primary],
         config: config
       )
-      if case .pilot(let slot, let score) = pilotDecision {
-        #expect(slot == .primary)
+      if case .pilot(let score) = pilotDecision {
         #expect(score >= config.pilotMatchThreshold)
       } else {
         Issue.record("expected generated pilot decision, got \(pilotDecision)")
@@ -258,34 +242,24 @@ struct SpeakerMatcherTests {
       )
       #expect(lowQualityDecision == .insufficientSpeech)
 
-      let secondarySeparated = Self.profile(
-        .secondary,
-        Self.unitVector(cosineAgainstXAxis: 1 - config.separationMargin - 0.005)
-      )
-      let separatedDecision = SpeakerMatcher.match(
-        candidate: Self.vector([1, 0], quality: qualityAboveFloor),
-        profiles: [primary, secondarySeparated],
-        config: config
-      )
-      if case .pilot(let slot, _) = separatedDecision {
-        #expect(slot == .primary)
-      } else {
-        Issue.record("expected separated best speaker to remain pilot, got \(separatedDecision)")
-      }
-
-      let secondaryInsideMargin = Self.profile(
-        .secondary,
-        Self.unitVector(cosineAgainstXAxis: 1 - config.separationMargin / 2)
-      )
-      let ambiguousDecision = SpeakerMatcher.match(
-        candidate: Self.vector([1, 0], quality: qualityAboveFloor),
-        profiles: [primary, secondaryInsideMargin],
-        config: config
-      )
-      if case .mixed(let score) = ambiguousDecision {
-        #expect(score >= config.pilotMatchThreshold)
-      } else {
-        Issue.record("expected inside-margin speaker to be mixed, got \(ambiguousDecision)")
+      // why: with a confident best match, a SECOND crew profile (separated OR close) never changes
+      // the own-side decision — the whole roster is own-side. Both must remain pilot.
+      for secondCosine in [
+        Float(1 - 0.005), config.pilotMatchThreshold, Float(0.30),
+      ] {
+        let secondProfile = Self.profile(Self.unitVector(cosineAgainstXAxis: secondCosine))
+        let multiProfileDecision = SpeakerMatcher.match(
+          candidate: Self.vector([1, 0], quality: qualityAboveFloor),
+          profiles: [primary, secondProfile],
+          config: config
+        )
+        if case .pilot = multiProfileDecision {
+          // expected: best (primary, score 1.0) clears the threshold => own-side crew
+        } else {
+          Issue.record(
+            "expected pilot with a second profile (cos=\(secondCosine)), got "
+              + "\(multiProfileDecision)")
+        }
       }
 
       let firstScore = random.float(in: -0.999...0.998)
@@ -388,7 +362,6 @@ private struct DeterministicSpeakerMatcherRandom {
     return SpeakerMatchConfig(
       minQuality: minQuality,
       pilotMatchThreshold: pilotThreshold,
-      separationMargin: float(in: 0.01...0.20),
       mixedSpeakerLowerBound: mixedLower
     )
   }
@@ -653,7 +626,6 @@ struct VoiceFilterStorageTests {
     let (store, cleanup) = makeStore()
     defer { cleanup() }
     let profile = PilotVoiceProfile(
-      slot: .primary,
       label: "Captain",
       voicePrint: VoicePrintVector(values: [0.1, 0.2, 0.3, 0.4], quality: 0.83),
       enrolledAt: Date(timeIntervalSince1970: 748_137_600)
@@ -661,7 +633,6 @@ struct VoiceFilterStorageTests {
     store.saveProfiles([profile])
     let loaded = store.loadProfiles()
     #expect(loaded.count == 1)
-    #expect(loaded.first?.slot == .primary)
     #expect(loaded.first?.label == "Captain")
     #expect(loaded.first?.voicePrint.values == [0.1, 0.2, 0.3, 0.4])
   }
@@ -679,7 +650,6 @@ struct VoiceFilterStorageTests {
     }
     let store = UserDefaultsVoiceFilterStorage(defaults: defaults, profileStoreURL: profileStoreURL)
     let profile = PilotVoiceProfile(
-      slot: .primary,
       label: "Captain",
       voicePrint: VoicePrintVector(values: [0.1, 0.2, 0.3, 0.4], quality: 0.83),
       enrolledAt: Date(timeIntervalSince1970: 748_137_600)
@@ -714,7 +684,6 @@ struct VoiceFilterStorageTests {
       }
     }
     let profile = PilotVoiceProfile(
-      slot: .primary,
       label: "Captain",
       voicePrint: VoicePrintVector(values: [0.1, 0.2, 0.3, 0.4], quality: 0.83),
       enrolledAt: Date(timeIntervalSince1970: 748_137_600)
@@ -743,7 +712,6 @@ struct VoiceFilterStorageTests {
     }
     let store = UserDefaultsVoiceFilterStorage(defaults: defaults, profileStoreURL: profileStoreURL)
     let profile = PilotVoiceProfile(
-      slot: .primary,
       label: "Captain",
       voicePrint: VoicePrintVector(values: [0.1, 0.2, 0.3, 0.4], quality: 0.83),
       enrolledAt: Date(timeIntervalSince1970: 748_137_600)
@@ -832,7 +800,7 @@ struct ATCTranscriptGateTests {
     var gate = ATCTranscriptGate(configuredCallSign: CallSign(raw: "N123AB"))
     let dec = gate.evaluate(
       text: "N123AB descending two thousand",
-      speaker: .pilot(slot: .primary, score: 0.91),
+      speaker: .pilot(score: 0.91),
       timestamp: t0
     )
     #expect(dec == .suppress(reason: .pilotReadback))
@@ -938,7 +906,7 @@ struct ATCTranscriptGateTests {
   @Test(arguments: [
     (
       "MAYDAY MAYDAY MAYDAY immediate descent",
-      SpeakerMatchDecision.pilot(slot: .primary, score: 0.99)
+      SpeakerMatchDecision.pilot(score: 0.99)
     ),
     ("PAN PAN PAN PAN PAN PAN engine failure", SpeakerMatchDecision.insufficientSpeech),
     ("pan-pan fuel emergency", SpeakerMatchDecision.nonPilot(bestPilotScore: 0.01)),
@@ -1048,8 +1016,7 @@ struct VoiceFilterPipelineTests {
     )
     pipeline.setEnabled(true)
     do {
-      _ = try await pipeline.enrollPilot(
-        slot: .primary,
+      _ = try await pipeline.enrollCrewMember(
         label: "Captain",
         samples: [0, 1, 0, 1],
         sampleRate: 16_000
@@ -1128,7 +1095,6 @@ struct VoiceFilterPipelineTests {
     store.enabled = true
     store.profiles = [
       PilotVoiceProfile(
-        slot: .primary,
         label: "Captain",
         voicePrint: VoicePrintVector(values: [1, 0, 0, 0], quality: 0.9)
       )
@@ -1138,7 +1104,7 @@ struct VoiceFilterPipelineTests {
       storage: store
     )
     let route = pipeline.routeBeforeTranscription(
-      speaker: .pilot(slot: .primary, score: 0.91)
+      speaker: .pilot(score: 0.91)
     )
     #expect(route == .transcribe(reason: .pilotVoice))
   }
@@ -1148,7 +1114,6 @@ struct VoiceFilterPipelineTests {
     store.enabled = true
     store.profiles = [
       PilotVoiceProfile(
-        slot: .primary,
         label: "Captain",
         voicePrint: VoicePrintVector(values: [1, 0, 0, 0], quality: 0.9)
       )
@@ -1168,8 +1133,7 @@ struct VoiceFilterPipelineTests {
       storage: store,
       modelPackStorage: InMemoryModelPackStorage(.installed(Self.installedPack()))
     )
-    let profile = try await pipeline.enrollPilot(
-      slot: .primary,
+    let profile = try await pipeline.enrollCrewMember(
       label: "Captain",
       samples: [0, 1, 0, 1],
       sampleRate: 16_000,
@@ -1178,6 +1142,55 @@ struct VoiceFilterPipelineTests {
     #expect(profile.spokenCallSign?.normalized == "N123AB")
     #expect(store.profiles.first?.spokenCallSign?.normalized == "N123AB")
     #expect(store.callSign?.normalized == "N123AB")
+  }
+
+  @Test func enrollAppendsEachNewCrewMember() async throws {
+    let store = InMemoryStorage()
+    let pipeline = VoiceFilterPipeline(
+      identifier: FakeIdentifier(vector: VoicePrintVector(values: [1, 0, 0, 0], quality: 0.92)),
+      storage: store,
+      modelPackStorage: InMemoryModelPackStorage(.installed(Self.installedPack()))
+    )
+    let first = try await pipeline.enrollCrewMember(
+      label: "Crew 1", samples: [0, 1], sampleRate: 16_000)
+    let second = try await pipeline.enrollCrewMember(
+      label: "Crew 2", samples: [1, 0], sampleRate: 16_000)
+    #expect(pipeline.profiles.count == 2)
+    #expect(first.id != second.id)
+    #expect(store.profiles.count == 2)
+  }
+
+  @Test func reEnrollReplacesInPlacePreservingIdAndLabel() async throws {
+    let store = InMemoryStorage()
+    let pipeline = VoiceFilterPipeline(
+      identifier: FakeIdentifier(vector: VoicePrintVector(values: [1, 0, 0, 0], quality: 0.92)),
+      storage: store,
+      modelPackStorage: InMemoryModelPackStorage(.installed(Self.installedPack()))
+    )
+    let original = try await pipeline.enrollCrewMember(
+      label: "Crew 1", samples: [0, 1], sampleRate: 16_000)
+    let updated = try await pipeline.enrollCrewMember(
+      replacing: original.id, label: "ignored-on-replace", samples: [1, 0], sampleRate: 16_000)
+    #expect(pipeline.profiles.count == 1)
+    #expect(updated.id == original.id)
+    #expect(updated.label == "Crew 1")
+  }
+
+  @Test func removeCrewMemberRemovesById() async throws {
+    let store = InMemoryStorage()
+    let pipeline = VoiceFilterPipeline(
+      identifier: FakeIdentifier(vector: VoicePrintVector(values: [1, 0, 0, 0], quality: 0.92)),
+      storage: store,
+      modelPackStorage: InMemoryModelPackStorage(.installed(Self.installedPack()))
+    )
+    let first = try await pipeline.enrollCrewMember(
+      label: "Crew 1", samples: [0, 1], sampleRate: 16_000)
+    let second = try await pipeline.enrollCrewMember(
+      label: "Crew 2", samples: [1, 0], sampleRate: 16_000)
+    pipeline.removeCrewMember(id: first.id)
+    #expect(pipeline.profiles.count == 1)
+    #expect(pipeline.profiles.first?.id == second.id)
+    #expect(store.profiles.count == 1)
   }
 
   @Test func absentPackMakesAvailableIdentifierUnavailable() {
@@ -1199,8 +1212,7 @@ struct VoiceFilterPipelineTests {
       modelPackStorage: InMemoryModelPackStorage(.absent)
     )
     do {
-      _ = try await pipeline.enrollPilot(
-        slot: .primary,
+      _ = try await pipeline.enrollCrewMember(
         label: "Captain",
         samples: [0, 1, 0, 1],
         sampleRate: 16_000
@@ -1221,7 +1233,6 @@ struct VoiceFilterPipelineTests {
     store.enabled = true
     store.profiles = [
       PilotVoiceProfile(
-        slot: .primary,
         label: "Captain",
         voicePrint: VoicePrintVector(values: [1, 0, 0, 0], quality: 0.9)
       )
@@ -1303,7 +1314,6 @@ struct VoiceFilterPipelineTests {
     store.enabled = true
     store.profiles = [
       PilotVoiceProfile(
-        slot: .primary,
         label: "Captain",
         voicePrint: VoicePrintVector(values: [1, 0, 0, 0], quality: 0.9)
       )
@@ -1314,8 +1324,8 @@ struct VoiceFilterPipelineTests {
       modelPackStorage: InMemoryModelPackStorage(.installed(Self.installedPack()))
     )
     let decision = try await pipeline.classify(samples: [0, 1, 0, 1], sampleRate: 16_000)
-    if case .pilot(let slot, _) = decision {
-      #expect(slot == .primary)
+    if case .pilot = decision {
+      // expected: the FakeIdentifier returns a pilot decision and the pipeline delegates to it
     } else {
       Issue.record("expected delegated pilot decision, got \(decision)")
     }
@@ -1327,7 +1337,6 @@ struct VoiceFilterPipelineTests {
     store.callSign = CallSign(raw: "N123AB")
     store.profiles = [
       PilotVoiceProfile(
-        slot: .primary,
         label: "Captain",
         voicePrint: VoicePrintVector(values: [1, 0, 0, 0], quality: 0.9)
       )
@@ -1350,7 +1359,7 @@ struct VoiceFilterPipelineTests {
     let speaker = try await pipeline.classify(samples: [0.1, 0.2], sampleRate: 16_000)
     #expect(speaker == .nonPilot(bestPilotScore: 0))
     #expect(
-      pipeline.routeBeforeTranscription(speaker: .pilot(slot: .primary, score: 0.99))
+      pipeline.routeBeforeTranscription(speaker: .pilot(score: 0.99))
         == .transcribe(reason: .filterDisabled)
     )
   }
@@ -1386,8 +1395,7 @@ struct VoiceFilterPipelineTests {
       Issue.record("disabled pack must report unavailable, got \(pipeline.capability)")
     }
     do {
-      _ = try await pipeline.enrollPilot(
-        slot: .primary,
+      _ = try await pipeline.enrollCrewMember(
         label: "Captain",
         samples: [0, 1, 0, 1],
         sampleRate: 16_000
@@ -1408,7 +1416,6 @@ struct VoiceFilterPipelineTests {
     store.enabled = true
     store.profiles = [
       PilotVoiceProfile(
-        slot: .primary,
         label: "Captain",
         voicePrint: VoicePrintVector(values: [1, 0, 0, 0], quality: 0.9)
       )
@@ -1940,7 +1947,6 @@ struct SpeakerModelPackInstallerTests {
     )
     storage.saveProfiles([
       PilotVoiceProfile(
-        slot: .primary,
         label: "Captain",
         voicePrint: VoicePrintVector(values: [1, 0, 0, 0], quality: 0.9),
         enrolledAt: Date(timeIntervalSince1970: 0)
@@ -2193,7 +2199,6 @@ struct LocalSpeakerIdentifierFactoryTests {
     store.enabled = true
     store.profiles = [
       PilotVoiceProfile(
-        slot: .primary,
         label: "Captain",
         voicePrint: VoicePrintVector(values: [1, 0, 0, 0], quality: 0.9)
       )
@@ -2225,10 +2230,10 @@ struct LocalSpeakerIdentifierFactoryTests {
     store.enabled = true
     store.profiles = [
       PilotVoiceProfile(
-        slot: .primary, label: "Captain",
+        label: "Captain",
         voicePrint: VoicePrintVector(values: [1, 0, 0, 0], quality: 0.9)),
       PilotVoiceProfile(
-        slot: .secondary, label: "FO",
+        label: "FO",
         voicePrint: VoicePrintVector(values: [0, 1, 0, 0], quality: 0.9)),
     ]
     let pipeline = VoiceFilterPipeline(
@@ -2333,7 +2338,6 @@ struct SpeechAudioBufferGateTests {
 
   private static func captainProfile() -> PilotVoiceProfile {
     PilotVoiceProfile(
-      slot: .primary,
       label: "Captain",
       voicePrint: VoicePrintVector(values: [1, 0, 0, 0], quality: 0.9)
     )
@@ -2356,7 +2360,7 @@ struct SpeechAudioBufferGateTests {
   @Test func confidentPilotTranscribesBeforeASR() async throws {
     let gate = VoiceFilterSpeechAudioBufferGate(
       pipeline: Self.enabledPipeline(
-        identifier: ScriptedIdentifier(decision: .pilot(slot: .primary, score: 1.0))
+        identifier: ScriptedIdentifier(decision: .pilot(score: 1.0))
       )
     )
     let route = (try await gate.route(samples: [0.1, 0.2, 0.1, 0.2], sampleRate: 16_000)).routing
@@ -2366,7 +2370,7 @@ struct SpeechAudioBufferGateTests {
   @Test func pilotClassifiedBufferStillReachesAppend() async {
     let gate = VoiceFilterSpeechAudioBufferGate(
       pipeline: Self.enabledPipeline(
-        identifier: ScriptedIdentifier(decision: .pilot(slot: .primary, score: 1.0))
+        identifier: ScriptedIdentifier(decision: .pilot(score: 1.0))
       )
     )
     let (appended, appendContinuation) = AsyncStream<Int>.makeStream()
@@ -2419,7 +2423,7 @@ struct SpeechAudioBufferGateTests {
     store.enabled = false
     store.profiles = [Self.captainProfile()]
     let pipeline = VoiceFilterPipeline(
-      identifier: ScriptedIdentifier(decision: .pilot(slot: .primary, score: 0.99)),
+      identifier: ScriptedIdentifier(decision: .pilot(score: 0.99)),
       storage: store,
       modelPackStorage: InMemoryModelPackStorage(.installed(Self.installedPack()))
     )
@@ -2433,7 +2437,7 @@ struct SpeechAudioBufferGateTests {
     store.enabled = true
     store.profiles = [Self.captainProfile()]
     let pipeline = VoiceFilterPipeline(
-      identifier: ScriptedIdentifier(decision: .pilot(slot: .primary, score: 0.99)),
+      identifier: ScriptedIdentifier(decision: .pilot(score: 0.99)),
       storage: store,
       modelPackStorage: InMemoryModelPackStorage(.installed(Self.installedPack())),
       voiceFilterActive: { false }
@@ -2448,7 +2452,7 @@ struct SpeechAudioBufferGateTests {
     store.enabled = true
     store.profiles = []
     let pipeline = VoiceFilterPipeline(
-      identifier: ScriptedIdentifier(decision: .pilot(slot: .primary, score: 0.99)),
+      identifier: ScriptedIdentifier(decision: .pilot(score: 0.99)),
       storage: store,
       modelPackStorage: InMemoryModelPackStorage(.installed(Self.installedPack()))
     )
@@ -2460,7 +2464,7 @@ struct SpeechAudioBufferGateTests {
   @Test func absentPackFailsOpenToASR() async throws {
     let gate = VoiceFilterSpeechAudioBufferGate(
       pipeline: Self.enabledPipeline(
-        identifier: ScriptedIdentifier(decision: .pilot(slot: .primary, score: 0.99)),
+        identifier: ScriptedIdentifier(decision: .pilot(score: 0.99)),
         pack: .absent
       )
     )
@@ -2471,7 +2475,7 @@ struct SpeechAudioBufferGateTests {
   @Test func disabledPackFailsOpenToASR() async throws {
     let gate = VoiceFilterSpeechAudioBufferGate(
       pipeline: Self.enabledPipeline(
-        identifier: ScriptedIdentifier(decision: .pilot(slot: .primary, score: 0.99)),
+        identifier: ScriptedIdentifier(decision: .pilot(score: 0.99)),
         pack: .disabled(Self.installedPack())
       )
     )
@@ -2491,7 +2495,7 @@ struct SpeechAudioBufferGateTests {
     let gate = VoiceFilterSpeechAudioBufferGate(
       pipeline: Self.enabledPipeline(
         identifier: ScriptedIdentifier(
-          decision: .pilot(slot: .primary, score: 0.99),
+          decision: .pilot(score: 0.99),
           thrownError: .captureFailed(reason: "boom")
         )
       )

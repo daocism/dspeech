@@ -269,7 +269,7 @@ struct WhisperKitLiveTranscriptionEngineTests {
         )
       ]
     }
-    let gate = StubSpeakerGate(speaker: .pilot(slot: .primary, score: 0.95))
+    let gate = StubSpeakerGate(speaker: .pilot(score: 0.95))
     let engine = WhisperKitLiveTranscriptionEngine(
       transcriber: transcriber,
       installedModelFolderURL: { URL(fileURLWithPath: "/tmp/local-whisper", isDirectory: true) },

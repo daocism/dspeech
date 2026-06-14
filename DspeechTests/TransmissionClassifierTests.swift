@@ -13,7 +13,7 @@ struct TransmissionClassifierTests {
 
     let classification = classifier.classify(
       text: "  \n\t  ",
-      speakers: [.pilot(slot: .primary, score: 0.99)],
+      speakers: [.pilot(score: 0.99)],
       endedAt: Self.t(0)
     )
 
@@ -29,7 +29,7 @@ struct TransmissionClassifierTests {
 
     let first = classifier.classify(
       text: "PAN PAN engine failure",
-      speakers: [.pilot(slot: .primary, score: 0.99)],
+      speakers: [.pilot(score: 0.99)],
       endedAt: Self.t(0)
     )
     let continuation = classifier.classify(
@@ -74,8 +74,8 @@ struct TransmissionClassifierTests {
     let classification = classifier.classify(
       text: "roger we are climbing",
       speakers: [
-        .pilot(slot: .primary, score: 0.91),
-        .pilot(slot: .primary, score: 0.88),
+        .pilot(score: 0.91),
+        .pilot(score: 0.88),
         .nonPilot(bestPilotScore: 0.12),
         .insufficientSpeech,
       ],
@@ -115,7 +115,7 @@ struct TransmissionClassifierTests {
 
     let classification = classifier.classify(
       text: "Speedbird 247 contact tower",
-      speakers: [.pilot(slot: .primary, score: 0.99)],
+      speakers: [.pilot(score: 0.99)],
       endedAt: Self.t(0)
     )
 
@@ -177,7 +177,7 @@ struct TransmissionClassifierTests {
 
     let classification = classifier.classify(
       text: "MAYDAY MAYDAY loss of engine",
-      speakers: [.pilot(slot: .primary, score: 0.99)],
+      speakers: [.pilot(score: 0.99)],
       endedAt: Self.t(0)
     )
 
