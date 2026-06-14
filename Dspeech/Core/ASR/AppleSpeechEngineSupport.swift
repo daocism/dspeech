@@ -31,6 +31,16 @@ extension AppleSpeechLiveTranscriptionEngine {
     return .restart
   }
 
+  // why: the restart-loop death-spiral ceiling resets when the recognizer proves it is ALIVE — ANY
+  // clean final, including an empty/whitespace one it retracts after silence, not only a non-empty
+  // segment. A loud cockpit produces empty finals from noise-triggered boundary cuts; counting those
+  // toward the 5-restarts/10s ceiling would FALSELY kill the engine mid-flight. Partials and failures
+  // still count, so a genuine restart loop (init failures produce failures, never clean finals) is
+  // still caught. Pure helper so the inline-callback decision is unit-tested directly.
+  static func shouldResetRestartGuard(isFinal: Bool, failure: ASRFailure?) -> Bool {
+    isFinal && failure == nil
+  }
+
   static func startupGateDecision(
     firstRead: RecognizerCapabilityRead,
     secondRead: RecognizerCapabilityRead?,
@@ -235,7 +245,6 @@ struct RecognitionCallbackEvent: Sendable {
   let event: LiveTranscriptionEvent?
   let isFinal: Bool
   let failure: ASRFailure?
-  let hasResult: Bool
 }
 
 struct ASRFailure: Equatable, Sendable {

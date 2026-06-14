@@ -168,6 +168,27 @@ struct AppleSpeechLiveTranscriptionEngineLifecycleTests {
         == .fail("engine-died-before-restart"))
   }
 
+  @Test func cleanFinalResetsRestartGuardEvenWhenEmpty() {
+    // An empty/whitespace final (the recognizer retracts a faint post-silence utterance) still
+    // proves the recognizer is alive, so it must reset the death-spiral ceiling — otherwise a loud
+    // cockpit's noise-triggered empty finals falsely trip asr-restart-loop and kill transcription.
+    #expect(AppleSpeechLiveTranscriptionEngine.shouldResetRestartGuard(isFinal: true, failure: nil))
+  }
+
+  @Test func partialDoesNotResetRestartGuard() {
+    #expect(
+      !AppleSpeechLiveTranscriptionEngine.shouldResetRestartGuard(isFinal: false, failure: nil))
+  }
+
+  @Test func failureDoesNotResetRestartGuard() {
+    let failure = ASRFailure(
+      domain: "kAFAssistantErrorDomain", code: 1110, message: "No speech detected.")
+    #expect(
+      !AppleSpeechLiveTranscriptionEngine.shouldResetRestartGuard(isFinal: true, failure: failure))
+    #expect(
+      !AppleSpeechLiveTranscriptionEngine.shouldResetRestartGuard(isFinal: false, failure: failure))
+  }
+
   @Test func restartLoopGuardFailsAfterTooManyRestartsWithoutResults() {
     let clock = ContinuousClock()
     let start = clock.now
@@ -316,8 +337,7 @@ struct AppleSpeechLiveTranscriptionEngineLifecycleTests {
     engine.emitRecognitionCallbackForTesting(
       generation: 7,
       event: .segment(final, speaker: nil),
-      isFinal: true,
-      hasResult: true
+      isFinal: true
     )
     #expect(await waitForEvent({ await recorder.segmentTexts().contains(final.text) }))
 
@@ -325,8 +345,7 @@ struct AppleSpeechLiveTranscriptionEngineLifecycleTests {
     engine.emitRecognitionCallbackForTesting(
       generation: 7,
       event: .partial("stale partial"),
-      isFinal: false,
-      hasResult: true
+      isFinal: false
     )
     for _ in 0..<50 { await Task.yield() }
 
@@ -349,8 +368,7 @@ struct AppleSpeechLiveTranscriptionEngineLifecycleTests {
     engine.emitRecognitionCallbackForTesting(
       generation: 31,
       event: .partial("  autorise atterrissage piste deux sept  "),
-      isFinal: false,
-      hasResult: true
+      isFinal: false
     )
     #expect(await waitForEvent({ await recorder.partialTexts().count == 1 }))
 
@@ -386,14 +404,12 @@ struct AppleSpeechLiveTranscriptionEngineLifecycleTests {
     engine.emitRecognitionCallbackForTesting(
       generation: 32,
       event: .partial("November one two three"),
-      isFinal: false,
-      hasResult: true
+      isFinal: false
     )
     engine.emitRecognitionCallbackForTesting(
       generation: 32,
       event: .segment(final, speaker: nil),
-      isFinal: true,
-      hasResult: true
+      isFinal: true
     )
     #expect(await waitForEvent({ await recorder.segmentTexts().contains(final.text) }))
 
@@ -422,16 +438,14 @@ struct AppleSpeechLiveTranscriptionEngineLifecycleTests {
     engine.emitRecognitionCallbackForTesting(
       generation: 41,
       event: .partial("five mike alpha"),
-      isFinal: false,
-      hasResult: true
+      isFinal: false
     )
     #expect(await waitForEvent({ await recorder.partialTexts().contains("five mike alpha") }))
 
     engine.emitRecognitionCallbackForTesting(
       generation: 41,
       event: nil,
-      isFinal: true,
-      hasResult: false
+      isFinal: true
     )
     for _ in 0..<50 { await Task.yield() }
 
@@ -455,8 +469,7 @@ struct AppleSpeechLiveTranscriptionEngineLifecycleTests {
     engine.emitRecognitionCallbackForTesting(
       generation: 33,
       event: .partial(" \n\t "),
-      isFinal: false,
-      hasResult: true
+      isFinal: false
     )
     #expect(await waitForEvent({ await recorder.partialTexts().count == 1 }))
 
@@ -482,8 +495,7 @@ struct AppleSpeechLiveTranscriptionEngineLifecycleTests {
     engine.emitRecognitionCallbackForTesting(
       generation: 34,
       event: .partial("contactez approche sur un deux trois décimale quatre"),
-      isFinal: false,
-      hasResult: true
+      isFinal: false
     )
     #expect(await waitForEvent({ await recorder.partialTexts().count == 1 }))
 
@@ -510,8 +522,7 @@ struct AppleSpeechLiveTranscriptionEngineLifecycleTests {
     engine.emitRecognitionCallbackForTesting(
       generation: 35,
       event: .partial("November one two three"),
-      isFinal: false,
-      hasResult: true
+      isFinal: false
     )
     #expect(await waitForEvent({ await recorder.partialTexts().count == 1 }))
     engine.simulateRecognitionRestartBoundaryForTesting()
@@ -519,8 +530,7 @@ struct AppleSpeechLiveTranscriptionEngineLifecycleTests {
     engine.emitRecognitionCallbackForTesting(
       generation: 36,
       event: .partial("November one two three descend"),
-      isFinal: false,
-      hasResult: true
+      isFinal: false
     )
     engine.emitRecognitionCallbackForTesting(
       generation: 36,
@@ -531,8 +541,7 @@ struct AppleSpeechLiveTranscriptionEngineLifecycleTests {
           sourceLanguageCode: "en",
           source: .liveATC
         ), speaker: nil),
-      isFinal: true,
-      hasResult: true
+      isFinal: true
     )
     #expect(await waitForEvent({ await recorder.segmentTexts().count == 2 }))
     engine.simulateRecognitionRestartBoundaryForTesting()
