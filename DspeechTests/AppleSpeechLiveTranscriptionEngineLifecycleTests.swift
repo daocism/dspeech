@@ -385,6 +385,43 @@ struct AppleSpeechLiveTranscriptionEngineLifecycleTests {
     collector.cancel()
   }
 
+  @Test func emptyFinalDoesNotDiscardPendingPartialBeforeRestartBoundary() async {
+    // why: the recognizer can RETRACT a faint utterance just after a long silence — emitting an
+    // empty final (no segment). The shown live partial must survive so the next restart boundary
+    // commits it as a card, instead of the line dictating then vanishing (2026-06-14 device report).
+    let engine = AppleSpeechLiveTranscriptionEngine(
+      localeProvider: { "en-US" },
+      requireOnDeviceModel: false,
+      skipPermissionRequests: true,
+      audioSession: SpyLiveAudioSession()
+    )
+    let recorder = EventRecorder()
+    let collector = collect(engine.events(), into: recorder)
+    engine.installRecognitionCallbackConduitForTesting(generation: 41)
+
+    engine.emitRecognitionCallbackForTesting(
+      generation: 41,
+      event: .partial("five mike alpha"),
+      isFinal: false,
+      hasResult: true
+    )
+    #expect(await waitForEvent({ await recorder.partialTexts().contains("five mike alpha") }))
+
+    engine.emitRecognitionCallbackForTesting(
+      generation: 41,
+      event: nil,
+      isFinal: true,
+      hasResult: false
+    )
+    for _ in 0..<50 { await Task.yield() }
+
+    engine.simulateRecognitionRestartBoundaryForTesting()
+
+    #expect(await waitForEvent({ await recorder.interimRestartSegments().count == 1 }))
+    #expect(await recorder.interimRestartSegments().first?.text == "five mike alpha")
+    collector.cancel()
+  }
+
   @Test func whitespacePartialDoesNotCommitAtRestartBoundary() async {
     let engine = AppleSpeechLiveTranscriptionEngine(
       requireOnDeviceModel: false,

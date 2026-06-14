@@ -47,6 +47,65 @@ struct SpeechActivitySegmenterTests {
         == .cutAtMaxWindow)
   }
 
+  // why: the live-engine utterance-boundary detector sets requireSpeechForMaxWindow so a long
+  // inter-transmission silence never recycles the recognition request (the churn that made the
+  // post-silence utterance dictate then vanish, 2026-06-14). A window of pure silence must NOT cut.
+  private func makeBoundarySegmenter() -> EnergySilenceSegmenter {
+    EnergySilenceSegmenter(
+      minSpeechSeconds: 0.3,
+      minSilenceSeconds: 1.0,
+      maxWindowSeconds: 1.0,
+      requireSpeechForMaxWindow: true
+    )
+  }
+
+  @Test func pureSilencePastMaxWindowDoesNotCutWhenSpeechRequired() {
+    let segmenter = makeBoundarySegmenter()
+    #expect(
+      segmenter.update(block: block(seconds: 0.9, amplitude: 0.0), sampleRate: Self.sampleRate)
+        == .accumulate)
+    #expect(
+      segmenter.update(block: block(seconds: 1.5, amplitude: 0.0), sampleRate: Self.sampleRate)
+        == .accumulate)
+    #expect(
+      segmenter.update(block: block(seconds: 1.5, amplitude: 0.0), sampleRate: Self.sampleRate)
+        == .accumulate)
+  }
+
+  @Test func realisticNoiseFloorSilencePastMaxWindowDoesNotCutWhenSpeechRequired() {
+    let segmenter = makeBoundarySegmenter()
+    // a real mic's "silence" sits above digital zero; it still must not trigger a max-window cut.
+    for _ in 0..<5 {
+      #expect(
+        segmenter.update(block: block(seconds: 1.0, amplitude: 0.02), sampleRate: Self.sampleRate)
+          == .accumulate)
+    }
+  }
+
+  @Test func continuousSpeechStillCutsAtMaxWindowWhenSpeechRequired() {
+    let segmenter = makeBoundarySegmenter()
+    #expect(
+      segmenter.update(block: block(seconds: 1.1, amplitude: 0.5), sampleRate: Self.sampleRate)
+        == .cutAtMaxWindow)
+  }
+
+  @Test func speechAfterLongSilenceCutsAtTrailingSilenceNotDiscarded() {
+    // the post-silence utterance: long silence (no cut), then speech, then a trailing pause closes
+    // the utterance cleanly via cutAfterSilence — the boundary the assembler turns into a card.
+    let segmenter = makeBoundarySegmenter()
+    for _ in 0..<4 {
+      #expect(
+        segmenter.update(block: block(seconds: 1.0, amplitude: 0.0), sampleRate: Self.sampleRate)
+          == .accumulate)
+    }
+    #expect(
+      segmenter.update(block: block(seconds: 0.5, amplitude: 0.5), sampleRate: Self.sampleRate)
+        == .accumulate)
+    #expect(
+      segmenter.update(block: block(seconds: 1.2, amplitude: 0.0), sampleRate: Self.sampleRate)
+        == .cutAfterSilence)
+  }
+
   @Test func resetClearsAccumulators() {
     let segmenter = makeSegmenter()
     _ = segmenter.update(block: block(seconds: 0.3, amplitude: 0.5), sampleRate: Self.sampleRate)
