@@ -236,17 +236,19 @@ final class VoiceEnrollmentRecorder {
       "voice enrollment cleanup started drainQueuedSamples=\(drainQueuedSamples, privacy: .public)"
     )
     let sessionID = activeSessionID
-    let continuation = captureContinuation
-    captureContinuation = nil
-    continuation?.finish()
+    // why: stop the mic tap BEFORE finishing the sample stream. Finishing first means tail buffers the
+    // tap is still delivering get yielded to an already-finished continuation and silently dropped —
+    // which can push a borderline recording under the voiced-duration floor and surface a wrong "too
+    // short" error (2026-06-14 audit). Stop the producer, then finish, then drain what it produced.
     let deactivateSession = releaseCaptureLease()
-    if captureStarted {
-      audioCapture.stop(deactivateSession: deactivateSession)
-    } else if captureStartAttempted {
+    if captureStarted || captureStartAttempted {
       audioCapture.stop(deactivateSession: deactivateSession)
     }
     captureStarted = false
     captureStartAttempted = false
+    let continuation = captureContinuation
+    captureContinuation = nil
+    continuation?.finish()
     if drainQueuedSamples {
       await consumeTask?.value
     } else {
