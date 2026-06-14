@@ -18880,6 +18880,76 @@
           }
         }
       }
+    },
+    "Didn't catch enough of your voice. Speak for about 5 seconds in a quiet spot, then tap Stop.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Didn't catch enough of your voice. Speak for about 5 seconds in a quiet spot, then tap Stop."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Stimme nicht ausreichend erfasst. Sprich etwa 5 Sekunden an einem ruhigen Ort und tippe dann auf Stopp."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "No se captó suficiente tu voz. Habla unos 5 segundos en un lugar tranquilo y luego toca Detener."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Voix pas assez captée. Parlez environ 5 secondes dans un endroit calme, puis touchez Arrêter."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Voce non sufficiente. Parla per circa 5 secondi in un luogo tranquillo, poi tocca Stop."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "声を十分に聞き取れませんでした。静かな場所で約5秒話してから「停止」をタップしてください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "목소리를 충분히 듣지 못했습니다. 조용한 곳에서 약 5초간 말한 후 정지를 누르세요."
+          }
+        },
+        "pt": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Não captei sua voz o suficiente. Fale por cerca de 5 segundos num local silencioso e toque em Parar."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Не удалось записать достаточно голоса. Говорите около 5 секунд в тихом месте, затем нажмите «Стоп»."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Не вдалося записати достатньо голосу. Говоріть близько 5 секунд у тихому місці, потім натисніть «Стоп»."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "没有录到足够的语音。请在安静处说约5秒,然后点按“停止”。"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

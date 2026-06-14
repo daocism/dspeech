@@ -27,6 +27,38 @@ func readMono16k(_ url: URL) throws -> [Float] {
 
 func fmt(_ value: Float) -> String { String(format: "%.3f", value) }
 
+// Replicates VoiceEnrollmentRecorder.hasMinimumVoicedDuration's adaptive-noise-floor VAD: total
+// seconds of audio whose RMS exceeds max(absoluteFloor, recent-minimum-RMS * speechRatio).
+func adaptiveVoicedSeconds(_ samples: [Float], sampleRate: Double) -> Double {
+  guard sampleRate > 0, !samples.isEmpty else { return 0 }
+  let frame = max(1, Int((sampleRate * 0.02).rounded()))
+  let absoluteFloor: Float = 0.006
+  let speechRatio: Float = 2
+  let noiseFloorCap: Float = 0.08
+  let noiseWindow = 2.0
+  var recent: [(rms: Float, sec: Double)] = []
+  var recentTotal = 0.0
+  var voiced = 0.0
+  var i = 0
+  while i < samples.count {
+    let end = min(i + frame, samples.count)
+    let count = end - i
+    var sq: Float = 0
+    for k in i..<end { sq += samples[k] * samples[k] }
+    let rms = (sq / Float(count)).squareRoot()
+    let sec = Double(count) / sampleRate
+    recent.append((rms, sec))
+    recentTotal += sec
+    while recent.count > 1, recentTotal - recent[0].sec >= noiseWindow {
+      recentTotal -= recent.removeFirst().sec
+    }
+    let floor = min(recent.map(\.rms).min() ?? rms, noiseFloorCap)
+    if rms > max(absoluteFloor, floor * speechRatio) { voiced += sec }
+    i = end
+  }
+  return voiced
+}
+
 func defaultFixtures() -> [URL] {
   // why: locate the committed fixtures relative to the package, so the eval is
   // self-contained from a repo checkout regardless of the working directory.
@@ -73,6 +105,46 @@ if argumentPaths.first == "gate", argumentPaths.count >= 5 {
     injectEnd: Double(argumentPaths[4]) ?? 0,
     manager: manager
   )
+  exit(0)
+}
+
+// Enrollment-gate probe: `swift run SpeakerEval probe <wav> [<startSec> <endSec>]`
+// Reports the two gates the app applies (adaptive-VAD voiced duration ≥4s, RMS voicedQuality ≥0.25)
+// plus the real FluidAudio embedding, so we can see exactly which gate rejects a real recording.
+if argumentPaths.first == "probe", argumentPaths.count >= 2 {
+  let url = URL(fileURLWithPath: argumentPaths[1])
+  var samples = try readMono16k(url)
+  let sampleRate = 16000.0
+  if argumentPaths.count >= 4, let start = Double(argumentPaths[2]),
+    let end = Double(argumentPaths[3])
+  {
+    let a = max(0, Int(start * sampleRate))
+    let b = min(samples.count, Int(end * sampleRate))
+    if a < b { samples = Array(samples[a..<b]) }
+  }
+  let duration = Double(samples.count) / sampleRate
+  var sq = 0.0
+  for x in samples { sq += Double(x) * Double(x) }
+  let rms = samples.isEmpty ? 0 : (sq / Double(samples.count)).squareRoot()
+  let voicedQuality = min(1.0, max(0.0, rms * 4.0))
+  let voiced = adaptiveVoicedSeconds(samples, sampleRate: sampleRate)
+  print("### probe \(url.lastPathComponent) — \(fmt(Float(duration)))s @16kHz")
+  let voicedFloor = 1.5
+  print(
+    "  gate1 hasMinimumVoicedDuration: adaptive-VAD voiced=\(fmt(Float(voiced)))s "
+      + "[need ≥\(fmt(Float(voicedFloor)))s → \(voiced >= voicedFloor ? "PASS" : "FAIL")]")
+  print(
+    "  gate2 enroll quality: rms=\(fmt(Float(rms))) quality=\(fmt(Float(voicedQuality))) "
+      + "[REMOVED for enroll → always PASS]")
+  do {
+    let embedding = try manager.extractSpeakerEmbedding(from: samples)
+    let enrolls = voiced >= voicedFloor
+    print(
+      "  FluidAudio embedding: dim=\(embedding.count) "
+        + "→ ENROLLMENT WOULD \(enrolls ? "SUCCEED ✅" : "FAIL (too short) ❌")")
+  } catch {
+    print("  FluidAudio embedding FAILED: \(error)")
+  }
   exit(0)
 }
 

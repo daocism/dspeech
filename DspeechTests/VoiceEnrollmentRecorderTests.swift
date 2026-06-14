@@ -150,7 +150,7 @@ struct VoiceEnrollmentRecorderTests {
       Issue.record("expected unavailable status for insufficient voiced duration")
       return
     }
-    #expect(reason.contains("voiced speech"))
+    #expect(reason.contains("enough of your voice"))
   }
 
   @Test func stopRejectsLowEnergyConstantNoiseShortOfMinimumVoicedDuration() async {
@@ -166,7 +166,7 @@ struct VoiceEnrollmentRecorderTests {
       Issue.record("expected unavailable status for low-energy constant noise")
       return
     }
-    #expect(reason.contains("voiced speech"))
+    #expect(reason.contains("enough of your voice"))
   }
 
   @Test func stopAcceptsSpeechLikeEnergyMeetingMinimumVoicedDuration() async {
@@ -181,6 +181,35 @@ struct VoiceEnrollmentRecorderTests {
     #expect(result?.samples == samples)
     #expect(result?.sampleRate == 16_000)
     #expect(recorder.status == .idle)
+  }
+
+  @Test func acceptsRealisticRecordingWithNaturalPausesAtProductionFloor() async {
+    // why: real speech is only ~70% voiced (pauses between words), so a 4s recording registers
+    // ~2.8s voiced. The PRODUCTION floor (VoiceEnrollmentRecorder.targetSeconds) must accept it; the
+    // old 4s VOICED floor rejected every normal recording ("слишком…", 2026-06-14 device report,
+    // root-caused against the real voice via `SpeakerEval probe`).
+    let audioCapture = FakeEnrollmentAudioCapture()
+    let recorder = makeRecorder(
+      audioCapture: audioCapture, targetSeconds: VoiceEnrollmentRecorder.targetSeconds)
+    await recorder.start()
+    let samples = Self.speechWithPauses(wallClockSeconds: 4.0, voicedFraction: 0.7)
+    audioCapture.emit(Self.makeBuffer(values: samples))
+    let result = await recorder.stop()
+
+    #expect(result != nil)
+    #expect(recorder.status == .idle)
+  }
+
+  @Test func rejectsTwoSecondRecordingBelowProductionFloor() async {
+    let audioCapture = FakeEnrollmentAudioCapture()
+    let recorder = makeRecorder(
+      audioCapture: audioCapture, targetSeconds: VoiceEnrollmentRecorder.targetSeconds)
+    await recorder.start()
+    let samples = Self.speechWithPauses(wallClockSeconds: 2.0, voicedFraction: 0.6)
+    audioCapture.emit(Self.makeBuffer(values: samples))
+    let result = await recorder.stop()
+
+    #expect(result == nil)
   }
 
   @Test func lateBufferAfterStopIsIgnored() async {
@@ -306,6 +335,37 @@ struct VoiceEnrollmentRecorderTests {
       Float(sin(Double(index % 64) / 64 * 2 * .pi) * 0.08)
     }
     return quiet + voiced
+  }
+
+  // why: model REAL speech — alternating voiced bursts and quiet gaps so the adaptive VAD sees a low
+  // floor and clear speech, with only `voicedFraction` of the wall clock actually voiced. A 4s clip at
+  // 0.7 yields ~2.8s voiced, exactly the case the old 4s-voiced floor wrongly rejected.
+  private static func speechWithPauses(
+    wallClockSeconds: Double, voicedFraction: Double, sampleRate: Double = 16_000
+  ) -> [Float] {
+    func tone(count: Int, amplitude: Float) -> [Float] {
+      var samples = [Float](repeating: 0, count: count)
+      for i in 0..<count {
+        let phase = Double(i % 64) / 64.0 * 2.0 * Double.pi
+        samples[i] = Float(sin(phase)) * amplitude
+      }
+      return samples
+    }
+    let burst = 0.35
+    let gap = burst * (1 - voicedFraction) / max(voicedFraction, 0.01)
+    var out: [Float] = []
+    let lead = max(1, Int(0.02 * sampleRate))
+    out += tone(count: lead, amplitude: 0.0005)
+    var elapsed = Double(lead) / sampleRate
+    var loud = true
+    while elapsed < wallClockSeconds {
+      let segment = loud ? burst : gap
+      let count = max(1, Int(segment * sampleRate))
+      out += tone(count: count, amplitude: loud ? 0.08 : 0.0008)
+      elapsed += segment
+      loud.toggle()
+    }
+    return out
   }
 
   private static func silence(seconds: Double, sampleRate: Double = 16_000) -> [Float] {

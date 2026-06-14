@@ -12,11 +12,12 @@ final class VoiceEnrollmentRecorder {
     case unavailable(String)
   }
 
-  // why: the minimum VOICED-speech floor for a usable embedding. 6s was onerous for a short
-  // callsign and silently failed enrollment (the UI showed only a generic error); 4s still yields a
-  // robust WeSpeaker embedding given the wide same/cross-voice margin (0.78–0.83 vs 0.15–0.23) and
-  // a longer recording still uses every captured sample. The real reason is now surfaced in the UI.
-  static let targetSeconds: Double = 4
+  // why: the minimum DETECTED-VOICED-speech floor — a lenient garbage filter, NOT the recording
+  // length. Real speech is ~70% voiced (natural pauses between words), so a 4s recording the UI asks
+  // for only registers ~2.9s voiced (measured on a real voice). The old 4s VOICED floor therefore
+  // rejected every normal ~4s recording ("слишком…", 2026-06-14 device report). 1.5s of voiced speech
+  // still yields a usable WeSpeaker embedding; the settings UI guides ~4–5s wall-clock for a good one.
+  static let targetSeconds: Double = 1.5
 
   private(set) var status: Status = .idle {
     didSet {
@@ -173,10 +174,12 @@ final class VoiceEnrollmentRecorder {
   }
 
   private func insufficientVoicedDurationReason() -> String {
-    let seconds = Self.formattedSeconds(targetSeconds)
-    return String(
+    // why: guide the user by WALL-CLOCK (what they control), not the internal voiced-seconds floor —
+    // telling them "1.5 seconds" would be misleading since real speech is only ~70% voiced.
+    String(
       localized:
-        "Not enough voiced speech. Speak clearly for at least \(seconds) seconds and try again.")
+        "Didn't catch enough of your voice. Speak for about 5 seconds in a quiet spot, then tap Stop."
+    )
   }
 
   private static func formattedSeconds(_ value: Double) -> String {
