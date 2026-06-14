@@ -25,6 +25,8 @@ enum SettingsStorageIssue: Equatable, Sendable {
   case recognitionLocaleCorrupted
   case recognitionLocaleSaveFailed
   case recognitionEngineCorrupted
+  case recognitionEngineSaveFailed
+  case transmissionGapSaveFailed
   case translationEnabledCorrupted
   case translationTargetCorrupted
   case translationEnabledSaveFailed

@@ -293,72 +293,72 @@
         }
       }
     },
-    "%lld segments - %@": {
+    "%lld transmissions - %@": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld segments - %@"
+            "value": "%lld transmissions - %@"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld Segmente - %@"
+            "value": "%lld Funksprüche - %@"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld segmentos - %@"
+            "value": "%lld transmisiones - %@"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld segments - %@"
+            "value": "%lld transmissions - %@"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld segmenti - %@"
+            "value": "%lld trasmissioni - %@"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld 件のセグメント - %@"
+            "value": "%lld 件の通信 - %@"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld개 구간 - %@"
+            "value": "%lld개 교신 - %@"
           }
         },
         "pt": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld segmentos - %@"
+            "value": "%lld transmissões - %@"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld сегментов — %@"
+            "value": "%lld передач — %@"
           }
         },
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld сегментів — %@"
+            "value": "%lld передач — %@"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld 个片段 - %@"
+            "value": "%lld 条通信 - %@"
           }
         }
       }

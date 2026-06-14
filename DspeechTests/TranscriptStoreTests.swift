@@ -69,6 +69,34 @@ struct TranscriptStoreTests {
     #expect(try store.segments(in: summary.id) == segments)
   }
 
+  @Test func sessionSummaryCountsTransmissionsNotSegments() throws {
+    let root = try Self.makeRoot()
+    defer { Self.removeRoot(root) }
+    let start = Date(timeIntervalSince1970: 100)
+    let end = Date(timeIntervalSince1970: 200)
+    var dates = [start, end]
+    let store = try FileTranscriptStore(rootDirectory: root) { dates.removeFirst() }
+
+    let summary = try store.beginSession(localeIdentifier: "en-US")
+    let first = Self.transmission(
+      id: UUID(uuidString: "00000000-0000-0000-0000-000000000301")!,
+      startedAt: Date(timeIntervalSince1970: 5),
+      endedAt: Date(timeIntervalSince1970: 9),
+      text: "Cleared to land runway two seven")
+    let second = Self.transmission(
+      id: UUID(uuidString: "00000000-0000-0000-0000-000000000302")!,
+      startedAt: Date(timeIntervalSince1970: 12),
+      endedAt: Date(timeIntervalSince1970: 15),
+      text: "Contact ground point niner")
+    try store.append(first, to: summary.id)
+    try store.append(second, to: summary.id)
+    try store.endSession(summary.id)
+
+    // why: segmentCount holds the TRANSMISSION count when transmissions exist — the relabeled
+    // "transmissions" semantics. The legacy round-trip test only exercises the segment fallback.
+    #expect(try store.sessions().first?.segmentCount == 2)
+  }
+
   @Test func openSessionSurvivesStoreRecreation() throws {
     let root = try Self.makeRoot()
     defer { Self.removeRoot(root) }
