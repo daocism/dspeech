@@ -272,7 +272,7 @@ final class VoiceFilterPipeline {
       relevance = gate.evaluate(text: text, speaker: speaker, timestamp: timestamp)
       indicator = Self.indicator(for: speaker, relevance: relevance)
     } else {
-      relevance = .display(reason: .noCallSignConfigured)
+      relevance = .display(reason: .filterDisabled)
       indicator = .filterOff
     }
     let speakerKind: String
@@ -354,6 +354,8 @@ final class VoiceFilterPipeline {
       return .noiseOrTooShortSuppressed
     case .suppress(reason: .pilotReadback):
       return .pilotSuppressed
+    case .display(reason: .filterDisabled):
+      return .filterOff
     case .display(reason: _), .holdContinuation(reason: _):
       return .probableDispatcher
     case .suppress(reason: _):

@@ -5,6 +5,9 @@ struct TranscriptSessionSummary: Identifiable, Equatable, Sendable, Codable {
   let id: UUID
   let startedAt: Date
   var endedAt: Date?
+  // why: holds the TRANSMISSION (card) count, not raw ASR segments — the JSON key stays
+  // `segmentCount` to avoid a persisted-summary migration; the UI labels it "transmissions".
+  // Legacy sessions with no stored transmissions fall back to the segment count (see endSession).
   var segmentCount: Int
   let localeIdentifier: String
 }

@@ -302,6 +302,30 @@ struct RecognitionSettingsTests {
     #expect(settings.hasStaleSettings)
   }
 
+  @MainActor @Test func engineSaveFailureSurfacesEngineSaveFailedIssue() {
+    let storage = InMemoryRecognitionSettingsStorage()
+    storage.failSaves = true
+    let settings = RecognitionSettings(
+      storage: storage, supportedLocales: supported, preferredLanguages: ["en-US"])
+
+    settings.engineChoice = .whisperKit
+
+    #expect(settings.storageIssue == .recognitionEngineSaveFailed)
+    #expect(settings.hasStaleSettings)
+  }
+
+  @MainActor @Test func transmissionGapSaveFailureSurfacesGapSaveFailedIssue() {
+    let storage = InMemoryRecognitionSettingsStorage()
+    storage.failSaves = true
+    let settings = RecognitionSettings(
+      storage: storage, supportedLocales: supported, preferredLanguages: ["en-US"])
+
+    settings.transmissionGapSeconds = 4
+
+    #expect(settings.storageIssue == .transmissionGapSaveFailed)
+    #expect(settings.hasStaleSettings)
+  }
+
   @MainActor @Test func unsupportedStoredLocaleSurfacesCorruptionIssue() {
     let storage = InMemoryRecognitionSettingsStorage()
     storage.stored = "zz-ZZ"

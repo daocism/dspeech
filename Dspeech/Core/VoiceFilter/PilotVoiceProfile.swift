@@ -121,6 +121,7 @@ enum ATCVoiceIndicator: Equatable, Sendable {
 enum ATCRelevanceDecision: Equatable, Sendable {
   enum Reason: Equatable, Sendable {
     case noCallSignConfigured
+    case filterDisabled
     case urgencyBroadcast
     case callSignMatch
     case continuationOfRecentHit

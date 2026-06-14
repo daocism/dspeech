@@ -104,7 +104,7 @@ private struct SessionSummaryRow: View {
         Text(session.startedAt.formatted(date: .abbreviated, time: .shortened))
           .font(.body.weight(.semibold))
         Text(
-          String(localized: "\(session.segmentCount) segments - \(session.localeIdentifier)")
+          String(localized: "\(session.segmentCount) transmissions - \(session.localeIdentifier)")
         )
         .font(.footnote.monospacedDigit())
         .foregroundStyle(.secondary)

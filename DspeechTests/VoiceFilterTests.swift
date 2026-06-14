@@ -1044,7 +1044,7 @@ struct VoiceFilterPipelineTests {
       timestamp: Date(timeIntervalSince1970: 0)
     )
     if case .display(let reason) = dec.relevance {
-      #expect(reason == .noCallSignConfigured)
+      #expect(reason == .filterDisabled)
     } else {
       Issue.record("disabled pipeline should display by default, got \(dec.relevance)")
     }
@@ -1378,7 +1378,7 @@ struct VoiceFilterPipelineTests {
       speaker: .nonPilot(bestPilotScore: 0),
       timestamp: Date(timeIntervalSince1970: 0)
     )
-    #expect(textDecision.relevance == .display(reason: .noCallSignConfigured))
+    #expect(textDecision.relevance == .display(reason: .filterDisabled))
     #expect(textDecision.indicator == .filterOff)
   }
 

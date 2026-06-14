@@ -226,7 +226,7 @@ final class RecognitionSettings {
         try storage.saveEngineChoice(engineChoice)
         storageIssue = nil
       } catch {
-        storageIssue = .recognitionLocaleSaveFailed
+        storageIssue = .recognitionEngineSaveFailed
       }
     }
   }
@@ -242,7 +242,7 @@ final class RecognitionSettings {
         try storage.saveTransmissionGapSeconds(clamped)
         storageIssue = nil
       } catch {
-        storageIssue = .recognitionLocaleSaveFailed
+        storageIssue = .transmissionGapSaveFailed
       }
     }
   }
