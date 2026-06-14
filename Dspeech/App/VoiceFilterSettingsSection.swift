@@ -555,41 +555,70 @@ struct VoiceFilterSettingsSection: View {
   private func crewRow(index: Int, profile: PilotVoiceProfile?) -> some View {
     let target: CrewEnrollmentTarget = profile.map { .existing($0.id) } ?? .new
     let isRecordingThis = recordingTarget == target
-    HStack(alignment: .firstTextBaseline, spacing: 8) {
-      VStack(alignment: .leading, spacing: 2) {
-        Text(crewDisplayName(index: index))
-          .font(.body.weight(.medium))
-          .lineLimit(1)
-          .minimumScaleFactor(0.7)
-        Text(crewRowSubtitle(isRecording: isRecordingThis))
-          .font(.footnote)
-          .foregroundStyle(.secondary)
-          .frame(maxWidth: .infinity, alignment: .leading)
-          .fixedSize(horizontal: false, vertical: true)
+    // why: at large Dynamic Type / the longest locale, name + Re-record + delete don't fit one row and
+    // the button truncated ("Neu aufneh…", 2026-06-14 visual review). ViewThatFits drops to a stacked
+    // layout where the controls get their own full-width line, so the button label never clips.
+    ViewThatFits(in: .horizontal) {
+      HStack(alignment: .firstTextBaseline, spacing: 8) {
+        crewRowName(index: index, isRecording: isRecordingThis)
+        Spacer(minLength: 4)
+        crewRowRecordButton(index: index, target: target, isRecording: isRecordingThis)
+        crewRowDeleteButton(index: index, profile: profile)
       }
-      Spacer(minLength: 4)
-      Button(isRecordingThis ? String(localized: "Stop") : String(localized: "Re-record")) {
-        Task { await toggleEnrollment(target: target) }
-      }
-      .buttonStyle(.bordered)
-      .tint(isRecordingThis ? .red : nil)
-      .disabled(!identifierAvailable || (recordingTarget != nil && !isRecordingThis))
-      .accessibilityIdentifier("voicefilter-enroll-crew-\(index)")
-      if let profile {
-        Button {
-          removeCrewMember(id: profile.id)
-        } label: {
-          Image(systemName: "minus.circle.fill")
-            .font(.system(size: 22))
-            .foregroundStyle(.red)
-            .frame(width: 44, height: 44)
-            .contentShape(Rectangle())
+      VStack(alignment: .leading, spacing: 8) {
+        crewRowName(index: index, isRecording: isRecordingThis)
+        HStack(spacing: 8) {
+          crewRowRecordButton(index: index, target: target, isRecording: isRecordingThis)
+          Spacer(minLength: 4)
+          crewRowDeleteButton(index: index, profile: profile)
         }
-        .buttonStyle(.plain)
-        .disabled(recordingTarget != nil)
-        .accessibilityIdentifier("voicefilter-remove-crew-\(index)")
-        .accessibilityLabel(String(localized: "Remove \(crewDisplayName(index: index))"))
       }
+    }
+  }
+
+  private func crewRowName(index: Int, isRecording: Bool) -> some View {
+    VStack(alignment: .leading, spacing: 2) {
+      Text(crewDisplayName(index: index))
+        .font(.body.weight(.medium))
+        .lineLimit(1)
+        .minimumScaleFactor(0.7)
+      Text(crewRowSubtitle(isRecording: isRecording))
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+  }
+
+  private func crewRowRecordButton(
+    index: Int, target: CrewEnrollmentTarget, isRecording: Bool
+  ) -> some View {
+    Button(isRecording ? String(localized: "Stop") : String(localized: "Re-record")) {
+      Task { await toggleEnrollment(target: target) }
+    }
+    .buttonStyle(.bordered)
+    .tint(isRecording ? .red : nil)
+    .lineLimit(1)
+    .disabled(!identifierAvailable || (recordingTarget != nil && !isRecording))
+    .accessibilityIdentifier("voicefilter-enroll-crew-\(index)")
+  }
+
+  @ViewBuilder
+  private func crewRowDeleteButton(index: Int, profile: PilotVoiceProfile?) -> some View {
+    if let profile {
+      Button {
+        removeCrewMember(id: profile.id)
+      } label: {
+        Image(systemName: "minus.circle.fill")
+          .font(.system(size: 22))
+          .foregroundStyle(.red)
+          .frame(width: 44, height: 44)
+          .contentShape(Rectangle())
+      }
+      .buttonStyle(.plain)
+      .disabled(recordingTarget != nil)
+      .accessibilityIdentifier("voicefilter-remove-crew-\(index)")
+      .accessibilityLabel(String(localized: "Remove \(crewDisplayName(index: index))"))
     }
   }
 
