@@ -501,10 +501,24 @@ struct ContentView: View {
   @ViewBuilder
   private func bannerStack() -> some View {
     VStack(spacing: 6) {
-      routeBanner()
-      backgroundStopNoticeBanner()
-      persistenceFailureBanner()
-      translationFailureBanner()
+      if let message = coordinator.routeBanner ?? coordinator.startBlockedMessage {
+        RouteBanner(message: message, canStart: coordinator.canStart)
+      }
+      if coordinator.stoppedForBackgroundNotice {
+        BackgroundStopNoticeBanner(
+          onDismiss: { coordinator.dismissStoppedForBackgroundNotice() })
+      }
+      if let persistenceFailure = liveViewModel.persistenceFailure {
+        PersistenceFailureBanner(
+          message: persistenceFailure,
+          onDismiss: { liveViewModel.dismissPersistenceFailure() })
+      }
+      if translation.enabled, let translationFailure = liveViewModel.translationFailure {
+        TranslationFailureBanner(
+          message: TranslationFailureText.userFacing(translationFailure),
+          isUnavailable: liveViewModel.translationUnavailable,
+          onOpenSettings: { showSettings = true })
+      }
     }
   }
 
@@ -513,165 +527,9 @@ struct ContentView: View {
     let count = liveViewModel.filteredTransmissions.count
     if count > 0 {
       HStack {
-        Button {
-          showSuppressedReview = true
-        } label: {
-          Label(
-            String(localized: "\(count) filtered"),
-            systemImage: "line.3.horizontal.decrease.circle.fill"
-          )
-          .font(.caption.weight(.semibold))
-          .lineLimit(1)
-          .minimumScaleFactor(0.75)
-          .fixedSize()
-          .foregroundStyle(.yellow)
-          .padding(.horizontal, 12)
-          .frame(minHeight: 44)
-          .background(.yellow.opacity(0.14), in: Capsule())
-          .overlay {
-            Capsule().stroke(.yellow.opacity(0.42), lineWidth: 1)
-          }
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("filtered-transmissions-pill")
-        .accessibilityLabel(String(localized: "\(count) filtered transmissions"))
+        FilteredCountPill(count: count, onReview: { showSuppressedReview = true })
         Spacer(minLength: 0)
       }
-    }
-  }
-
-  @ViewBuilder
-  private func routeBanner() -> some View {
-    if let message = coordinator.routeBanner ?? coordinator.startBlockedMessage {
-      HStack(spacing: 8) {
-        Image(systemName: coordinator.canStart ? "exclamationmark.triangle.fill" : "mic.slash.fill")
-          .font(.footnote.weight(.semibold))
-        Text(message)
-          .font(.footnote.weight(.medium))
-          .fixedSize(horizontal: false, vertical: true)
-        Spacer(minLength: 0)
-      }
-      .foregroundStyle(coordinator.canStart ? Color.orange : Color.red)
-      .padding(.horizontal, 12)
-      .padding(.vertical, 8)
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .background(
-        (coordinator.canStart ? Color.orange : Color.red).opacity(0.14),
-        in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-      )
-      .overlay {
-        RoundedRectangle(cornerRadius: 12, style: .continuous)
-          .stroke((coordinator.canStart ? Color.orange : Color.red).opacity(0.4), lineWidth: 1)
-      }
-      .accessibilityIdentifier("route-banner")
-    }
-  }
-
-  @ViewBuilder
-  private func backgroundStopNoticeBanner() -> some View {
-    if coordinator.stoppedForBackgroundNotice {
-      HStack(spacing: 8) {
-        Image(systemName: "info.circle.fill")
-          .font(.footnote.weight(.semibold))
-        Text(String(localized: "Listening stopped while the app was in the background."))
-          .font(.footnote.weight(.medium))
-          .fixedSize(horizontal: false, vertical: true)
-        Spacer(minLength: 0)
-        Button {
-          coordinator.dismissStoppedForBackgroundNotice()
-        } label: {
-          Image(systemName: "xmark")
-            .font(.caption.weight(.bold))
-            .frame(width: 28, height: 28)
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("background-stop-dismiss")
-        .accessibilityLabel(String(localized: "Dismiss background stop notice"))
-      }
-      .foregroundStyle(Color.white.opacity(0.86))
-      .padding(.horizontal, 12)
-      .padding(.vertical, 8)
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .background(Color.white.opacity(0.10), in: RoundedRectangle(cornerRadius: 12))
-      .overlay {
-        RoundedRectangle(cornerRadius: 12)
-          .stroke(Color.white.opacity(0.26), lineWidth: 1)
-      }
-      .accessibilityIdentifier("background-stop-banner")
-    }
-  }
-
-  @ViewBuilder
-  private func persistenceFailureBanner() -> some View {
-    if let persistenceFailure = liveViewModel.persistenceFailure {
-      HStack(spacing: 8) {
-        Image(systemName: "externaldrive.badge.exclamationmark")
-          .font(.footnote.weight(.semibold))
-        Text(persistenceFailure)
-          .font(.footnote.weight(.medium))
-          .fixedSize(horizontal: false, vertical: true)
-        Spacer(minLength: 0)
-        Button {
-          liveViewModel.dismissPersistenceFailure()
-        } label: {
-          Image(systemName: "xmark")
-            .font(.caption.weight(.bold))
-            .frame(width: 28, height: 28)
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("persistence-failure-dismiss")
-        .accessibilityLabel(String(localized: "Dismiss transcript storage warning"))
-      }
-      .foregroundStyle(Color.orange)
-      .padding(.horizontal, 12)
-      .padding(.vertical, 8)
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .background(Color.orange.opacity(0.14), in: RoundedRectangle(cornerRadius: 12))
-      .overlay {
-        RoundedRectangle(cornerRadius: 12)
-          .stroke(Color.orange.opacity(0.4), lineWidth: 1)
-      }
-      .accessibilityIdentifier("persistence-failure-banner")
-    }
-  }
-
-  @ViewBuilder
-  private func translationFailureBanner() -> some View {
-    if translation.enabled, let translationFailure = liveViewModel.translationFailure {
-      HStack(spacing: 8) {
-        Image(
-          systemName: liveViewModel.translationUnavailable
-            ? "arrow.down.circle.fill" : "exclamationmark.triangle.fill"
-        )
-        .font(.footnote.weight(.semibold))
-        Text(TranslationFailureText.userFacing(translationFailure))
-          .font(.footnote.weight(.medium))
-          .fixedSize(horizontal: false, vertical: true)
-        Spacer(minLength: 0)
-        Button {
-          showSettings = true
-        } label: {
-          Text(String(localized: "Translation settings"))
-            .font(.caption.weight(.semibold))
-            .lineLimit(1)
-            .minimumScaleFactor(0.65)
-            .padding(.horizontal, 10)
-            .frame(minHeight: 32)
-            .background(.black.opacity(0.32), in: Capsule())
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("translation-settings-action")
-      }
-      .foregroundStyle(Color.cyan)
-      .padding(.horizontal, 12)
-      .padding(.vertical, 8)
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .background(Color.cyan.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
-      .overlay {
-        RoundedRectangle(cornerRadius: 12)
-          .stroke(Color.cyan.opacity(0.38), lineWidth: 1)
-      }
-      .accessibilityIdentifier("translation-failure-banner")
     }
   }
 
@@ -840,80 +698,6 @@ private struct TranscriptViewportHeightPreferenceKey: PreferenceKey {
     value = nextValue()
   }
 }
-
-#if DEBUG
-  @MainActor
-  private final class RenderStableScriptedLiveTranscriptionEngine: LiveTranscriptionEngine {
-    private var continuation: AsyncStream<LiveTranscriptionEvent>.Continuation?
-    private var finalTask: Task<Void, Never>?
-    private(set) var status: LiveTranscriptionStatus = .idle
-    // why: UI-test seam — drive a specific failure (e.g. a permission-denied banner) instead of the
-    // normal scripted transcript, so the error/permission states are auditable in the sim.
-    private let failCode: String?
-
-    init(failCode: String? = nil) {
-      self.failCode = failCode
-    }
-
-    static func makeFromLaunchArguments(
-      _ arguments: [String] = CommandLine.arguments
-    ) -> RenderStableScriptedLiveTranscriptionEngine? {
-      guard ScriptedLiveTranscriptionEngine.makeFromLaunchArguments(arguments) != nil else {
-        return nil
-      }
-      let failCode = arguments.firstIndex(of: "-dspeech.uitest.scripted-fail").flatMap {
-        $0 + 1 < arguments.count ? arguments[$0 + 1] : nil
-      }
-      return RenderStableScriptedLiveTranscriptionEngine(failCode: failCode)
-    }
-
-    func events() -> AsyncStream<LiveTranscriptionEvent> {
-      AsyncStream<LiveTranscriptionEvent> { continuation in
-        self.continuation = continuation
-        continuation.yield(.status(self.status))
-      }
-    }
-
-    func start() async {
-      transition(to: .requestingPermission)
-      if let failCode {
-        transition(to: .failed(failCode))
-        return
-      }
-      transition(to: .listening)
-      continuation?.yield(.partial("Tower N123AB"))
-      finalTask?.cancel()
-      finalTask = Task { @MainActor [weak self] in
-        do {
-          try await Task.sleep(nanoseconds: 2_500_000_000)
-        } catch {
-          return
-        }
-        guard let self, self.status == .listening else { return }
-        self.continuation?.yield(
-          .segment(
-            TranscriptSegment(
-              text: "Tower N123AB cleared for takeoff",
-              confidence: 0.96,
-              sourceLanguageCode: "en",
-              source: .liveATC
-            ), speaker: nil))
-        self.transition(to: .stopped)
-      }
-    }
-
-    func stop() {
-      finalTask?.cancel()
-      finalTask = nil
-      transition(to: .stopped)
-    }
-
-    private func transition(to newStatus: LiveTranscriptionStatus) {
-      status = newStatus
-      continuation?.yield(.status(newStatus))
-    }
-  }
-#endif
 
 private struct TranscriptBottomOffsetPreferenceKey: PreferenceKey {
   static let defaultValue: CGFloat = 0
