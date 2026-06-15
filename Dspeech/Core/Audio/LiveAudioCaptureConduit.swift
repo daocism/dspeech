@@ -1,5 +1,20 @@
 @preconcurrency import AVFoundation
 import Foundation
+import Synchronization
+
+// why: a Sendable, realtime-safe drop counter for the bounded capture/recognition FIFOs. Lives in
+// a class so it can be captured BY REFERENCE into the @Sendable realtime tap / recognition-callback
+// closures (a Mutex value is non-copyable and can't be captured by copy). Only touched on the rare
+// drop path, so the common (no-drop) path stays lock-free.
+final class CaptureBackpressureCounter: Sendable {
+  private let dropped = Mutex(0)
+  func recordDrop() -> Int {
+    dropped.withLock {
+      $0 += 1
+      return $0
+    }
+  }
+}
 
 struct LiveCapturedAudioBuffer: @unchecked Sendable {
   let buffer: AVAudioPCMBuffer
@@ -64,6 +79,16 @@ final class LiveAudioCaptureConduit {
   private var audioEngine = AVAudioEngine()
   private var engineConfigurationObserver: NSObjectProtocol?
   private var captureContinuation: AsyncStream<LiveCapturedAudioBuffer>.Continuation?
+  private var captureDropCounter = CaptureBackpressureCounter()
+
+  // why: bound the capture FIFO so a MainActor stall can't balloon memory with deep-copied audio
+  // buffers. ~1-2 s of capture at the 1024-frame tap size, mirroring AudioReplayTail's 96-buffer/1 s
+  // bound so the limit is principled, not magic. Newest-wins: under a stall keep the most recent
+  // audio (best for ASR catch-up) and drop the oldest — COUNTED and logged, never silently.
+  static let captureBufferQueueLimit = 96
+  // why: read from the nonisolated realtime tap closure's drop path, so it must not inherit the
+  // type's @MainActor isolation (it's an immutable Sendable constant — safe to read anywhere).
+  nonisolated private static let dropLogInterval = 100
 
   init(
     arbiter: AudioCaptureArbiter = .shared,
@@ -87,9 +112,10 @@ final class LiveAudioCaptureConduit {
       throw LiveEngineError.captureSessionBusy
     }
     let (captureStream, audioContinuation) = AsyncStream<LiveCapturedAudioBuffer>.makeStream(
-      bufferingPolicy: .unbounded
+      bufferingPolicy: .bufferingNewest(Self.captureBufferQueueLimit)
     )
     captureContinuation = audioContinuation
+    captureDropCounter = CaptureBackpressureCounter()
     do {
       try beginAudioSession()
       try startEngine(
@@ -200,12 +226,23 @@ final class LiveAudioCaptureConduit {
     // forces the block nonisolated so it legally runs off-MainActor. It captures only
     // the Sendable continuation (never self / @MainActor state), deep-copies the
     // recycled buffer, and yields it in capture order for the @MainActor consumer.
+    let dropCounter = captureDropCounter
     inputNode.installTap(onBus: 0, bufferSize: 1024, format: nil) { @Sendable buffer, _ in
       guard let copy = buffer.dspeechDeepCopy() else { return }
       let samples = LiveAudioCaptureConduit.monoFloatSamples(from: copy) ?? []
-      audioContinuation.yield(
+      let result = audioContinuation.yield(
         LiveCapturedAudioBuffer(buffer: copy, samples: samples, sampleRate: copy.format.sampleRate)
       )
+      // why: bounded FIFO — a dropped buffer means the MainActor consumer stalled. Count + log
+      // (rate-limited) so the loss is visible in the field; never a silent truncation.
+      if case .dropped = result {
+        let total = dropCounter.recordDrop()
+        if total == 1 || total.isMultiple(of: LiveAudioCaptureConduit.dropLogInterval) {
+          DspeechLog.engine.error(
+            "live capture buffer dropped slug=capture-queue-overflow totalDropped=\(total, privacy: .public)"
+          )
+        }
+      }
     }
     DspeechLog.engine.info(
       "live audio tap installed sampleRate=\(recordingFormat.sampleRate, privacy: .public) channels=\(recordingFormat.channelCount, privacy: .public)"
