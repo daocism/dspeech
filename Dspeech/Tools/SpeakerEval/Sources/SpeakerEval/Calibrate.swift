@@ -111,21 +111,37 @@ func runCalibration(corpusDirectory: URL, manifestPath: URL, manager: DiarizerMa
   // well ABOVE and CROSS-voice well BELOW the gap that brackets them. If a FluidAudio/extraction
   // change collapses that separation, FAIL loudly so the thresholds get re-derived instead of
   // silently mis-classifying crew vs dispatcher. Bounds live in the corpus manifest.
-  if let bounds = manifest.thresholds {
-    var failures: [String] = []
-    if let minSame = bounds.sameVoiceMinCosine, sameStats.min < minSame {
-      failures.append("SAME-voice min \(sameStats.min) < required \(minSame)")
-    }
-    if let maxCross = bounds.crossVoiceMaxCosine, crossStats.max > maxCross {
-      failures.append("CROSS-voice max \(crossStats.max) > allowed \(maxCross)")
-    }
-    if !separable {
-      failures.append("no clean gap: SAME-min \(sameStats.min) <= CROSS-max \(crossStats.max)")
-    }
-    guard failures.isEmpty else {
-      throw CalibrationError.separationRegressed(
-        "speaker separation regressed: " + failures.joined(separator: "; "))
-    }
-    print("  GUARD: PASS — real-model separation holds the calibrated thresholds")
+  // Reach floor (anti-vacuity): a guard that measured too few pairs proves nothing — e.g. a degenerate
+  // single-voice corpus where cross == [] makes crossStats.max == 0 and `separable` trivially true.
+  // Require real same- AND cross-voice evidence before the guard can mean anything. ("measure reach".)
+  let minSamePairs = 3
+  let minCrossPairs = 3
+  guard same.count >= minSamePairs, cross.count >= minCrossPairs else {
+    throw CalibrationError.separationRegressed(
+      "insufficient pairs to measure separation: same=\(same.count) cross=\(cross.count) "
+        + "(need ≥\(minSamePairs) same and ≥\(minCrossPairs) cross — corpus is degenerate)")
   }
+  // Bounds are REQUIRED, not optional: a manifest without cosine bounds must fail loudly, never
+  // silently skip the regression guard.
+  guard let minSame = manifest.thresholds?.sameVoiceMinCosine,
+    let maxCross = manifest.thresholds?.crossVoiceMaxCosine
+  else {
+    throw CalibrationError.separationRegressed(
+      "manifest missing sameVoiceMinCosine / crossVoiceMaxCosine bounds — cannot guard separation")
+  }
+  var failures: [String] = []
+  if sameStats.min < minSame {
+    failures.append("SAME-voice min \(sameStats.min) < required \(minSame)")
+  }
+  if crossStats.max > maxCross {
+    failures.append("CROSS-voice max \(crossStats.max) > allowed \(maxCross)")
+  }
+  if !separable {
+    failures.append("no clean gap: SAME-min \(sameStats.min) <= CROSS-max \(crossStats.max)")
+  }
+  guard failures.isEmpty else {
+    throw CalibrationError.separationRegressed(
+      "speaker separation regressed: " + failures.joined(separator: "; "))
+  }
+  print("  GUARD: PASS — real-model separation holds the calibrated thresholds")
 }
