@@ -89,8 +89,11 @@ struct FilteredTransmissionsReviewSheet: View {
               VStack(alignment: .leading, spacing: 6) {
                 Text(transmissionReasonLabel(for: transmission.classification))
                   .font(.caption.weight(.semibold))
-                  .lineLimit(1)
-                  .minimumScaleFactor(0.75)
+                  // why: localized reason phrases (de "An anderes Luftfahrzeug gerichtet") overflow a
+                  // single line at accessibility Dynamic Type; allow a 2-line wrap + more shrink so the
+                  // badge never clips (caught by the de · AX-XL audit).
+                  .lineLimit(2)
+                  .minimumScaleFactor(0.6)
                   .foregroundStyle(.yellow)
                   .accessibilityIdentifier("transmission-reason-badge")
                 Text(transmission.text)
@@ -240,8 +243,9 @@ struct TransmissionTranscriptCard: View {
 
       Text(transmissionReasonLabel(for: transmission.classification))
         .font(.caption.monospaced().weight(.bold))
-        .lineLimit(1)
-        .minimumScaleFactor(0.75)
+        // why: see review-sheet badge — long localized reasons must wrap, not clip, at AX sizes.
+        .lineLimit(2)
+        .minimumScaleFactor(0.6)
         .foregroundStyle(reasonColor)
         .padding(.horizontal, 7)
         .padding(.vertical, 3)

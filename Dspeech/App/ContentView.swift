@@ -688,6 +688,10 @@ struct ContentView: View {
           .font(.system(isLandscape ? .body : .title3, design: .rounded).weight(.medium))
           .foregroundStyle(.white.opacity(0.7))
           .multilineTextAlignment(.center)
+          // why: give the message its full intrinsic height so the long localized string
+          // (de "Keine On-Device-Erkennungssprachen verfügbar.") wraps fully at AX sizes
+          // instead of being vertically constrained between the Spacers.
+          .fixedSize(horizontal: false, vertical: true)
           .padding(.horizontal, 24)
           .accessibilityIdentifier("transcript-empty-state")
         Spacer()
