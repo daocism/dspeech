@@ -16,8 +16,23 @@ struct CalibrationClip: Decodable {
   let voice: String
 }
 
+struct CalibrationThresholds: Decodable {
+  let sameVoiceMinCosine: Float?
+  let crossVoiceMaxCosine: Float?
+}
+
 struct CalibrationManifest: Decodable {
   let clips: [CalibrationClip]
+  let thresholds: CalibrationThresholds?
+}
+
+enum CalibrationError: Error, CustomStringConvertible {
+  case separationRegressed(String)
+  var description: String {
+    switch self {
+    case .separationRegressed(let message): return message
+    }
+  }
 }
 
 func appCosineSimilarity(_ a: [Float], _ b: [Float]) -> Float {
@@ -90,4 +105,27 @@ func runCalibration(corpusDirectory: URL, manifestPath: URL, manager: DiarizerMa
       format: "  RECOMMEND  pilotMatchThreshold≈%.3f  mixedSpeakerLowerBound≈%.3f  "
         + "separationMargin≈%.3f", pilotMatch, mixedLower, separationMargin))
   print("  separable: \(separable ? "YES (clean gap)" : "NO — overlap; threshold trades FP/FN")")
+
+  // Regression guard: the safety thresholds (SpeakerMatchConfig pilotMatch 0.72,
+  // ATCTranscriptGate pilotSuppress 0.82) are only valid while the real model keeps SAME-voice
+  // well ABOVE and CROSS-voice well BELOW the gap that brackets them. If a FluidAudio/extraction
+  // change collapses that separation, FAIL loudly so the thresholds get re-derived instead of
+  // silently mis-classifying crew vs dispatcher. Bounds live in the corpus manifest.
+  if let bounds = manifest.thresholds {
+    var failures: [String] = []
+    if let minSame = bounds.sameVoiceMinCosine, sameStats.min < minSame {
+      failures.append("SAME-voice min \(sameStats.min) < required \(minSame)")
+    }
+    if let maxCross = bounds.crossVoiceMaxCosine, crossStats.max > maxCross {
+      failures.append("CROSS-voice max \(crossStats.max) > allowed \(maxCross)")
+    }
+    if !separable {
+      failures.append("no clean gap: SAME-min \(sameStats.min) <= CROSS-max \(crossStats.max)")
+    }
+    guard failures.isEmpty else {
+      throw CalibrationError.separationRegressed(
+        "speaker separation regressed: " + failures.joined(separator: "; "))
+    }
+    print("  GUARD: PASS — real-model separation holds the calibrated thresholds")
+  }
 }
