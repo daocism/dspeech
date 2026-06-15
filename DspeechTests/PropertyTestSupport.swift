@@ -97,8 +97,9 @@ func frenchSpelling(of normalized: String, using rng: inout SeededGenerator) -> 
   spelling(of: normalized, digitWords: frenchDigitWords, using: &rng)
 }
 
-// Arbitrary messy ATC-like text. Deliberately contains NO urgency tokens (MAYDAY/PAN PAN/SECURITE/
-// ALL STATIONS), so callers can treat it as non-urgency input.
+// Arbitrary messy ATC-like text — always non-empty (a transmission has content; the empty case is
+// its own concern) and containing NO urgency tokens (MAYDAY/PAN PAN/SECURITE/ALL STATIONS), so
+// callers can treat it as non-urgency, non-empty input.
 func randomTranscript(using rng: inout SeededGenerator) -> String {
   let pool =
     noiseWords
@@ -109,7 +110,7 @@ func randomTranscript(using rng: inout SeededGenerator) -> String {
     ]
     + ["123", "27", "0", "9", "2", "700"]
   let separators = [" ", "  ", ", ", "-", "/", " . "]
-  let count = Int.random(in: 0...12, using: &rng)
+  let count = Int.random(in: 1...12, using: &rng)
   var parts: [String] = []
   for _ in 0..<count { parts.append(pool.randomElement(using: &rng)!) }
   var text = ""
@@ -128,4 +129,48 @@ func randomRawString(using rng: inout SeededGenerator) -> String {
   var s = ""
   for _ in 0..<count { s.append(alphabet.randomElement(using: &rng)!) }
   return s
+}
+
+// MARK: - Gate / classifier shared generators
+
+// A fixed reference timestamp + locale set for the gate and classifier suites.
+let t0 = Date(timeIntervalSinceReferenceDate: 0)
+let locales: [String?] = [nil, "en-US", "fr-FR"]
+
+let urgencyPhrases = [
+  "MAYDAY", "PAN PAN", "PANPAN", "SECURITE", "SÉCURITÉ", "ALL STATIONS",
+]
+
+func randomScore(using rng: inout SeededGenerator) -> Float {
+  Float(Int.random(in: 0...1000, using: &rng)) / 1000
+}
+
+func randomNonPilotOrMixed(using rng: inout SeededGenerator) -> SpeakerMatchDecision {
+  Bool.random(using: &rng)
+    ? .nonPilot(bestPilotScore: randomScore(using: &rng))
+    : .mixed(bestPilotScore: randomScore(using: &rng))
+}
+
+func randomAnySpeaker(using rng: inout SeededGenerator) -> SpeakerMatchDecision {
+  switch Int.random(in: 0...3, using: &rng) {
+  case 0: return .pilot(score: randomScore(using: &rng))
+  case 1: return .nonPilot(bestPilotScore: randomScore(using: &rng))
+  case 2: return .mixed(bestPilotScore: randomScore(using: &rng))
+  default: return .insufficientSpeech
+  }
+}
+
+func injectUrgency(into text: String, using rng: inout SeededGenerator) -> String {
+  let phrase = urgencyPhrases.randomElement(using: &rng)!
+  switch Int.random(in: 0...2, using: &rng) {
+  case 0: return "\(phrase) \(text)"
+  case 1: return "\(text) \(phrase)"
+  default:
+    let words = text.split(separator: " ")
+    guard words.count > 1 else { return "\(phrase) \(text)" }
+    let mid = words.count / 2
+    let head = words[..<mid].joined(separator: " ")
+    let tail = words[mid...].joined(separator: " ")
+    return "\(head) \(phrase) \(tail)"
+  }
 }
