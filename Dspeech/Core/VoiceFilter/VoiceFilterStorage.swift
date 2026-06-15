@@ -147,8 +147,13 @@ struct UserDefaultsVoiceFilterStorage: VoiceFilterStorage, @unchecked Sendable {
   }
 
   func saveGateConfig(_ config: ATCTranscriptGateConfig) {
-    guard let data = try? JSONEncoder().encode(config) else { return }
-    defaults.set(data, forKey: Self.configKey)
+    do {
+      let data = try JSONEncoder().encode(config)
+      defaults.set(data, forKey: Self.configKey)
+    } catch {
+      DspeechLog.voiceFilter.error(
+        "gate config persist failed error=\(String(describing: error), privacy: .private)")
+    }
   }
 
   func loadEnabled() -> Bool {
@@ -182,7 +187,17 @@ struct UserDefaultsVoiceFilterStorage: VoiceFilterStorage, @unchecked Sendable {
     let gateConfig: ATCTranscriptGateConfig
     if let data = defaults.data(forKey: Self.configKey) {
       do {
-        gateConfig = try decoder.decode(ATCTranscriptGateConfig.self, from: data)
+        let decoded = try decoder.decode(ATCTranscriptGateConfig.self, from: data)
+        // why: a well-formed but semantically-invalid suppress threshold (at or below the SpeakerMatcher
+        // match boundary) collapses the [match, suppress) fail-open band and silently reintroduces the
+        // hide-a-dispatcher bug. Treat it as corrupt and recover to the safe default, same as a decode
+        // failure. (2026-06-15 adversarial-review defense-in-depth finding.)
+        if decoded.pilotSuppressThreshold > SpeakerMatchConfig.default.pilotMatchThreshold {
+          gateConfig = decoded
+        } else {
+          gateConfig = .default
+          issues.append(.gateConfigCorrupted)
+        }
       } catch {
         gateConfig = .default
         issues.append(.gateConfigCorrupted)
