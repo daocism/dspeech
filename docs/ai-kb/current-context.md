@@ -93,6 +93,25 @@ Codex GPT-5.5 workers = implementation).
   (matchesAbbreviated) is DISPLAY-only, so it can't hide a clearance. The lenient tier already
   matches NATO-letter tails in English; the locale fix matters specifically for numeric-tail
   callsigns, where French digit words decode only under fr-FR.
+- **Production-readiness expert audit + fixes (2026-06-15, 5-agent team, all CI-green)**: parallel
+  niche audit (Swift-6 concurrency / privacy-security / audio-ASR / a11y-UI / perf-resilience) + 3 fix
+  rounds, 12 commits. HIGHs: callsign recognitionTask handler missing @Sendable → off-main EXC_BREAKPOINT
+  crash (same banked tap class; sibling engine already @Sendable) FIXED; WhisperKit live resample
+  violated the AVAudioConverter contract (fresh converter per buffer + always-.haveData re-feed) FIXED
+  via a session-persistent converter + consumed-flag input block (OSAllocatedUnfairLock, FluidAudio
+  idiom) + a real-converter host test. MEDIUMs: persistence fsync-on-MainActor → checkpoint-flush (drop
+  per-append fsync + .atomic; flush at endSession + the F8 background hook; torn-scratch recovery skip);
+  unbounded capture/recognition FIFOs → bufferingNewest + drop counters (no silent truncation); unbounded
+  in-memory transcript → 2000-transmission window (silent cap, older→SessionHistory) with segmentOwner-
+  gated derived-state eviction + O(visible) render; arbiter preemption now stops the preempted meter;
+  5 sub-44pt tap targets → 44pt. LOWs: mode-aware PrivacyBadge, hidden decorative symbols, voiceprint
+  .completeFileProtection at write, ModelPackState/store-init silent-swallow logging. OWNER product
+  calls: removed the dead unrendered ATCVoiceIndicator render API (kept VoiceFilterDecision.indicator);
+  transcript RAM cap 2000 silent. ADR-0002 local-only RE-PROVEN clean (every egress traced; on-device
+  SFSpeech forced; manifest correct). DEFERRED (LOW/device, non-blocking): P4 WhisperKit window growth
+  (device-only verification), P5 FluidAudio unload-on-disable, P6 VM deinit task-cancel. Process win:
+  local `xcodebuild build -destination generic/platform=iOS` is the app-compile gate (caught 3 Swift-6
+  errors pre-push) — see [[dspeech-local-app-compile-works]].
 - **Crew-voice / dispatcher-separation audit + refactor (2026-06-15)**: 6-dimension audit found a
   hide-a-dispatcher path — the voice-first gate suppressed ANY .pilot before the callsign check, so a
   controller false-accepted as crew without a callsign was hidden by both layers. FIXED:
