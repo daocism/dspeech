@@ -89,6 +89,16 @@ enum SpeakerMatchDecision: Equatable, Sendable {
   case nonPilot(bestPilotScore: Float)
   case mixed(bestPilotScore: Float)
   case insufficientSpeech
+
+  // Stable, non-PII log token for the decision kind (no score, no voiceprint content).
+  var logName: String {
+    switch self {
+    case .pilot: return "pilot"
+    case .nonPilot: return "nonPilot"
+    case .mixed: return "mixed"
+    case .insufficientSpeech: return "insufficientSpeech"
+    }
+  }
 }
 
 enum PreTranscriptionRoutingDecision: Equatable, Sendable {

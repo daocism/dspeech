@@ -50,21 +50,8 @@ final class VoiceFilterPipeline {
       config: snapshot.gateConfig,
       configuredCallSign: snapshot.callSign
     )
-    let modelPackStateName: String
-    switch modelPackState {
-    case .absent:
-      modelPackStateName = "absent"
-    case .acquiring(let acquisition):
-      modelPackStateName = "acquiring-\(acquisition.phase.rawValue)"
-    case .installed:
-      modelPackStateName = "installed"
-    case .failed(let failure):
-      modelPackStateName = "failed-\(failure.kind.rawValue)"
-    case .disabled:
-      modelPackStateName = "disabled"
-    }
     DspeechLog.voiceFilter.info(
-      "voice filter pipeline initialized enabled=\(self.enabled, privacy: .public) profiles=\(self.profiles.count, privacy: .public) modelPackState=\(modelPackStateName, privacy: .public) storageIssues=\(self.storageIssues.count, privacy: .public)"
+      "voice filter pipeline initialized enabled=\(self.enabled, privacy: .public) profiles=\(self.profiles.count, privacy: .public) modelPackState=\(self.modelPackState.logName, privacy: .public) storageIssues=\(self.storageIssues.count, privacy: .public)"
     )
   }
 
@@ -83,34 +70,8 @@ final class VoiceFilterPipeline {
     let previous = modelPackState
     modelPackState = state
     modelPackStorage.saveState(state)
-    let previousName: String
-    switch previous {
-    case .absent:
-      previousName = "absent"
-    case .acquiring(let acquisition):
-      previousName = "acquiring-\(acquisition.phase.rawValue)"
-    case .installed:
-      previousName = "installed"
-    case .failed(let failure):
-      previousName = "failed-\(failure.kind.rawValue)"
-    case .disabled:
-      previousName = "disabled"
-    }
-    let newName: String
-    switch state {
-    case .absent:
-      newName = "absent"
-    case .acquiring(let acquisition):
-      newName = "acquiring-\(acquisition.phase.rawValue)"
-    case .installed:
-      newName = "installed"
-    case .failed(let failure):
-      newName = "failed-\(failure.kind.rawValue)"
-    case .disabled:
-      newName = "disabled"
-    }
     DspeechLog.voiceFilter.info(
-      "voice filter model-pack state changed from=\(previousName, privacy: .public) to=\(newName, privacy: .public)"
+      "voice filter model-pack state changed from=\(previous.logName, privacy: .public) to=\(state.logName, privacy: .public)"
     )
     // why: identifier is built from the pack state at init; when the state
     // changes at runtime (install/delete/enable) rebuild it via the backend
@@ -277,19 +238,8 @@ final class VoiceFilterPipeline {
       relevance = .display(reason: .filterDisabled)
       indicator = .filterOff
     }
-    let speakerKind: String
-    switch speaker {
-    case .pilot:
-      speakerKind = "pilot"
-    case .nonPilot:
-      speakerKind = "nonPilot"
-    case .mixed:
-      speakerKind = "mixed"
-    case .insufficientSpeech:
-      speakerKind = "insufficientSpeech"
-    }
     DspeechLog.voiceFilter.debug(
-      "transcript gate decision speaker=\(speakerKind, privacy: .public) relevance=\(String(describing: relevance), privacy: .public) indicator=\(String(describing: indicator), privacy: .public)"
+      "transcript gate decision speaker=\(speaker.logName, privacy: .public) relevance=\(String(describing: relevance), privacy: .public) indicator=\(String(describing: indicator), privacy: .public)"
     )
     return VoiceFilterDecision(
       segmentText: text,
@@ -381,19 +331,8 @@ final class VoiceFilterPipeline {
         sampleRate: sampleRate,
         profiles: profiles
       )
-      let decisionKind: String
-      switch decision {
-      case .pilot:
-        decisionKind = "pilot"
-      case .nonPilot:
-        decisionKind = "nonPilot"
-      case .mixed:
-        decisionKind = "mixed"
-      case .insufficientSpeech:
-        decisionKind = "insufficientSpeech"
-      }
       DspeechLog.voiceFilter.debug(
-        "speaker classification succeeded decision=\(decisionKind, privacy: .public)"
+        "speaker classification succeeded decision=\(decision.logName, privacy: .public)"
       )
       return decision
     } catch {

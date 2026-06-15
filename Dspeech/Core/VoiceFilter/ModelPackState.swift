@@ -122,6 +122,17 @@ enum ModelPackState: Equatable, Sendable, Codable {
     return false
   }
 
+  // Stable, non-PII log token for this state (no pack/voiceprint content).
+  var logName: String {
+    switch self {
+    case .absent: return "absent"
+    case .acquiring(let acquisition): return "acquiring-\(acquisition.phase.rawValue)"
+    case .installed: return "installed"
+    case .failed(let failure): return "failed-\(failure.kind.rawValue)"
+    case .disabled: return "disabled"
+    }
+  }
+
   var installedPack: InstalledModelPack? {
     switch self {
     case .installed(let pack), .disabled(let pack):
