@@ -779,6 +779,37 @@ struct VoiceFilterStorageTests {
     #expect(store.loadCallSign() == validCallSign)
     #expect(store.loadSnapshot().issues.isEmpty)
   }
+
+  // A well-formed but semantically-invalid gate config (suppress threshold at/below the SpeakerMatcher
+  // match boundary) collapses the [match, suppress) fail-open band and would silently reintroduce the
+  // hide-a-dispatcher bug. loadSnapshot must reject it as corrupt and recover to the safe default,
+  // while preserving a validly-tightened config. (2026-06-15 adversarial-review defense-in-depth.)
+  @Test func gateConfigCollapsingFailOpenBandIsTreatedCorrupt() throws {
+    let suiteName = "dspeech.tests.voicefilter.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    // suppress == match -> empty fail-open band -> corrupt.
+    let collapsed = ATCTranscriptGateConfig(
+      continuationWindowSeconds: 8, readbackMaxWords: 16,
+      pilotSuppressThreshold: SpeakerMatchConfig.default.pilotMatchThreshold)
+    defaults.set(
+      try JSONEncoder().encode(collapsed), forKey: UserDefaultsVoiceFilterStorage.configKey)
+    let snapshot = UserDefaultsVoiceFilterStorage(defaults: defaults).loadSnapshot()
+    #expect(snapshot.issues.contains(.gateConfigCorrupted))
+    #expect(snapshot.gateConfig == .default)
+
+    // control: a validly-tightened suppress threshold (still above the match boundary) is preserved.
+    let tightened = ATCTranscriptGateConfig(
+      continuationWindowSeconds: 8, readbackMaxWords: 16, pilotSuppressThreshold: 0.78)
+    defaults.set(
+      try JSONEncoder().encode(tightened), forKey: UserDefaultsVoiceFilterStorage.configKey)
+    let snapshot2 = UserDefaultsVoiceFilterStorage(defaults: defaults).loadSnapshot()
+    #expect(!snapshot2.issues.contains(.gateConfigCorrupted))
+    #expect(snapshot2.gateConfig != .default)
+    #expect(
+      snapshot2.gateConfig.pilotSuppressThreshold > SpeakerMatchConfig.default.pilotMatchThreshold)
+  }
 }
 
 struct ATCTranscriptGateTests {
@@ -1105,9 +1136,41 @@ struct VoiceFilterPipelineTests {
     #expect(normal.relevance == .display(reason: .filterDisabled))
   }
 
+  // An uncertain-band pilot (>= match 0.72, < suppress 0.82) that the gate SHOWS (fail-open) must NOT
+  // be badged .pilotSuppressed — the badge must reflect the displayed segment, else the UI audit trail
+  // reads "crew suppressed" on a visible clearance. A CONFIDENT pilot still suppresses and badges
+  // .pilotSuppressed. (2026-06-15 adversarial-review indicator finding.)
+  @Test func uncertainPilotShownIsNotBadgedSuppressed() {
+    let store = InMemoryStorage()  // no call sign -> the gate fails open and SHOWS the segment
+    let pipeline = VoiceFilterPipeline(
+      identifier: UnavailableLocalSpeakerIdentifier(),
+      storage: store
+    )
+    pipeline.setEnabled(true)
+
+    let uncertain = pipeline.decide(
+      text: "descend and maintain three thousand",
+      speaker: .pilot(score: 0.75),
+      timestamp: Date(timeIntervalSince1970: 0)
+    )
+    #expect(uncertain.relevance == .display(reason: .noCallSignConfigured))
+    #expect(
+      uncertain.indicator != .pilotSuppressed, "a displayed segment must not be badged suppressed")
+    #expect(uncertain.indicator == .probableDispatcher)
+
+    // control: a confident pilot (>= 0.82) is suppressed and correctly badged .pilotSuppressed.
+    let confident = pipeline.decide(
+      text: "descend and maintain three thousand",
+      speaker: .pilot(score: 0.95),
+      timestamp: Date(timeIntervalSince1970: 0)
+    )
+    #expect(confident.relevance == .suppress(reason: .pilotReadback))
+    #expect(confident.indicator == .pilotSuppressed)
+  }
+
   // Deleting the model pack wipes enrolled voiceprints from memory AND storage — voice data
   // must not survive on disk and silently return on reinstall (the privacy/data-retention wipe).
-  // Includes the empty-roster early-return no-op. (2026-06-15 audit gap — was untested.)
+  // Includes the idempotent second wipe. (2026-06-15 audit gap — was untested.)
   @Test func removeAllCrewMembersWipesProfilesAndStorage() {
     let store = InMemoryStorage()
     store.profiles = [
@@ -1126,9 +1189,34 @@ struct VoiceFilterPipelineTests {
     #expect(pipeline.profiles.isEmpty, "wipe left profiles in memory")
     #expect(store.profiles.isEmpty, "wipe did not persist — voiceprints remain on disk")
 
-    // empty-roster early return: a second wipe is an inert no-op.
+    // a second wipe is an idempotent no-op.
     pipeline.removeAllCrewMembers()
     #expect(pipeline.profiles.isEmpty)
+  }
+
+  // The wipe must clear ON-DISK voiceprints even when in-memory profiles are already empty — a
+  // corrupted/partial load can leave bytes on disk while `profiles == []` in memory, and an
+  // empty-memory early-return would let that personal voice data survive the explicit removal.
+  // (2026-06-15 adversarial-review privacy finding — the old guard short-circuited this.)
+  @Test func removeAllCrewMembersWipesStorageEvenWhenMemoryEmpty() {
+    let store = InMemoryStorage()
+    let pipeline = VoiceFilterPipeline(
+      identifier: UnavailableLocalSpeakerIdentifier(),
+      storage: store
+    )
+    #expect(pipeline.profiles.isEmpty, "fresh pipeline should have no in-memory profiles")
+    // Disk holds voiceprints the in-memory load did not surface (corrupted-then-recovered scenario).
+    store.profiles = [
+      PilotVoiceProfile(
+        label: "Ghost",
+        voicePrint: VoicePrintVector(values: [Float](repeating: 0.2, count: 256), quality: 0.8),
+        enrolledAt: Date(timeIntervalSince1970: 0))
+    ]
+
+    pipeline.removeAllCrewMembers()
+
+    #expect(
+      store.profiles.isEmpty, "wipe must clear on-disk voiceprints even when memory was empty")
   }
 
   // The inconsistent cold-start state the audit flagged: pack-state says installed, but the

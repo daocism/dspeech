@@ -81,8 +81,10 @@ final class VoiceFilterPipeline {
         state: state,
         backendBuilder: backendBuilder
       )
+      let availabilityState =
+        self.identifier.availability == .available ? "available" : "unavailable"
       DspeechLog.voiceFilter.info(
-        "voice filter identifier rebuilt availability=\(String(describing: self.identifier.availability))"
+        "voice filter identifier rebuilt availability=\(availabilityState, privacy: .public)"
       )
     }
   }
@@ -208,7 +210,10 @@ final class VoiceFilterPipeline {
   // survive on disk (and silently return on reinstall) after the user removed the feature that uses
   // it (2026-06-14 audit, privacy/data-retention).
   func removeAllCrewMembers() {
-    guard !profiles.isEmpty else { return }
+    // why: wipe storage UNCONDITIONALLY, not just when in-memory profiles are non-empty — a corrupted
+    // or partially-loaded snapshot can leave voiceprint bytes on disk while `profiles` is empty in
+    // memory; an empty-memory early-return would let that personal voice data survive the explicit
+    // removal. deleteAllProfiles() is idempotent. (2026-06-15 adversarial-review privacy finding.)
     profiles = []
     storage.deleteAllProfiles()
     DspeechLog.voiceFilter.info("crew enrollment removed all reason=pack-deleted")
@@ -295,9 +300,12 @@ final class VoiceFilterPipeline {
     relevance: ATCRelevanceDecision
   ) -> ATCVoiceIndicator {
     if case .display(reason: .urgencyBroadcast) = relevance { return .urgencyBroadcast }
-    if case .pilot = speaker { return .pilotSuppressed }
     if case .insufficientSpeech = speaker { return .noiseOrTooShortSuppressed }
     if case .mixed = speaker { return .mixedSpeakerCandidate }
+    // why: no score-blind .pilot early-exit — a CONFIDENT pilot is suppressed by the gate and badged
+    // via the .suppress(reason: .pilotReadback) arm below; an UNCERTAIN pilot in the [match, suppress)
+    // band that the gate SHOWED (fail-open) must take the relevance-derived badge, not a misleading
+    // .pilotSuppressed stamped on a visible segment. (2026-06-15 audit / adversarial-review finding.)
 
     switch relevance {
     case .display(reason: .callSignMatch):
