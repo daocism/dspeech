@@ -415,7 +415,7 @@ struct ReplayEvaluator: Sendable {
     decision: ATCRelevanceDecision
   ) -> String {
     switch decision {
-    case .display, .holdContinuation:
+    case .display:
       return transcript
     case .suppress:
       return ""
@@ -428,8 +428,6 @@ struct ReplayEvaluator: Sendable {
       return "display-\(reason)"
     case .suppress(let reason):
       return "suppress-\(reason)"
-    case .holdContinuation(let reason):
-      return "hold-\(reason)"
     }
   }
 

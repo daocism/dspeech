@@ -343,8 +343,7 @@ final class VoiceFilterPipeline {
     switch relevance {
     case .display(reason: .callSignMatch):
       return .dispatcherAddressedOwnCallSign
-    case .display(reason: .continuationOfRecentHit),
-      .holdContinuation(reason: .continuationOfRecentHit):
+    case .display(reason: .continuationOfRecentHit):
       return .dispatcherContinuation
     case .display(reason: .noCallSignConfigured):
       return .probableDispatcher
@@ -358,7 +357,7 @@ final class VoiceFilterPipeline {
       return .pilotSuppressed
     case .display(reason: .filterDisabled):
       return .filterOff
-    case .display(reason: _), .holdContinuation(reason: _):
+    case .display(reason: _):
       return .probableDispatcher
     case .suppress(reason: _):
       return .otherTrafficSuppressed
