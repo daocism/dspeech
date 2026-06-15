@@ -29,7 +29,27 @@ final class AudioSourceController {
     self.settings = settings
     self.meter = meter
     self.arbiter = arbiter
+    // why: MEDIUM-2 — if live transcription preempts our capture lease (core capability beats the
+    // cosmetic meter), tear our engine down immediately so two AVAudioEngines never tap the shared
+    // input. Registered once here for the meter client.
+    arbiter.setPreemptionHandler(for: .inputLevelMeter) { [weak self] in
+      self?.handlePreemption()
+    }
     refresh()
+  }
+
+  // why: invoked by the arbiter the instant live transcription preempts our lease. Stop the meter
+  // engine + cancel the consume task and clear local state. Do NOT call arbiter.release here — the
+  // lease is already reassigned to live transcription, so a release would be a no-op refusal; just
+  // clear our local lease flag so a later stopMetering can't double-release.
+  private func handlePreemption() {
+    meterTask?.cancel()
+    meterTask = nil
+    meterLeaseAcquired = false
+    meter.stop()
+    inputLevel = 0
+    isMetering = false
+    DspeechLog.audioSession.info("input level meter stopped reason=preempted-by-live")
   }
 
   // why: a transient "test level" meter for the audio-source settings — only run
