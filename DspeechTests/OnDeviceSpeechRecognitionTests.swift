@@ -137,6 +137,28 @@ struct OnDeviceSpeechRecognitionTests {
     }
   }
 
+  // France conducts ATC in French (digits "un deux trois", NATO letters), so the transcriber must
+  // work for fr-FR too — not only en-US. Same device-only gate as the English path: synthesize a
+  // French callsign read-out and assert the on-device fr-FR recognizer produces a transcript.
+  @Test(.enabled(if: canExerciseRealRecognition))
+  func recognizesSynthesizedFrenchSpeechEndToEnd() async throws {
+    let recognizer = try #require(SFSpeechRecognizer(locale: Locale(identifier: "fr-FR")))
+    let buffers = await Self.synthesize("novembre un deux trois cinq", language: "fr-FR")
+    #expect(!buffers.isEmpty, "French speech synthesis produced no audio buffers")
+
+    let outcome = await Self.recognize(buffers, recognizer: recognizer)
+    switch outcome {
+    case .transcript(let text):
+      print("[OnDeviceSpeech] fr transcript: \(text)")
+      #expect(!text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+    case .failure(let domain, let code, let description):
+      print("[OnDeviceSpeech] fr recognition outcome \(domain)#\(code) \(description)")
+      #expect(
+        Bool(false),
+        "French device ASR happy path produced no transcript: \(domain)#\(code) \(description)")
+    }
+  }
+
   // Crash-repro that runs on the Simulator: the input-level meter installs an AVAudioEngine
   // tap with no permission gate and must emit either a level or a typed visible failure.
   @Test func inputLevelMeterInstallsTapWithoutCrashing() async throws {
