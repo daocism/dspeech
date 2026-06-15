@@ -1,5 +1,6 @@
 @preconcurrency import AVFoundation
 import Foundation
+import os
 
 struct WhisperLiveSegment: Equatable, Sendable {
   let text: String
@@ -466,13 +467,22 @@ final class WhisperKitLiveTranscriptionEngine: LiveTranscriptionEngine {
     // converter flushes the output it can produce and stays REUSABLE for the next buffer
     // (`.endOfStream` would finalize it). The prior block returned the same buffer on every
     // `.haveData`, letting the converter re-consume it and duplicate a few tail frames per block.
-    var fed = false
+    // why: AVAudioConverterInputBlock is @Sendable, so a captured mutable `var` feed-once flag is a
+    // Swift 6 data-race error even though convert() invokes the block synchronously. Hold the state
+    // in an OSAllocatedUnfairLock — the same idiom FluidAudio's AudioConverter uses for this exact
+    // pattern. We report `.noDataNow` (not `.endOfStream`) on the second call to keep the persistent
+    // converter reusable for the next buffer.
+    let fed = OSAllocatedUnfairLock(initialState: false)
     let inputBlock: AVAudioConverterInputBlock = { _, outStatus in
-      if fed {
+      let alreadyFed = fed.withLock { state -> Bool in
+        if state { return true }
+        state = true
+        return false
+      }
+      if alreadyFed {
         outStatus.pointee = .noDataNow
         return nil
       }
-      fed = true
       outStatus.pointee = .haveData
       return buffer
     }
