@@ -1131,6 +1131,37 @@ struct VoiceFilterPipelineTests {
     #expect(pipeline.profiles.isEmpty)
   }
 
+  // The inconsistent cold-start state the audit flagged: pack-state says installed, but the
+  // identifier (built from a stale/recovered state) is unavailable. classify must throw a typed
+  // error rather than classify with the unavailable identifier. (2026-06-15 audit, two sources of
+  // truth.)
+  @Test func classifyThrowsWhenStateInstalledButIdentifierUnavailable() async {
+    let store = InMemoryStorage()
+    store.profiles = [
+      PilotVoiceProfile(
+        label: "Captain",
+        voicePrint: VoicePrintVector(values: [Float](repeating: 0.1, count: 256), quality: 0.9),
+        enrolledAt: Date(timeIntervalSince1970: 0))
+    ]
+    let pipeline = VoiceFilterPipeline(
+      identifier: UnavailableLocalSpeakerIdentifier(reason: "stale"),
+      storage: store,
+      modelPackStorage: InMemoryModelPackStorage(.installed(Self.installedPack()))
+    )
+    pipeline.setEnabled(true)
+    do {
+      _ = try await pipeline.classify(samples: [0, 1, 0, 1], sampleRate: 16_000)
+      Issue.record("expected throw on state/identifier disagreement")
+    } catch let err as LocalSpeakerIdentifierError {
+      if case .modelUnavailable = err {
+      } else {
+        Issue.record("expected modelUnavailable, got \(err)")
+      }
+    } catch {
+      Issue.record("unexpected error \(error)")
+    }
+  }
+
   @Test func decideUsesGateWhenEnabled() {
     let store = InMemoryStorage()
     store.callSign = CallSign(raw: "N123AB")

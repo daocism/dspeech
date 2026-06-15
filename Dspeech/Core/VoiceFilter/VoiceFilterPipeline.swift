@@ -92,6 +92,15 @@ final class VoiceFilterPipeline {
       DspeechLog.voiceFilter.error("voice filter model-pack gate blocked reason=not-installed")
       throw LocalSpeakerIdentifierError.modelUnavailable(reason: modelPackState.capabilityReason)
     }
+    // why: modelPackState is the source of truth, but enroll/classify use the IDENTIFIER (built
+    // from the state at construction). A cold-start load that recovered or corrupted the state can
+    // leave them disagreeing; assert agreement so a mismatch throws a typed error HERE instead of
+    // classifying with an unavailable identifier (2026-06-15 audit, two sources of truth).
+    if case .unavailable(let reason) = identifier.availability {
+      DspeechLog.voiceFilter.error(
+        "voice filter state/identifier disagree state=installed identifier=unavailable")
+      throw LocalSpeakerIdentifierError.modelUnavailable(reason: reason)
+    }
   }
 
   func setEnabled(_ flag: Bool) {
