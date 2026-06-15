@@ -847,6 +847,13 @@ private struct TranscriptViewportHeightPreferenceKey: PreferenceKey {
     private var continuation: AsyncStream<LiveTranscriptionEvent>.Continuation?
     private var finalTask: Task<Void, Never>?
     private(set) var status: LiveTranscriptionStatus = .idle
+    // why: UI-test seam — drive a specific failure (e.g. a permission-denied banner) instead of the
+    // normal scripted transcript, so the error/permission states are auditable in the sim.
+    private let failCode: String?
+
+    init(failCode: String? = nil) {
+      self.failCode = failCode
+    }
 
     static func makeFromLaunchArguments(
       _ arguments: [String] = CommandLine.arguments
@@ -854,7 +861,10 @@ private struct TranscriptViewportHeightPreferenceKey: PreferenceKey {
       guard ScriptedLiveTranscriptionEngine.makeFromLaunchArguments(arguments) != nil else {
         return nil
       }
-      return RenderStableScriptedLiveTranscriptionEngine()
+      let failCode = arguments.firstIndex(of: "-dspeech.uitest.scripted-fail").flatMap {
+        $0 + 1 < arguments.count ? arguments[$0 + 1] : nil
+      }
+      return RenderStableScriptedLiveTranscriptionEngine(failCode: failCode)
     }
 
     func events() -> AsyncStream<LiveTranscriptionEvent> {
@@ -866,6 +876,10 @@ private struct TranscriptViewportHeightPreferenceKey: PreferenceKey {
 
     func start() async {
       transition(to: .requestingPermission)
+      if let failCode {
+        transition(to: .failed(failCode))
+        return
+      }
       transition(to: .listening)
       continuation?.yield(.partial("Tower N123AB"))
       finalTask?.cancel()
