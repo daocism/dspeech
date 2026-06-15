@@ -1078,6 +1078,59 @@ struct VoiceFilterPipelineTests {
     }
   }
 
+  // An urgency broadcast must be SHOWN even with the filter OFF — the one decision the
+  // disabled filter still makes (decide()'s `containsUrgencyBroadcast || enabled` short-circuit).
+  // Pinned at the pipeline level (not just the gate); a confident pilot speaker proves urgency wins
+  // over voice classification too. (2026-06-15 audit gap.)
+  @Test func decideShowsUrgencyEvenWhenFilterDisabled() {
+    let store = InMemoryStorage()
+    store.callSign = CallSign(raw: "N123AB")
+    let pipeline = VoiceFilterPipeline(
+      identifier: UnavailableLocalSpeakerIdentifier(),
+      storage: store
+    )
+    pipeline.setEnabled(false)
+    let urgent = pipeline.decide(
+      text: "MAYDAY MAYDAY MAYDAY N123AB engine failure",
+      speaker: .pilot(score: 0.95),
+      timestamp: Date(timeIntervalSince1970: 0)
+    )
+    #expect(urgent.relevance == .display(reason: .urgencyBroadcast))
+    // control: a non-urgency segment in the disabled pipeline displays as filterDisabled.
+    let normal = pipeline.decide(
+      text: "United 247 descend",
+      speaker: .pilot(score: 0.95),
+      timestamp: Date(timeIntervalSince1970: 0)
+    )
+    #expect(normal.relevance == .display(reason: .filterDisabled))
+  }
+
+  // Deleting the model pack wipes enrolled voiceprints from memory AND storage — voice data
+  // must not survive on disk and silently return on reinstall (the privacy/data-retention wipe).
+  // Includes the empty-roster early-return no-op. (2026-06-15 audit gap — was untested.)
+  @Test func removeAllCrewMembersWipesProfilesAndStorage() {
+    let store = InMemoryStorage()
+    store.profiles = [
+      PilotVoiceProfile(
+        label: "Captain",
+        voicePrint: VoicePrintVector(values: [Float](repeating: 0.1, count: 256), quality: 0.9),
+        enrolledAt: Date(timeIntervalSince1970: 0))
+    ]
+    let pipeline = VoiceFilterPipeline(
+      identifier: UnavailableLocalSpeakerIdentifier(),
+      storage: store
+    )
+    #expect(!pipeline.profiles.isEmpty, "seeded profile did not load")
+
+    pipeline.removeAllCrewMembers()
+    #expect(pipeline.profiles.isEmpty, "wipe left profiles in memory")
+    #expect(store.profiles.isEmpty, "wipe did not persist — voiceprints remain on disk")
+
+    // empty-roster early return: a second wipe is an inert no-op.
+    pipeline.removeAllCrewMembers()
+    #expect(pipeline.profiles.isEmpty)
+  }
+
   @Test func decideUsesGateWhenEnabled() {
     let store = InMemoryStorage()
     store.callSign = CallSign(raw: "N123AB")
