@@ -84,7 +84,15 @@ Codex GPT-5.5 workers = implementation).
 - **Filter safety**: urgency bypass (MAYDAY/PAN PAN/SECURITE/ALL STATIONS — unsuppressible,
   opens continuation window), abbreviated-callsign DISPLAY tier (matchesAbbreviated,
   exact-run; strict matches() unchanged for suppression-grade logic), full ICAO phonetics,
-  insufficientSpeech fails open everywhere.
+  insufficientSpeech fails open everywhere. Segment gate (ATCTranscriptGate.evaluate) is
+  locale-aware: it decodes the callsign in the segment's recognition language
+  (segment.sourceLanguageCode), so a French clearance read with French digit words
+  ("November un deux trois") matches at the segment level — not just the card classifier.
+  Behavior-preserving for English (localeIdentifier nil/en → English decode path); adding a
+  decode path only ADDS matches, never flips display→suppress, and the only widened tier
+  (matchesAbbreviated) is DISPLAY-only, so it can't hide a clearance. The lenient tier already
+  matches NATO-letter tails in English; the locale fix matters specifically for numeric-tail
+  callsigns, where French digit words decode only under fr-FR.
 - **Transcript = flight data (D4)**: FileTranscriptStore (JSONL, per-append flush, crash
   recovery, protected files), session history UI + share/export, auto-scroll + jump-to-live,
   Clear-with-confirmation (history retained), suppressed-segment review sheet, demo/hints
