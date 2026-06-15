@@ -166,8 +166,20 @@ struct BottomLeftControls: View {
 struct PrivacyBadge: View {
   let mode: PrivacyMode
 
+  // why: tint + VoiceOver label derive from whether the mode keeps audio on-device, not a
+  // hardcoded green/"On-device" — so a future off-device mode can't render green or be
+  // mislabeled "On-device processing" (ADR 0002 demands the badge tell the truth).
+  private var tint: Color {
+    mode.sendsAudioOffDevice ? .orange : .green
+  }
+
+  private var voiceOverLabel: String {
+    mode.sendsAudioOffDevice
+      ? String(localized: "Sends audio off device")
+      : String(localized: "On-device processing")
+  }
+
   var body: some View {
-    let tint: Color = .green
     Text(mode.badgeText)
       .font(.caption2.weight(.bold).monospaced())
       .lineLimit(1)
@@ -180,7 +192,7 @@ struct PrivacyBadge: View {
         Capsule().stroke(tint.opacity(0.45), lineWidth: 1)
       )
       .accessibilityIdentifier("privacy-badge")
-      .accessibilityLabel(String(localized: "On-device processing"))
+      .accessibilityLabel(voiceOverLabel)
   }
 }
 
@@ -313,8 +325,8 @@ private struct LiveFailureBanner: View {
             .font(.caption.weight(.semibold))
             .lineLimit(1)
             .minimumScaleFactor(0.65)
-            .padding(.horizontal, 8)
-            .frame(minHeight: 30)
+            .padding(.horizontal, 12)
+            .frame(minHeight: 44)
             .background(.black.opacity(0.35), in: Capsule())
         }
         .buttonStyle(.plain)

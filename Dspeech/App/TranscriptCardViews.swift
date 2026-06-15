@@ -149,7 +149,8 @@ struct NoAnchorTransmissionHint: View {
         Image(systemName: "xmark")
           .font(.caption.weight(.bold))
           .foregroundStyle(.black.opacity(0.78))
-          .frame(width: 28, height: 28)
+          .frame(width: 44, height: 44)
+          .contentShape(Rectangle())
       }
       .buttonStyle(.plain)
       .accessibilityIdentifier("no-anchor-hint-dismiss")
