@@ -168,9 +168,16 @@ final class AccessibilityAuditUITests: XCTestCase {
         // still flags it like the settings footnotes; acknowledged by id so clipping stays HARD on the
         // transcript cards on the same surface.
         let isEmptyStateMessage = id == "transcript-empty-state"
+        // the recognition-failure banner is INTENTIONALLY a narrow column left of the floating mic
+        // (a reserved 84pt spacer keeps it from ever wrapping under the button — the famous overlap
+        // defect); its long localized copy (de "Keine On-Device-Erkennungssprache verfügbar. Öffne…")
+        // wraps to several lines but is fully readable (verified by the de·AX-XL screenshot). Only
+        // textClipped is acknowledged here — elementDetection (banner obscured by the mic) stays
+        // HARD-gated, since that is the real risk for this critical element.
+        let isErrorBanner = id == "error-banner"
         if isClippedText
           && (screen.hasPrefix("settings") || screen.contains("review sheet")
-            || isEmptyStateMessage)
+            || isEmptyStateMessage || isErrorBanner)
         {
           print("A11Y_ACK_CLIPPED|\(screen)|id=\(id)|label=\(label)")
           return true
@@ -242,6 +249,59 @@ final class AccessibilityAuditUITests: XCTestCase {
       app.buttons["stop-button"].exists,
       "listening must have stopped (Stop button gone) before auditing the failure state")
     audit(app, "main · recognition-failure (error banner vs mic button)")
+  }
+
+  // worst case for the same defect: the longest localized error copy at the largest accessibility
+  // size — a tall German banner is the most likely to overlap the floating mic button or clip.
+  @MainActor func testMainFailureState_de_large() {
+    let app = launch(
+      locale: "de", contentSize: Self.largeType, extra: ["--dspeech-recognition-no-locales"])
+    let start = app.buttons["start-button"]
+    XCTAssertTrue(start.waitForExistence(timeout: 8))
+    let monitor = addUIInterruptionMonitor(withDescription: "permissions") { alert in
+      for label in ["Allow", "OK", "Allow While Using App", "While Using the App", "Erlauben"] {
+        if alert.buttons[label].exists {
+          alert.buttons[label].tap()
+          return true
+        }
+      }
+      return false
+    }
+    defer { removeUIInterruptionMonitor(monitor) }
+    start.tap()
+    app.tap()
+    acceptPermissionAlertsIfPresent(in: app)
+    let errorBanner = app.staticTexts["error-banner"]
+    XCTAssertTrue(
+      errorBanner.waitForExistence(timeout: 20),
+      "recognition failure must surface a visible error banner")
+    XCTAssertTrue(
+      app.buttons["start-button"].waitForExistence(timeout: 8),
+      "failure must return the surface to an idle Start state before auditing")
+    capture(app, "error-banner-de-AX-XL")
+    audit(app, "main · recognition-failure · de · AX-XL")
+  }
+
+  // permission-denied is the other error surface: the banner ALSO shows an "Open Settings" button.
+  // The longest German copy + that button in the narrow column left of the mic is the tight case.
+  @MainActor func testMainPermissionDenied_de_large() {
+    let app = launch(
+      locale: "de", contentSize: Self.largeType,
+      extra: [
+        "-dspeech.uitest.scripted-engine", "-dspeech.uitest.scripted-fail",
+        "microphone-permission-denied",
+      ])
+    let start = app.buttons["start-button"]
+    XCTAssertTrue(start.waitForExistence(timeout: 8))
+    start.tap()
+    XCTAssertTrue(
+      app.staticTexts["error-banner"].waitForExistence(timeout: 12),
+      "permission-denied must surface the error banner")
+    XCTAssertTrue(
+      app.buttons["start-button"].waitForExistence(timeout: 8),
+      "failure must return the surface to idle Start before auditing")
+    capture(app, "permission-denied-de-AX-XL")
+    audit(app, "main · permission-denied · de · AX-XL")
   }
 
   @MainActor func testSettings_de_default() {
