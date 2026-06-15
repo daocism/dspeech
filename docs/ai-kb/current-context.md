@@ -124,11 +124,12 @@ Codex GPT-5.5 workers = implementation).
 - W10: ContentView decomposition DONE (946→730; banners + DEBUG scripted engine extracted to
   TranscriptBanners.swift / RenderStableScriptedLiveTranscriptionEngine.swift, behavior-preserving).
   Open: iPad adaptivity, full l10n fill, privacy-toggle truthfulness. W11: scripted-engine seam,
-  real-pipeline replay eval; PBT sweeps for the voice-filter safety core DONE
-  (CallSignPropertyTests + ATCTranscriptGatePropertyTests — seeded-PRNG, reach-counter-gated against
-  vacuity, shared generators in PropertyTestSupport; gate suite pins urgency-never-suppressed +
-  fail-open + pilot-suppress + addressed-iff-display); still want PBT on the TransmissionClassifier.
-  No timing-window assertions. W12: warnings-as-errors DONE
+  real-pipeline replay eval; PBT sweep for the voice-filter safety core DONE — all three components:
+  CallSignPropertyTests + ATCTranscriptGatePropertyTests + TransmissionClassifierPropertyTests
+  (seeded-PRNG, reach-counter-gated against vacuity, shared generators in PropertyTestSupport). Gate
+  pins urgency-never-suppressed + fail-open + pilot-suppress + addressed-iff-display + continuation/
+  other-callsign; classifier pins the content-first divergence (own callsign shown even from pilot
+  voice, where the gate suppresses). No timing-window assertions. W12: warnings-as-errors DONE
   (SWIFT/GCC_TREAT_WARNINGS_AS_ERRORS=YES both configs); version xcconfig, script robustness,
   staged-only gitleaks hook, SHA-pinned actions remain.
 - After wave 4: ko locale + listing-it/uk + release-policy locale check; final adversarial
@@ -136,3 +137,12 @@ Codex GPT-5.5 workers = implementation).
   checklist: lock/call/cable-pull scenarios per ADR 0010) until a physical device session.
 - Known accepted-for-now: replay-tail may rarely duplicate a word across task restarts
   (loss is worse than duplication for ATC) — quantify on the device replay corpus.
+- BUILD GOTCHA: after editing a file already in the test bundle, `xcodebuild build test` can run a
+  STALE bundle (recompiles the file but doesn't relink the new code into the run) — the tell is an
+  unchanged test COUNT or an identical pass/fail set. A `-only-testing:<Suite>` run forces a proper
+  relink; re-run the full suite after and verify the expected test count (e.g. 735) before trusting
+  green. Bit twice in the PBT work (new gate suite not registering; a fixed generator not taking).
+- PBT convention: a shared generator's full output range must satisfy EVERY consumer's preconditions.
+  randomTranscript returning "" tripped the classifier's first-priority insufficientEvidence guard
+  (the gate has no empty guard, so it passed there) — shared generators are non-empty; empty/junk get
+  their own explicit fixtures. Each guard-bearing property carries an exercised-counter reach gate.
