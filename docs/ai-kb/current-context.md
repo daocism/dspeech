@@ -102,12 +102,17 @@ Codex GPT-5.5 workers = implementation).
   comment (0.72 came from a SYNTHETIC 12-clip/3-voice corpus that understates the cross-speaker tail);
   removed dead ATCRelevanceDecision.holdContinuation; extracted enum logName (killed stringify dup);
   storage persist/delete failures now logged not swallowed; pinned urgency-when-filter-disabled +
-  the removeAllCrewMembers privacy wipe. STILL OPEN from the audit: modelPackState vs identifier are
-  two sources of truth (cold-start can disagree — assert+throw); best-of-roster max vs fixed
-  threshold grows false-accept with crew size (N-aware threshold — needs real calibration data); the
-  real-FluidAudio calibration has no CI regression guard; mixed band is vestigial; enrollment-quality
+  the removeAllCrewMembers privacy wipe. RESOLVED since: modelPackState vs identifier two-sources-of-
+  truth now assert+throw on cold-start disagreement (2966ae0); the real-FluidAudio calibration now has
+  a CI regression guard — `scripts/check-speaker-calibration.sh` + the path-filtered `speaker-
+  calibration.yml` lane run the REAL WeSpeaker model over the labeled corpus and FAIL if the cosine
+  separation stops bracketing the thresholds (validated on the GH runner: SAME min 0.820, CROSS max
+  0.599, separable; bounds sameVoiceMinCosine 0.75 / crossVoiceMaxCosine 0.65 in the corpus manifest).
+  STILL OPEN from the audit: best-of-roster max vs fixed threshold grows false-accept with crew size
+  (N-aware threshold — needs real calibration data); mixed band is vestigial; enrollment-quality
   asymmetry + host-checkable FileProtection untested. The 0.72/0.82 thresholds remain PROVISIONAL
-  until re-derived on real device-path audio.
+  until re-derived on real device-path audio (the synthetic-corpus guard catches REGRESSION, not the
+  device-path tail).
 - **Transcript = flight data (D4)**: FileTranscriptStore (JSONL, per-append flush, crash
   recovery, protected files), session history UI + share/export, auto-scroll + jump-to-live,
   Clear-with-confirmation (history retained), suppressed-segment review sheet, demo/hints
