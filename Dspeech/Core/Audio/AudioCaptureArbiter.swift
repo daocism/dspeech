@@ -18,8 +18,17 @@ final class AudioCaptureArbiter {
   static let shared = AudioCaptureArbiter()
 
   private(set) var activeClient: Client?
+  private var preemptionHandlers: [Client: @MainActor () -> Void] = [:]
 
   init() {}
+
+  // why: lets a preemptable client (the level meter) register a teardown invoked the moment it is
+  // preempted, so it stops its OWN engine instead of relying on a UI invariant (MEDIUM-2). Chose
+  // this over "refuse acquire when any client holds": live transcription is the core capability and
+  // must win over the cosmetic meter — refusing would demote the core path to the cosmetic one.
+  func setPreemptionHandler(for client: Client, _ handler: @escaping @MainActor () -> Void) {
+    preemptionHandlers[client] = handler
+  }
 
   // why: live transcription is the product's core capability — it may preempt the level
   // meter (a cosmetic surface), but secondary recorders may never preempt anything.
@@ -41,6 +50,10 @@ final class AudioCaptureArbiter {
         "audio capture preempted previous=\(Client.inputLevelMeter.rawValue, privacy: .public) client=\(client.rawValue, privacy: .public)"
       )
       activeClient = client
+      // why: MEDIUM-2 — preemption used to flip ownership but leave the meter's AVAudioEngine
+      // running, so two engines could tap the shared input. Tear the preempted client down NOW.
+      // Ownership is already reassigned above, so its handler must not call back into release().
+      preemptionHandlers[.inputLevelMeter]?()
       return true
     case .some(let current):
       DspeechLog.audioSession.info(

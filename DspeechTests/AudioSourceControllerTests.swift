@@ -265,19 +265,27 @@ struct AudioSourceControllerTests {
     #expect(arbiter.activeClient == .liveTranscription)
   }
 
-  @Test func stopMeteringAfterLivePreemptionLeavesLiveCaptureHolder() {
+  // why: MEDIUM-2 — live transcription preempting the meter lease must IMMEDIATELY tear the meter
+  // engine down (not wait for a manual stopMetering or rely on a UI invariant), so two
+  // AVAudioEngines never tap the shared input. A late stopMetering must still not yank the lease
+  // out from under the new live holder.
+  @Test func livePreemptionImmediatelyStopsMeterAndKeepsLiveHolder() {
     let arbiter = AudioCaptureArbiter()
     let meter = FakeInputLevelMeter([], finishImmediately: false)
     let controller = makeController(meter: meter, arbiter: arbiter)
 
     controller.startMetering()
     #expect(arbiter.activeClient == .inputLevelMeter)
-    #expect(arbiter.acquire(.liveTranscription))
+    #expect(controller.isMetering)
 
-    controller.stopMetering()
+    #expect(arbiter.acquire(.liveTranscription))
 
     #expect(arbiter.activeClient == .liveTranscription)
     #expect(meter.stopCount >= 1)
+    #expect(!controller.isMetering)
+
+    controller.stopMetering()
+    #expect(arbiter.activeClient == .liveTranscription)
   }
 
   @Test func startMeteringSurfacesFailureAndStopsMetering() async {
