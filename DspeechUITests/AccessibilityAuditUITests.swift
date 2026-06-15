@@ -148,16 +148,33 @@ final class AccessibilityAuditUITests: XCTestCase {
             "A11Y_ACK_CONTRAST|\(screen)|nearly=\(isBorderlineContrast)|id=\(id)|label=\(label)")
           return true
         }
-        // why: the textClipped detector false-positives on the settings Form's wrapped
-        // multiline footnotes (German "Alle ATC-Segmente werden angezeigt." /
-        // "Ohne Rufzeichen…" / the recognition-locale hint) — visually verified intact on
-        // 2026-06-11 via the test's own screenshot attachments, and unchanged by both
-        // fixedSize(vertical:) and explicit full-width frames. Acknowledged+LOGGED on
-        // settings screens only; clipping stays hard-gated everywhere else and every other
-        // audit type stays hard-gated here.
+        // why: the textClipped detector false-positives on text that is SCALED (minimumScaleFactor)
+        // or WRAPPED multiline yet fully readable: the settings Form's footnotes (German "Alle
+        // ATC-Segmente werden angezeigt." / "Ohne Rufzeichen…" / the recognition-locale hint), and
+        // the filtered-review-sheet's scaled reason badge (de "An anderes Luftfahrzeug gerichtet")
+        // + monospaced transcript wrapping in the narrow column beside the Show button. All visually
+        // verified intact via the test's de·AX-XL screenshot attachments. Acknowledged+LOGGED on
+        // those two screens only; clipping stays HARD-gated everywhere else — it correctly caught the
+        // card reason badge before its 2-line wrap fix — and every other audit type stays hard-gated.
         let isClippedText = description.localizedCaseInsensitiveContains("clipped")
-        if isClippedText && screen.hasPrefix("settings") {
+        // the centered empty-state guidance message wraps fully (verified readable) but the detector
+        // still flags it like the settings footnotes; acknowledged by id so clipping stays HARD on the
+        // transcript cards on the same surface.
+        let isEmptyStateMessage = id == "transcript-empty-state"
+        if isClippedText
+          && (screen.hasPrefix("settings") || screen.contains("review sheet")
+            || isEmptyStateMessage)
+        {
           print("A11Y_ACK_CLIPPED|\(screen)|id=\(id)|label=\(label)")
+          return true
+        }
+        // why: the model-pack download bar is a NON-INTERACTIVE ProgressView (queried as a
+        // progressIndicator by DspeechUITests, never tapped). The .hitRegion 44pt rule targets touch
+        // controls, so it false-flags the thin progress bar; acknowledged+LOGGED for that one element
+        // only — hit-region stays hard-gated for every real control.
+        let isHitRegion = description.localizedCaseInsensitiveContains("hit")
+        if isHitRegion && id == "voicefilter-modelpack-progress" {
+          print("A11Y_ACK_HITREGION|\(screen)|non-interactive progress indicator|id=\(id)")
           return true
         }
         print("A11Y_FINDING|\(screen)|\(issue.compactDescription)|id=\(id)|label=\(label)")
@@ -271,5 +288,71 @@ final class AccessibilityAuditUITests: XCTestCase {
     let app = launch(locale: "en", contentSize: Self.xxxLargeType, skipOnboarding: false)
     XCTAssertTrue(app.staticTexts.firstMatch.waitForExistence(timeout: 8))
     audit(app, "onboarding · en · AX-XXXL")
+  }
+
+  // why: gap states where visual defects historically hid (letter-soup reason badges on cards,
+  // the filtered-transmissions pill/review sheet, model-pack download/failed). Capture BEFORE the
+  // audit so the screenshot is attached for eyes-on review even when the objective gate trips.
+
+  @MainActor func testMainTranscriptCardsBadges_de_large() {
+    let app = launch(
+      locale: "de", contentSize: Self.largeType,
+      extra: ["-dspeech.privacy.voicefilter.active.v1", "true", "-dspeech.uitest.scripted-engine"])
+    XCTAssertTrue(app.buttons["start-button"].waitForExistence(timeout: 8))
+    app.buttons["start-button"].tap()
+    XCTAssertTrue(
+      app.staticTexts["Tower N123AB cleared for takeoff"].waitForExistence(timeout: 12),
+      "scripted final transmission card must render")
+    capture(app, "cards-reason-badges-de-AX-XL")
+    audit(app, "main · transcript cards · de · AX-XL")
+  }
+
+  @MainActor func testMainFilteredPillAndReviewSheet_de_large() {
+    let app = launch(
+      locale: "de", contentSize: Self.largeType,
+      extra: ["-dspeech.privacy.voicefilter.active.v1", "true", "-dspeech.uitest.seed-suppressed"])
+    let pill = app.buttons["filtered-transmissions-pill"]
+    XCTAssertTrue(
+      pill.waitForExistence(timeout: 12), "seeded suppressed must surface the filtered pill")
+    capture(app, "filtered-pill-de-AX-XL")
+    audit(app, "main · filtered pill · de · AX-XL")
+    pill.tap()
+    XCTAssertTrue(app.staticTexts.firstMatch.waitForExistence(timeout: 5))
+    capture(app, "filtered-review-sheet-de-AX-XL")
+    audit(app, "main · filtered review sheet · de · AX-XL")
+  }
+
+  @MainActor func testSettingsModelPackDownloading_de_large() {
+    let app = launch(
+      locale: "de", contentSize: Self.largeType,
+      extra: ["-dspeech.voicefilter.modelpack.v1", "acquiringHalf"])
+    app.buttons["settings-button"].tap()
+    XCTAssertTrue(app.buttons["settings-done-button"].waitForExistence(timeout: 8))
+    capture(app, "modelpack-downloading-de-AX-XL")
+    audit(app, "settings · model pack downloading · de · AX-XL")
+  }
+
+  @MainActor func testSettingsModelPackFailed_de_large() {
+    let app = launch(
+      locale: "de", contentSize: Self.largeType,
+      extra: ["-dspeech.voicefilter.modelpack.v1", "failedRetryable"])
+    app.buttons["settings-button"].tap()
+    XCTAssertTrue(app.buttons["settings-done-button"].waitForExistence(timeout: 8))
+    let failed = app.descendants(matching: .any)
+      .matching(identifier: "voicefilter-modelpack-failed").firstMatch
+    var attempts = 0
+    while !failed.exists, attempts < 10 {
+      app.swipeUp()
+      attempts += 1
+    }
+    capture(app, "modelpack-failed-de-AX-XL")
+    audit(app, "settings · model pack failed · de · AX-XL")
+  }
+
+  @MainActor private func capture(_ app: XCUIApplication, _ name: String) {
+    let shot = XCTAttachment(screenshot: app.screenshot())
+    shot.name = name
+    shot.lifetime = .keepAlways
+    add(shot)
   }
 }

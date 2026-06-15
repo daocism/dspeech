@@ -13,7 +13,8 @@
       "containerPath" : "container:Dspeech.xcodeproj",
       "identifier" : "A00000000000000000000012",
       "name" : "Dspeech"
-    }
+    },
+    "userAttachmentLifetime" : "keepAlways"
   },
   "testTargets" : [
     {

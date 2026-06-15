@@ -375,6 +375,9 @@ struct VoiceFilterSettingsSection: View {
         modelPackAcquisition.cancelDownload()
       }
       .buttonStyle(.bordered)
+      // why: on the dark voice-filter card the default blue .bordered tint colours text AND its faint
+      // fill the same hue, failing the contrast audit; white text on the neutral fill is high-contrast.
+      .foregroundStyle(.white)
       .accessibilityIdentifier("voicefilter-modelpack-cancel")
     }
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -457,13 +460,16 @@ struct VoiceFilterSettingsSection: View {
         Button(String(localized: "Retry download")) {
           modelPackAcquisition.startDownload()
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(.borderedProminent)
+        .tint(.cyan)
+        .foregroundStyle(.black)
         .accessibilityIdentifier("voicefilter-modelpack-retry")
       }
       Button(String(localized: "Continue without voice filter")) {
         transition(to: .absent)
       }
       .buttonStyle(.bordered)
+      .foregroundStyle(.white)
       .accessibilityIdentifier("voicefilter-modelpack-continue-without")
     }
     .frame(maxWidth: .infinity, alignment: .leading)
