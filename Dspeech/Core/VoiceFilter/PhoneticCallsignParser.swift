@@ -42,21 +42,6 @@ enum PhoneticCallsignParser {
     "nine": "9", "niner": "9",
   ]
 
-  private static let frenchTokenMap: [String: String] = [
-    "zero": "0",
-    "un": "1", "unite": "1",
-    "deux": "2",
-    "trois": "3",
-    "quatre": "4",
-    "cinq": "5",
-    "six": "6",
-    "sept": "7",
-    "huit": "8",
-    "neuf": "9",
-  ]
-
-  private static let frenchIgnoredTokens: Set<String> = ["decimale", "virgule"]
-
   private static func tokens(from spoken: String, foldDiacritics: Bool) -> [String] {
     let source =
       foldDiacritics
@@ -95,7 +80,7 @@ enum PhoneticCallsignParser {
   }
 
   private static func lookupToken(_ token: String, usesFrench: Bool) -> String? {
-    tokenMap[token] ?? (usesFrench ? frenchTokenMap[token] : nil)
+    tokenMap[token] ?? (usesFrench ? PhoneticAlphabet.frenchDigits[token.uppercased()] : nil)
   }
 
   private static func mappedToken(
@@ -104,7 +89,7 @@ enum PhoneticCallsignParser {
     next: String?,
     usesFrench: Bool
   ) -> String? {
-    if usesFrench, frenchIgnoredTokens.contains(token) {
+    if usesFrench, PhoneticAlphabet.frenchIgnoredTokens.contains(token.uppercased()) {
       return ""
     }
     if token == "oh" {
