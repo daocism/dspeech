@@ -306,6 +306,74 @@ struct WhisperKitLiveTranscriptionEngineTests {
     #expect(WhisperKitLiveTranscriptionEngine.confidence(fromAverageLogProb: -1_000) == 0)
   }
 
+  // why: HIGH-1 regression. On a real device the live engine ALWAYS resamples (hardware input
+  // is 48kHz, never the 16kHz fast path), but that AVAudioConverter path had ZERO coverage — the
+  // [Float] appendSamplesForTesting seam feeds already-16kHz samples straight to the window and
+  // never touches the converter. These drive the REAL converter with real 48kHz PCM buffers and
+  // assert the output is genuinely downsampled (≈ frames*16000/48000, NOT inflated by the prior
+  // re-fed-buffer bug) and non-silent (a constant tone survives resample + stereo downmix).
+  @Test func resamplesFortyEightKMonoBufferToSixteenKWithoutInflation() throws {
+    let engine = Self.makeIdleEngine()
+    let buffer = Self.pcmBuffer(sampleRate: 48_000, channels: 1, frames: 48_000, value: 0.2)
+    let out = try engine.whisperSamplesForTesting(from: buffer)
+    #expect(out.count <= 16_000 + 64, "resample must not inflate (re-fed-buffer duplication)")
+    #expect(out.count >= 12_000, "output must be downsampled toward 16kHz, not passed through")
+    #expect(out.contains { abs($0) > 0.05 }, "constant tone must survive resampling")
+  }
+
+  @Test func resamplesFortyEightKStereoBufferToSixteenKMonoWithoutInflation() throws {
+    let engine = Self.makeIdleEngine()
+    let buffer = Self.pcmBuffer(sampleRate: 48_000, channels: 2, frames: 48_000, value: 0.2)
+    let out = try engine.whisperSamplesForTesting(from: buffer)
+    #expect(out.count <= 16_000 + 64, "stereo resample must not inflate")
+    #expect(out.count >= 12_000, "stereo input must downsample + downmix toward 16kHz mono")
+    #expect(out.contains { abs($0) > 0.05 }, "downmixed constant tone must survive resampling")
+  }
+
+  // why: the converter is now session-persistent (one per format, not per buffer). A second
+  // buffer of the same format must resample stably through the reused converter — proving the
+  // reuse path neither throws nor drifts in length.
+  @Test func reusedResampleConverterStaysStableAcrossBuffers() throws {
+    let engine = Self.makeIdleEngine()
+    let first = try engine.whisperSamplesForTesting(
+      from: Self.pcmBuffer(sampleRate: 48_000, channels: 1, frames: 48_000, value: 0.2))
+    let second = try engine.whisperSamplesForTesting(
+      from: Self.pcmBuffer(sampleRate: 48_000, channels: 1, frames: 48_000, value: 0.2))
+    #expect(second.count <= 16_000 + 64)
+    #expect(second.count >= 12_000)
+    #expect(abs(first.count - second.count) <= 256, "reused converter must not drift in length")
+  }
+
+  private static func makeIdleEngine() -> WhisperKitLiveTranscriptionEngine {
+    WhisperKitLiveTranscriptionEngine(
+      transcriber: FakeWhisperLiveTranscriber { _, _ in [] },
+      installedModelFolderURL: { nil },
+      localeProvider: { "en-US" },
+      authorizer: SpyWhisperAuthorizer(microphoneAllowed: true)
+    )
+  }
+
+  private static func pcmBuffer(
+    sampleRate: Double,
+    channels: AVAudioChannelCount,
+    frames: AVAudioFrameCount,
+    value: Float
+  ) -> AVAudioPCMBuffer {
+    let format = AVAudioFormat(
+      commonFormat: .pcmFormatFloat32,
+      sampleRate: sampleRate,
+      channels: channels,
+      interleaved: false
+    )!
+    let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames)!
+    buffer.frameLength = frames
+    for channel in 0..<Int(channels) {
+      let pointer = buffer.floatChannelData![channel]
+      for frame in 0..<Int(frames) { pointer[frame] = value }
+    }
+    return buffer
+  }
+
   private static func samples(count: Int, value: Float) -> [Float] {
     [Float](repeating: value, count: count)
   }
