@@ -93,6 +93,21 @@ Codex GPT-5.5 workers = implementation).
   (matchesAbbreviated) is DISPLAY-only, so it can't hide a clearance. The lenient tier already
   matches NATO-letter tails in English; the locale fix matters specifically for numeric-tail
   callsigns, where French digit words decode only under fr-FR.
+- **Crew-voice / dispatcher-separation audit + refactor (2026-06-15)**: 6-dimension audit found a
+  hide-a-dispatcher path — the voice-first gate suppressed ANY .pilot before the callsign check, so a
+  controller false-accepted as crew without a callsign was hidden by both layers. FIXED:
+  ATCTranscriptGateConfig.pilotSuppressThreshold (0.82, above the 0.72 SpeakerMatcher match boundary,
+  at the bottom of the measured same-voice range) — gate suppresses crew only at high confidence; the
+  [0.72, 0.82) band falls through to the relevance check and fails OPEN. Also: honest calibration
+  comment (0.72 came from a SYNTHETIC 12-clip/3-voice corpus that understates the cross-speaker tail);
+  removed dead ATCRelevanceDecision.holdContinuation; extracted enum logName (killed stringify dup);
+  storage persist/delete failures now logged not swallowed; pinned urgency-when-filter-disabled +
+  the removeAllCrewMembers privacy wipe. STILL OPEN from the audit: modelPackState vs identifier are
+  two sources of truth (cold-start can disagree — assert+throw); best-of-roster max vs fixed
+  threshold grows false-accept with crew size (N-aware threshold — needs real calibration data); the
+  real-FluidAudio calibration has no CI regression guard; mixed band is vestigial; enrollment-quality
+  asymmetry + host-checkable FileProtection untested. The 0.72/0.82 thresholds remain PROVISIONAL
+  until re-derived on real device-path audio.
 - **Transcript = flight data (D4)**: FileTranscriptStore (JSONL, per-append flush, crash
   recovery, protected files), session history UI + share/export, auto-scroll + jump-to-live,
   Clear-with-confirmation (history retained), suppressed-segment review sheet, demo/hints
