@@ -804,6 +804,32 @@ struct ATCTranscriptGateTests {
     #expect(dec == .suppress(reason: .pilotReadback))
   }
 
+  // why: a numeric tail (N12345) — so ONLY the French digit decode can match it; a letter tail like
+  // "AB" would match via the lenient abbreviation tier even in English, masking the locale effect.
+  @Test func gateMatchesOwnCallSignInFrenchLocale() {
+    var gate = ATCTranscriptGate(configuredCallSign: CallSign(raw: "N12345"))
+    let dec = gate.evaluate(
+      text: "November un deux trois quatre cinq, autorisé à atterrir",
+      speaker: .nonPilot(bestPilotScore: 0.1),
+      timestamp: t0,
+      localeIdentifier: "fr-FR"
+    )
+    #expect(dec == .display(reason: .callSignMatch))
+  }
+
+  // Regression guard for the fix: without the French locale the French digit words don't decode, so
+  // the gate does NOT match our own callsign — the bug that wrongly suppressed French clearances.
+  @Test func gateDoesNotMatchFrenchDigitsWithoutFrenchLocale() {
+    var gate = ATCTranscriptGate(configuredCallSign: CallSign(raw: "N12345"))
+    let dec = gate.evaluate(
+      text: "November un deux trois quatre cinq, autorisé à atterrir",
+      speaker: .nonPilot(bestPilotScore: 0.1),
+      timestamp: t0,
+      localeIdentifier: "en-US"
+    )
+    #expect(dec != .display(reason: .callSignMatch))
+  }
+
   @Test func nonPilotWithCallSignMatchDisplays() {
     var gate = ATCTranscriptGate(configuredCallSign: CallSign(raw: "N123AB"))
     let dec = gate.evaluate(

@@ -427,7 +427,11 @@ final class LiveTranscriptionViewModel {
     let decision = pipeline.decide(
       text: segment.text,
       speaker: speaker ?? .nonPilot(bestPilotScore: 0),
-      timestamp: segment.startedAt
+      timestamp: segment.startedAt,
+      // why: match the configured call sign in the SEGMENT's recognition language, so a French
+      // clearance ("November un deux trois Alpha Bravo") decodes the French digits at the gate —
+      // not only at the card classifier. Empty/English locale keeps the English decode (unchanged).
+      localeIdentifier: segment.sourceLanguageCode
     )
     filterIndicators[segment.id] = decision.indicator
     if case .suppress = decision.relevance {

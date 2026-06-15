@@ -36,6 +36,9 @@ struct ReplayFixture: Decodable, Sendable {
   // classifier paths but are excluded from WER / precision / recall / FDR
   // averages so the gate never compares against fabricated text.
   let audioOnly: Bool?
+  // why: the recognition locale of this fixture's transcript — drives the gate's locale-aware
+  // callsign decode (a French "un deux trois" matches only with fr-FR). nil/absent = English.
+  let locale: String?
 
   var isAudioOnly: Bool { audioOnly ?? false }
 }
@@ -359,7 +362,8 @@ struct ReplayEvaluator: Sendable {
       let decision = pipeline.decide(
         text: fixture.transcript,
         speaker: speaker,
-        timestamp: Date(timeIntervalSince1970: Double(index))
+        timestamp: Date(timeIntervalSince1970: Double(index)),
+        localeIdentifier: fixture.locale
       )
       let actualTranscript = Self.filteredTranscript(
         fixture.transcript,

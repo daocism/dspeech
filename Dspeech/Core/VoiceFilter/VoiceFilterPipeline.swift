@@ -262,14 +262,16 @@ final class VoiceFilterPipeline {
   func decide(
     text: String,
     speaker: SpeakerMatchDecision,
-    timestamp: Date = .now
+    timestamp: Date = .now,
+    localeIdentifier: String? = nil
   ) -> VoiceFilterDecision {
     let relevance: ATCRelevanceDecision
     let indicator: ATCVoiceIndicator
     // why: an urgency broadcast (mayday/pan-pan) is ALWAYS evaluated and shown, even with the filter
     // off; otherwise the gate runs only when the filter is enabled. Both share the same evaluation.
     if ATCTranscriptGate.containsUrgencyBroadcast(in: text) || enabled {
-      relevance = gate.evaluate(text: text, speaker: speaker, timestamp: timestamp)
+      relevance = gate.evaluate(
+        text: text, speaker: speaker, timestamp: timestamp, localeIdentifier: localeIdentifier)
       indicator = Self.indicator(for: speaker, relevance: relevance)
     } else {
       relevance = .display(reason: .filterDisabled)

@@ -43,6 +43,13 @@
       "expectedPilotDiscard": false
     },
     {
+      "fixture": "dispatcher-own.wav",
+      "transcript": "November un deux trois Alpha Bravo, autorisé à atterrir piste deux sept",
+      "expectedTranscriptAfterFilter": "November un deux trois Alpha Bravo, autorisé à atterrir piste deux sept",
+      "expectedPilotDiscard": false,
+      "locale": "fr-FR"
+    },
+    {
       "fixture": "atc-real-img2549.wav",
       "transcript": "",
       "expectedTranscriptAfterFilter": "",
