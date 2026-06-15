@@ -24,6 +24,13 @@ import XCTest
 final class AccessibilityAuditUITests: XCTestCase {
   override func setUpWithError() throws {
     continueAfterFailure = true
+    // why: every test starts portrait. The orientation-capture tests deliberately leave the device
+    // landscape (resetting in their teardown races the screenshot-attachment flush and silently
+    // drops the captures), so the reset belongs here, before the next test launches. setUp runs on
+    // the main thread, so assumeIsolated reaches the MainActor-isolated XCUIDevice safely.
+    MainActor.assumeIsolated {
+      XCUIDevice.shared.orientation = .portrait
+    }
   }
 
   private static let auditTypes: XCUIAccessibilityAuditType = [
@@ -349,8 +356,56 @@ final class AccessibilityAuditUITests: XCTestCase {
     audit(app, "settings · model pack failed · de · AX-XL")
   }
 
+  // why: landscape and iPad (regular size class, 720pt max content width) layouts were never
+  // captured or audited. Capture-only for the eyes-on review — run on an iPhone destination for
+  // portrait+landscape and on an iPad destination for the regular-size-class layouts.
+  @MainActor func testCaptureMainOrientations() {
+    let app = launch(
+      locale: "en",
+      extra: ["-dspeech.privacy.voicefilter.active.v1", "true", "-dspeech.uitest.scripted-engine"])
+    XCTAssertTrue(app.buttons["start-button"].waitForExistence(timeout: 8))
+    app.buttons["start-button"].tap()
+    XCTAssertTrue(
+      app.staticTexts["Tower N123AB cleared for takeoff"].waitForExistence(timeout: 12),
+      "scripted card must render before capture")
+    captureScreen("orient-main-portrait")
+    XCUIDevice.shared.orientation = .landscapeLeft
+    XCTAssertTrue(
+      app.staticTexts["Tower N123AB cleared for takeoff"].waitForExistence(timeout: 6))
+    captureScreen("orient-main-landscape")
+  }
+
+  @MainActor func testCaptureSettingsOrientations() {
+    let app = launch(
+      locale: "en",
+      extra: ["-dspeech.voicefilter.modelpack.v1", "installed", "-dspeech.uitest.seed-crew"])
+    XCTAssertTrue(app.buttons["settings-button"].waitForExistence(timeout: 8))
+    app.buttons["settings-button"].tap()
+    XCTAssertTrue(app.buttons["settings-done-button"].waitForExistence(timeout: 8))
+    captureScreen("orient-settings-portrait")
+    XCUIDevice.shared.orientation = .landscapeLeft
+    let done = app.buttons["settings-done-button"]
+    XCTAssertTrue(done.waitForExistence(timeout: 6))
+    // resolve the ambiguous rotated screenshot: Done must stay within the screen, not clip past
+    // the edge, in landscape (iPad form sheet + iPhone full-screen sheet).
+    XCTAssertTrue(done.isHittable, "Done must be reachable in landscape")
+    XCTAssertLessThanOrEqual(
+      done.frame.maxX, app.frame.maxX + 1, "Done must not clip past the screen edge in landscape")
+    captureScreen("orient-settings-landscape")
+  }
+
   @MainActor private func capture(_ app: XCUIApplication, _ name: String) {
     let shot = XCTAttachment(screenshot: app.screenshot())
+    shot.name = name
+    shot.lifetime = .keepAlways
+    add(shot)
+  }
+
+  // why: XCUIScreen captures the physical display in its CURRENT orientation; app.screenshot()
+  // composites the app element in its portrait coordinate space and renders sideways after a
+  // device rotation. Use this for the orientation captures so landscape shows the real layout.
+  @MainActor private func captureScreen(_ name: String) {
+    let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
     shot.name = name
     shot.lifetime = .keepAlways
     add(shot)
