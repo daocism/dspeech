@@ -371,7 +371,10 @@ struct CallsignDictationServiceTests {
 
   private static func wait(
     for predicate: @MainActor () -> Bool,
-    timeout: Duration = .seconds(5)
+    // why: generous so a CPU-starved CI runner (the documented hosted-runner starvation) doesn't
+    // time out before an async append Task is scheduled — it returns as soon as the condition holds,
+    // so the headroom only costs wall time on a genuine failure, never on the passing path.
+    timeout: Duration = .seconds(60)
   ) async -> Bool {
     let clock = ContinuousClock()
     let deadline = clock.now.advanced(by: timeout)

@@ -150,6 +150,60 @@ struct SpeechActivitySegmenterPropertyTests {
     }
     #expect(exercised >= 180, "too few cases reached the assertion: \(exercised)")
   }
+
+  // The default (router) config flushes a silence-only window at the max window — its latency
+  // ceiling must fire even with no speech, unlike the boundary detector. (Reviewer-identified gap.)
+  @Test func defaultConfigFlushesPureSilenceAtMaxWindow() {
+    var rng = SeededGenerator(seed: 0x5E60_0007)
+    var exercised = 0
+    for _ in 0..<300 {
+      let maxWindow = Double(Int.random(in: 5...15, using: &rng)) / 10
+      let segmenter = EnergySilenceSegmenter(
+        minSpeechSeconds: 0.25, minSilenceSeconds: 0.40, maxWindowSeconds: maxWindow)
+      var cut: SegmentationDecision?
+      var fed = 0.0
+      while fed <= maxWindow + 0.5, cut == nil {
+        let decision = segmenter.update(
+          block: block(seconds: 0.1, amplitude: randomSilenceAmplitude(using: &rng)),
+          sampleRate: segmenterSampleRate)
+        fed += 0.1
+        if decision != .accumulate { cut = decision }
+      }
+      #expect(cut == .cutAtMaxWindow, "default config did not flush silence at max=\(maxWindow)")
+      exercised += 1
+    }
+    #expect(exercised >= 270, "too few cases reached the assertion: \(exercised)")
+  }
+
+  // A sub-minSpeech speech burst (which opens the window, speechSeconds > 0) followed by sustained
+  // silence still closes at the max window — the boundary detector must not STICK on .accumulate
+  // forever. (Reviewer-identified gap; guards a documented prior regression.)
+  @Test func boundaryDetectorSubMinSpeechBurstStillCutsAtMaxWindow() {
+    var rng = SeededGenerator(seed: 0x5E60_0008)
+    var exercised = 0
+    for _ in 0..<300 {
+      let maxWindow = Double(Int.random(in: 8...15, using: &rng)) / 10
+      let segmenter = EnergySilenceSegmenter(
+        minSpeechSeconds: 0.25, minSilenceSeconds: 0.40, maxWindowSeconds: maxWindow,
+        requireSpeechForMaxWindow: true)
+      // one 0.1s speech block: below minSpeech (0.25) but opens the window (speechSeconds > 0)
+      _ = segmenter.update(
+        block: block(seconds: 0.1, amplitude: randomSpeechAmplitude(using: &rng)),
+        sampleRate: segmenterSampleRate)
+      var cut: SegmentationDecision?
+      var fed = 0.1
+      while fed <= maxWindow + 0.5, cut == nil {
+        let decision = segmenter.update(
+          block: block(seconds: 0.1, amplitude: randomSilenceAmplitude(using: &rng)),
+          sampleRate: segmenterSampleRate)
+        fed += 0.1
+        if decision != .accumulate { cut = decision }
+      }
+      #expect(cut == .cutAtMaxWindow, "sub-minSpeech burst stuck (never cut) at max=\(maxWindow)")
+      exercised += 1
+    }
+    #expect(exercised >= 270, "too few cases reached the assertion: \(exercised)")
+  }
 }
 
 // MARK: - Segmenter-specific generators
