@@ -201,6 +201,17 @@ final class LiveTranscriptionViewModel {
     recordPersistenceFailure()
   }
 
+  // why: durability checkpoint for the transcript store's deferred-fsync model — called from the
+  // background hook so the page-cache-durable appends are fsync'd before the app can be suspended.
+  func flushPersistence() {
+    guard let transcriptStore else { return }
+    do {
+      try transcriptStore.flush()
+    } catch {
+      recordPersistenceFailure()
+    }
+  }
+
   func showFilteredTransmission(id: UUID) {
     guard let index = filteredTransmissions.firstIndex(where: { $0.id == id }) else { return }
     let transmission = filteredTransmissions.remove(at: index)
