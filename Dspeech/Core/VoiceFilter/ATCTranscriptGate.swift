@@ -3,10 +3,19 @@ import Foundation
 struct ATCTranscriptGateConfig: Equatable, Sendable, Codable {
   var continuationWindowSeconds: TimeInterval
   var readbackMaxWords: Int
+  // why: suppress a pilot segment as own read-back ONLY at this confidence or above — above the
+  // SpeakerMatcher pilotMatchThreshold (0.72) and at the bottom of the measured same-voice range
+  // (0.82). A voice match in the uncertain band [0.72, 0.82) is NOT hidden before the callsign
+  // check; it falls through to the relevance test and fails open. So a controller false-accepted as
+  // crew is never silently suppressed: a hidden clearance is the one unacceptable failure, while
+  // showing an extra crew read-back is mere noise. The synthetic calibration corpus understates the
+  // real cross-speaker tail, so this margin is deliberate. See the 2026-06-15 crew-voice audit.
+  var pilotSuppressThreshold: Float
 
   static let `default` = ATCTranscriptGateConfig(
     continuationWindowSeconds: 8,
-    readbackMaxWords: 16
+    readbackMaxWords: 16,
+    pilotSuppressThreshold: 0.82
   )
 }
 
@@ -48,10 +57,13 @@ struct ATCTranscriptGate: Sendable {
     case .insufficientSpeech:
       DspeechLog.voiceFilter.debug("atc transcript gate display reason=insufficientSpeech")
       return .display(reason: .insufficientSpeech)
-    case .pilot:
+    case .pilot(let score) where score >= config.pilotSuppressThreshold:
       DspeechLog.voiceFilter.debug("atc transcript gate suppress reason=pilotReadback")
       return .suppress(reason: .pilotReadback)
-    case .nonPilot, .mixed:
+    case .pilot, .nonPilot, .mixed:
+      // why: a pilot match below the suppress threshold is not confident enough to hide as own
+      // read-back — suppressing it before the callsign check could hide a controller false-accepted
+      // as crew (a hidden clearance). Fall through to the relevance check and fail open.
       break
     }
 
