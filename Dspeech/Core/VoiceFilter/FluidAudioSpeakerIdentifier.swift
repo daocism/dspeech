@@ -138,19 +138,8 @@ struct FluidAudioSpeakerIdentifier: LocalSpeakerIdentifier {
       profiles: profiles,
       config: matchConfig
     )
-    let decisionKind: String
-    switch decision {
-    case .pilot:
-      decisionKind = "pilot"
-    case .nonPilot:
-      decisionKind = "nonPilot"
-    case .mixed:
-      decisionKind = "mixed"
-    case .insufficientSpeech:
-      decisionKind = "insufficientSpeech"
-    }
     DspeechLog.modelPack.debug(
-      "fluid audio classification succeeded decision=\(decisionKind, privacy: .public)"
+      "fluid audio classification succeeded decision=\(decision.logName, privacy: .public)"
     )
     return decision
   }
