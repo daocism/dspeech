@@ -1,0 +1,57 @@
+name: Speaker calibration guard
+
+# why: the crew-vs-dispatcher separation rests entirely on the REAL FluidAudio WeSpeaker cosine gap
+# that sets SpeakerMatchConfig pilotMatch 0.72 / ATCTranscriptGate pilotSuppress 0.82. That gap was
+# measured once by a print-only CLI and never re-checked in CI — a FluidAudio/extraction change could
+# silently collapse it and the app would mis-classify crew as dispatcher (or the reverse). This lane
+# re-runs the real model over the labeled corpus and FAILS if the separation no longer brackets the
+# thresholds. It is path-filtered to the speaker-ID surface (rarely changes) and runs PR + main +
+# manual only — never per feature-branch push — to respect the 10x macOS CI-minute multiplier.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'Dspeech/Core/VoiceFilter/SpeakerMatcher.swift'
+      - 'Dspeech/Core/VoiceFilter/FluidAudioSpeakerIdentifier.swift'
+      - 'Dspeech/Core/VoiceFilter/PilotVoiceProfile.swift'
+      - 'Dspeech/Tools/SpeakerEval/**'
+      - 'scripts/testdata/voice-corpus.json'
+      - 'scripts/testdata/generate-voice-corpus.sh'
+      - 'scripts/check-speaker-calibration.sh'
+      - '.github/workflows/speaker-calibration.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'Dspeech/Core/VoiceFilter/SpeakerMatcher.swift'
+      - 'Dspeech/Core/VoiceFilter/FluidAudioSpeakerIdentifier.swift'
+      - 'Dspeech/Core/VoiceFilter/PilotVoiceProfile.swift'
+      - 'Dspeech/Tools/SpeakerEval/**'
+      - 'scripts/testdata/voice-corpus.json'
+      - 'scripts/testdata/generate-voice-corpus.sh'
+      - 'scripts/check-speaker-calibration.sh'
+      - '.github/workflows/speaker-calibration.yml'
+
+concurrency:
+  group: speaker-calibration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  calibration:
+    name: Real-FluidAudio separation guard
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        with:
+          persist-credentials: false
+
+      - name: Select latest Xcode 26
+        run: scripts/ci/select-xcode26.sh
+
+      - name: Install ffmpeg (corpus radio/overlap rendering)
+        run: brew install ffmpeg
+
+      - name: Run real-model separation guard
+        run: scripts/check-speaker-calibration.sh
