@@ -44,6 +44,9 @@ struct ContentView: View {
       } catch {
         persistentTranscriptStore = nil
         transcriptStoreUnavailable = true
+        DspeechLog.persistence.error(
+          "transcript store init failed error=\(String(describing: error), privacy: .private)"
+        )
       }
     }
     let filter: VoiceFilterPipeline
