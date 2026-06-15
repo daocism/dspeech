@@ -5,17 +5,21 @@ struct SpeakerMatchConfig: Equatable, Sendable, Codable {
   var pilotMatchThreshold: Float
   var mixedSpeakerLowerBound: Float
 
-  // why: calibrated against the REAL FluidAudio WeSpeaker model over the controlled labeled
-  // corpus (2026-06-13, `swift run SpeakerEval calibrate tmp/voice-corpus
-  // scripts/testdata/voice-corpus.json`). Measured raw cosine (1 - FluidAudio cosineDistance):
+  // PROVISIONAL calibration against the FluidAudio WeSpeaker model over a SYNTHETIC corpus
+  // (2026-06-13, `swift run SpeakerEval calibrate ... scripts/testdata/voice-corpus.json`): 12
+  // macOS `say` clips from 3 built-in voices — clean, single-session TTS, NOT real human voices
+  // through the device/VHF path. Measured raw cosine (1 - FluidAudio cosineDistance):
   //   SAME-voice  0.820 … 0.969 (mean 0.901)
   //   CROSS-voice 0.095 … 0.599 (mean 0.233)
-  // A clean, wide gap (0.60 → 0.82). pilotMatchThreshold 0.72 sits safely ABOVE every observed
-  // cross-speaker score (never call another speaker crew) and BELOW every same-speaker score
-  // (always catch enrolled crew). A confident match to ANY enrolled profile means own-side crew —
-  // the whole roster is own-side, so no second-best separation is needed. minQuality 0.25 correctly
-  // rejects noisy received-ATC embeddings (measured quality 0.137–0.204) so they fail open (shown)
-  // rather than mis-classify; the operator's own clean read-back clears it.
+  // The gap looks wide, but the corpus has none of the real within-speaker spread (separate
+  // sessions, headset/mic change, VHF band-limiting + AM noise, stressed speech) and only 3 voices,
+  // so it almost certainly UNDERSTATES the cross-speaker tail. So pilotMatchThreshold 0.72 is the
+  // MATCH (badge) boundary only; SUPPRESSION uses a higher, separate gate threshold
+  // (ATCTranscriptGateConfig.pilotSuppressThreshold 0.82) that biases toward never hiding a
+  // dispatcher. minQuality 0.25 rejects noisy received-ATC embeddings (measured 0.137–0.204) so
+  // they fail open (shown) rather than mis-classify. Follow-up: re-derive against real voices
+  // through the device path, reporting measured false-accept/false-reject at the thresholds
+  // (audit 2026-06-15).
   static let `default` = SpeakerMatchConfig(
     minQuality: 0.25,
     pilotMatchThreshold: 0.72,

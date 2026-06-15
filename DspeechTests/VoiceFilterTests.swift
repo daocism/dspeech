@@ -874,7 +874,8 @@ struct ATCTranscriptGateTests {
 
   @Test func displayedContinuationRefreshesRelevanceWindow() {
     var gate = ATCTranscriptGate(
-      config: ATCTranscriptGateConfig(continuationWindowSeconds: 5, readbackMaxWords: 16),
+      config: ATCTranscriptGateConfig(
+        continuationWindowSeconds: 5, readbackMaxWords: 16, pilotSuppressThreshold: 0.82),
       configuredCallSign: CallSign(raw: "N123AB")
     )
     let first = gate.evaluate(
@@ -943,7 +944,8 @@ struct ATCTranscriptGateTests {
   ) {
     let detector: @Sendable (String) -> Bool = { _ in true }
     var gate = ATCTranscriptGate(
-      config: ATCTranscriptGateConfig(continuationWindowSeconds: 0, readbackMaxWords: 1),
+      config: ATCTranscriptGateConfig(
+        continuationWindowSeconds: 0, readbackMaxWords: 1, pilotSuppressThreshold: 0.82),
       configuredCallSign: CallSign(raw: "N123AB"),
       otherCallSignDetector: detector
     )

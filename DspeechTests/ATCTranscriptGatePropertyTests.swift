@@ -50,10 +50,11 @@ struct ATCTranscriptGatePropertyTests {
     #expect(exercised >= 270, "too few cases reached the assertion: \(exercised)")
   }
 
-  // The crew's own voice is suppressed before any callsign check (voice-first), for any
-  // non-urgency text, callsign config, and locale.
-  @Test func pilotIsAlwaysSuppressedOnNonUrgencyText() {
+  // The crew's own voice is suppressed before any callsign check (voice-first) WHEN the match is
+  // confident (>= pilotSuppressThreshold), for any non-urgency text, callsign config, and locale.
+  @Test func confidentPilotIsSuppressedOnNonUrgencyText() {
     var rng = SeededGenerator(seed: 0x0A11_0003)
+    let suppress = ATCTranscriptGateConfig.default.pilotSuppressThreshold
     var exercised = 0
     for _ in 0..<300 {
       let callsign =
@@ -61,12 +62,36 @@ struct ATCTranscriptGatePropertyTests {
       let locale = locales.randomElement(using: &rng)!
       var gate = ATCTranscriptGate(configuredCallSign: callsign)
       let decision = gate.evaluate(
-        text: randomTranscript(using: &rng), speaker: .pilot(score: randomScore(using: &rng)),
+        text: randomTranscript(using: &rng),
+        speaker: .pilot(score: Float.random(in: suppress...1, using: &rng)),
         timestamp: t0, localeIdentifier: locale)
       #expect(decision == .suppress(reason: .pilotReadback))
       exercised += 1
     }
-    #expect(exercised >= 270, "too few cases reached the assertion: \(exercised)")
+    #expect(exercised >= 300, "too few cases reached the assertion: \(exercised)")
+  }
+
+  // SAFETY: a pilot match BELOW the suppress threshold is not confident enough to hide — it falls
+  // through to the relevance check instead of being suppressed before the callsign check. With no
+  // callsign anchor it fails OPEN (shown), so a controller false-accepted as crew in the uncertain
+  // band is never silently hidden. (2026-06-15 audit fix.)
+  @Test func uncertainPilotBelowSuppressThresholdFailsOpen() {
+    var rng = SeededGenerator(seed: 0x0A11_0009)
+    let suppress = ATCTranscriptGateConfig.default.pilotSuppressThreshold
+    var exercised = 0
+    for _ in 0..<300 {
+      let locale = locales.randomElement(using: &rng)!
+      var gate = ATCTranscriptGate(configuredCallSign: nil)
+      let decision = gate.evaluate(
+        text: randomTranscript(using: &rng),
+        speaker: .pilot(score: Float.random(in: 0..<suppress, using: &rng)),
+        timestamp: t0, localeIdentifier: locale)
+      #expect(
+        decision == .display(reason: .noCallSignConfigured),
+        "uncertain pilot should fail open, got \(decision)")
+      exercised += 1
+    }
+    #expect(exercised >= 300, "too few cases reached the assertion: \(exercised)")
   }
 
   // With no callsign anchor, every non-pilot transmission is shown (fail-open) — the app cannot

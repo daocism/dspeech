@@ -125,7 +125,9 @@ struct TransmissionClassifierPropertyTests {
       let lead = noiseWords.randomElement(using: &rng)!
       let text = "\(lead) \(cs.normalized)"
       let locale = locales.randomElement(using: &rng)!
-      let pilot = SpeakerMatchDecision.pilot(score: randomScore(using: &rng))
+      // confident crew match: the gate suppresses only at/above its suppress threshold.
+      let suppress = ATCTranscriptGateConfig.default.pilotSuppressThreshold
+      let pilot = SpeakerMatchDecision.pilot(score: Float.random(in: suppress...1, using: &rng))
 
       var gate = ATCTranscriptGate(configuredCallSign: cs)
       let gated = gate.evaluate(
