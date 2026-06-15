@@ -85,10 +85,18 @@ struct UserDefaultsVoiceFilterStorage: VoiceFilterStorage, @unchecked Sendable {
 
   let defaults: UserDefaults
   let profileStoreURL: URL
+  // why: injectable so a test can spy the data-at-rest protection request (the Simulator does not
+  // enforce FileProtection, so the only way to assert it is to observe the setAttributes call).
+  let fileManager: FileManager
 
-  init(defaults: UserDefaults = .standard, profileStoreURL: URL? = nil) {
+  init(
+    defaults: UserDefaults = .standard,
+    profileStoreURL: URL? = nil,
+    fileManager: FileManager = .default
+  ) {
     self.defaults = defaults
     self.profileStoreURL = profileStoreURL ?? Self.defaultProfileStoreURL()
+    self.fileManager = fileManager
   }
 
   func loadProfiles() -> [PilotVoiceProfile] {
@@ -110,9 +118,9 @@ struct UserDefaultsVoiceFilterStorage: VoiceFilterStorage, @unchecked Sendable {
   }
 
   func deleteAllProfiles() {
-    if FileManager.default.fileExists(atPath: profileStoreURL.path) {
+    if fileManager.fileExists(atPath: profileStoreURL.path) {
       do {
-        try FileManager.default.removeItem(at: profileStoreURL)
+        try fileManager.removeItem(at: profileStoreURL)
       } catch {
         // why: a silent delete failure leaves personal voiceprints on disk after the user removed
         // the feature (a privacy/data-retention leak) — surface it rather than swallow (audit).
@@ -245,7 +253,7 @@ struct UserDefaultsVoiceFilterStorage: VoiceFilterStorage, @unchecked Sendable {
   private func loadProfilesFromFileOrMigratedDefaults(
     decoder: JSONDecoder
   ) -> (profiles: [PilotVoiceProfile], issues: [VoiceFilterStorageIssue]) {
-    if FileManager.default.fileExists(atPath: profileStoreURL.path) {
+    if fileManager.fileExists(atPath: profileStoreURL.path) {
       do {
         let data = try Data(contentsOf: profileStoreURL)
         return (try decoder.decode([PilotVoiceProfile].self, from: data), [])
@@ -271,7 +279,7 @@ struct UserDefaultsVoiceFilterStorage: VoiceFilterStorage, @unchecked Sendable {
   private func persistProfiles(_ profiles: [PilotVoiceProfile]) throws {
     let data = try JSONEncoder().encode(profiles)
     let directory = profileStoreURL.deletingLastPathComponent()
-    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
     try data.write(to: profileStoreURL, options: .atomic)
     try applyVoiceProfileFileAttributes(to: profileStoreURL)
   }
@@ -281,7 +289,7 @@ struct UserDefaultsVoiceFilterStorage: VoiceFilterStorage, @unchecked Sendable {
     var values = URLResourceValues()
     values.isExcludedFromBackup = true
     #if os(iOS)
-      try FileManager.default.setAttributes(
+      try fileManager.setAttributes(
         [.protectionKey: FileProtectionType.complete],
         ofItemAtPath: url.path
       )
