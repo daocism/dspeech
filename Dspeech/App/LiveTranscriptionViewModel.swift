@@ -34,7 +34,6 @@ final class LiveTranscriptionViewModel {
   private(set) var filteredTransmissions: [Transmission] = []
   private(set) var partialText: String = ""
   private(set) var status: LiveTranscriptionStatus = .idle
-  private(set) var filterIndicators: [UUID: ATCVoiceIndicator] = [:]
   private(set) var suppressedSegmentIDs: Set<UUID> = []
   private(set) var translations: [UUID: String] = [:]
   private(set) var translationFailure: TranslationFailure?
@@ -56,6 +55,16 @@ final class LiveTranscriptionViewModel {
   private let translationTarget: @MainActor () -> Locale.Language?
   private let now: @MainActor () -> Date
   private let transmissionTickNanoseconds: UInt64
+  // why: cap on the RAM-resident transmission cards (the disk store keeps the full record). Far
+  // above the 500 visible-segment cap so live scrollback never hits the eviction boundary; older
+  // content lives in Session History.
+  private let transmissionWindowLimit: Int
+  // why: displayable segments already EVICTED from the RAM window — added so
+  // olderSegmentCountInHistory reflects the full on-disk record, not just resident segments.
+  private var evictedDisplayableSegmentCount = 0
+  // why: segment.id -> owning transmission.id. Eviction drops a segment's derived state only when
+  // the transmission that owns it is itself evicted, never stripping a still-retained card's data.
+  private var segmentOwner: [UUID: UUID] = [:]
   private var eventTask: Task<Void, Never>?
   private var transmissionTickTask: Task<Void, Never>?
   private var transmissionAssembler: TransmissionAssembler?
@@ -82,7 +91,8 @@ final class LiveTranscriptionViewModel {
     translator: (any TranslationService)? = nil,
     translationTarget: @escaping @MainActor () -> Locale.Language? = { nil },
     now: @escaping @MainActor () -> Date = { Date() },
-    transmissionTickNanoseconds: UInt64 = 500_000_000
+    transmissionTickNanoseconds: UInt64 = 500_000_000,
+    transmissionWindowLimit: Int = 2_000
   ) {
     self.engine = engine
     self.transcriptStore = transcriptStore
@@ -95,6 +105,7 @@ final class LiveTranscriptionViewModel {
     self.translationTarget = translationTarget
     self.now = now
     self.transmissionTickNanoseconds = transmissionTickNanoseconds
+    self.transmissionWindowLimit = transmissionWindowLimit
     self.hasEverStarted = firstSessionStorage.loadHasEverStarted()
     self.hasShownNoAnchorHint = noAnchorHintStorage.loadHasShownNoAnchorHint()
   }
@@ -106,11 +117,9 @@ final class LiveTranscriptionViewModel {
   }
 
   var olderSegmentCountInHistory: Int {
-    max(displayableSegments.count - Self.visibleSegmentLimit, 0)
-  }
-
-  func indicator(for segment: TranscriptSegment) -> ATCVoiceIndicator? {
-    filterIndicators[segment.id]
+    // why: include displayable segments already EVICTED from the RAM window so this reflects the
+    // full on-disk record (evicted + resident), not just what is currently in memory.
+    max(evictedDisplayableSegmentCount + displayableSegments.count - Self.visibleSegmentLimit, 0)
   }
 
   var voiceFilterCapability: VoiceFilterCapability? {
@@ -184,8 +193,9 @@ final class LiveTranscriptionViewModel {
     transmissionAssembler = nil
     partialText = ""
     oneTimeNoAnchorHintVisible = false
-    filterIndicators.removeAll()
     suppressedSegmentIDs.removeAll()
+    segmentOwner.removeAll()
+    evictedDisplayableSegmentCount = 0
     clearTranslations()
   }
 
@@ -216,12 +226,14 @@ final class LiveTranscriptionViewModel {
     guard let index = filteredTransmissions.firstIndex(where: { $0.id == id }) else { return }
     let transmission = filteredTransmissions.remove(at: index)
     displayedTransmissions.append(transmission)
+    evictOldestTransmissions(from: &displayedTransmissions)
   }
 
   func unhideAllSuppressedSegments() {
     suppressedSegmentIDs.removeAll()
     displayedTransmissions.append(contentsOf: filteredTransmissions)
     filteredTransmissions.removeAll()
+    evictOldestTransmissions(from: &displayedTransmissions)
   }
 
   func clearTranslations() {
@@ -379,18 +391,64 @@ final class LiveTranscriptionViewModel {
   }
 
   private func upsertTransmission(_ transmission: Transmission) {
-    displayedTransmissions.removeAll { $0.id == transmission.id }
-    filteredTransmissions.removeAll { $0.id == transmission.id }
+    // why: an open transmission is upserted every tick; scanning BOTH arrays to remove its prior
+    // copy was O(n) per tick. The hot path (updating the still-open transmission, which sits at the
+    // tail of its array) is now O(1); only a rare reclassification falls back to a full scan.
+    removeExistingTransmission(id: transmission.id)
     let display = compactingCallSign(in: transmission)
     guard !display.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
       return
     }
+    for segment in display.segments { segmentOwner[segment.id] = display.id }
     switch display.classification {
     case .displayed:
       displayedTransmissions.append(display)
+      evictOldestTransmissions(from: &displayedTransmissions)
     case .filtered:
       filteredTransmissions.append(display)
+      evictOldestTransmissions(from: &filteredTransmissions)
     }
+  }
+
+  private func removeExistingTransmission(id: UUID) {
+    if displayedTransmissions.last?.id == id {
+      displayedTransmissions.removeLast()
+    } else if filteredTransmissions.last?.id == id {
+      filteredTransmissions.removeLast()
+    } else if displayedTransmissions.contains(where: { $0.id == id }) {
+      displayedTransmissions.removeAll { $0.id == id }
+    } else {
+      filteredTransmissions.removeAll { $0.id == id }
+    }
+  }
+
+  // why: cap the RAM-resident card list (the disk store keeps the full record). Evict oldest-first
+  // and cascade to each evicted card's segments + per-segment derived state, so the bound is real
+  // rather than cosmetic. Older content remains available through Session History.
+  private func evictOldestTransmissions(from transmissions: inout [Transmission]) {
+    while transmissions.count > transmissionWindowLimit {
+      evictDerivedState(for: transmissions.removeFirst())
+    }
+  }
+
+  private func evictDerivedState(for transmission: Transmission) {
+    // why: only drop a segment whose CURRENT owner is the transmission being evicted — never strip
+    // state still referenced by a retained card (1:1 ownership today; the guard is insurance).
+    let evictableIDs = transmission.segments.map(\.id).filter {
+      segmentOwner[$0] == transmission.id
+    }
+    guard !evictableIDs.isEmpty else { return }
+    let evictableSet = Set(evictableIDs)
+    for id in evictableIDs {
+      if !suppressedSegmentIDs.contains(id) { evictedDisplayableSegmentCount += 1 }
+      suppressedSegmentIDs.remove(id)
+      translations[id] = nil
+      translationTasks[id]?.cancel()
+      translationTasks[id] = nil
+      translationTaskTokens[id] = nil
+      segmentOwner[id] = nil
+    }
+    segments.removeAll { evictableSet.contains($0.id) }
   }
 
   // why: DISPLAY the operator's own call sign as the compact registration ("A123B"), not its
@@ -444,19 +502,18 @@ final class LiveTranscriptionViewModel {
       // not only at the card classifier. Empty/English locale keeps the English decode (unchanged).
       localeIdentifier: segment.sourceLanguageCode
     )
-    filterIndicators[segment.id] = decision.indicator
     if case .suppress = decision.relevance {
       suppressedSegmentIDs.insert(segment.id)
     }
   }
 
   private func clearDerivedState(for id: UUID) {
-    filterIndicators[id] = nil
     suppressedSegmentIDs.remove(id)
     translations[id] = nil
     translationTasks[id]?.cancel()
     translationTasks[id] = nil
     translationTaskTokens[id] = nil
+    segmentOwner[id] = nil
   }
 
   private func startObservingEvents() {
@@ -616,7 +673,6 @@ final class LiveTranscriptionViewModel {
           localeIdentifier: "en-US"
         )
       ]
-      filterIndicators = [segment.id: .otherTrafficSuppressed]
       suppressedSegmentIDs = [segment.id]
       // why: in-memory only — persisting the flag from a UI-test seed would leak
       // first-run state across UI tests and make them order-dependent.
