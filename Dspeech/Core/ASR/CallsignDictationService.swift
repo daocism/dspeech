@@ -360,7 +360,12 @@ private final class AppleCallsignSpeechRecognizer: CallsignSpeechRecognizing {
     request.contextualStrings = contextualStrings
     self.request = request
 
-    let task = recognizer.recognitionTask(with: request) { result, error in
+    // why: @Sendable is load-bearing. This closure is formed in a @MainActor type, so a bare
+    // literal inherits @MainActor isolation; SFSpeech delivers the resultHandler on a private
+    // (not main) queue, so a @MainActor closure trips swift_task_isCurrentExecutor →
+    // dispatch_assert_queue_fail (EXC_BREAKPOINT) on the first callback. @Sendable forces it
+    // nonisolated; it hops to the MainActor via onUpdate's Task. Mirrors the live engine.
+    let task = recognizer.recognitionTask(with: request) { @Sendable result, error in
       let text = result?.bestTranscription.formattedString
       let hardError = Self.hardError(from: error)
       onUpdate(
