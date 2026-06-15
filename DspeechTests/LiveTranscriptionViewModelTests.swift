@@ -333,13 +333,13 @@ struct LiveTranscriptionViewModelTests {
 
     let pilotReadback = makeSegment("November one two three alpha bravo cleared for takeoff")
     engine.push(.segment(pilotReadback, speaker: .pilot(score: 0.95)))
-    await wait(for: { vm.indicator(for: pilotReadback) == .pilotSuppressed })
-    #expect(vm.indicator(for: pilotReadback) == .pilotSuppressed)
+    await wait(for: { vm.suppressedSegmentIDs.contains(pilotReadback.id) })
+    #expect(vm.suppressedSegmentIDs.contains(pilotReadback.id))
 
     let controller = makeSegment("November one two three alpha bravo descend three thousand")
     engine.push(.segment(controller, speaker: .nonPilot(bestPilotScore: 0.1)))
-    await wait(for: { vm.indicator(for: controller) != nil })
-    #expect(vm.indicator(for: controller) != .pilotSuppressed)
+    await wait(for: { vm.segments.contains { $0.id == controller.id } })
+    #expect(!vm.suppressedSegmentIDs.contains(controller.id))
   }
 
   @Test func noAnchorHintShowsOnceAcrossViewModels() async {
@@ -387,7 +387,7 @@ struct LiveTranscriptionViewModelTests {
     #expect(vm.segments.count == 1)
     #expect(vm.visibleSegments.isEmpty)
     if let stored = vm.segments.first {
-      #expect(vm.indicator(for: stored) == .otherTrafficSuppressed)
+      #expect(vm.suppressedSegmentIDs.contains(stored.id))
     } else {
       Issue.record("expected stored suppressed segment")
     }
@@ -411,7 +411,7 @@ struct LiveTranscriptionViewModelTests {
 
     #expect(vm.visibleSegments.first?.text == "N123AB descend and maintain three thousand")
     if let stored = vm.visibleSegments.first {
-      #expect(vm.indicator(for: stored) == .dispatcherAddressedOwnCallSign)
+      #expect(!vm.suppressedSegmentIDs.contains(stored.id))
     } else {
       Issue.record("expected visible segment")
     }
@@ -750,7 +750,79 @@ struct LiveTranscriptionViewModelTests {
     #expect(vm.visibleSegments.last?.text == "Transmission 10049")
   }
 
-  @Test func unhideAllSuppressedSegmentsKeepsIndicators() async throws {
+  @Test func ramCollectionsAreWindowedWhileOlderHistoryStaysTruthful() async {
+    let engine = FakeEngine()
+    let store = FakeTranscriptStore()
+    var clock = Date(timeIntervalSince1970: 0)
+    let vm = LiveTranscriptionViewModel(
+      engine: engine,
+      transcriptStore: store,
+      // why: advance the clock past the transmission gap per segment so each becomes its own card;
+      // a huge tick interval keeps the tick loop dormant so the count is driven only by pushes.
+      now: {
+        defer { clock = clock.addingTimeInterval(10) }
+        return clock
+      },
+      transmissionTickNanoseconds: 3_600_000_000_000,
+      transmissionWindowLimit: 3
+    )
+    await vm.start()
+
+    for index in 0..<600 {
+      engine.push(.segment(makeSegment("Transmission \(index)"), speaker: nil))
+    }
+    #expect(await wait(for: { vm.displayedTransmissions.count == 3 && vm.segments.count == 3 }))
+
+    // every retained collection stays bounded by the window — the cap is real, not cosmetic
+    #expect(vm.displayedTransmissions.count == 3)
+    #expect(vm.filteredTransmissions.isEmpty)
+    #expect(vm.segments.count == 3)
+    #expect(vm.translations.isEmpty)
+    #expect(vm.suppressedSegmentIDs.isEmpty)
+
+    // truthful older-count across eviction: all 600 pushed segments are displayable
+    #expect(vm.olderSegmentCountInHistory == 600 - 500)
+
+    // no data loss: the store retains the closed transmissions evicted from RAM
+    #expect(store.appendedTransmissions.count >= 500)
+  }
+
+  @Test func evictionDropsSuppressionStateForEvictedSegments() async {
+    let engine = FakeEngine()
+    let storage = VoiceFilterMemoryStorage()
+    storage.enabled = true
+    storage.callSign = CallSign(raw: "N123AB")
+    let pipeline = VoiceFilterPipeline(
+      identifier: UnavailableLocalSpeakerIdentifier(),
+      storage: storage
+    )
+    var clock = Date(timeIntervalSince1970: 0)
+    let vm = LiveTranscriptionViewModel(
+      engine: engine,
+      voiceFilter: pipeline,
+      now: {
+        defer { clock = clock.addingTimeInterval(10) }
+        return clock
+      },
+      transmissionTickNanoseconds: 3_600_000_000_000,
+      transmissionWindowLimit: 3
+    )
+    await vm.start()
+
+    // why: a proven non-matching call sign (suppressed → filtered); makeSegment mints a fresh id
+    // per call, so identical text across time-separated transmissions still yields distinct cards.
+    for _ in 0..<8 {
+      engine.push(.segment(makeSegment("United 247 contact ground point niner"), speaker: nil))
+    }
+    #expect(await wait(for: { vm.filteredTransmissions.count == 3 }))
+
+    // suppressed cards are windowed too, and the derived suppression set never outgrows the window
+    #expect(vm.filteredTransmissions.count == 3)
+    #expect(vm.segments.count == 3)
+    #expect(vm.suppressedSegmentIDs.count <= 3)
+  }
+
+  @Test func unhideAllSuppressedSegmentsMakesThemVisible() async {
     let engine = FakeEngine()
     let storage = VoiceFilterMemoryStorage()
     storage.enabled = true
@@ -765,13 +837,11 @@ struct LiveTranscriptionViewModelTests {
     engine.push(.segment(makeSegment("United 247 contact ground point niner"), speaker: nil))
     engine.push(.segment(makeSegment("Delta 45 monitor tower"), speaker: nil))
     #expect(await wait(for: { vm.suppressedSegmentIDs.count == 2 }))
-    let first = try #require(vm.segments.first)
 
     vm.unhideAllSuppressedSegments()
 
     #expect(vm.suppressedSegmentIDs.isEmpty)
     #expect(vm.visibleSegments.count == 2)
-    #expect(vm.indicator(for: first) == .otherTrafficSuppressed)
   }
 
   // MARK: - Translation orchestration (F3)
