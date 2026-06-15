@@ -13,9 +13,10 @@ struct TranscriptSessionSummary: Identifiable, Equatable, Sendable, Codable {
 }
 
 // why: the transcript is flight data (D4 in the 2026-06-11 spec). Losing it on app kill,
-// jetsam, or crash is data loss, so every finalized segment is persisted as it arrives and
-// sessions are recoverable after relaunch. Implementations must be safe to call on every
-// ASR final without blocking the MainActor render path.
+// jetsam, or crash is data loss, so every finalized segment is WRITTEN as it arrives (the
+// bytes survive app-kill/jetsam/crash via the page cache, and recovery tolerates a torn tail).
+// Durability against power-loss/panic is checkpointed — not per-append — via flush() (wired to
+// the background hook) and endSession, so appends never fsync on the MainActor render path.
 @MainActor
 protocol TranscriptStoring {
   @discardableResult
@@ -24,6 +25,9 @@ protocol TranscriptStoring {
   func updateOpen(_ transmission: Transmission, in sessionID: UUID) throws
   func append(_ transmission: Transmission, to sessionID: UUID) throws
   func endSession(_ sessionID: UUID) throws
+  // why: fsync the active session's open handles at a checkpoint (app backgrounding) so the
+  // page-cache-durable appends also survive power-loss/panic, without an fsync per append.
+  func flush() throws
   func sessions() throws -> [TranscriptSessionSummary]
   func segments(in sessionID: UUID) throws -> [TranscriptSegment]
   func transmissions(in sessionID: UUID) throws -> [Transmission]
@@ -117,7 +121,6 @@ final class FileTranscriptStore: TranscriptStoring {
       let handle = try segmentAppendHandle(for: sessionID)
       try handle.write(contentsOf: line)
       try handle.write(contentsOf: Self.newline)
-      try handle.synchronize()
     } catch let error as TranscriptStoreError {
       logAppendFailure(sessionID: sessionID, error: error)
       throw error
@@ -133,7 +136,11 @@ final class FileTranscriptStore: TranscriptStoring {
       try ensureSessionExists(sessionID)
       let data = try encodeTransmissionLine(transmission)
       let fileURL = openTransmissionURL(for: sessionID)
-      try data.write(to: fileURL, options: .atomic)
+      // why: NOT .atomic — the open-transmission scratch is a best-effort live snapshot rewritten
+      // every ~500ms; .atomic implies a per-tick fsync on the MainActor. A non-atomic write can be
+      // torn by a crash, but transmissions() skips an undecodable scratch and the CLOSED log is the
+      // durable record, so atomicity buys nothing here worth the recurring main-thread stall.
+      try data.write(to: fileURL)
       try applyProtection(to: fileURL)
     } catch let error as TranscriptStoreError {
       logAppendFailure(sessionID: sessionID, error: error)
@@ -153,7 +160,6 @@ final class FileTranscriptStore: TranscriptStoring {
       let handle = try transmissionAppendHandle(for: sessionID)
       try handle.write(contentsOf: line)
       try handle.write(contentsOf: Self.newline)
-      try handle.synchronize()
       try removeOpenTransmissionIfPresent(for: sessionID)
     } catch let error as TranscriptStoreError {
       logAppendFailure(sessionID: sessionID, error: error)
@@ -184,6 +190,18 @@ final class FileTranscriptStore: TranscriptStoring {
     DspeechLog.persistence.info(
       "transcript session ended id=\(sessionID.uuidString, privacy: .public) segmentCount=\(summary.segmentCount, privacy: .public)"
     )
+  }
+
+  // why: B's durability checkpoint — fsync the open append handles so the page-cache-durable
+  // per-append writes also survive power-loss/panic, called from the app's background hook rather
+  // than per append. No-op when no session is open (empty handle maps).
+  func flush() throws {
+    do {
+      for handle in segmentAppendHandles.values { try handle.synchronize() }
+      for handle in transmissionAppendHandles.values { try handle.synchronize() }
+    } catch {
+      throw TranscriptStoreError.ioFailure(error.localizedDescription)
+    }
   }
 
   func sessions() throws -> [TranscriptSessionSummary] {
@@ -264,10 +282,11 @@ final class FileTranscriptStore: TranscriptStoring {
           loaded.append(open)
         }
       } catch {
-        throw TranscriptStoreError.decodingFailure(
-          sessionID: sessionID,
-          line: nil,
-          underlyingDescription: error.localizedDescription
+        // why: the scratch is a best-effort live snapshot written without atomicity, so a crash
+        // mid-write can leave it torn (invalid JSON). Skip an undecodable scratch — the CLOSED
+        // transmissions are the durable record; never fail the whole session read on a torn scratch.
+        DspeechLog.persistence.error(
+          "open-transmission scratch undecodable; skipping id=\(sessionID.uuidString, privacy: .public)"
         )
       }
     }
@@ -481,6 +500,9 @@ final class FileTranscriptStore: TranscriptStoring {
   }
 
   private func applyProtection(to url: URL) throws {
+    // why: flight data must stay appendable while the device is locked during an ADR-0010
+    // keep-awake session, so .complete (voiceprints' level) is too strict; per-append flush
+    // precludes holding an open handle, so .completeUnlessOpen isn't viable either.
     do {
       try fileManager.setAttributes(
         [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],

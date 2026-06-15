@@ -232,6 +232,31 @@ struct TranscriptStoreTests {
     #expect(try store.transmissions(in: summary.id) == [closed])
   }
 
+  @Test func tornOpenTransmissionScratchIsSkippedAndClosedTransmissionsSurvive() throws {
+    let root = try Self.makeRoot()
+    defer { Self.removeRoot(root) }
+    let store = try FileTranscriptStore(rootDirectory: root)
+    let summary = try store.beginSession(localeIdentifier: "en-US")
+    let closed = Self.transmission(
+      id: UUID(uuidString: "00000000-0000-0000-0000-000000000260")!,
+      startedAt: Date(timeIntervalSince1970: 3),
+      endedAt: Date(timeIntervalSince1970: 4),
+      text: "Cleared for takeoff runway two seven")
+    try store.append(closed, to: summary.id)
+
+    // why: simulate a crash mid-updateOpen leaving a torn (invalid-JSON) scratch — the non-atomic
+    // write B uses can produce this. Recovery must SKIP it and still return the durable CLOSED log,
+    // never throw on the whole session read.
+    let scratchURL =
+      root
+      .appendingPathComponent(summary.id.uuidString, isDirectory: true)
+      .appendingPathComponent("open-transmission.json", isDirectory: false)
+    try Data(#"{"id":"00000000-0000-0000-0000-0000000"#.utf8).write(to: scratchURL)
+
+    #expect(try store.transmissions(in: summary.id) == [closed])
+    #expect(try store.segments(in: summary.id).map(\.text) == [closed.text])
+  }
+
   @Test func legacySegmentOnlyExportStillWorksWithoutTransmissionFiles() throws {
     let root = try Self.makeRoot()
     defer { Self.removeRoot(root) }

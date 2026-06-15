@@ -79,10 +79,15 @@ final class CaptureCoordinator {
   // capture covertly. Receive-only product, no UIBackgroundModes audio entitlement,
   // so this also matches what the OS would do on suspension, made explicit.
   func stopForBackground() {
-    guard live.canStopCurrentSession else { return }
-    stoppedForBackgroundNotice = true
-    DspeechLog.routing.info("capture stopped for background")
-    live.stop()
+    if live.canStopCurrentSession {
+      stoppedForBackgroundNotice = true
+      DspeechLog.routing.info("capture stopped for background")
+      live.stop()
+    }
+    // why: the transcript store defers fsync off the per-append render path (P1), so backgrounding
+    // is the durability checkpoint — fsync the just-committed transmissions before the common
+    // background->jetsam path can lose them to a power-loss/panic window.
+    live.flushPersistence()
   }
 
   func refreshOnForeground() {

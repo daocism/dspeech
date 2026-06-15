@@ -168,6 +168,12 @@ struct LiveTranscriptionViewModelTests {
       endedSessionIDs.append(sessionID)
     }
 
+    var flushCount = 0
+    func flush() throws {
+      if let appendError { throw appendError }
+      flushCount += 1
+    }
+
     func sessions() throws -> [TranscriptSessionSummary] { [] }
     func segments(in sessionID: UUID) throws -> [TranscriptSegment] { [] }
     func transmissions(in sessionID: UUID) throws -> [Transmission] { [] }
