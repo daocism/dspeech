@@ -8,6 +8,7 @@ struct RouteBanner: View {
     HStack(spacing: 8) {
       Image(systemName: canStart ? "exclamationmark.triangle.fill" : "mic.slash.fill")
         .font(.footnote.weight(.semibold))
+        .accessibilityHidden(true)
       Text(message)
         .font(.footnote.weight(.medium))
         .fixedSize(horizontal: false, vertical: true)
@@ -36,6 +37,7 @@ struct BackgroundStopNoticeBanner: View {
     HStack(spacing: 8) {
       Image(systemName: "info.circle.fill")
         .font(.footnote.weight(.semibold))
+        .accessibilityHidden(true)
       Text(String(localized: "Listening stopped while the app was in the background."))
         .font(.footnote.weight(.medium))
         .fixedSize(horizontal: false, vertical: true)
@@ -43,7 +45,8 @@ struct BackgroundStopNoticeBanner: View {
       Button(action: onDismiss) {
         Image(systemName: "xmark")
           .font(.caption.weight(.bold))
-          .frame(width: 28, height: 28)
+          .frame(width: 44, height: 44)
+          .contentShape(Rectangle())
       }
       .buttonStyle(.plain)
       .accessibilityIdentifier("background-stop-dismiss")
@@ -70,6 +73,7 @@ struct PersistenceFailureBanner: View {
     HStack(spacing: 8) {
       Image(systemName: "externaldrive.badge.exclamationmark")
         .font(.footnote.weight(.semibold))
+        .accessibilityHidden(true)
       Text(message)
         .font(.footnote.weight(.medium))
         .fixedSize(horizontal: false, vertical: true)
@@ -77,7 +81,8 @@ struct PersistenceFailureBanner: View {
       Button(action: onDismiss) {
         Image(systemName: "xmark")
           .font(.caption.weight(.bold))
-          .frame(width: 28, height: 28)
+          .frame(width: 44, height: 44)
+          .contentShape(Rectangle())
       }
       .buttonStyle(.plain)
       .accessibilityIdentifier("persistence-failure-dismiss")
@@ -108,6 +113,7 @@ struct TranslationFailureBanner: View {
           ? "arrow.down.circle.fill" : "exclamationmark.triangle.fill"
       )
       .font(.footnote.weight(.semibold))
+      .accessibilityHidden(true)
       Text(message)
         .font(.footnote.weight(.medium))
         .fixedSize(horizontal: false, vertical: true)
@@ -117,8 +123,8 @@ struct TranslationFailureBanner: View {
           .font(.caption.weight(.semibold))
           .lineLimit(1)
           .minimumScaleFactor(0.65)
-          .padding(.horizontal, 10)
-          .frame(minHeight: 32)
+          .padding(.horizontal, 12)
+          .frame(minHeight: 44)
           .background(.black.opacity(0.32), in: Capsule())
       }
       .buttonStyle(.plain)
