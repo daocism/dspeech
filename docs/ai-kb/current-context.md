@@ -129,7 +129,11 @@ Codex GPT-5.5 workers = implementation).
   (seeded-PRNG, reach-counter-gated against vacuity, shared generators in PropertyTestSupport). Gate
   pins urgency-never-suppressed + fail-open + pilot-suppress + addressed-iff-display + continuation/
   other-callsign; classifier pins the content-first divergence (own callsign shown even from pilot
-  voice, where the gate suppresses). No timing-window assertions. W12: warnings-as-errors DONE
+  voice, where the gate suppresses). PBT also covers the ASR assembly core
+  (SpeechActivitySegmenterPropertyTests: continuous-speech-always-cuts anti-dictaphone +
+  boundary-never-cuts-on-silence anti-churn; TransmissionAssemblerPropertyTests: endedAt>=startedAt
+  under backwards timestamps + unchanged-partials-don't-outlast-gap + gap-split + replay-tail dedup).
+  No timing-window assertions. W12: warnings-as-errors DONE
   (SWIFT/GCC_TREAT_WARNINGS_AS_ERRORS=YES both configs); version xcconfig, script robustness,
   staged-only gitleaks hook, SHA-pinned actions remain.
 - After wave 4: ko locale + listing-it/uk + release-policy locale check; final adversarial
