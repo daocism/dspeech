@@ -62,6 +62,12 @@ final class WhisperKitLiveTranscriptionEngine: LiveTranscriptionEngine {
   private var windowStartAbsoluteSample: Int64 = 0
   private var lastDecodeRequestAbsoluteSample: Int64 = 0
   private var segmenter = WhisperKitLiveTranscriptionEngine.makeSegmenter()
+  // why: ONE sample-rate converter for the session, not one per buffer. An SRC carries
+  // anti-aliasing filter state across calls; allocating a fresh converter per ~21 ms tap
+  // buffer reset that state every block and produced discontinuities at every boundary.
+  // Rebuilt only when the hardware input format actually changes (e.g. a route change).
+  private var resampleConverter: AVAudioConverter?
+  private var resampleConverterInputFormat: AVAudioFormat?
 
   init(
     transcriber: any WhisperLiveTranscribing,
@@ -193,7 +199,7 @@ final class WhisperKitLiveTranscriptionEngine: LiveTranscriptionEngine {
 
   private func consume(_ captured: LiveCapturedAudioBuffer) {
     do {
-      let samples = try Self.whisperSamples(from: captured.buffer)
+      let samples = try whisperSamples(from: captured.buffer)
       appendWhisperSamples(samples)
     } catch {
       handleCaptureConduitFailure("audio-resample-failed: \(error.localizedDescription)")
@@ -353,6 +359,10 @@ final class WhisperKitLiveTranscriptionEngine: LiveTranscriptionEngine {
     windowStartAbsoluteSample = 0
     lastDecodeRequestAbsoluteSample = 0
     segmenter.reset()
+    // why: drop the session converter so the next start rebuilds it against the then-current
+    // input format with clean filter state.
+    resampleConverter = nil
+    resampleConverterInputFormat = nil
     let cleanupResult = audioConduit.stop()
     consumeTask?.cancel()
     consumeTask = nil
@@ -440,39 +450,36 @@ final class WhisperKitLiveTranscriptionEngine: LiveTranscriptionEngine {
     )
   }
 
-  private static func whisperSamples(from buffer: AVAudioPCMBuffer) throws -> [Float] {
+  private func whisperSamples(from buffer: AVAudioPCMBuffer) throws -> [Float] {
     guard buffer.frameLength > 0 else { return [] }
-    let outputFormat = try whisperAudioFormat()
     if buffer.format.commonFormat == .pcmFormatFloat32,
-      buffer.format.sampleRate == targetSampleRate,
+      buffer.format.sampleRate == Self.targetSampleRate,
       buffer.format.channelCount == 1,
       let samples = LiveAudioCaptureConduit.monoFloatSamples(from: buffer)
     {
       return samples
     }
-    guard let converter = AVAudioConverter(from: buffer.format, to: outputFormat) else {
-      throw WhisperLiveEngineError.resamplerUnavailable
-    }
-    var capacity =
-      converter.outputFormat.sampleRate * Double(buffer.frameLength)
-      / converter.inputFormat.sampleRate
-    if capacity.truncatingRemainder(dividingBy: 1) != 0 {
-      capacity = max(1, capacity.rounded(.up))
-    }
-    guard
-      let converted = AVAudioPCMBuffer(
-        pcmFormat: converter.outputFormat,
-        frameCapacity: AVAudioFrameCount(capacity)
-      )
-    else {
-      throw WhisperLiveEngineError.resampleBufferUnavailable
-    }
+    let converter = try cachedResampleConverter(for: buffer.format)
+    let converted = try Self.makeResampleOutputBuffer(
+      for: converter, inputFrameCount: buffer.frameLength)
+    // why: feed the source buffer exactly ONCE, then report `.noDataNow` so the persistent
+    // converter flushes the output it can produce and stays REUSABLE for the next buffer
+    // (`.endOfStream` would finalize it). The prior block returned the same buffer on every
+    // `.haveData`, letting the converter re-consume it and duplicate a few tail frames per block.
+    var fed = false
     let inputBlock: AVAudioConverterInputBlock = { _, outStatus in
+      if fed {
+        outStatus.pointee = .noDataNow
+        return nil
+      }
+      fed = true
       outStatus.pointee = .haveData
       return buffer
     }
     var error: NSError?
     let status = converter.convert(to: converted, error: &error, withInputFrom: inputBlock)
+    // why: `.error` is the only failure. `.inputRanDry` (input block returned `.noDataNow`),
+    // `.haveData`, and `.endOfStream` are normal streaming outcomes — read what was produced.
     if status == .error {
       throw error ?? WhisperLiveEngineError.resampleFailed
     }
@@ -480,6 +487,42 @@ final class WhisperKitLiveTranscriptionEngine: LiveTranscriptionEngine {
       throw WhisperLiveEngineError.resampleOutputUnavailable
     }
     return samples
+  }
+
+  private func cachedResampleConverter(for inputFormat: AVAudioFormat) throws -> AVAudioConverter {
+    if let resampleConverter, resampleConverterInputFormat == inputFormat {
+      return resampleConverter
+    }
+    let outputFormat = try Self.whisperAudioFormat()
+    guard let converter = AVAudioConverter(from: inputFormat, to: outputFormat) else {
+      throw WhisperLiveEngineError.resamplerUnavailable
+    }
+    resampleConverter = converter
+    resampleConverterInputFormat = inputFormat
+    return converter
+  }
+
+  private static func makeResampleOutputBuffer(
+    for converter: AVAudioConverter,
+    inputFrameCount: AVAudioFrameCount
+  ) throws -> AVAudioPCMBuffer {
+    var capacity =
+      converter.outputFormat.sampleRate * Double(inputFrameCount)
+      / converter.inputFormat.sampleRate
+    if capacity.truncatingRemainder(dividingBy: 1) != 0 {
+      capacity = max(1, capacity.rounded(.up))
+    }
+    // why: a few frames of slack absorb the resampler's filter-delay jitter so a full block's
+    // worth of output is never clipped by an exact-fit capacity.
+    guard
+      let converted = AVAudioPCMBuffer(
+        pcmFormat: converter.outputFormat,
+        frameCapacity: AVAudioFrameCount(capacity) + 16
+      )
+    else {
+      throw WhisperLiveEngineError.resampleBufferUnavailable
+    }
+    return converted
   }
 
   private static func whisperAudioFormat() throws -> AVAudioFormat {
@@ -515,6 +558,14 @@ final class WhisperKitLiveTranscriptionEngine: LiveTranscriptionEngine {
     func appendSamplesForTesting(_ samples: [Float], sampleRate: Double) {
       guard sampleRate == Self.targetSampleRate else { return }
       appendWhisperSamples(samples)
+    }
+
+    // why: the [Float] seam above bypasses the AVAudioConverter (it feeds already-16kHz
+    // samples straight into the window). Real device input is 48kHz, so the resample path is
+    // the one that always runs on-device yet had zero coverage. This drives the REAL converter
+    // with a real PCM buffer so the 48kHz→16kHz contract can be asserted from a host test.
+    func whisperSamplesForTesting(from buffer: AVAudioPCMBuffer) throws -> [Float] {
+      try whisperSamples(from: buffer)
     }
 
     func simulateCaptureConduitFailureForTesting(_ slug: String) {

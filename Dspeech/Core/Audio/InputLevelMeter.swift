@@ -54,7 +54,7 @@ enum InputLevelMeterEvent: Equatable, Sendable {
         // why: the tap is nonisolated/realtime; it computes RMS synchronously and
         // yields only a Sendable Double — no AVAudioPCMBuffer escapes the callback,
         // so there is no actor-isolation hazard under Swift 6 complete concurrency.
-        input.installTap(onBus: 0, bufferSize: 1024, format: nil) { buffer, _ in
+        input.installTap(onBus: 0, bufferSize: 1024, format: nil) { @Sendable buffer, _ in
           continuation.yield(
             .level(AudioLevel.normalized(rms: AVAudioEngineInputLevelMeter.rms(of: buffer))))
         }
