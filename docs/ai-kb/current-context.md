@@ -117,11 +117,21 @@ Codex GPT-5.5 workers = implementation).
   fail-open band — loadSnapshot now rejects it as .gateConfigCorrupted; (4) saveGateConfig swallowed
   encode failures + the availability log was redacted — both fixed. Also floored the calibration guard
   against a degenerate corpus (>=3 same/cross pairs + required bounds; see
-  [[feedback_vacuous_guard_measure_reach]] recurrence). STILL OPEN: best-of-roster max vs fixed
-  threshold grows false-accept with crew size (N-aware threshold — needs real calibration data);
-  mixed-band reachability (decide remove-vs-keep); enrollment-quality asymmetry + host-checkable
-  FileProtection still untested. The 0.72/0.82 thresholds remain PROVISIONAL until re-derived on real
-  device-path audio (the synthetic-corpus guard catches REGRESSION, not the device-path tail).
+  [[feedback_vacuous_guard_measure_reach]] recurrence). BACKLOG CLOSED (3 traced items): mixed-band is
+  REACHABLE+kept (NOT vestigial — SpeakerMatcher returns .mixed for any best cosine in [0.50, 0.72),
+  now pipeline-indicator-tested); enrollment-quality asymmetry is intentional and PINNED (3 tests:
+  enrollment ungated by design — the 0.25 floor wrongly rejected a quiet on-device enrollment — while
+  matching gates only the incoming candidate and ignores the enrolled profile's quality); FileProtection
+  now has a constructor-injected FileManager seam on UserDefaultsVoiceFilterStorage + a .complete spy
+  test (reach-floored: asserts setAttributes was called before checking .complete). STILL OPEN:
+  N-aware roster threshold (deferred — needs real calibration data, not a synthetic magic number). NEW
+  PRODUCT FINDING for Andrei: ATCVoiceIndicator (the per-segment classification badge: pilotSuppressed
+  / mixedSpeakerCandidate / probableDispatcher / dispatcherAddressedOwnCallSign / …) is computed in
+  VoiceFilterPipeline + stored in LiveTranscriptionViewModel.filterIndicators + exposed via
+  indicator(for:), but NO SwiftUI view renders it — the suppression hide/unhide is wired, the WHY-badge
+  is UI-dead. Decision: render the badges (give the pilot visibility into the filter's per-segment
+  calls) or remove the unused indicator API. The 0.72/0.82 thresholds remain PROVISIONAL until
+  re-derived on real device-path audio (the synthetic-corpus guard catches REGRESSION, not the tail).
 - **Transcript = flight data (D4)**: FileTranscriptStore (JSONL, per-append flush, crash
   recovery, protected files), session history UI + share/export, auto-scroll + jump-to-live,
   Clear-with-confirmation (history retained), suppressed-segment review sheet, demo/hints
