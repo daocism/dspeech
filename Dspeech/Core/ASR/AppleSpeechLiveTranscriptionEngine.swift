@@ -58,6 +58,15 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
   private var recognizerAvailabilityDelegate: LiveRecognizerAvailabilityDelegate?
   private var recognitionCallbackContinuation: AsyncStream<RecognitionCallbackEvent>.Continuation?
   private var recognitionCallbackTask: Task<Void, Never>?
+  private var recognitionEventDropCounter = CaptureBackpressureCounter()
+  // why: bound the recognition-event FIFO. Events are tiny (text + flags), but an unbounded queue
+  // under an indefinite MainActor stall is still unbounded memory. Sized generously (newest-wins
+  // retains the latest results incl. the final; only old partials are dropped). A drop signals a
+  // pathological stall and is logged; the utterance-boundary restart is an independent backstop.
+  private static let recognitionEventQueueLimit = 256
+  // why: read from the nonisolated recognition resultHandler's drop path, so it must not inherit the
+  // type's @MainActor isolation (immutable Sendable constant — safe to read anywhere).
+  nonisolated private static let recognitionEventDropLogInterval = 100
   private var pendingRecognitionPartial = PendingRecognitionPartial()
   private let replayTailEnabled: Bool
   private var replayTail = AudioReplayTail<AVAudioPCMBuffer>(
@@ -388,6 +397,7 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     let generation = taskGeneration
     let sourceLanguageCode = Self.sourceLanguageCode(for: activeLocaleIdentifier)
     let callbackContinuation = installRecognitionCallbackConduit(generation: generation)
+    let recognitionDropCounter = recognitionEventDropCounter
 
     task = recognizer.recognitionTask(with: request) { @Sendable result, error in
       let failure: ASRFailure? = (error as NSError?).map {
@@ -430,13 +440,23 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
         event = nil
         isFinal = false
       }
-      callbackContinuation.yield(
+      let yieldResult = callbackContinuation.yield(
         RecognitionCallbackEvent(
           generation: generation,
           event: event,
           isFinal: isFinal,
           failure: failure
         ))
+      // why: bounded event FIFO — a drop means a pathological MainActor stall. Count + log
+      // (rate-limited) so the loss is never silent; finals are retained by newest-wins.
+      if case .dropped = yieldResult {
+        let total = recognitionDropCounter.recordDrop()
+        if total == 1 || total.isMultiple(of: Self.recognitionEventDropLogInterval) {
+          DspeechLog.engine.error(
+            "recognition event dropped slug=recognition-queue-overflow totalDropped=\(total, privacy: .public)"
+          )
+        }
+      }
     }
     for buffer in replayTailEnabled ? replayTail.buffers : [] {
       request.append(buffer)
@@ -447,9 +467,10 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
     generation: Int
   ) -> AsyncStream<RecognitionCallbackEvent>.Continuation {
     let (stream, continuation) = AsyncStream<RecognitionCallbackEvent>.makeStream(
-      bufferingPolicy: .unbounded
+      bufferingPolicy: .bufferingNewest(Self.recognitionEventQueueLimit)
     )
     recognitionCallbackContinuation = continuation
+    recognitionEventDropCounter = CaptureBackpressureCounter()
     recognitionCallbackTask = Task { @MainActor [weak self] in
       for await callback in stream {
         guard let self, self.taskGeneration == generation else { continue }
