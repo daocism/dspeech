@@ -147,6 +147,66 @@ struct ATCTranscriptGatePropertyTests {
     }
     #expect(exercised >= 270, "too few cases reached the assertion: \(exercised)")
   }
+
+  // Stateful: after a hit, a following non-matching segment stays visible within the continuation
+  // window and is suppressed once it lapses — the gate's only time-dependent branch. A re-addressed
+  // follow-up refreshes the hit. (Reviewer-identified coverage gap.)
+  @Test func continuationWindowKeepsRecentExchangeVisibleThenLapses() {
+    var rng = SeededGenerator(seed: 0x0A11_0007)
+    let window = ATCTranscriptGateConfig.default.continuationWindowSeconds
+    var exercised = 0
+    for _ in 0..<400 {
+      guard let cs = CallSign(raw: randomCallSignNormalized(using: &rng)) else { continue }
+      let locale = locales.randomElement(using: &rng)!
+      var gate = ATCTranscriptGate(configuredCallSign: cs)
+      let lead = noiseWords.randomElement(using: &rng)!
+      let first = gate.evaluate(
+        text: "\(lead) \(cs.normalized)", speaker: randomNonPilotOrMixed(using: &rng),
+        timestamp: t0, localeIdentifier: locale)
+      #expect(first == .display(reason: .callSignMatch))
+      let delta = Double(Int.random(in: 0...16, using: &rng))
+      let followText = randomTranscript(using: &rng)
+      let second = gate.evaluate(
+        text: followText, speaker: randomNonPilotOrMixed(using: &rng),
+        timestamp: t0.addingTimeInterval(delta), localeIdentifier: locale)
+      let addressed =
+        cs.matches(in: followText, localeIdentifier: locale)
+        || cs.matchesAbbreviated(in: followText, localeIdentifier: locale)
+      if addressed {
+        #expect(second == .display(reason: .callSignMatch))
+      } else if delta <= window {
+        #expect(second == .display(reason: .continuationOfRecentHit))
+      } else {
+        #expect(second == .suppress(reason: .nonRelevant))
+      }
+      exercised += 1
+    }
+    #expect(exercised >= 360, "too few cases reached the assertion: \(exercised)")
+  }
+
+  // A non-urgency segment naming a DIFFERENT aircraft (own callsign not matched, other-callsign
+  // detector fires) is suppressed as addressedToOther. (Reviewer-identified coverage gap.)
+  @Test func otherCallSignDetectorSuppressesForeignTraffic() {
+    var rng = SeededGenerator(seed: 0x0A11_0008)
+    let marker = "ZZOTHERZZ"
+    var exercised = 0
+    for _ in 0..<300 {
+      guard let cs = CallSign(raw: randomCallSignNormalized(using: &rng)) else { continue }
+      let text = "\(noiseWords.randomElement(using: &rng)!) \(marker)"
+      guard !cs.matches(in: text, localeIdentifier: nil),
+        !cs.matchesAbbreviated(in: text, localeIdentifier: nil)
+      else { continue }
+      var gate = ATCTranscriptGate(
+        configuredCallSign: cs,
+        otherCallSignDetector: { @Sendable in $0.contains(marker) })
+      let decision = gate.evaluate(
+        text: text, speaker: randomNonPilotOrMixed(using: &rng), timestamp: t0,
+        localeIdentifier: nil)
+      #expect(decision == .suppress(reason: .addressedToOther))
+      exercised += 1
+    }
+    #expect(exercised >= 250, "too few cases reached the assertion: \(exercised)")
+  }
 }
 
 // MARK: - Gate-specific deterministic generators
