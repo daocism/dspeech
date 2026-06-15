@@ -108,11 +108,20 @@ Codex GPT-5.5 workers = implementation).
   calibration.yml` lane run the REAL WeSpeaker model over the labeled corpus and FAIL if the cosine
   separation stops bracketing the thresholds (validated on the GH runner: SAME min 0.820, CROSS max
   0.599, separable; bounds sameVoiceMinCosine 0.75 / crossVoiceMaxCosine 0.65 in the corpus manifest).
-  STILL OPEN from the audit: best-of-roster max vs fixed threshold grows false-accept with crew size
-  (N-aware threshold — needs real calibration data); mixed band is vestigial; enrollment-quality
-  asymmetry + host-checkable FileProtection untested. The 0.72/0.82 thresholds remain PROVISIONAL
-  until re-derived on real device-path audio (the synthetic-corpus guard catches REGRESSION, not the
-  device-path tail).
+  ADVERSARIAL SELF-REVIEW (2 lenses) found NO dispatcher-hiding/urgency-suppression path — core fix
+  holds — and 4 real runtime defects, all FIXED + unit-green: (1) indicator() badged ANY .pilot
+  .pilotSuppressed regardless of score, mislabeling an uncertain shown pilot on a visible clearance
+  (removed the score-blind early-exit; see [[feedback_enum_payload_silent_drift]]); (2) removeAll-
+  CrewMembers early-returned on empty memory, leaking corrupted-on-disk voiceprints — now wipes
+  storage unconditionally; (3) a persisted pilotSuppressThreshold <= match boundary collapses the
+  fail-open band — loadSnapshot now rejects it as .gateConfigCorrupted; (4) saveGateConfig swallowed
+  encode failures + the availability log was redacted — both fixed. Also floored the calibration guard
+  against a degenerate corpus (>=3 same/cross pairs + required bounds; see
+  [[feedback_vacuous_guard_measure_reach]] recurrence). STILL OPEN: best-of-roster max vs fixed
+  threshold grows false-accept with crew size (N-aware threshold — needs real calibration data);
+  mixed-band reachability (decide remove-vs-keep); enrollment-quality asymmetry + host-checkable
+  FileProtection still untested. The 0.72/0.82 thresholds remain PROVISIONAL until re-derived on real
+  device-path audio (the synthetic-corpus guard catches REGRESSION, not the device-path tail).
 - **Transcript = flight data (D4)**: FileTranscriptStore (JSONL, per-append flush, crash
   recovery, protected files), session history UI + share/export, auto-scroll + jump-to-live,
   Clear-with-confirmation (history retained), suppressed-segment review sheet, demo/hints
