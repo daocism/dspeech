@@ -150,3 +150,9 @@ Codex GPT-5.5 workers = implementation).
   randomTranscript returning "" tripped the classifier's first-priority insufficientEvidence guard
   (the gate has no empty guard, so it passed there) — shared generators are non-empty; empty/junk get
   their own explicit fixtures. Each guard-bearing property carries an exercised-counter reach gate.
+- CI flake fixed at root: CallsignDictationServiceTests.wait(for:) used a 5s poll that timed out on
+  the CPU-starved hosted runner before the async append Task was scheduled (passed locally) — bumped
+  to 60s (returns as soon as the condition holds, so headroom only costs wall time on real failure).
+  This was the hosted "Unit tests (DspeechTests)" red; distinct from the documented hosted-UITest
+  CPU-starvation flakes. Adversarial review of the segmenter/assembler PBT then found + closed 5
+  stateful/edge coverage gaps (see [[feedback_pbt_branch_coverage]]).
