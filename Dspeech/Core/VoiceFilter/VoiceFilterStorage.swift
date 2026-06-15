@@ -100,7 +100,12 @@ struct UserDefaultsVoiceFilterStorage: VoiceFilterStorage, @unchecked Sendable {
       try persistProfiles(profiles)
       defaults.removeObject(forKey: Self.profilesKey)
     } catch {
-      return
+      // why: surface to the log/crash-report boundary (`log collect`) instead of swallowing — a
+      // silent persist failure left the UI claiming success while the voiceprint never saved
+      // (2026-06-15 audit). Error is .private (may carry a path); no voiceprint content is logged.
+      DspeechLog.voiceFilter.error(
+        "voiceprint persist failed error=\(String(describing: error), privacy: .private)"
+      )
     }
   }
 
@@ -109,7 +114,11 @@ struct UserDefaultsVoiceFilterStorage: VoiceFilterStorage, @unchecked Sendable {
       do {
         try FileManager.default.removeItem(at: profileStoreURL)
       } catch {
-        return
+        // why: a silent delete failure leaves personal voiceprints on disk after the user removed
+        // the feature (a privacy/data-retention leak) — surface it rather than swallow (audit).
+        DspeechLog.voiceFilter.error(
+          "voiceprint delete failed error=\(String(describing: error), privacy: .private)"
+        )
       }
     }
     defaults.removeObject(forKey: Self.profilesKey)
@@ -124,8 +133,13 @@ struct UserDefaultsVoiceFilterStorage: VoiceFilterStorage, @unchecked Sendable {
       defaults.removeObject(forKey: Self.callSignKey)
       return
     }
-    guard let data = try? JSONEncoder().encode(callSign) else { return }
-    defaults.set(data, forKey: Self.callSignKey)
+    do {
+      let data = try JSONEncoder().encode(callSign)
+      defaults.set(data, forKey: Self.callSignKey)
+    } catch {
+      DspeechLog.voiceFilter.error(
+        "callsign persist failed error=\(String(describing: error), privacy: .private)")
+    }
   }
 
   func loadGateConfig() -> ATCTranscriptGateConfig {
