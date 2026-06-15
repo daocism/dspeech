@@ -22,17 +22,7 @@ struct CallSign: Equatable, Hashable, Sendable, Codable {
     }
   }
 
-  private static let icaoAlphabet: [Character: String] = [
-    "A": "ALPHA", "B": "BRAVO", "C": "CHARLIE", "D": "DELTA",
-    "E": "ECHO", "F": "FOXTROT", "G": "GOLF", "H": "HOTEL",
-    "I": "INDIA", "J": "JULIETT", "K": "KILO", "L": "LIMA",
-    "M": "MIKE", "N": "NOVEMBER", "O": "OSCAR", "P": "PAPA",
-    "Q": "QUEBEC", "R": "ROMEO", "S": "SIERRA", "T": "TANGO",
-    "U": "UNIFORM", "V": "VICTOR", "W": "WHISKEY", "X": "XRAY",
-    "Y": "YANKEE", "Z": "ZULU",
-    "0": "ZERO", "1": "ONE", "2": "TWO", "3": "THREE", "4": "FOUR",
-    "5": "FIVE", "6": "SIX", "7": "SEVEN", "8": "EIGHT", "9": "NINER",
-  ]
+  private static let icaoAlphabet = PhoneticAlphabet.icao
 
   private static func expandPhonetics(_ normalized: String) -> [String] {
     normalized.compactMap { icaoAlphabet[$0] }
@@ -60,19 +50,8 @@ struct CallSign: Equatable, Hashable, Sendable, Codable {
 
   private static let posixLocale = Locale(identifier: "en_US_POSIX")
   private static let compactRunSeparators = CharacterSet(charactersIn: "-/")
-  private static let frenchPhoneticDecode: [String: String] = [
-    "ZERO": "0",
-    "UN": "1", "UNITE": "1",
-    "DEUX": "2",
-    "TROIS": "3",
-    "QUATRE": "4",
-    "CINQ": "5",
-    "SIX": "6",
-    "SEPT": "7",
-    "HUIT": "8",
-    "NEUF": "9",
-  ]
-  private static let frenchIgnoredTokens: Set<String> = ["DECIMALE", "VIRGULE"]
+  private static let frenchPhoneticDecode = PhoneticAlphabet.frenchDigits
+  private static let frenchIgnoredTokens = PhoneticAlphabet.frenchIgnoredTokens
 
   private static func isFrenchLocale(_ localeIdentifier: String?) -> Bool {
     guard let localeIdentifier else { return false }
