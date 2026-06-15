@@ -124,9 +124,11 @@ Codex GPT-5.5 workers = implementation).
 - W10: ContentView decomposition DONE (946→730; banners + DEBUG scripted engine extracted to
   TranscriptBanners.swift / RenderStableScriptedLiveTranscriptionEngine.swift, behavior-preserving).
   Open: iPad adaptivity, full l10n fill, privacy-toggle truthfulness. W11: scripted-engine seam,
-  real-pipeline replay eval; PBT sweeps STARTED (CallSignPropertyTests — seeded-PRNG property tests
-  for the callsign decode/match safety core, reach-counter-gated against vacuity); still want PBT on
-  the gate + classifier. No timing-window assertions. W12: warnings-as-errors DONE
+  real-pipeline replay eval; PBT sweeps for the voice-filter safety core DONE
+  (CallSignPropertyTests + ATCTranscriptGatePropertyTests — seeded-PRNG, reach-counter-gated against
+  vacuity, shared generators in PropertyTestSupport; gate suite pins urgency-never-suppressed +
+  fail-open + pilot-suppress + addressed-iff-display); still want PBT on the TransmissionClassifier.
+  No timing-window assertions. W12: warnings-as-errors DONE
   (SWIFT/GCC_TREAT_WARNINGS_AS_ERRORS=YES both configs); version xcconfig, script robustness,
   staged-only gitleaks hook, SHA-pinned actions remain.
 - After wave 4: ko locale + listing-it/uk + release-policy locale check; final adversarial
