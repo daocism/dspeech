@@ -4,6 +4,9 @@ import os
 enum DspeechLog {
   static let subsystem = "com.dspeech.replaykit"
   static let voiceFilter = Logger(subsystem: subsystem, category: "voice-filter")
+  // why: ModelPackState.swift is symlinked into this tool and logs persist failures via
+  // DspeechLog.modelPack; the stub must carry every category the symlinked sources reference.
+  static let modelPack = Logger(subsystem: subsystem, category: "model-pack")
 }
 
 enum ReplayKitError: Error, CustomStringConvertible {

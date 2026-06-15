@@ -237,7 +237,9 @@ struct UserDefaultsModelPackStateStorage: ModelPackStateStorage, @unchecked Send
       let data = try JSONEncoder().encode(persisted)
       defaults.set(data, forKey: Self.stateKey)
     } catch {
-      return
+      DspeechLog.modelPack.error(
+        "model-pack state persist failed error=\(String(describing: error), privacy: .private)"
+      )
     }
   }
 
