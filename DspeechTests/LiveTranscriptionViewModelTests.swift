@@ -758,20 +758,25 @@ struct LiveTranscriptionViewModelTests {
       engine: engine,
       transcriptStore: store,
       // why: advance the clock past the transmission gap per segment so each becomes its own card;
-      // a huge tick interval keeps the tick loop dormant so the count is driven only by pushes.
+      // a huge tick interval keeps the tick loop dormant so totals are driven only by pushes.
       now: {
         defer { clock = clock.addingTimeInterval(10) }
         return clock
       },
       transmissionTickNanoseconds: 3_600_000_000_000,
-      transmissionWindowLimit: 3
+      transmissionWindowLimit: 3,
+      visibleSegmentLimit: 2
     )
     await vm.start()
 
-    for index in 0..<600 {
+    // why: push one segment at a time and AWAIT it forms its own (open) card before the next, so
+    // the totals below are read AFTER a KNOWN number of transmissions — never mid-drain. The prior
+    // 600-push version raced the event queue: the count==3 cap was hit while most were unprocessed,
+    // so olderSegmentCountInHistory/store-count were read against a partial, non-deterministic set.
+    for index in 0..<6 {
       engine.push(.segment(makeSegment("Transmission \(index)"), speaker: nil))
+      #expect(await wait(for: { vm.displayedTransmissions.last?.text == "Transmission \(index)" }))
     }
-    #expect(await wait(for: { vm.displayedTransmissions.count == 3 && vm.segments.count == 3 }))
 
     // every retained collection stays bounded by the window — the cap is real, not cosmetic
     #expect(vm.displayedTransmissions.count == 3)
@@ -780,11 +785,12 @@ struct LiveTranscriptionViewModelTests {
     #expect(vm.translations.isEmpty)
     #expect(vm.suppressedSegmentIDs.isEmpty)
 
-    // truthful older-count across eviction: all 600 pushed segments are displayable
-    #expect(vm.olderSegmentCountInHistory == 600 - 500)
+    // truthful older-count across eviction: all 6 pushed segments are displayable (older = 6 - 2)
+    #expect(vm.olderSegmentCountInHistory == 6 - 2)
 
-    // no data loss: the store retains the closed transmissions evicted from RAM
-    #expect(store.appendedTransmissions.count >= 500)
+    // no data loss: the cards evicted from RAM (0,1,2) were persisted (closed) before eviction
+    let storedTexts = Set(store.appendedTransmissions.map(\.transmission.text))
+    #expect(storedTexts.isSuperset(of: ["Transmission 0", "Transmission 1", "Transmission 2"]))
   }
 
   @Test func evictionDropsSuppressionStateForEvictedSegments() async {

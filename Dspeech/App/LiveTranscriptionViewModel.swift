@@ -27,8 +27,6 @@ struct UserDefaultsNoAnchorHintStateStorage: NoAnchorHintStateStorage, @unchecke
 @MainActor
 @Observable
 final class LiveTranscriptionViewModel {
-  private static let visibleSegmentLimit = 500
-
   private(set) var segments: [TranscriptSegment] = []
   private(set) var displayedTransmissions: [Transmission] = []
   private(set) var filteredTransmissions: [Transmission] = []
@@ -59,6 +57,9 @@ final class LiveTranscriptionViewModel {
   // above the 500 visible-segment cap so live scrollback never hits the eviction boundary; older
   // content lives in Session History.
   private let transmissionWindowLimit: Int
+  // why: visible-segment cap (UI tail + the "older in history" boundary). Injectable so tests can
+  // exercise the window/eviction math at small N; production uses the default.
+  private let visibleSegmentLimit: Int
   // why: displayable segments already EVICTED from the RAM window — added so
   // olderSegmentCountInHistory reflects the full on-disk record, not just resident segments.
   private var evictedDisplayableSegmentCount = 0
@@ -92,7 +93,8 @@ final class LiveTranscriptionViewModel {
     translationTarget: @escaping @MainActor () -> Locale.Language? = { nil },
     now: @escaping @MainActor () -> Date = { Date() },
     transmissionTickNanoseconds: UInt64 = 500_000_000,
-    transmissionWindowLimit: Int = 2_000
+    transmissionWindowLimit: Int = 2_000,
+    visibleSegmentLimit: Int = 500
   ) {
     self.engine = engine
     self.transcriptStore = transcriptStore
@@ -106,20 +108,21 @@ final class LiveTranscriptionViewModel {
     self.now = now
     self.transmissionTickNanoseconds = transmissionTickNanoseconds
     self.transmissionWindowLimit = transmissionWindowLimit
+    self.visibleSegmentLimit = visibleSegmentLimit
     self.hasEverStarted = firstSessionStorage.loadHasEverStarted()
     self.hasShownNoAnchorHint = noAnchorHintStorage.loadHasShownNoAnchorHint()
   }
 
   var visibleSegments: [TranscriptSegment] {
     let displayable = displayableSegments
-    guard displayable.count > Self.visibleSegmentLimit else { return displayable }
-    return Array(displayable.suffix(Self.visibleSegmentLimit))
+    guard displayable.count > visibleSegmentLimit else { return displayable }
+    return Array(displayable.suffix(visibleSegmentLimit))
   }
 
   var olderSegmentCountInHistory: Int {
     // why: include displayable segments already EVICTED from the RAM window so this reflects the
     // full on-disk record (evicted + resident), not just what is currently in memory.
-    max(evictedDisplayableSegmentCount + displayableSegments.count - Self.visibleSegmentLimit, 0)
+    max(evictedDisplayableSegmentCount + displayableSegments.count - visibleSegmentLimit, 0)
   }
 
   var voiceFilterCapability: VoiceFilterCapability? {
