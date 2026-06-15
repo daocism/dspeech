@@ -35,7 +35,8 @@ struct ATCTranscriptGate: Sendable {
   mutating func evaluate(
     text: String,
     speaker: SpeakerMatchDecision,
-    timestamp: Date
+    timestamp: Date,
+    localeIdentifier: String? = nil
   ) -> ATCRelevanceDecision {
     if Self.containsUrgencyBroadcast(in: text) {
       lastCallSignHitAt = timestamp
@@ -59,7 +60,9 @@ struct ATCTranscriptGate: Sendable {
       return .display(reason: .noCallSignConfigured)
     }
 
-    if callSign.matches(in: text) || callSign.matchesAbbreviated(in: text) {
+    if callSign.matches(in: text, localeIdentifier: localeIdentifier)
+      || callSign.matchesAbbreviated(in: text, localeIdentifier: localeIdentifier)
+    {
       lastCallSignHitAt = timestamp
       DspeechLog.voiceFilter.debug("atc transcript gate display reason=callSignMatch")
       return .display(reason: .callSignMatch)
