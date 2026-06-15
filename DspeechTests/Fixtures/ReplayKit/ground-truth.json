@@ -31,6 +31,18 @@
       "expectedPilotDiscard": false
     },
     {
+      "fixture": "pilot-readback.wav",
+      "transcript": "Air France un deux trois, autorisé décollage piste deux sept",
+      "expectedTranscriptAfterFilter": "",
+      "expectedPilotDiscard": true
+    },
+    {
+      "fixture": "dispatcher-own.wav",
+      "transcript": "Sécurité Sécurité Sécurité, fort vent traversier piste deux sept",
+      "expectedTranscriptAfterFilter": "Sécurité Sécurité Sécurité, fort vent traversier piste deux sept",
+      "expectedPilotDiscard": false
+    },
+    {
       "fixture": "atc-real-img2549.wav",
       "transcript": "",
       "expectedTranscriptAfterFilter": "",
