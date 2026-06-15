@@ -280,7 +280,15 @@ struct UserDefaultsVoiceFilterStorage: VoiceFilterStorage, @unchecked Sendable {
     let data = try JSONEncoder().encode(profiles)
     let directory = profileStoreURL.deletingLastPathComponent()
     try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
-    try data.write(to: profileStoreURL, options: .atomic)
+    // why: set .complete at creation so the voiceprint file is never briefly readable at the
+    // container-default class (completeUntilFirstUserAuthentication) in the window between the
+    // write and applyVoiceProfileFileAttributes' setAttributes. The setAttributes call is kept
+    // (belt-and-suspenders) so the protection-intent spy seam stays observable on the host.
+    #if os(iOS)
+      try data.write(to: profileStoreURL, options: [.atomic, .completeFileProtection])
+    #else
+      try data.write(to: profileStoreURL, options: .atomic)
+    #endif
     try applyVoiceProfileFileAttributes(to: profileStoreURL)
   }
 
