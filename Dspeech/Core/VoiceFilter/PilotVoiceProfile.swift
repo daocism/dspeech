@@ -133,5 +133,4 @@ enum ATCRelevanceDecision: Equatable, Sendable {
 
   case display(reason: Reason)
   case suppress(reason: Reason)
-  case holdContinuation(reason: Reason)
 }
