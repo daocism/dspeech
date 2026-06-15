@@ -101,12 +101,13 @@ struct TransmissionAssemblerPropertyTests {
     for _ in 0..<300 {
       var assembler = makeAssembler()
       let text = randomWords(minWords: 2, using: &rng)
-      let first = assembler.process(.fragment(segment: seg(text), speaker: nil, at: assemblerT0))
-      let afterFirst = lastText(in: first)
-      let second = assembler.process(
+      _ = assembler.process(.fragment(segment: seg(text), speaker: nil, at: assemblerT0))
+      _ = assembler.process(
         .fragment(segment: seg(text), speaker: nil, at: assemblerT0.addingTimeInterval(0.2)))
-      let afterSecond = lastText(in: second) ?? afterFirst
-      #expect(afterSecond == afterFirst, "re-feeding an identical fragment duplicated text")
+      let closed = assembler.finish(at: assemblerT0.addingTimeInterval(5))
+      #expect(
+        lastText(in: closed) == text,
+        "re-feeding an identical fragment duplicated text: \(lastText(in: closed) ?? "nil")")
       exercised += 1
     }
     #expect(exercised >= 270, "too few cases reached the assertion: \(exercised)")
@@ -145,6 +146,72 @@ struct TransmissionAssemblerPropertyTests {
       exercised += 1
     }
     #expect(exercised >= 270, "too few cases reached the assertion: \(exercised)")
+  }
+
+  // A fragment sharing a 2+word seam with the existing text appends only the NEW tail — the actual
+  // replay-tail dedup across task restarts, not just the fully-identical case. (Reviewer gap.)
+  @Test func partialOverlapAppendsOnlyTheNewTail() {
+    var rng = SeededGenerator(seed: 0x7A55_0007)
+    let overlap = 2
+    var exercised = 0
+    for _ in 0..<300 {
+      let total = Int.random(in: 4...7, using: &rng)
+      let words = randomDistinctWords(count: total, using: &rng)
+      let existingCount = Int.random(in: overlap...(total - 1), using: &rng)
+      let existing = words[0..<existingCount].joined(separator: " ")
+      let fragment = words[(existingCount - overlap)...].joined(separator: " ")
+      var assembler = makeAssembler()
+      _ = assembler.process(.fragment(segment: seg(existing), speaker: nil, at: assemblerT0))
+      _ = assembler.process(
+        .fragment(segment: seg(fragment), speaker: nil, at: assemblerT0.addingTimeInterval(0.2)))
+      let closed = assembler.finish(at: assemblerT0.addingTimeInterval(5))
+      #expect(
+        lastText(in: closed) == words.joined(separator: " "),
+        "partial overlap did not append tail-only: \(lastText(in: closed) ?? "nil")")
+      exercised += 1
+    }
+    #expect(exercised >= 270, "too few cases reached the assertion: \(exercised)")
+  }
+
+  // A task restart closes the open transmission once the gap has elapsed, but not within it.
+  @Test func taskRestartClosesAfterGapNotWithin() {
+    var rng = SeededGenerator(seed: 0x7A55_0008)
+    let gap = TransmissionAssemblerConfig.default.transmissionGapSeconds
+    var exercised = 0
+    for _ in 0..<300 {
+      var assembler = makeAssembler()
+      _ = assembler.process(
+        .fragment(segment: seg(randomWords(using: &rng)), speaker: nil, at: assemblerT0))
+      let within = assembler.process(.taskRestart(at: assemblerT0.addingTimeInterval(gap - 0.5)))
+      #expect(closedCount(in: within) == 0, "task restart within the gap closed the transmission")
+      let after = assembler.process(.taskRestart(at: assemblerT0.addingTimeInterval(gap + 0.5)))
+      #expect(closedCount(in: after) == 1, "task restart after the gap did not close")
+      exercised += 1
+    }
+    #expect(exercised >= 270, "too few cases reached the assertion: \(exercised)")
+  }
+
+  // The classification is refreshed as the accumulated text grows: a card flips from filtered to
+  // displayed once an appended fragment makes it relevant. (Reviewer gap — exercises the refresh.)
+  @Test func classificationRefreshesAsAccumulatedTextGrows() {
+    var rng = SeededGenerator(seed: 0x7A55_0009)
+    var exercised = 0
+    for _ in 0..<200 {
+      var assembler = TransmissionAssembler(
+        config: .default, localeIdentifier: "en-US",
+        classify: { text, _, _ in
+          text.contains("tower") ? .displayed(.callSignMatch) : .filtered(.nonRelevant)
+        })
+      let firstWord = ["cleared", "contact", "ground", "runway"].randomElement(using: &rng)!
+      let first = assembler.process(
+        .fragment(segment: seg(firstWord), speaker: nil, at: assemblerT0))
+      #expect(lastClassification(in: first) == .filtered(.nonRelevant))
+      let second = assembler.process(
+        .fragment(segment: seg("tower"), speaker: nil, at: assemblerT0.addingTimeInterval(0.2)))
+      #expect(lastClassification(in: second) == .displayed(.callSignMatch))
+      exercised += 1
+    }
+    #expect(exercised >= 180, "too few cases reached the assertion: \(exercised)")
   }
 }
 
@@ -185,6 +252,14 @@ private func closedCount(in updates: [TransmissionUpdate]) -> Int {
 
 private func lastText(in updates: [TransmissionUpdate]) -> String? {
   updates.last.map(\.transmission.text)
+}
+
+private func lastClassification(in updates: [TransmissionUpdate]) -> TransmissionClassification? {
+  updates.last.map(\.transmission.classification)
+}
+
+private func randomDistinctWords(count: Int, using rng: inout SeededGenerator) -> [String] {
+  Array(assemblerWords.shuffled(using: &rng).prefix(count))
 }
 
 private struct UpdateProjection: Equatable {
