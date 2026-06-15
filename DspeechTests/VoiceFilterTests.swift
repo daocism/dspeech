@@ -1089,6 +1089,23 @@ struct VoiceFilterPipelineTests {
     }
   }
 
+  // .mixed (best cosine in [0.50, 0.72)) is reachable in production and routes through
+  // indicator(for:) to its own .mixedSpeakerCandidate badge — the one indicator path not covered at
+  // the pipeline level. Pins it so the mixed-band badge can't silently regress. (2026-06-15 backlog.)
+  @Test func mixedSpeakerDecisionYieldsMixedSpeakerCandidateIndicator() {
+    let pipeline = VoiceFilterPipeline(
+      identifier: UnavailableLocalSpeakerIdentifier(),
+      storage: InMemoryStorage()
+    )
+    pipeline.setEnabled(true)
+    let dec = pipeline.decide(
+      text: "traffic, two o'clock, three miles",
+      speaker: .mixed(bestPilotScore: 0.62),
+      timestamp: Date(timeIntervalSince1970: 0)
+    )
+    #expect(dec.indicator == .mixedSpeakerCandidate)
+  }
+
   @Test func decideRespectsDisabledFlag() {
     let store = InMemoryStorage()
     store.callSign = CallSign(raw: "N123AB")
@@ -1356,6 +1373,50 @@ struct VoiceFilterPipelineTests {
     #expect(pipeline.profiles.count == 2)
     #expect(first.id != second.id)
     #expect(store.profiles.count == 2)
+  }
+
+  // ENROLLMENT-QUALITY ASYMMETRY (intentional, 2026-06-14 incident): enrollment has NO quality gate
+  // — the 0.25 minQuality floor was calibrated to reject received ATC noise for CLASSIFICATION and it
+  // wrongly rejected a quietly-spoken on-device enrollment. Matching gates only the INCOMING
+  // candidate's quality and never reads the enrolled profile's quality. These pin all three halves so
+  // the asymmetry can't silently flip into rejecting quiet enrollments or trusting noisy candidates.
+  @Test func enrollAcceptsLowQualitySampleByDesign() async throws {
+    let store = InMemoryStorage()
+    let pipeline = VoiceFilterPipeline(
+      identifier: FakeIdentifier(vector: VoicePrintVector(values: [1, 0, 0, 0], quality: 0.05)),
+      storage: store,
+      modelPackStorage: InMemoryModelPackStorage(.installed(Self.installedPack()))
+    )
+    let profile = try await pipeline.enrollCrewMember(
+      label: "Quiet Captain", samples: [0, 1], sampleRate: 16_000)
+    #expect(pipeline.profiles.count == 1)
+    #expect(profile.voicePrint.quality == 0.05)
+    #expect(store.profiles.first?.voicePrint.quality == 0.05)
+  }
+
+  @Test func matcherIgnoresEnrolledProfileQuality() {
+    // enrolled profile is BELOW the 0.25 floor; the incoming candidate is high quality + identical.
+    let profile = PilotVoiceProfile(
+      label: "Captain",
+      voicePrint: VoicePrintVector(values: [1, 0], quality: 0.05),
+      enrolledAt: Date(timeIntervalSince1970: 0))
+    let candidate = VoicePrintVector(values: [1, 0], quality: 0.9)
+    let decision = SpeakerMatcher.match(candidate: candidate, profiles: [profile])
+    guard case .pilot(let score) = decision else {
+      Issue.record("profile quality must not gate matching; got \(decision)")
+      return
+    }
+    #expect(score > 0.99)
+  }
+
+  @Test func matcherRejectsLowQualityIncomingCandidate() {
+    // the OTHER half of the asymmetry: the incoming candidate IS gated on quality.
+    let profile = PilotVoiceProfile(
+      label: "Captain",
+      voicePrint: VoicePrintVector(values: [1, 0], quality: 0.9),
+      enrolledAt: Date(timeIntervalSince1970: 0))
+    let candidate = VoicePrintVector(values: [1, 0], quality: 0.1)
+    #expect(SpeakerMatcher.match(candidate: candidate, profiles: [profile]) == .insufficientSpeech)
   }
 
   @Test func reEnrollReplacesInPlacePreservingIdAndLabel() async throws {
@@ -3143,5 +3204,47 @@ private actor ScriptedModelPackInstaller: ModelPackInstalling {
   func fail(_ error: Error, at index: Int) {
     guard attempts.indices.contains(index) else { return }
     attempts[index].continuation.resume(throwing: error)
+  }
+}
+
+struct VoiceFilterStorageProtectionTests {
+  // why: data-at-rest protection is device-enforced and the Simulator does not honour it, so we
+  // cannot read the attribute back; instead we spy the exact setAttributes call the store makes and
+  // assert it REQUESTS .complete for the voiceprint file (stricter than the transcript store's
+  // completeUntilFirstUserAuthentication — voiceprints stay encrypted until first unlock). Audit gap.
+  private final class ProtectionSpyFileManager: FileManager, @unchecked Sendable {
+    private(set) var protectionCalls: [(path: String, protection: FileProtectionType?)] = []
+    override func setAttributes(
+      _ attributes: [FileAttributeKey: Any], ofItemAtPath path: String
+    ) throws {
+      protectionCalls.append((path, attributes[.protectionKey] as? FileProtectionType))
+      try super.setAttributes(attributes, ofItemAtPath: path)
+    }
+  }
+
+  @Test func voiceProfileFileRequestsCompleteProtection() throws {
+    let dir = URL(fileURLWithPath: NSTemporaryDirectory())
+      .appendingPathComponent("dspeech-vf-\(UUID().uuidString)", isDirectory: true)
+    let profileURL = dir.appendingPathComponent("profiles.json")
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let spy = ProtectionSpyFileManager()
+    let store = UserDefaultsVoiceFilterStorage(
+      defaults: UserDefaults(suiteName: "dspeech.tests.vfstorage.\(UUID().uuidString)")!,
+      profileStoreURL: profileURL,
+      fileManager: spy)
+
+    store.saveProfiles([
+      PilotVoiceProfile(
+        label: "Captain",
+        voicePrint: VoicePrintVector(values: [Float](repeating: 0.1, count: 256), quality: 0.9),
+        enrolledAt: Date(timeIntervalSince1970: 0))
+    ])
+
+    #if os(iOS)
+      #expect(
+        !spy.protectionCalls.isEmpty, "voiceprint file must request data-at-rest protection")
+      let wrong = spy.protectionCalls.filter { $0.protection != .complete }
+      #expect(wrong.isEmpty, "voiceprints must use .complete protection; got \(wrong.map(\.path))")
+    #endif
   }
 }
