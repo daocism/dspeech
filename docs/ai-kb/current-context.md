@@ -175,6 +175,13 @@ Codex GPT-5.5 workers = implementation).
   DictationTranscriber is the migration target at iOS 27 re-eval.
 - ADR 0010: keep-awake, auto-resume, NO UIBackgroundModes audio without a superseding ADR
   signed by Andrei. F8 stop-on-background stands.
+- ADR 0011: Apple default + WhisperKit selectable (multilingual).
+- ADR 0012 (2026-06-22, PLANNING): third ASR engine — Parakeet EOU streaming via FluidAudio
+  (English-only, lowest-latency 160ms chunks, true streaming + built-in EOU), default policy
+  unchanged. Phase 0 recon LANDED (`FluidAudio.StreamingEouAsrManager` API verified against
+  pinned commit 8048812); engine code BLOCKED on Phase 1 (need network-side pinned-revision
+  + per-file SHA-256 manifest before any code lands, per CLAUDE.md hard rule #3). Multi-commit
+  implementation spec at `docs/PLAN-2026-06-22-parakeet-third-engine.md`.
 - Spec D1-D5 (docs/SPEC-2026-06-11-production-readiness.md) bind all remediation work.
 
 ## In flight (wave 4) + open tail
