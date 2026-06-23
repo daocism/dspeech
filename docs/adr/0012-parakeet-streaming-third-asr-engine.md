@@ -1,7 +1,7 @@
 # ADR 0012 — Third ASR engine: Parakeet EOU streaming (English-only) via FluidAudio
 
 Date: 2026-06-22
-Status: accepted (planning); implementation across a follow-up wave (see `docs/PLAN-2026-06-22-parakeet-third-engine.md`)
+Status: accepted (landed 2026-06-23 on `feat/parakeet-third-engine`); implemented per `docs/PLAN-2026-06-22-parakeet-third-engine.md`
 Relates: ADR 0009 (SFSpeechRecognizer stays), ADR 0011 (Apple default + WhisperKit selectable), ADR 0007/0008 (FluidAudio speaker pack acquisition pattern), CLAUDE.md hard rules #1/#2 (local-only, no fake AI)
 
 ## Decision
