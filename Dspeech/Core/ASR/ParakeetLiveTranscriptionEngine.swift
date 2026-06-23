@@ -249,6 +249,10 @@ final class ParakeetLiveTranscriptionEngine: LiveTranscriptionEngine {
     // EOU fires per session and the partial transcript grows unbounded. Reset even on an empty
     // EOU (the model still latched). The top guard already dropped stale/stopped generations
     // before any await; reset() runs on the (free) FluidAudio actor, not re-entrant here.
+    // Bounded tradeoff: any tokens FluidAudio decodes between the EOU chunk and the end of the
+    // current processBufferedAudio drain are wiped by this reset (the EOU transcript was already
+    // snapshotted by value in the callback). That window is sub-chunk audio inside the 1280ms EOU
+    // silence — acceptable, and the only alternative (one segment per whole session) is far worse.
     await transcriber.reset()
   }
 

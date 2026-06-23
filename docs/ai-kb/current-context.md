@@ -36,6 +36,16 @@ Landed (atomic, behavior-preserving until the UI commit; full DspeechTests suite
   the pack isn't installed); SettingsView picker offers Parakeet only for en-* locales (hidden
   otherwise; switching to non-en while selected resets to Apple) + a model-install section.
 
+Adversarial self-review (two passes) found + fixed three real defects before merge: (1) CRITICAL —
+the engine never called `reset()`, but FluidAudio's `StreamingEouAsrManager` latches `eouDetected =
+true` and accumulates tokens across the whole session, so EXACTLY ONE segment fired per session and
+the partial grew unbounded; fixed by resetting after every EOU (verified against the source). (2)
+CRITICAL — fire-and-forget model teardown raced a Stop→Start `loadModels` and wiped the fresh models;
+fixed with a serialized, awaitable teardown chain that `start()` waits on. (3) HIGH — the 213 MB
+encoder-weights SHA-256 ran on the MainActor with a full heap load; fixed with `.mappedIfSafe` +
+detached hashing. New regression tests cover all three plus the previously-uncovered capture-failure,
+model-load-throw, and consume-forwarding branches. Second review pass: zero actionable findings.
+
 OPEN (deferred, non-blocking): (1) wire a real per-segment confidence when FluidAudio surfaces
 one for the streaming path (PLAN open-Q1); (2) voice-filter speaker classification on Parakeet
 EOU segments once utterance-boundary samples are available; (3) `scripts/verify-primary-scenario.sh`
