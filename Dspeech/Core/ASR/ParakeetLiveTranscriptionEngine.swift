@@ -51,6 +51,11 @@ final class ParakeetLiveTranscriptionEngine: LiveTranscriptionEngine {
   private var lifecycleGeneration = 0
   private var eventContinuations: [UUID: AsyncStream<LiveTranscriptionEvent>.Continuation] = [:]
   private var consumeTask: Task<Void, Never>?
+  // why: the model teardown (FluidAudio cleanup()) runs off the MainActor and must be SERIALIZED
+  // and awaitable — a Stop→Start race would otherwise let cleanup() wipe the models that the next
+  // start()'s loadModels() just loaded, leaving a loaded-but-nil manager that crashes on the next
+  // chunk. start() awaits this before reloading; each cleanup chains behind the previous one.
+  private var teardownTask: Task<Void, Never>?
   private var latestPartialText: String?
 
   init(
@@ -118,6 +123,14 @@ final class ParakeetLiveTranscriptionEngine: LiveTranscriptionEngine {
     }
 
     do {
+      // why: a previous session's teardown frees the CoreML models off the MainActor; wait for it
+      // to finish before reloading, or the two race on FluidAudio's actor and the freshly-loaded
+      // models get wiped mid-session (finding #2/#3). teardownTask is nil on a clean first start.
+      await teardownTask?.value
+      guard isCurrentStartup(generation) else {
+        _ = cleanup()
+        return
+      }
       try await transcriber.loadModels(from: modelFolderURL)
       guard isCurrentStartup(generation) else {
         _ = cleanup()
@@ -191,15 +204,19 @@ final class ParakeetLiveTranscriptionEngine: LiveTranscriptionEngine {
     }
     await transcriber.setEouCallback { [weak self] text in
       Task { @MainActor [weak self] in
-        self?.handleEndOfUtterance(text, generation: generation)
+        await self?.handleEndOfUtterance(text, generation: generation)
       }
     }
   }
 
   private func consume(_ captured: LiveCapturedAudioBuffer) async {
+    await consumeSamples(captured.samples, sampleRate: captured.sampleRate)
+  }
+
+  private func consumeSamples(_ samples: [Float], sampleRate: Double) async {
     guard status == .listening else { return }
     do {
-      try await transcriber.appendSamples(captured.samples, sampleRate: captured.sampleRate)
+      try await transcriber.appendSamples(samples, sampleRate: sampleRate)
       try await transcriber.processBufferedAudio()
     } catch {
       handleCaptureConduitFailure("parakeet-process-failed: \(error.localizedDescription)")
@@ -214,18 +231,25 @@ final class ParakeetLiveTranscriptionEngine: LiveTranscriptionEngine {
     emit(.partial(trimmed))
   }
 
-  private func handleEndOfUtterance(_ text: String, generation: Int) {
+  private func handleEndOfUtterance(_ text: String, generation: Int) async {
     guard lifecycleGeneration == generation, status == .listening else { return }
     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
     latestPartialText = nil
-    guard !trimmed.isEmpty else { return }
-    let segment = TranscriptSegment(
-      text: trimmed,
-      confidence: Self.unknownConfidence,
-      sourceLanguageCode: Self.sourceLanguageCode,
-      source: .liveATC
-    )
-    emit(.segment(segment, speaker: nil))
+    if !trimmed.isEmpty {
+      let segment = TranscriptSegment(
+        text: trimmed,
+        confidence: Self.unknownConfidence,
+        sourceLanguageCode: Self.sourceLanguageCode,
+        source: .liveATC
+      )
+      emit(.segment(segment, speaker: nil))
+    }
+    // why: REQUIRED after every EOU — FluidAudio latches `eouDetected = true` and accumulates
+    // tokens across the whole session, and only reset() clears them. Without this, exactly one
+    // EOU fires per session and the partial transcript grows unbounded. Reset even on an empty
+    // EOU (the model still latched). The top guard already dropped stale/stopped generations
+    // before any await; reset() runs on the (free) FluidAudio actor, not re-entrant here.
+    await transcriber.reset()
   }
 
   private func handleEngineConfigurationChange() {
@@ -268,10 +292,16 @@ final class ParakeetLiveTranscriptionEngine: LiveTranscriptionEngine {
     let cleanupResult = audioConduit.stop()
     consumeTask?.cancel()
     consumeTask = nil
-    // why: release the CoreML models off the MainActor. The generation bump above already
-    // invalidates any stray callback, so a late cleanup completing is harmless.
+    // why: release the CoreML models off the MainActor, SERIALIZED behind any in-flight teardown
+    // and awaitable by the next start() (which waits on teardownTask before loadModels). This
+    // prevents a Stop→Start race from wiping the freshly-loaded models. The generation bump above
+    // already invalidates any stray callback, so a late cleanup completing is harmless.
     let transcriber = transcriber
-    Task { await transcriber.cleanup() }
+    let previousTeardown = teardownTask
+    teardownTask = Task {
+      await previousTeardown?.value
+      await transcriber.cleanup()
+    }
     return cleanupResult
   }
 
@@ -306,6 +336,13 @@ final class ParakeetLiveTranscriptionEngine: LiveTranscriptionEngine {
 
     func simulateCaptureConduitFailureForTesting(_ slug: String) {
       handleCaptureConduitFailure(slug)
+    }
+
+    // why: exercises the real production consume path (appendSamples → processBufferedAudio
+    // forwarding to the transcriber) without a live mic, which the headless simulator can't
+    // acquire. Mirrors the WhisperKit engine's appendSamplesForTesting seam intent.
+    func consumeSamplesForTesting(_ samples: [Float], sampleRate: Double) async {
+      await consumeSamples(samples, sampleRate: sampleRate)
     }
   #endif
 }

@@ -15,7 +15,11 @@ protocol ParakeetLiveStreaming: Sendable {
   /// Append 16 kHz mono Float32 samples; the adapter resamples internally if needed.
   func appendSamples(_ samples: [Float], sampleRate: Double) async throws
   func processBufferedAudio() async throws
-  func reset() async throws
+  // why: FluidAudio's StreamingEouAsrManager.reset() is `async` but NOT throwing, so the protocol
+  // matches reality (no throws-lie). reset() is REQUIRED after every finalized utterance: the
+  // manager latches `eouDetected = true` and accumulates tokens across the whole session — only
+  // reset() clears them, so without it exactly one EOU ever fires. See ParakeetLiveTranscriptionEngine.
+  func reset() async
   func cleanup() async
 }
 
@@ -55,11 +59,7 @@ actor SystemParakeetStreamingAdapter: ParakeetLiveStreaming {
     try await manager.processBufferedAudio()
   }
 
-  func reset() async throws {
-    // why: FluidAudio's StreamingEouAsrManager.reset() is `async` but NOT throwing;
-    // the protocol keeps `throws` so a fake conformance may surface a failure, but the
-    // real bridge has nothing to throw. `try` here would be a warnings-as-errors build
-    // failure ("no calls to throwing functions occur within 'try'").
+  func reset() async {
     await manager.reset()
   }
 

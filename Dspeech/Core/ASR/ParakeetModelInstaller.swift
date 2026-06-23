@@ -501,7 +501,15 @@ final class ParakeetModelInstaller {
         localModelPath: finalModelFolder.path
       )
     } catch {
-      try? Self.removeIfPresent(stagingRoot)
+      // why: best-effort staging teardown, but a removal failure is an OS-level signal — log it
+      // (never silently swallow per project error rules) rather than leak orphan staging folders.
+      do {
+        try Self.removeIfPresent(stagingRoot)
+      } catch let teardownError {
+        DspeechLog.engine.error(
+          "parakeet staging teardown failed error=\(teardownError.localizedDescription, privacy: .public)"
+        )
+      }
       throw error
     }
   }
@@ -532,8 +540,7 @@ final class ParakeetModelInstaller {
       guard FileManager.default.fileExists(atPath: destination.path) else {
         throw ParakeetModelInstallError.fileMissingAfterDownload(expectedFile.relativePath)
       }
-      let data = try Data(contentsOf: destination)
-      let computedSHA256 = Self.hexDigest(SHA256.hash(data: data))
+      let (computedSHA256, actualSizeBytes) = try await Self.fileDigest(at: destination)
       // why: integrity gate — compare the just-downloaded bytes against the baked-in pinned
       // hash before accepting the file. A mismatch throws (never fail-open); the staging folder
       // is then torn down by downloadAndInstallModel's catch, so a tampered file never installs.
@@ -547,10 +554,12 @@ final class ParakeetModelInstaller {
       let file = ParakeetInstalledModelFile(
         relativePath: expectedFile.relativePath,
         sha256: computedSHA256,
-        sizeBytes: Int64(data.count)
+        sizeBytes: actualSizeBytes
       )
       installedFiles.append(file)
-      completedBytes += expectedFile.sizeBytes
+      // why: advance by the actual received size (== manifest size for any file that passed the
+      // checksum gate above), so progress can never diverge or exceed 1.0 on a bad download.
+      completedBytes += actualSizeBytes
       transition(
         to: .downloading(
           ParakeetModelDownloadProgress(
@@ -592,8 +601,20 @@ final class ParakeetModelInstaller {
     try mutableURL.setResourceValues(values)
   }
 
-  private static func hexDigest(_ digest: SHA256.Digest) -> String {
+  private nonisolated static func hexDigest(_ digest: SHA256.Digest) -> String {
     digest.map { String(format: "%02x", $0) }.joined()
+  }
+
+  // why: read + SHA-256 OFF the MainActor and memory-mapped, so verifying the ~213 MB encoder
+  // weights neither blocks the UI nor loads the whole file into the heap (mmap pages are hashed
+  // lazily). Returns the actual on-disk size so progress reflects bytes truly received. (finding #4/#5.)
+  private nonisolated static func fileDigest(at url: URL) async throws -> (
+    sha256: String, sizeBytes: Int64
+  ) {
+    try await Task.detached(priority: .utility) {
+      let data = try Data(contentsOf: url, options: .mappedIfSafe)
+      return (hexDigest(SHA256.hash(data: data)), Int64(data.count))
+    }.value
   }
 }
 

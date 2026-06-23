@@ -183,6 +183,122 @@ struct ParakeetLiveTranscriptionEngineTests {
     collector.cancel()
   }
 
+  // why: regression for the FluidAudio EOU latch — StreamingEouAsrManager sets eouDetected=true
+  // and accumulates tokens across the whole session; only reset() clears them. The engine MUST
+  // reset after each EOU or exactly one segment ever fires. Assert reset is called per EOU and a
+  // second utterance still finalizes.
+  @Test func endOfUtteranceResetsTranscriberSoNextUtteranceCanFire() async {
+    let transcriber = FakeParakeetLiveStreaming()
+    let engine = ParakeetLiveTranscriptionEngine(
+      transcriber: transcriber,
+      installedModelFolderURL: { URL(fileURLWithPath: "/tmp/parakeet", isDirectory: true) },
+      localeProvider: { "en-US" },
+      authorizer: SpyParakeetAuthorizer(microphoneAllowed: true)
+    )
+    let recorder = ParakeetEventRecorder()
+    let collector = collect(engine.events(), into: recorder)
+    await engine.primeListeningForTesting(acquireCapture: false)
+
+    await transcriber.fireEndOfUtterance("tower one cleared to land")
+    #expect(await waitForEvent({ await recorder.segments().count == 1 }))
+    #expect(await waitForEvent({ await transcriber.resetCount() == 1 }))
+
+    await transcriber.fireEndOfUtterance("ground one taxi to gate")
+    #expect(await waitForEvent({ await recorder.segments().count == 2 }))
+    #expect(await waitForEvent({ await transcriber.resetCount() == 2 }))
+
+    collector.cancel()
+    engine.stop()
+  }
+
+  @Test func captureFailureCommitsPendingPartialBeforeFailedStatus() async {
+    let transcriber = FakeParakeetLiveStreaming()
+    let engine = ParakeetLiveTranscriptionEngine(
+      transcriber: transcriber,
+      installedModelFolderURL: { URL(fileURLWithPath: "/tmp/parakeet", isDirectory: true) },
+      localeProvider: { "en-US" },
+      arbiter: AudioCaptureArbiter(),
+      audioSession: SpyParakeetAudioSession(),
+      authorizer: SpyParakeetAuthorizer(microphoneAllowed: true)
+    )
+    let recorder = ParakeetEventRecorder()
+    let collector = collect(engine.events(), into: recorder)
+    await engine.primeListeningForTesting(acquireCapture: true)
+
+    await transcriber.firePartial("pending words")
+    #expect(await waitForEvent({ await recorder.partialTexts() == ["pending words"] }))
+    engine.simulateCaptureConduitFailureForTesting("capture-failed")
+
+    #expect(await waitForEvent({ await recorder.failedStatuses().count == 1 }))
+    let committed = await recorder.interimRestartSegments().first
+    #expect(committed?.text == "pending words")
+    #expect(committed?.confidence == 0)
+    #expect(committed?.sourceLanguageCode == "en")
+    #expect(committed?.isInterimRestartCommit == true)
+    let events = await recorder.recordedEvents()
+    #expect(indexOfInterimSegment(in: events) < indexOfFailedStatus(in: events))
+    #expect(engine.status == .failed("capture-failed"))
+
+    collector.cancel()
+  }
+
+  @Test func startFailsWhenModelLoadThrows() async {
+    let transcriber = FakeParakeetLiveStreaming()
+    await transcriber.failLoadModels()
+    let engine = ParakeetLiveTranscriptionEngine(
+      transcriber: transcriber,
+      installedModelFolderURL: { URL(fileURLWithPath: "/tmp/parakeet", isDirectory: true) },
+      localeProvider: { "en-US" },
+      audioSession: SpyParakeetAudioSession(),
+      authorizer: SpyParakeetAuthorizer(microphoneAllowed: true)
+    )
+
+    await engine.start()
+
+    guard case .failed(let slug) = engine.status else {
+      Issue.record("expected failed status, got \(engine.status)")
+      return
+    }
+    #expect(slug.hasPrefix("start-failed"))
+  }
+
+  // why: covers the production consume path (appendSamples → processBufferedAudio forwarding),
+  // which primeListeningForTesting(acquireCapture:) otherwise leaves untested.
+  @Test func consumeForwardsSamplesToTranscriberAndProcesses() async {
+    let transcriber = FakeParakeetLiveStreaming()
+    let engine = ParakeetLiveTranscriptionEngine(
+      transcriber: transcriber,
+      installedModelFolderURL: { URL(fileURLWithPath: "/tmp/parakeet", isDirectory: true) },
+      localeProvider: { "en-US" },
+      authorizer: SpyParakeetAuthorizer(microphoneAllowed: true)
+    )
+    let collector = collect(engine.events(), into: ParakeetEventRecorder())
+    await engine.primeListeningForTesting(acquireCapture: false)
+
+    await engine.consumeSamplesForTesting([Float](repeating: 0.1, count: 1600), sampleRate: 16_000)
+    await engine.consumeSamplesForTesting([Float](repeating: 0.2, count: 800), sampleRate: 16_000)
+
+    #expect(await transcriber.appendedCounts() == [1600, 800])
+    #expect(await transcriber.processCount() == 2)
+
+    collector.cancel()
+    engine.stop()
+  }
+
+  private func indexOfInterimSegment(in events: [LiveTranscriptionEvent]) -> Int {
+    events.firstIndex {
+      if case .segment(let segment, _) = $0 { return segment.isInterimRestartCommit }
+      return false
+    } ?? Int.max
+  }
+
+  private func indexOfFailedStatus(in events: [LiveTranscriptionEvent]) -> Int {
+    events.firstIndex {
+      if case .status(.failed) = $0 { return true }
+      return false
+    } ?? Int.max
+  }
+
   private func collect(
     _ events: AsyncStream<LiveTranscriptionEvent>,
     into recorder: ParakeetEventRecorder
@@ -215,6 +331,10 @@ private actor ParakeetEventRecorder {
     events.append(event)
   }
 
+  func recordedEvents() -> [LiveTranscriptionEvent] {
+    events
+  }
+
   func partialTexts() -> [String] {
     events.compactMap {
       if case .partial(let text) = $0 { return text }
@@ -229,6 +349,17 @@ private actor ParakeetEventRecorder {
     }
   }
 
+  func interimRestartSegments() -> [TranscriptSegment] {
+    segments().filter(\.isInterimRestartCommit)
+  }
+
+  func failedStatuses() -> [LiveTranscriptionStatus] {
+    events.compactMap {
+      if case .status(let status) = $0, case .failed = status { return status }
+      return nil
+    }
+  }
+
   func lastSegmentSpeaker() -> SpeakerMatchDecision? {
     for event in events.reversed() {
       if case .segment(_, let speaker) = event { return speaker }
@@ -237,15 +368,24 @@ private actor ParakeetEventRecorder {
   }
 }
 
+private struct FakeParakeetLoadError: Error {}
+
 private actor FakeParakeetLiveStreaming: ParakeetLiveStreaming {
   private var folders: [URL] = []
   private var partialCallback: (@Sendable (String) -> Void)?
   private var eouCallback: (@Sendable (String) -> Void)?
   private var appendedSampleCounts: [Int] = []
-  private var processCount = 0
+  private var processCalls = 0
   private var cleanupCalls = 0
+  private var resetCalls = 0
+  private var loadShouldThrow = false
+
+  func failLoadModels() {
+    loadShouldThrow = true
+  }
 
   func loadModels(from folderURL: URL) async throws {
+    if loadShouldThrow { throw FakeParakeetLoadError() }
     folders.append(folderURL)
   }
 
@@ -262,10 +402,12 @@ private actor FakeParakeetLiveStreaming: ParakeetLiveStreaming {
   }
 
   func processBufferedAudio() async throws {
-    processCount += 1
+    processCalls += 1
   }
 
-  func reset() async throws {}
+  func reset() async {
+    resetCalls += 1
+  }
 
   func cleanup() async {
     cleanupCalls += 1
@@ -281,6 +423,9 @@ private actor FakeParakeetLiveStreaming: ParakeetLiveStreaming {
 
   func loadedFolders() -> [URL] { folders }
   func cleanupCount() -> Int { cleanupCalls }
+  func resetCount() -> Int { resetCalls }
+  func processCount() -> Int { processCalls }
+  func appendedCounts() -> [Int] { appendedSampleCounts }
 }
 
 @MainActor
