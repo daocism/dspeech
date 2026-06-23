@@ -26,41 +26,55 @@ unreferenced from product code paths until the wiring commit.
   `~/Library/Application Support/FluidAudio/Models/parakeet-eou-streaming/<repo>/`.
 - ✅ ADR-0012 documents the architectural decision (this PLAN's parent).
 
-## Phase 1 — Hash manifest prerequisite (BLOCKING, requires network)
+## Phase 1 — Hash manifest (LANDED 2026-06-23, resolved against HuggingFace)
 
-**Cannot land any code in Phase 2+ without this.** The pinned manifest requires:
+Pinned revision and per-file SHA-256 manifest, ready to paste into
+`ParakeetModelPackInstaller.swift`:
 
-1. Resolve the current HEAD revision SHA of `FluidInference/parakeet-realtime-eou-120m-coreml`
-   from HuggingFace.
-2. Download all files under the `160ms/` subpath at that revision.
-3. Compute per-file SHA-256 hashes.
-4. Record (revision, file list, sizes, hashes) into the new
-   `ParakeetModelPackInstaller.swift` `ExpectedModelFile` constants.
-
-The CLI commands (run from a network-enabled host):
-
-```bash
-REV=$(curl -s https://huggingface.co/api/models/FluidInference/parakeet-realtime-eou-120m-coreml \
-        | jq -r '.sha')
-echo "Pinned revision: $REV"
-mkdir -p /tmp/parakeet-pin
-cd /tmp/parakeet-pin
-# Discover files under 160ms/ subpath at that revision (HF API)
-curl -s "https://huggingface.co/api/models/FluidInference/parakeet-realtime-eou-120m-coreml/tree/$REV/160ms" \
-  | jq -r '.[] | .path'
-# Download each (or use git lfs clone with revision checkout)
-# For each file F:
-#   curl -L "https://huggingface.co/FluidInference/parakeet-realtime-eou-120m-coreml/resolve/$REV/$F" -o "$F"
-#   shasum -a 256 "$F"
-#   stat -f '%z' "$F"   # file size
+```
+Repository:  FluidInference/parakeet-realtime-eou-120m-coreml
+PinnedRev:   40a23f4c0b333aa17ad8c0f2ea47ec2347f2f355
+SubPath:     160ms/
+TotalBytes:  224_031_731  (~213.65 MiB)
+License:     nvidia-open-model-license
+Language:    en (English-only)
+Resolved:    2026-06-23
 ```
 
-**Acceptance criterion for Phase 1:** A populated `expectedModelFiles: [ExpectedModelFile]`
-array with hashes is ready to paste into `ParakeetModelPackInstaller.swift`. Total expected
-download size is calculated and recorded.
+| File (relative to `160ms/`) | Size (bytes) | SHA-256 |
+|---|---:|---|
+| `streaming_encoder.mlmodelc/analytics/coremldata.bin` | 243 | `a981b257db79b4f86e6fa06a92562160a0ae71554746c24af24d8634b85f0356` |
+| `streaming_encoder.mlmodelc/coremldata.bin` | 670 | `e762abc60d999bcd10aab985b68191a602f2e8e03165cf08671c60f93936037a` |
+| `streaming_encoder.mlmodelc/metadata.json` | 5_327 | `75be31534cdd91711b08ba3a46046523eb9be9909618cd569cce1ea79e842a95` |
+| `streaming_encoder.mlmodelc/model.mil` | 639_646 | `709f9280eb0bba1fd698cc252275ba802885c2c53cdb60d399277281dac09b5d` |
+| `streaming_encoder.mlmodelc/weights/weight.bin` | 212_691_776 | `12cd781a4300b52b6687587b7d8e37e0ce5c8ccb1dbea036008275e6abf5070c` |
+| `decoder.mlmodelc/analytics/coremldata.bin` | 243 | `3996975a8cbc1949159c55605b3132b39b2484f51acbd55d796d93c70de02b49` |
+| `decoder.mlmodelc/coremldata.bin` | 497 | `c3ccbff963d8cf07e2be2bd56ea3384a89ea49628922c6bd95ff62e2ae57dc34` |
+| `decoder.mlmodelc/metadata.json` | 3_283 | `0977480649f2756894b0acfe2fdf4231a991f25e3fe02562bfb71b65ca944575` |
+| `decoder.mlmodelc/model.mil` | 7_409 | `b7c084a35bdbc887d69d6226cd533e2c11b2792c37d7352cf878f9f6f3c13555` |
+| `decoder.mlmodelc/weights/weight.bin` | 7_873_600 | `0b4cacecdcd9df79ab1e56de67230baf5a8664d2afe0bb8f3408eefa972cb2f4` |
+| `joint_decision.mlmodelc/analytics/coremldata.bin` | 243 | `5bca32ad130dcad6605cc00044c752aa5b45ef57d14c17f2d1a2fa49d6cf55b5` |
+| `joint_decision.mlmodelc/coremldata.bin` | 493 | `22d4abc4625b935ee035b5f8ce7cb28d1041b9b01c12173e287bf4b5f5d99625` |
+| `joint_decision.mlmodelc/metadata.json` | 3_181 | `e970ae87137730020690d24d971813db3633bbdfed602d43b6a9c84deced6dc8` |
+| `joint_decision.mlmodelc/model.mil` | 9_608 | `45e8590bc87e34c162b547e43a4f60e64db15b017f48395d7835a6867884804f` |
+| `joint_decision.mlmodelc/weights/weight.bin` | 2_794_182 | `7039b2010a269153f5a96edf28637f921a86ef8822f248f2d6712f7a6bce84b4` |
+| `vocab.json` | 17_437 | `83fd42ad33dae1bd3ceee6c0bb6c625f314cf0b2dc8430be441ac1e2643d5c36` |
 
-**Until Phase 1 is complete, Phase 2+ MUST NOT proceed.** Hardcoded fake hashes are
-explicitly banned by CLAUDE.md hard rule #3 (no placeholders).
+Reproduce / re-verify:
+
+```bash
+REV="40a23f4c0b333aa17ad8c0f2ea47ec2347f2f355"
+BASE="https://huggingface.co/FluidInference/parakeet-realtime-eou-120m-coreml/resolve/${REV}/160ms"
+for f in <see table above>; do
+  curl -fsSL -o "$f" "$BASE/$f"
+  shasum -a 256 "$f"
+done
+```
+
+`StreamingEouAsrManager.loadModels(from:)` only consumes the three `.mlmodelc`
+bundles + `vocab.json` (the preprocessor was replaced by FluidAudio's native
+Swift mel spectrogram). The `1280ms/` and `320ms/` subpaths are intentionally
+excluded — ADR-0012 ships only the 160ms variant.
 
 ## Phase 2 — Engine code (4 commits, atomic, behavior-preserving)
 
@@ -239,16 +253,54 @@ this commit just makes them reachable.
    option in a future wave?** Out of scope for this PLAN; revisit after Phase 4
    validation results.
 
-## What landed in this session (2026-06-22)
+## What landed in this session (2026-06-22 → 2026-06-23)
 
 - ✅ Phase 0 recon
 - ✅ ADR-0012
 - ✅ This PLAN doc
+- ✅ Phase 1 hash manifest (all 16 files SHA-256 + sizes resolved against HF, pinned
+  to revision `40a23f4c0b333aa17ad8c0f2ea47ec2347f2f355`)
+- ✅ Draft of `Dspeech/Core/ASR/ParakeetStreamingAdapter.swift` written to disk
+  (NOT yet wired into the Xcode project — see handoff below).
 
-## What blocks Phase 2 (engine code)
+## Handoff to user (BLOCKING, cannot proceed without)
 
-- ❌ Phase 1 hash manifest — requires network to HuggingFace + ~5 file downloads
-  + shasum computation. Cannot be done in a sandboxed session.
+The repo's steering extension blocks Claude from editing `project.pbxproj` while
+Xcode is open (correctly — direct pbxproj edits while Xcode is running can crash
+Xcode and corrupt the file). All file registration must happen via Xcode's UI.
 
-When Phase 1 completes, all subsequent phases are mechanical multi-commit work
-following this PLAN.
+**Action required from owner** (sequence below; ~3 minutes in Xcode UI):
+
+1. Open `Dspeech.xcodeproj` in Xcode.
+2. In the Project Navigator, expand `Dspeech > Dspeech > Core > ASR`.
+3. Right-click the `ASR` group → `Add Files to "Dspeech"…`.
+4. Navigate to `Dspeech/Dspeech/Core/ASR/` (relative to repo root) and select
+   `ParakeetStreamingAdapter.swift`.
+5. In the add-dialog: targets = **Dspeech only** (NOT the test targets), reference
+   type = `Create groups`, NOT `Create folder references`. Confirm.
+6. Verify the file shows up under `ASR` group and is added to the `Dspeech`
+   target (check the right-pane Target Membership).
+7. ⌘B to build — should still pass (the adapter is unreferenced from any other
+   code at this point; it's library code waiting for the engine to import it).
+8. Once green, commit the pbxproj change + the new Swift file together:
+   `git add Dspeech.xcodeproj/project.pbxproj Dspeech/Core/ASR/ParakeetStreamingAdapter.swift`
+   `git commit -m "feat(asr): add ParakeetStreamingAdapter (FluidAudio bridge)"`
+
+After step 8, the next Claude session continues with:
+
+- Commit 2.2 (engine): `ParakeetLiveTranscriptionEngine.swift` + tests, same
+  add-to-Xcode dance for both files.
+- Commit 2.3 (installer): `ParakeetModelInstaller.swift` + tests, with the hash
+  manifest from Phase 1 already pasted in.
+- Commits 3.1–3.2 (wiring): only existing files touched
+  (`RecognitionSettings.swift`, `ContentView.swift`, `SettingsView.swift`,
+  `Localizable.xcstrings`) — no pbxproj edits needed.
+
+## What blocks Phase 2.2+ (engine code, installer code)
+
+- ❌ Owner must perform the Xcode UI steps above for **every new Swift file**
+  Claude writes (~5 files total, one batch per commit).
+- ❌ For final installer verification, BuildProject + RunSomeTests must run
+  AFTER the file is registered in Xcode. Until then, Claude's
+  `XcodeRefreshCodeIssuesInFile` reports "file not found in project structure"
+  (which is what blocked verification of the in-disk adapter today).
