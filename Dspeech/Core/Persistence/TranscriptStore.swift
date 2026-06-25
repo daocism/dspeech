@@ -267,7 +267,8 @@ final class FileTranscriptStore: TranscriptStoring {
       } catch {
         throw TranscriptStoreError.ioFailure(error.localizedDescription)
       }
-      loaded.append(contentsOf: try decodeTransmissionLines(data, sessionID: sessionID))
+      let decoded: [Transmission] = try decodeLines(data, sessionID: sessionID)
+      loaded.append(contentsOf: decoded)
     }
     if fileManager.fileExists(atPath: openTransmissionURL(for: sessionID).path) {
       let data: Data
@@ -302,7 +303,8 @@ final class FileTranscriptStore: TranscriptStoring {
     } catch {
       throw TranscriptStoreError.ioFailure(error.localizedDescription)
     }
-    return Self.dedupedStopPlaceholders(try decodeSegmentLines(data, sessionID: sessionID))
+    let decoded: [TranscriptSegment] = try decodeLines(data, sessionID: sessionID)
+    return Self.dedupedStopPlaceholders(decoded)
   }
 
   func deleteSession(_ sessionID: UUID) throws {
@@ -574,22 +576,25 @@ final class FileTranscriptStore: TranscriptStoring {
     }
   }
 
-  private func decodeSegmentLines(_ data: Data, sessionID: UUID) throws -> [TranscriptSegment] {
+  // why: JSONL decode is generic in the row type — segments and transmissions share the same
+  // file layout (newline-delimited JSON, torn-tail tolerance). Keeping one implementation rules
+  // out asymmetric drift between the two readers.
+  private func decodeLines<Row: Decodable>(_ data: Data, sessionID: UUID) throws -> [Row] {
     guard !data.isEmpty else {
       return []
     }
 
     let endsWithNewline = data.last == Self.newline.first
     let lines = data.split(separator: Self.newline[0], omittingEmptySubsequences: false)
-    var segments: [TranscriptSegment] = []
-    segments.reserveCapacity(lines.count)
+    var rows: [Row] = []
+    rows.reserveCapacity(lines.count)
 
     for (index, line) in lines.enumerated() {
       if line.isEmpty && index == lines.count - 1 && endsWithNewline {
         continue
       }
       do {
-        segments.append(try decoder.decode(TranscriptSegment.self, from: Data(line)))
+        rows.append(try decoder.decode(Row.self, from: Data(line)))
       } catch {
         if index == lines.count - 1 && !endsWithNewline {
           continue
@@ -601,77 +606,47 @@ final class FileTranscriptStore: TranscriptStoring {
         )
       }
     }
-    return segments
+    return rows
   }
 
-  private func decodeTransmissionLines(_ data: Data, sessionID: UUID) throws -> [Transmission] {
-    guard !data.isEmpty else {
-      return []
+  // why: opening a write-to-end FileHandle has the same shape for segments and transmissions —
+  // exists check + writer + seekToEnd + uniform ioFailure mapping. Per-row cache management
+  // stays in the call sites so the two row kinds keep their own caches.
+  private func openAppendHandle(at fileURL: URL, missingMessage: @autoclosure () -> String)
+    throws -> FileHandle
+  {
+    guard fileManager.fileExists(atPath: fileURL.path) else {
+      throw TranscriptStoreError.ioFailure(missingMessage())
     }
-
-    let endsWithNewline = data.last == Self.newline.first
-    let lines = data.split(separator: Self.newline[0], omittingEmptySubsequences: false)
-    var transmissions: [Transmission] = []
-    transmissions.reserveCapacity(lines.count)
-
-    for (index, line) in lines.enumerated() {
-      if line.isEmpty && index == lines.count - 1 && endsWithNewline {
-        continue
-      }
-      do {
-        transmissions.append(try decoder.decode(Transmission.self, from: Data(line)))
-      } catch {
-        if index == lines.count - 1 && !endsWithNewline {
-          continue
-        }
-        throw TranscriptStoreError.decodingFailure(
-          sessionID: sessionID,
-          line: index + 1,
-          underlyingDescription: error.localizedDescription
-        )
-      }
+    do {
+      let handle = try FileHandle(forWritingTo: fileURL)
+      try handle.seekToEnd()
+      return handle
+    } catch {
+      throw TranscriptStoreError.ioFailure(error.localizedDescription)
     }
-    return transmissions
   }
 
   private func segmentAppendHandle(for sessionID: UUID) throws -> FileHandle {
     if let handle = segmentAppendHandles[sessionID] {
       return handle
     }
-
-    let fileURL = segmentsURL(for: sessionID)
-    guard fileManager.fileExists(atPath: fileURL.path) else {
-      throw TranscriptStoreError.ioFailure("Segments file is missing for \(sessionID)")
-    }
-
-    do {
-      let handle = try FileHandle(forWritingTo: fileURL)
-      try handle.seekToEnd()
-      segmentAppendHandles[sessionID] = handle
-      return handle
-    } catch {
-      throw TranscriptStoreError.ioFailure(error.localizedDescription)
-    }
+    let handle = try openAppendHandle(
+      at: segmentsURL(for: sessionID),
+      missingMessage: "Segments file is missing for \(sessionID)")
+    segmentAppendHandles[sessionID] = handle
+    return handle
   }
 
   private func transmissionAppendHandle(for sessionID: UUID) throws -> FileHandle {
     if let handle = transmissionAppendHandles[sessionID] {
       return handle
     }
-
-    let fileURL = transmissionsURL(for: sessionID)
-    guard fileManager.fileExists(atPath: fileURL.path) else {
-      throw TranscriptStoreError.ioFailure("Transmissions file is missing for \(sessionID)")
-    }
-
-    do {
-      let handle = try FileHandle(forWritingTo: fileURL)
-      try handle.seekToEnd()
-      transmissionAppendHandles[sessionID] = handle
-      return handle
-    } catch {
-      throw TranscriptStoreError.ioFailure(error.localizedDescription)
-    }
+    let handle = try openAppendHandle(
+      at: transmissionsURL(for: sessionID),
+      missingMessage: "Transmissions file is missing for \(sessionID)")
+    transmissionAppendHandles[sessionID] = handle
+    return handle
   }
 
   private func closeAppendHandle(for sessionID: UUID) throws {

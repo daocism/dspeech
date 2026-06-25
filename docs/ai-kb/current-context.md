@@ -2,6 +2,58 @@
 
 > Rolling 1-page pointer. Updated by `knowledge-curator` after every substantive run.
 
+## READ FIRST (2026-06-23)
+
+**Parakeet EOU is now the third ASR engine** (`feat/parakeet-third-engine`, ADR-0012
+LANDED). Three-engine roster: **Apple SFSpeechRecognizer = default** (ADR-0009/0011,
+unchanged), **WhisperKit = multilingual selectable** (ADR-0011), **Parakeet EOU 120M
+streaming (FluidAudio) = English-only selectable** (ADR-0012). Default policy unchanged —
+Parakeet is selectable, never auto-selected.
+
+Landed (atomic, behavior-preserving until the UI commit; full DspeechTests suite green,
+852 tests):
+- `ParakeetStreamingAdapter.swift` — `ParakeetLiveStreaming` protocol + actor bridge over
+  `FluidAudio.StreamingEouAsrManager` (160ms chunks). Protocol is AVAudioPCMBuffer-free so
+  tests substitute a fake without importing FluidAudio. NOTE: FluidAudio `reset()` is `async`
+  but NOT throwing — `try` there is a warnings-as-errors build break.
+- `ParakeetLiveTranscriptionEngine.swift` — `LiveTranscriptionEngine` driven by FluidAudio's
+  partial + EOU callbacks. English-only locale gate (`!hasPrefix("en")` → `.failed`), model-
+  not-installed guard, generation-guarded `@Sendable` callbacks that hop to MainActor before
+  touching state. EOU segments carry **confidence 0** (honest unknown — the streaming callback
+  yields text only, no confidence; `requiresVerification` is therefore true) and **speaker nil**
+  (FluidAudio's streaming API exposes no per-utterance sample window for the voice-filter gate,
+  unlike WhisperKit which holds the decode window). Both are deliberate, documented in-code; the
+  `bufferGate` is wired for API parity but not consulted for classification this round.
+- `ParakeetModelInstaller.swift` — pinned HF rev `40a23f4c`,
+  `FluidInference/parakeet-realtime-eou-120m-coreml`, 160ms variant (16 files), staged to
+  `Application Support/FluidAudio/Models/parakeet-realtime-eou-120m-coreml/160ms/`. **Supply-chain
+  upgrade vs the WhisperKit installer**: each file carries a baked-in SHA-256 and is verified
+  post-download; a mismatch throws `checksumMismatch`, tears down staging, never installs (no
+  fail-open). `expectedFiles` is injectable ONLY so tests can drive the verification path with
+  content they control (real model bytes can't be reproduced from a fake downloader).
+- Wiring: `TranscriptionEngineChoice.parakeet` (forward-only migration via the existing
+  unknown→.apple fallback); ContentView engine factory `.parakeet` arm (falls back to Apple when
+  the pack isn't installed); SettingsView picker offers Parakeet only for en-* locales (hidden
+  otherwise; switching to non-en while selected resets to Apple) + a model-install section.
+
+Adversarial self-review (two passes) found + fixed three real defects before merge: (1) CRITICAL —
+the engine never called `reset()`, but FluidAudio's `StreamingEouAsrManager` latches `eouDetected =
+true` and accumulates tokens across the whole session, so EXACTLY ONE segment fired per session and
+the partial grew unbounded; fixed by resetting after every EOU (verified against the source). (2)
+CRITICAL — fire-and-forget model teardown raced a Stop→Start `loadModels` and wiped the fresh models;
+fixed with a serialized, awaitable teardown chain that `start()` waits on. (3) HIGH — the 213 MB
+encoder-weights SHA-256 ran on the MainActor with a full heap load; fixed with `.mappedIfSafe` +
+detached hashing. New regression tests cover all three plus the previously-uncovered capture-failure,
+model-load-throw, and consume-forwarding branches. Second review pass: zero actionable findings.
+
+OPEN (deferred, non-blocking): (1) wire a real per-segment confidence when FluidAudio surfaces
+one for the streaming path (PLAN open-Q1); (2) voice-filter speaker classification on Parakeet
+EOU segments once utterance-boundary samples are available; (3) `scripts/verify-primary-scenario.sh`
++ `run-asr-eval.py` Parakeet arm on EN cockpit fixtures before any "Parakeet default" consideration
+(Phase 4, not yet done); (4) `.xcstrings` catalog entries for the new Parakeet UI strings are
+populated by an Xcode GUI build/export (headless xcodebuild only reformats the catalog), so they
+resolve to their English source at runtime until then.
+
 ## READ FIRST (2026-06-13)
 
 Testing reoriented per owner: the **simulator is for visual UI review only** (page
@@ -175,6 +227,14 @@ Codex GPT-5.5 workers = implementation).
   DictationTranscriber is the migration target at iOS 27 re-eval.
 - ADR 0010: keep-awake, auto-resume, NO UIBackgroundModes audio without a superseding ADR
   signed by Andrei. F8 stop-on-background stands.
+- ADR 0011: Apple default + WhisperKit selectable (multilingual).
+- ADR 0012 (2026-06-22, LANDED 2026-06-23 on `feat/parakeet-third-engine`): third ASR engine —
+  Parakeet EOU streaming via FluidAudio (English-only, lowest-latency 160ms chunks, true streaming
+  + built-in EOU), default policy unchanged. Adapter + engine + pinned-manifest installer (per-file
+  SHA-256 verification) + settings wiring + English-only picker exposure all landed; full
+  DspeechTests suite green. Phase 4 harness arm (EN cockpit fixtures) + real-confidence wiring
+  deferred (see the 2026-06-23 READ FIRST block). Spec at
+  `docs/PLAN-2026-06-22-parakeet-third-engine.md`.
 - Spec D1-D5 (docs/SPEC-2026-06-11-production-readiness.md) bind all remediation work.
 
 ## In flight (wave 4) + open tail

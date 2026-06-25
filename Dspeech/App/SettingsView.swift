@@ -36,6 +36,7 @@ struct SettingsView: View {
   // in-app language switch, no bundle swizzling.
   @State private var appLanguage: String = Self.currentAppLanguagePickerTag()
   @State private var whisperKitInstaller = WhisperKitModelInstaller()
+  @State private var parakeetInstaller = ParakeetModelInstaller()
 
   private static let appLanguages: [(code: String, name: String)] = [
     ("", String(localized: "System")),
@@ -251,12 +252,20 @@ struct SettingsView: View {
         Section {
           Picker(String(localized: "Engine"), selection: $recognition.engineChoice) {
             ForEach(TranscriptionEngineChoice.allCases) { choice in
-              Text(choice.displayName).tag(choice)
+              // why: Parakeet EOU is English-only — never offer it for a non-en recognition
+              // locale (the model would hallucinate on other languages). Hiding the option (vs
+              // disabling) avoids implying a configuration that can't apply. (ADR-0012.)
+              if choice != .parakeet || isParakeetSelectable {
+                Text(choice.displayName).tag(choice)
+              }
             }
           }
           .accessibilityIdentifier("recognition-engine-picker")
           if shouldShowWhisperKitModelRows {
             whisperKitModelContent
+          }
+          if shouldShowParakeetModelRows {
+            parakeetModelContent
           }
         } header: {
           Text(String(localized: "Recognition engine"))
@@ -329,6 +338,13 @@ struct SettingsView: View {
       .task { await recognition.refreshCapableLocales() }
       .onChange(of: recognition.localeIdentifier) {
         Task { await recognition.refreshSelectedDownloadState() }
+        // why: if the user switches to a non-English recognition locale while Parakeet is the
+        // selected engine, the (English-only) Parakeet tag disappears from the picker. Reset to
+        // Apple so the picker never shows a selection that no longer exists. This is deselection,
+        // never auto-selection. (ADR-0012.)
+        if recognition.engineChoice == .parakeet, !isParakeetSelectable {
+          recognition.engineChoice = .apple
+        }
       }
       .onDisappear { audioSource.stopMetering() }
       .navigationTitle(String(localized: "Settings"))
@@ -384,6 +400,133 @@ struct SettingsView: View {
 
   private var shouldShowWhisperKitModelRows: Bool {
     recognition.engineChoice == .whisperKit || whisperKitInstaller.state.isInstalled
+  }
+
+  // why: Parakeet EOU is English-only — selectable only when the recognition locale is en-*.
+  private var isParakeetSelectable: Bool {
+    recognition.localeIdentifier?.hasPrefix("en") == true
+  }
+
+  private var shouldShowParakeetModelRows: Bool {
+    recognition.engineChoice == .parakeet || parakeetInstaller.state.isInstalled
+  }
+
+  @ViewBuilder
+  private var parakeetModelContent: some View {
+    switch parakeetInstaller.state {
+    case .absent:
+      parakeetAbsentContent
+    case .downloading(let progress):
+      parakeetDownloadingContent(progress)
+    case .installed(let model):
+      parakeetInstalledContent(model)
+    case .failed(let failure):
+      parakeetFailedContent(failure)
+    }
+  }
+
+  private var parakeetAbsentContent: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      parakeetStatusRow(
+        title: String(localized: "Parakeet model not installed"),
+        detail: String(localized: "Required download") + ": "
+          + byteString(ParakeetModelInstaller.expectedModelSizeBytes)
+      )
+      if recognition.engineChoice == .parakeet {
+        Text(
+          String(
+            localized:
+              "Download the Parakeet model before using it. Until then, Dspeech falls back to Apple Speech."
+          )
+        )
+        .font(.footnote)
+        .foregroundStyle(.orange)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .fixedSize(horizontal: false, vertical: true)
+      }
+      Button {
+        Task { await parakeetInstaller.install() }
+      } label: {
+        Label(
+          String(
+            localized:
+              "Install Parakeet (English, \(byteString(ParakeetModelInstaller.expectedModelSizeBytes)))"
+          ),
+          systemImage: "arrow.down.circle.fill"
+        )
+      }
+      .buttonStyle(.borderedProminent)
+      .accessibilityIdentifier("parakeet-model-download")
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  private func parakeetDownloadingContent(_ progress: ParakeetModelDownloadProgress)
+    -> some View
+  {
+    VStack(alignment: .leading, spacing: 8) {
+      parakeetStatusRow(
+        title: String(localized: "Downloading Parakeet model"),
+        detail: "\(progress.percentComplete)% · \(byteString(progress.totalBytes))"
+      )
+      ProgressView(value: progress.fractionComplete)
+      Label(
+        String(localized: "Downloading") + " \(progress.percentComplete)%",
+        systemImage: "arrow.down.circle.fill"
+      )
+      .font(.footnote.weight(.medium))
+      .foregroundStyle(.secondary)
+      .accessibilityIdentifier("parakeet-model-downloading")
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  private func parakeetInstalledContent(_ model: ParakeetInstalledModel) -> some View {
+    VStack(alignment: .leading, spacing: 8) {
+      parakeetStatusRow(
+        title: String(localized: "Parakeet model installed"),
+        detail: "\(model.name) · \(byteString(model.sizeBytes))"
+      )
+      Button(String(localized: "Delete Parakeet model")) {
+        Task { await parakeetInstaller.deleteInstalledModel() }
+      }
+      .buttonStyle(.bordered)
+      .tint(.red)
+      .accessibilityIdentifier("parakeet-model-delete")
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  private func parakeetFailedContent(_ failure: ParakeetModelInstallFailure) -> some View {
+    VStack(alignment: .leading, spacing: 8) {
+      parakeetStatusRow(
+        title: String(localized: "Parakeet model install failed"),
+        detail: failure.userSafeReason
+      )
+      if failure.isRetryable {
+        Button(String(localized: "Retry Parakeet download")) {
+          Task { await parakeetInstaller.install() }
+        }
+        .buttonStyle(.bordered)
+        .accessibilityIdentifier("parakeet-model-retry")
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  private func parakeetStatusRow(title: String, detail: String) -> some View {
+    VStack(alignment: .leading, spacing: 2) {
+      Text(title)
+        .font(.body.weight(.medium))
+      Text(detail)
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .accessibilityElement(children: .combine)
+    .accessibilityIdentifier("parakeet-model-status")
   }
 
   @ViewBuilder

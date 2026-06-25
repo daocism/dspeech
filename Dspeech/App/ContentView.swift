@@ -77,13 +77,15 @@ struct ContentView: View {
       let debugScriptedEngine: (any LiveTranscriptionEngine)? = nil
     #endif
     let whisperKitInstaller = WhisperKitModelInstaller()
+    let parakeetInstaller = ParakeetModelInstaller()
     let resolvedEngine =
       engine
       ?? debugScriptedEngine
       ?? Self.makeLiveTranscriptionEngine(
         recognition: recognitionSettings,
         voiceFilter: filter,
-        whisperKitInstaller: whisperKitInstaller
+        whisperKitInstaller: whisperKitInstaller,
+        parakeetInstaller: parakeetInstaller
       )
     let translationSettings = TranslationSettings()
     let live = LiveTranscriptionViewModel(
@@ -123,7 +125,8 @@ struct ContentView: View {
   private static func makeLiveTranscriptionEngine(
     recognition: RecognitionSettings,
     voiceFilter: VoiceFilterPipeline,
-    whisperKitInstaller: WhisperKitModelInstaller
+    whisperKitInstaller: WhisperKitModelInstaller,
+    parakeetInstaller: ParakeetModelInstaller
   ) -> any LiveTranscriptionEngine {
     switch recognition.engineChoice {
     case .apple:
@@ -147,6 +150,25 @@ struct ContentView: View {
       return WhisperKitLiveTranscriptionEngine(
         transcriber: WhisperKitTranscriberAdapter(),
         installedModelFolderURL: { whisperKitInstaller.installedModelFolderURL },
+        localeProvider: { recognition.localeIdentifier ?? recognition.activeLocaleIdentifier },
+        bufferGate: VoiceFilterSpeechAudioBufferGate(pipeline: voiceFilter)
+      )
+    case .parakeet:
+      guard parakeetInstaller.state.isInstalled,
+        parakeetInstaller.installedModelFolderURL != nil
+      else {
+        DspeechLog.engine.error(
+          "parakeet engine selected but local model is not installed; falling back to apple speech"
+        )
+        return makeAppleSpeechLiveTranscriptionEngine(
+          recognition: recognition,
+          voiceFilter: voiceFilter
+        )
+      }
+      DspeechLog.engine.info("parakeet engine selected with installed local model")
+      return ParakeetLiveTranscriptionEngine(
+        transcriber: SystemParakeetStreamingAdapter(),
+        installedModelFolderURL: { parakeetInstaller.installedModelFolderURL },
         localeProvider: { recognition.localeIdentifier ?? recognition.activeLocaleIdentifier },
         bufferGate: VoiceFilterSpeechAudioBufferGate(pipeline: voiceFilter)
       )
@@ -207,10 +229,10 @@ struct ContentView: View {
   private var emptyStateText: String {
     switch liveViewModel.status {
     case .idle, .stopped, .failed:
-      // why: the on-device-locale readiness check is Apple-Speech-specific. WhisperKit
-      // is multilingual and has no Apple per-language asset, so its idle screen must NOT
-      // claim "no recognition languages" — that gate only applies to the Apple engine.
-      if recognition.engineChoice == .whisperKit {
+      // why: the on-device-locale readiness check is Apple-Speech-specific. WhisperKit and
+      // Parakeet ship their own downloaded models and have no Apple per-language asset, so their
+      // idle screen must NOT claim "no recognition languages" — that gate only applies to Apple.
+      if recognition.engineChoice == .whisperKit || recognition.engineChoice == .parakeet {
         return idleInviteText
       }
       // why: before the first Start, reflect whether on-device recognition is actually ready —

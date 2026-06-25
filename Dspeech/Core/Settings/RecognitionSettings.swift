@@ -28,6 +28,11 @@ enum RecognitionLocaleAvailabilityState: Equatable, Sendable {
 enum TranscriptionEngineChoice: String, Codable, Sendable, CaseIterable, Identifiable {
   case apple
   case whisperKit
+  // why: Parakeet EOU streaming (FluidAudio), English-only. Selectable only when the recognition
+  // locale is en-* (gated in the picker + defensively in the engine). Default stays .apple.
+  // Forward-only migration: older stored .apple/.whisperKit values still decode unchanged; an
+  // unknown raw value falls back to .apple via loadEngineChoice. (ADR-0012.)
+  case parakeet
 
   var id: String { rawValue }
 
@@ -37,6 +42,8 @@ enum TranscriptionEngineChoice: String, Codable, Sendable, CaseIterable, Identif
       return String(localized: "Apple Speech")
     case .whisperKit:
       return String(localized: "WhisperKit")
+    case .parakeet:
+      return String(localized: "Parakeet (EN)")
     }
   }
 }
