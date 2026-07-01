@@ -108,8 +108,11 @@ microphone/speech permissions if prompted.
 
 - Apple Developer team credentials are intentionally outside this repo.
 - App Store Connect API key was not found in 1Password during this run.
-- Final app icon and styled marketing screenshot assets are missing from this
-  checkout.
+- The 1024px app icon exists and is wired
+  (`ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon`,
+  `Dspeech/Assets.xcassets/AppIcon.appiconset/icon-1024.png`). Dark and tinted
+  icon variants and styled marketing screenshot assets are still missing from
+  this checkout.
 - `PrivacyInfo.xcprivacy` must be verified in the final archive.
 - `ITSAppUsesNonExemptEncryption = NO` is configured in the current working
   tree and must be verified in the processed archive.
