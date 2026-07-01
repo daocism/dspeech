@@ -476,8 +476,7 @@ struct SpeakerModelPackInstaller: Sendable {
   }
 
   static func fluidAudioRoot() -> URL {
-    FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
-      .first!
+    ApplicationSupport.directoryOrTrap()
       .appendingPathComponent("FluidAudio", isDirectory: true)
   }
 

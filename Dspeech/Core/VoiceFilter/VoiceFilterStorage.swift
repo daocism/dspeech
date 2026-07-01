@@ -243,8 +243,7 @@ struct UserDefaultsVoiceFilterStorage: VoiceFilterStorage, @unchecked Sendable {
   }
 
   private static func defaultProfileStoreURL() -> URL {
-    FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
-      .first!
+    ApplicationSupport.directoryOrTrap()
       .appendingPathComponent("Dspeech", isDirectory: true)
       .appendingPathComponent("VoiceFilter", isDirectory: true)
       .appendingPathComponent(profileStoreFileName, isDirectory: false)

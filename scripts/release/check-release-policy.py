@@ -215,6 +215,10 @@ def check_whisperkit_model_installer_contract(state: CheckState) -> None:
         state.fail("WhisperKitModelInstaller must keep the pinned download boundary explicit")
     if '"https://' in text and "resolve/\\(pinnedRevision)" not in text:
         state.fail("WhisperKitModelInstaller downloads must resolve through the pinned revision")
+    # B4: WhisperKit closed the fail-open integrity gap — each pinned file is verified against a
+    # baked-in per-file SHA-256 before install, identical to Parakeet's boundary.
+    if not re.search(r'expectedSHA256:\s*"[0-9a-f]{64}"', text):
+        state.fail("WhisperKitModelInstaller must verify downloads against per-file SHA-256")
 
 
 def check_parakeet_model_installer_contract(state: CheckState) -> None:

@@ -190,7 +190,7 @@ struct UserDefaultsModelPackStateStorage: ModelPackStateStorage, @unchecked Send
   init(defaults: UserDefaults = .standard, applicationSupportDirectory: URL? = nil) {
     self.defaults = defaults
     self.applicationSupportDirectory =
-      applicationSupportDirectory ?? Self.defaultApplicationSupportDirectory()
+      applicationSupportDirectory ?? ApplicationSupport.directoryOrTrap()
   }
 
   func loadState() -> ModelPackState {
@@ -304,10 +304,6 @@ struct UserDefaultsModelPackStateStorage: ModelPackStateStorage, @unchecked Send
     isRetryable: false
   )
 
-  private static func defaultApplicationSupportDirectory() -> URL {
-    FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-  }
-
   private static func resolvedModelPaths(
     in state: ModelPackState,
     applicationSupportDirectory: URL
@@ -316,14 +312,14 @@ struct UserDefaultsModelPackStateStorage: ModelPackStateStorage, @unchecked Send
     case .installed(let pack):
       return .installed(
         pack.replacingLocalModelPath(
-          resolvedLocalModelPath(
+          ApplicationSupportRelativePath.resolved(
             pack.localModelPath,
             applicationSupportDirectory: applicationSupportDirectory
           )))
     case .disabled(let pack):
       return .disabled(
         pack.replacingLocalModelPath(
-          resolvedLocalModelPath(
+          ApplicationSupportRelativePath.resolved(
             pack.localModelPath,
             applicationSupportDirectory: applicationSupportDirectory
           )))
@@ -340,64 +336,19 @@ struct UserDefaultsModelPackStateStorage: ModelPackStateStorage, @unchecked Send
     case .installed(let pack):
       return .installed(
         pack.replacingLocalModelPath(
-          persistedLocalModelPath(
+          ApplicationSupportRelativePath.persisted(
             pack.localModelPath,
             applicationSupportDirectory: applicationSupportDirectory
           )))
     case .disabled(let pack):
       return .disabled(
         pack.replacingLocalModelPath(
-          persistedLocalModelPath(
+          ApplicationSupportRelativePath.persisted(
             pack.localModelPath,
             applicationSupportDirectory: applicationSupportDirectory
           )))
     case .absent, .acquiring, .failed:
       return state
     }
-  }
-
-  private static func resolvedLocalModelPath(
-    _ path: String?,
-    applicationSupportDirectory: URL
-  ) -> String? {
-    guard let path, !path.isEmpty else { return path }
-    if path.hasPrefix("/") {
-      let relative = relativePathInsideApplicationSupport(
-        path,
-        applicationSupportDirectory: applicationSupportDirectory
-      )
-      guard relative != path else { return path }
-      return applicationSupportDirectory.appendingPathComponent(relative, isDirectory: true).path
-    }
-    return applicationSupportDirectory.appendingPathComponent(path, isDirectory: true).path
-  }
-
-  private static func persistedLocalModelPath(
-    _ path: String?,
-    applicationSupportDirectory: URL
-  ) -> String? {
-    guard let path, !path.isEmpty else { return path }
-    return relativePathInsideApplicationSupport(
-      path,
-      applicationSupportDirectory: applicationSupportDirectory
-    )
-  }
-
-  private static func relativePathInsideApplicationSupport(
-    _ path: String,
-    applicationSupportDirectory: URL
-  ) -> String {
-    guard path.hasPrefix("/") else { return path }
-    let standardizedPath = URL(fileURLWithPath: path).standardizedFileURL.path
-    let appSupportPath = applicationSupportDirectory.standardizedFileURL.path
-    let prefix = appSupportPath.hasSuffix("/") ? appSupportPath : appSupportPath + "/"
-    if standardizedPath.hasPrefix(prefix) {
-      return String(standardizedPath.dropFirst(prefix.count))
-    }
-    let marker = "/Application Support/"
-    guard let range = standardizedPath.range(of: marker) else {
-      return path
-    }
-    return String(standardizedPath[range.upperBound...])
   }
 }

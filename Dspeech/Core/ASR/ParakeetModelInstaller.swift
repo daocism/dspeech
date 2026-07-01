@@ -1,4 +1,3 @@
-import CryptoKit
 import Foundation
 import Observation
 
@@ -7,9 +6,9 @@ enum ParakeetModelInstallError: Error, Equatable {
   case invalidURL(String)
   case fileMissingAfterDownload(String)
   case insufficientDiskSpace(requiredBytes: Int64, availableBytes: Int64)
-  // why: upgrade vs the WhisperKit installer — Parakeet verifies each downloaded file against a
-  // baked-in per-file SHA-256 (supply-chain pinning, ADR-0012). A mismatch is surfaced, never
-  // swallowed and never fail-open: a tampered or corrupted CoreML bundle must not be loaded.
+  // why: Parakeet verifies each downloaded file against a baked-in per-file SHA-256 (supply-chain
+  // pinning, ADR-0012). A mismatch is surfaced, never swallowed and never fail-open: a tampered or
+  // corrupted CoreML bundle must not be loaded.
   case checksumMismatch(relativePath: String, expected: String, actual: String)
 }
 
@@ -107,7 +106,7 @@ struct UserDefaultsParakeetModelStateStorage: ParakeetModelStateStorage, @unchec
   init(defaults: UserDefaults = .standard, applicationSupportDirectory: URL? = nil) {
     self.defaults = defaults
     self.applicationSupportDirectory =
-      applicationSupportDirectory ?? Self.defaultApplicationSupportDirectory()
+      applicationSupportDirectory ?? ApplicationSupport.directoryOrTrap()
   }
 
   func loadState() -> ParakeetModelInstallState {
@@ -160,10 +159,6 @@ struct UserDefaultsParakeetModelStateStorage: ParakeetModelStateStorage, @unchec
     isRetryable: false
   )
 
-  private static func defaultApplicationSupportDirectory() -> URL {
-    FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-  }
-
   private static func resolvedModelPaths(
     in state: ParakeetModelInstallState,
     applicationSupportDirectory: URL
@@ -172,7 +167,7 @@ struct UserDefaultsParakeetModelStateStorage: ParakeetModelStateStorage, @unchec
     case .installed(let model):
       return .installed(
         model.replacingLocalModelPath(
-          resolvedLocalModelPath(
+          ApplicationSupportRelativePath.resolved(
             model.localModelPath,
             applicationSupportDirectory: applicationSupportDirectory
           )))
@@ -189,58 +184,13 @@ struct UserDefaultsParakeetModelStateStorage: ParakeetModelStateStorage, @unchec
     case .installed(let model):
       return .installed(
         model.replacingLocalModelPath(
-          persistedLocalModelPath(
+          ApplicationSupportRelativePath.persisted(
             model.localModelPath,
             applicationSupportDirectory: applicationSupportDirectory
           )))
     case .absent, .downloading, .failed:
       return state
     }
-  }
-
-  private static func resolvedLocalModelPath(
-    _ path: String?,
-    applicationSupportDirectory: URL
-  ) -> String? {
-    guard let path, !path.isEmpty else { return path }
-    if path.hasPrefix("/") {
-      let relative = relativePathInsideApplicationSupport(
-        path,
-        applicationSupportDirectory: applicationSupportDirectory
-      )
-      guard relative != path else { return path }
-      return applicationSupportDirectory.appendingPathComponent(relative, isDirectory: true).path
-    }
-    return applicationSupportDirectory.appendingPathComponent(path, isDirectory: true).path
-  }
-
-  private static func persistedLocalModelPath(
-    _ path: String?,
-    applicationSupportDirectory: URL
-  ) -> String? {
-    guard let path, !path.isEmpty else { return path }
-    return relativePathInsideApplicationSupport(
-      path,
-      applicationSupportDirectory: applicationSupportDirectory
-    )
-  }
-
-  private static func relativePathInsideApplicationSupport(
-    _ path: String,
-    applicationSupportDirectory: URL
-  ) -> String {
-    guard path.hasPrefix("/") else { return path }
-    let standardizedPath = URL(fileURLWithPath: path).standardizedFileURL.path
-    let appSupportPath = applicationSupportDirectory.standardizedFileURL.path
-    let prefix = appSupportPath.hasSuffix("/") ? appSupportPath : appSupportPath + "/"
-    if standardizedPath.hasPrefix(prefix) {
-      return String(standardizedPath.dropFirst(prefix.count))
-    }
-    let marker = "/Application Support/"
-    guard let range = standardizedPath.range(of: marker) else {
-      return path
-    }
-    return String(standardizedPath[range.upperBound...])
   }
 }
 
@@ -386,14 +336,14 @@ final class ParakeetModelInstaller {
   // from a fake downloader (preimage resistance), so the happy install path needs a manifest
   // whose hashes match the fixture content. Production always uses the static default.
   private let expectedFiles: [ExpectedModelFile]
-  private let expectedModelSizeBytes: Int64
+  private let expectedFilesSizeBytes: Int64
 
   init(
     stateStorage: any ParakeetModelStateStorage = UserDefaultsParakeetModelStateStorage(),
     fileDownloader: any ParakeetModelFileDownloading = URLSessionParakeetModelFileDownloader(),
     applicationSupportDirectory: URL? = nil,
     availableCapacityProvider: @escaping @Sendable (URL) throws -> Int64 = {
-      try ParakeetModelInstaller.availableCapacity(at: $0)
+      try ModelInstallFileSystem.availableCapacity(at: $0)
     },
     now: @escaping @Sendable () -> Date = Date.init,
     expectedFiles: [ExpectedModelFile] = ParakeetModelInstaller.expectedModelFiles
@@ -401,11 +351,11 @@ final class ParakeetModelInstaller {
     self.stateStorage = stateStorage
     self.fileDownloader = fileDownloader
     self.applicationSupportDirectory =
-      applicationSupportDirectory ?? Self.defaultApplicationSupportDirectory()
+      applicationSupportDirectory ?? ApplicationSupport.directoryOrTrap()
     self.availableCapacityProvider = availableCapacityProvider
     self.now = now
     self.expectedFiles = expectedFiles
-    self.expectedModelSizeBytes = expectedFiles.reduce(0) { $0 + $1.sizeBytes }
+    self.expectedFilesSizeBytes = expectedFiles.reduce(0) { $0 + $1.sizeBytes }
     self.state = stateStorage.loadState()
   }
 
@@ -426,7 +376,7 @@ final class ParakeetModelInstaller {
   func deleteInstalledModel() async {
     do {
       if let installedModelFolderURL {
-        try Self.removeIfPresent(installedModelFolderURL)
+        try ModelInstallFileSystem.removeIfPresent(installedModelFolderURL)
       }
       transition(to: .absent)
     } catch {
@@ -463,158 +413,60 @@ final class ParakeetModelInstaller {
       applicationSupportDirectory
       .appendingPathComponent(Self.modelsRootComponent, isDirectory: true)
     try FileManager.default.createDirectory(at: modelsRoot, withIntermediateDirectories: true)
-    try Self.excludeFromBackup(modelsRoot)
+    try ModelInstallFileSystem.excludeFromBackup(modelsRoot)
     try Self.preflightSufficientFreeSpace(
       availableBytes: availableCapacityProvider(modelsRoot),
-      expectedModelSizeBytes: expectedModelSizeBytes
+      expectedModelSizeBytes: expectedFilesSizeBytes
     )
 
-    let stagingRoot = modelsRoot.appendingPathComponent(
-      ".\(Self.modelFolderName).staging-\(UUID().uuidString)",
-      isDirectory: true
-    )
-    let stagingModelFolder = stagingRoot.appendingPathComponent(
-      Self.modelFolderName,
-      isDirectory: true
-    )
-    let finalModelFolder = modelsRoot.appendingPathComponent(
-      Self.modelFolderName, isDirectory: true)
-    try Self.removeIfPresent(stagingRoot)
-    try FileManager.default.createDirectory(
-      at: stagingModelFolder, withIntermediateDirectories: true)
-    try Self.excludeFromBackup(stagingRoot)
-
-    do {
-      let files = try await downloadFiles(to: stagingModelFolder)
-      let sizeBytes = files.reduce(Int64(0)) { $0 + $1.sizeBytes }
-      try Self.removeIfPresent(finalModelFolder)
-      try FileManager.default.moveItem(at: stagingModelFolder, to: finalModelFolder)
-      try Self.removeIfPresent(stagingRoot)
-      try Self.excludeFromBackup(finalModelFolder)
-      return ParakeetInstalledModel(
-        name: Self.modelName,
-        repository: Self.repository,
-        revision: Self.sourceRevision,
-        files: files,
-        sizeBytes: sizeBytes,
-        installedAt: now(),
-        localModelPath: finalModelFolder.path
-      )
-    } catch {
-      // why: best-effort staging teardown, but a removal failure is an OS-level signal — log it
-      // (never silently swallow per project error rules) rather than leak orphan staging folders.
-      do {
-        try Self.removeIfPresent(stagingRoot)
-      } catch let teardownError {
-        DspeechLog.engine.error(
-          "parakeet staging teardown failed error=\(teardownError.localizedDescription, privacy: .public)"
+    let totalBytes = expectedFilesSizeBytes
+    let staged = try await downloadAndStagePinnedModel(
+      modelsRoot: modelsRoot,
+      modelFolderName: Self.modelFolderName,
+      specs: expectedFiles.map {
+        PinnedModelFileSpec(
+          relativePath: $0.relativePath,
+          sizeBytes: $0.sizeBytes,
+          expectedSHA256: $0.expectedSHA256
         )
+      },
+      sourceURL: { try Self.pinnedDownloadURL(relativePath: $0) },
+      download: { try await self.fileDownloader.download(from: $0, to: $1) },
+      fileMissing: { ParakeetModelInstallError.fileMissingAfterDownload($0) },
+      checksumMismatch: {
+        ParakeetModelInstallError.checksumMismatch(relativePath: $0, expected: $1, actual: $2)
+      },
+      onProgress: { completedBytes in
+        self.transition(
+          to: .downloading(
+            ParakeetModelDownloadProgress(
+              fractionComplete: totalBytes > 0 ? Double(completedBytes) / Double(totalBytes) : 0,
+              bytesReceived: completedBytes,
+              totalBytes: totalBytes
+            )))
       }
-      throw error
-    }
-  }
+    )
 
-  private func downloadFiles(to stagingModelFolder: URL) async throws
-    -> [ParakeetInstalledModelFile]
-  {
-    var completedBytes: Int64 = 0
-    var installedFiles: [ParakeetInstalledModelFile] = []
-    transition(
-      to: .downloading(
-        ParakeetModelDownloadProgress(
-          fractionComplete: 0,
-          bytesReceived: completedBytes,
-          totalBytes: expectedModelSizeBytes
-        )))
-
-    for expectedFile in expectedFiles {
-      try Task.checkCancellation()
-      let destination = stagingModelFolder.appendingPathComponent(
-        expectedFile.relativePath,
-        isDirectory: false
-      )
-      try await fileDownloader.download(
-        from: Self.pinnedDownloadURL(relativePath: expectedFile.relativePath),
-        to: destination
-      )
-      guard FileManager.default.fileExists(atPath: destination.path) else {
-        throw ParakeetModelInstallError.fileMissingAfterDownload(expectedFile.relativePath)
-      }
-      let (computedSHA256, actualSizeBytes) = try await Self.fileDigest(at: destination)
-      // why: integrity gate — compare the just-downloaded bytes against the baked-in pinned
-      // hash before accepting the file. A mismatch throws (never fail-open); the staging folder
-      // is then torn down by downloadAndInstallModel's catch, so a tampered file never installs.
-      guard computedSHA256.lowercased() == expectedFile.expectedSHA256.lowercased() else {
-        throw ParakeetModelInstallError.checksumMismatch(
-          relativePath: expectedFile.relativePath,
-          expected: expectedFile.expectedSHA256.lowercased(),
-          actual: computedSHA256.lowercased()
+    return ParakeetInstalledModel(
+      name: Self.modelName,
+      repository: Self.repository,
+      revision: Self.sourceRevision,
+      files: staged.files.map {
+        ParakeetInstalledModelFile(
+          relativePath: $0.relativePath,
+          sha256: $0.sha256,
+          sizeBytes: $0.sizeBytes
         )
-      }
-      let file = ParakeetInstalledModelFile(
-        relativePath: expectedFile.relativePath,
-        sha256: computedSHA256,
-        sizeBytes: actualSizeBytes
-      )
-      installedFiles.append(file)
-      // why: advance by the actual received size (== manifest size for any file that passed the
-      // checksum gate above), so progress can never diverge or exceed 1.0 on a bad download.
-      completedBytes += actualSizeBytes
-      transition(
-        to: .downloading(
-          ParakeetModelDownloadProgress(
-            fractionComplete: Double(completedBytes) / Double(expectedModelSizeBytes),
-            bytesReceived: completedBytes,
-            totalBytes: expectedModelSizeBytes
-          )))
-    }
-    return installedFiles.sorted { $0.relativePath < $1.relativePath }
+      },
+      sizeBytes: staged.sizeBytes,
+      installedAt: now(),
+      localModelPath: staged.finalModelFolder.path
+    )
   }
 
   private func transition(to newState: ParakeetModelInstallState) {
     state = newState
     stateStorage.saveState(newState)
-  }
-
-  private static func defaultApplicationSupportDirectory() -> URL {
-    FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-  }
-
-  private nonisolated static func availableCapacity(at url: URL) throws -> Int64 {
-    let attributes = try FileManager.default.attributesOfFileSystem(forPath: url.path)
-    guard let freeSize = attributes[.systemFreeSize] as? NSNumber else {
-      return 0
-    }
-    return freeSize.int64Value
-  }
-
-  private static func removeIfPresent(_ url: URL) throws {
-    if FileManager.default.fileExists(atPath: url.path) {
-      try FileManager.default.removeItem(at: url)
-    }
-  }
-
-  private static func excludeFromBackup(_ url: URL) throws {
-    var mutableURL = url
-    var values = URLResourceValues()
-    values.isExcludedFromBackup = true
-    try mutableURL.setResourceValues(values)
-  }
-
-  private nonisolated static func hexDigest(_ digest: SHA256.Digest) -> String {
-    digest.map { String(format: "%02x", $0) }.joined()
-  }
-
-  // why: read + SHA-256 OFF the MainActor and memory-mapped, so verifying the ~213 MB encoder
-  // weights neither blocks the UI nor loads the whole file into the heap (mmap pages are hashed
-  // lazily). Returns the actual on-disk size so progress reflects bytes truly received. (finding #4/#5.)
-  private nonisolated static func fileDigest(at url: URL) async throws -> (
-    sha256: String, sizeBytes: Int64
-  ) {
-    try await Task.detached(priority: .utility) {
-      let data = try Data(contentsOf: url, options: .mappedIfSafe)
-      return (hexDigest(SHA256.hash(data: data)), Int64(data.count))
-    }.value
   }
 }
 
@@ -700,15 +552,5 @@ private func isParakeetDiskFull(_ error: Error) -> Bool {
   if case .insufficientDiskSpace = error as? ParakeetModelInstallError {
     return true
   }
-  let nsError = error as NSError
-  if nsError.domain == NSCocoaErrorDomain && nsError.code == NSFileWriteOutOfSpaceError {
-    return true
-  }
-  if nsError.domain == NSPOSIXErrorDomain && nsError.code == Int(POSIXErrorCode.ENOSPC.rawValue) {
-    return true
-  }
-  if let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? Error {
-    return isParakeetDiskFull(underlying)
-  }
-  return false
+  return isModelInstallDiskFullNSError(error)
 }

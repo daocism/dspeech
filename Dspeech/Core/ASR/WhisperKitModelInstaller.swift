@@ -1,4 +1,3 @@
-import CryptoKit
 import Foundation
 import Observation
 
@@ -7,6 +6,11 @@ enum WhisperKitModelInstallError: Error, Equatable {
   case invalidURL(String)
   case fileMissingAfterDownload(String)
   case insufficientDiskSpace(requiredBytes: Int64, availableBytes: Int64)
+  // why: B4 closed the fail-open integrity gap — WhisperKit now verifies each downloaded file
+  // against a baked-in per-file SHA-256 (pinned HF revision, ADR-0011), exactly like Parakeet. A
+  // mismatch is surfaced, never swallowed and never fail-open: a tampered/corrupt CoreML bundle
+  // must not be loaded.
+  case checksumMismatch(relativePath: String, expected: String, actual: String)
 }
 
 struct WhisperKitModelDownloadProgress: Equatable, Sendable, Codable {
@@ -103,7 +107,7 @@ struct UserDefaultsWhisperKitModelStateStorage: WhisperKitModelStateStorage, @un
   init(defaults: UserDefaults = .standard, applicationSupportDirectory: URL? = nil) {
     self.defaults = defaults
     self.applicationSupportDirectory =
-      applicationSupportDirectory ?? Self.defaultApplicationSupportDirectory()
+      applicationSupportDirectory ?? ApplicationSupport.directoryOrTrap()
   }
 
   func loadState() -> WhisperKitModelInstallState {
@@ -156,10 +160,6 @@ struct UserDefaultsWhisperKitModelStateStorage: WhisperKitModelStateStorage, @un
     isRetryable: false
   )
 
-  private static func defaultApplicationSupportDirectory() -> URL {
-    FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-  }
-
   private static func resolvedModelPaths(
     in state: WhisperKitModelInstallState,
     applicationSupportDirectory: URL
@@ -168,7 +168,7 @@ struct UserDefaultsWhisperKitModelStateStorage: WhisperKitModelStateStorage, @un
     case .installed(let model):
       return .installed(
         model.replacingLocalModelPath(
-          resolvedLocalModelPath(
+          ApplicationSupportRelativePath.resolved(
             model.localModelPath,
             applicationSupportDirectory: applicationSupportDirectory
           )))
@@ -185,58 +185,13 @@ struct UserDefaultsWhisperKitModelStateStorage: WhisperKitModelStateStorage, @un
     case .installed(let model):
       return .installed(
         model.replacingLocalModelPath(
-          persistedLocalModelPath(
+          ApplicationSupportRelativePath.persisted(
             model.localModelPath,
             applicationSupportDirectory: applicationSupportDirectory
           )))
     case .absent, .downloading, .failed:
       return state
     }
-  }
-
-  private static func resolvedLocalModelPath(
-    _ path: String?,
-    applicationSupportDirectory: URL
-  ) -> String? {
-    guard let path, !path.isEmpty else { return path }
-    if path.hasPrefix("/") {
-      let relative = relativePathInsideApplicationSupport(
-        path,
-        applicationSupportDirectory: applicationSupportDirectory
-      )
-      guard relative != path else { return path }
-      return applicationSupportDirectory.appendingPathComponent(relative, isDirectory: true).path
-    }
-    return applicationSupportDirectory.appendingPathComponent(path, isDirectory: true).path
-  }
-
-  private static func persistedLocalModelPath(
-    _ path: String?,
-    applicationSupportDirectory: URL
-  ) -> String? {
-    guard let path, !path.isEmpty else { return path }
-    return relativePathInsideApplicationSupport(
-      path,
-      applicationSupportDirectory: applicationSupportDirectory
-    )
-  }
-
-  private static func relativePathInsideApplicationSupport(
-    _ path: String,
-    applicationSupportDirectory: URL
-  ) -> String {
-    guard path.hasPrefix("/") else { return path }
-    let standardizedPath = URL(fileURLWithPath: path).standardizedFileURL.path
-    let appSupportPath = applicationSupportDirectory.standardizedFileURL.path
-    let prefix = appSupportPath.hasSuffix("/") ? appSupportPath : appSupportPath + "/"
-    if standardizedPath.hasPrefix(prefix) {
-      return String(standardizedPath.dropFirst(prefix.count))
-    }
-    let marker = "/Application Support/"
-    guard let range = standardizedPath.range(of: marker) else {
-      return path
-    }
-    return String(standardizedPath[range.upperBound...])
   }
 }
 
@@ -270,6 +225,7 @@ final class WhisperKitModelInstaller {
   struct ExpectedModelFile: Equatable, Sendable {
     let relativePath: String
     let sizeBytes: Int64
+    let expectedSHA256: String
   }
 
   nonisolated static let modelName = "large-v3-v20240930_626MB"
@@ -277,42 +233,95 @@ final class WhisperKitModelInstaller {
   nonisolated static let repository = "argmaxinc/whisperkit-coreml"
   // why: supply-chain policy forbids downloading mutable Hugging Face main; this is main as resolved on 2026-06-12.
   nonisolated static let pinnedRevision = "97a5bf9bbc74c7d9c12c755d04dea59e672e3808"
+  // why: per-file SHA-256 baked in from the pinned revision (measured 2026-07-02 by downloading each
+  // file from the pinned HF URL and hashing it; sizes match this manifest exactly). B4 verifies every
+  // downloaded file against these before install — no fail-open, no unverified files.
   nonisolated static let expectedModelFiles: [ExpectedModelFile] = [
     ExpectedModelFile(
       relativePath: "AudioEncoder.mlmodelc/analytics/coremldata.bin",
-      sizeBytes: 243
+      sizeBytes: 243,
+      expectedSHA256: "56793886ab1adb9ca8a4e335efbe8af6640f40d958ab2d29c3ad2d7d6f712e95"
     ),
-    ExpectedModelFile(relativePath: "AudioEncoder.mlmodelc/coremldata.bin", sizeBytes: 348),
-    ExpectedModelFile(relativePath: "AudioEncoder.mlmodelc/metadata.json", sizeBytes: 1_922),
-    ExpectedModelFile(relativePath: "AudioEncoder.mlmodelc/model.mil", sizeBytes: 934_263),
+    ExpectedModelFile(
+      relativePath: "AudioEncoder.mlmodelc/coremldata.bin",
+      sizeBytes: 348,
+      expectedSHA256: "ffa9eb76e8e9d9be75a4d527e5249e61d67fd43081c5aa110fd24efa6c8c5ea3"
+    ),
+    ExpectedModelFile(
+      relativePath: "AudioEncoder.mlmodelc/metadata.json",
+      sizeBytes: 1_922,
+      expectedSHA256: "a87a3375afe79e88e27af30247e234e706b98679dedfd1b021a74f7ee108c669"
+    ),
+    ExpectedModelFile(
+      relativePath: "AudioEncoder.mlmodelc/model.mil",
+      sizeBytes: 934_263,
+      expectedSHA256: "3cec2580fb07b12a88087f0e1586c6ba2982980eb36499561e1ffca2b0950442"
+    ),
     ExpectedModelFile(
       relativePath: "AudioEncoder.mlmodelc/weights/weight.bin",
-      sizeBytes: 421_968_768
+      sizeBytes: 421_968_768,
+      expectedSHA256: "e4740fa28ed65907af754af893dfce98473fafb84dd8d718ad346985fe7678c1"
     ),
     ExpectedModelFile(
       relativePath: "MelSpectrogram.mlmodelc/analytics/coremldata.bin",
-      sizeBytes: 243
+      sizeBytes: 243,
+      expectedSHA256: "c5be419f8622083ac7046306400643539f0e7577c843448c36defc090d41e7ce"
     ),
-    ExpectedModelFile(relativePath: "MelSpectrogram.mlmodelc/coremldata.bin", sizeBytes: 329),
-    ExpectedModelFile(relativePath: "MelSpectrogram.mlmodelc/metadata.json", sizeBytes: 1_850),
-    ExpectedModelFile(relativePath: "MelSpectrogram.mlmodelc/model.mil", sizeBytes: 10_143),
+    ExpectedModelFile(
+      relativePath: "MelSpectrogram.mlmodelc/coremldata.bin",
+      sizeBytes: 329,
+      expectedSHA256: "2bfc12cffc2e45e039c7a18f384f09adffb72c182fcd93f9413d405d1a6c1130"
+    ),
+    ExpectedModelFile(
+      relativePath: "MelSpectrogram.mlmodelc/metadata.json",
+      sizeBytes: 1_850,
+      expectedSHA256: "2bc552e09a6f124d9e6c178dd1a6979e010206acb26308b2224887c9dcbeb35f"
+    ),
+    ExpectedModelFile(
+      relativePath: "MelSpectrogram.mlmodelc/model.mil",
+      sizeBytes: 10_143,
+      expectedSHA256: "c270b95b5f81d7f7d0b8a3e8f991d4e5812a37cad29349868a35b91f3a6a4463"
+    ),
     ExpectedModelFile(
       relativePath: "MelSpectrogram.mlmodelc/weights/weight.bin",
-      sizeBytes: 373_376
+      sizeBytes: 373_376,
+      expectedSHA256: "009d9fb8f6b589accfa08cebf1c712ef07c3405229ce3cfb3a57ee033c9d8a49"
     ),
     ExpectedModelFile(
       relativePath: "TextDecoder.mlmodelc/analytics/coremldata.bin",
-      sizeBytes: 243
+      sizeBytes: 243,
+      expectedSHA256: "3913b8c9716b284a917cf3744f4d415f2a05e2b910594a14c6cc10092284d3f8"
     ),
-    ExpectedModelFile(relativePath: "TextDecoder.mlmodelc/coremldata.bin", sizeBytes: 633),
-    ExpectedModelFile(relativePath: "TextDecoder.mlmodelc/metadata.json", sizeBytes: 4_924),
-    ExpectedModelFile(relativePath: "TextDecoder.mlmodelc/model.mil", sizeBytes: 217_177),
+    ExpectedModelFile(
+      relativePath: "TextDecoder.mlmodelc/coremldata.bin",
+      sizeBytes: 633,
+      expectedSHA256: "3faabaf66930e66956d8291d0ff485fb382496e30a91a7185548b9b898ce90a9"
+    ),
+    ExpectedModelFile(
+      relativePath: "TextDecoder.mlmodelc/metadata.json",
+      sizeBytes: 4_924,
+      expectedSHA256: "994f6030d7b1a8be999940444c3cf5d6a57d40ddd4423cf1d1fc93520aa1b052"
+    ),
+    ExpectedModelFile(
+      relativePath: "TextDecoder.mlmodelc/model.mil",
+      sizeBytes: 217_177,
+      expectedSHA256: "dbe833be9e64348c95b7fa598d0ae4309a91aedce4e82fa500a714b0e4b5d754"
+    ),
     ExpectedModelFile(
       relativePath: "TextDecoder.mlmodelc/weights/weight.bin",
-      sizeBytes: 203_199_860
+      sizeBytes: 203_199_860,
+      expectedSHA256: "d69700903d518ada33170ab77faaaf464496fb9ff65752c6d5a6109aa2fb02db"
     ),
-    ExpectedModelFile(relativePath: "config.json", sizeBytes: 1_149),
-    ExpectedModelFile(relativePath: "generation_config.json", sizeBytes: 2_767),
+    ExpectedModelFile(
+      relativePath: "config.json",
+      sizeBytes: 1_149,
+      expectedSHA256: "f01d83dd891791d6f12421c05d3ed8ebbe70866f10d6c9a7a7e80b558ce5a0f1"
+    ),
+    ExpectedModelFile(
+      relativePath: "generation_config.json",
+      sizeBytes: 2_767,
+      expectedSHA256: "7fbb053a023be11fbeccd8421811610308143daa93d9617c52aab4a0fa1491c6"
+    ),
   ]
   nonisolated static let expectedModelSizeBytes: Int64 = expectedModelFiles.reduce(0) {
     $0 + $1.sizeBytes
@@ -325,22 +334,31 @@ final class WhisperKitModelInstaller {
   private let applicationSupportDirectory: URL
   private let availableCapacityProvider: @Sendable (URL) throws -> Int64
   private let now: @Sendable () -> Date
+  // why: defaults to the pinned production manifest. Injectable ONLY so tests can exercise the
+  // SHA-256 verification path with content they control — real model bytes can't be reproduced from
+  // a fake downloader (preimage resistance), so the happy install path needs a manifest whose hashes
+  // match the fixture content. Production always uses the static default.
+  private let expectedFiles: [ExpectedModelFile]
+  private let expectedFilesSizeBytes: Int64
 
   init(
     stateStorage: any WhisperKitModelStateStorage = UserDefaultsWhisperKitModelStateStorage(),
     fileDownloader: any WhisperKitModelFileDownloading = URLSessionWhisperKitModelFileDownloader(),
     applicationSupportDirectory: URL? = nil,
     availableCapacityProvider: @escaping @Sendable (URL) throws -> Int64 = {
-      try WhisperKitModelInstaller.availableCapacity(at: $0)
+      try ModelInstallFileSystem.availableCapacity(at: $0)
     },
-    now: @escaping @Sendable () -> Date = Date.init
+    now: @escaping @Sendable () -> Date = Date.init,
+    expectedFiles: [ExpectedModelFile] = WhisperKitModelInstaller.expectedModelFiles
   ) {
     self.stateStorage = stateStorage
     self.fileDownloader = fileDownloader
     self.applicationSupportDirectory =
-      applicationSupportDirectory ?? Self.defaultApplicationSupportDirectory()
+      applicationSupportDirectory ?? ApplicationSupport.directoryOrTrap()
     self.availableCapacityProvider = availableCapacityProvider
     self.now = now
+    self.expectedFiles = expectedFiles
+    self.expectedFilesSizeBytes = expectedFiles.reduce(0) { $0 + $1.sizeBytes }
     self.state = stateStorage.loadState()
   }
 
@@ -361,7 +379,7 @@ final class WhisperKitModelInstaller {
   func deleteInstalledModel() async {
     do {
       if let installedModelFolderURL {
-        try Self.removeIfPresent(installedModelFolderURL)
+        try ModelInstallFileSystem.removeIfPresent(installedModelFolderURL)
       }
       transition(to: .absent)
     } catch {
@@ -398,129 +416,76 @@ final class WhisperKitModelInstaller {
       applicationSupportDirectory
       .appendingPathComponent("WhisperKit/Models", isDirectory: true)
     try FileManager.default.createDirectory(at: modelsRoot, withIntermediateDirectories: true)
-    try Self.excludeFromBackup(modelsRoot)
+    try ModelInstallFileSystem.excludeFromBackup(modelsRoot)
     try Self.preflightSufficientFreeSpace(
-      availableBytes: availableCapacityProvider(modelsRoot)
+      availableBytes: availableCapacityProvider(modelsRoot),
+      expectedModelSizeBytes: expectedFilesSizeBytes
     )
 
-    let stagingRoot = modelsRoot.appendingPathComponent(
-      ".\(Self.modelFolderName).staging-\(UUID().uuidString)",
-      isDirectory: true
-    )
-    let stagingModelFolder = stagingRoot.appendingPathComponent(
-      Self.modelFolderName,
-      isDirectory: true
-    )
-    let finalModelFolder = modelsRoot.appendingPathComponent(
-      Self.modelFolderName, isDirectory: true)
-    try Self.removeIfPresent(stagingRoot)
-    try FileManager.default.createDirectory(
-      at: stagingModelFolder, withIntermediateDirectories: true)
-    try Self.excludeFromBackup(stagingRoot)
-
-    do {
-      let files = try await downloadFiles(to: stagingModelFolder)
-      let sizeBytes = files.reduce(Int64(0)) { $0 + $1.sizeBytes }
-      try Self.removeIfPresent(finalModelFolder)
-      try FileManager.default.moveItem(at: stagingModelFolder, to: finalModelFolder)
-      try Self.removeIfPresent(stagingRoot)
-      try Self.excludeFromBackup(finalModelFolder)
-      return WhisperKitInstalledModel(
-        name: Self.modelName,
-        repository: Self.repository,
-        revision: Self.pinnedRevision,
-        files: files,
-        sizeBytes: sizeBytes,
-        installedAt: now(),
-        localModelPath: finalModelFolder.path
-      )
-    } catch {
-      try? Self.removeIfPresent(stagingRoot)
-      throw error
-    }
-  }
-
-  private func downloadFiles(to stagingModelFolder: URL) async throws
-    -> [WhisperKitInstalledModelFile]
-  {
-    var completedBytes: Int64 = 0
-    var installedFiles: [WhisperKitInstalledModelFile] = []
-    transition(
-      to: .downloading(
-        WhisperKitModelDownloadProgress(
-          fractionComplete: 0,
-          bytesReceived: completedBytes,
-          totalBytes: Self.expectedModelSizeBytes
-        )))
-
-    for expectedFile in Self.expectedModelFiles {
-      try Task.checkCancellation()
-      let destination = stagingModelFolder.appendingPathComponent(
-        expectedFile.relativePath,
-        isDirectory: false
-      )
-      try await fileDownloader.download(
-        from: Self.pinnedDownloadURL(relativePath: expectedFile.relativePath),
-        to: destination
-      )
-      guard FileManager.default.fileExists(atPath: destination.path) else {
-        throw WhisperKitModelInstallError.fileMissingAfterDownload(expectedFile.relativePath)
+    let totalBytes = expectedFilesSizeBytes
+    let staged = try await downloadAndStagePinnedModel(
+      modelsRoot: modelsRoot,
+      modelFolderName: Self.modelFolderName,
+      specs: expectedFiles.map {
+        PinnedModelFileSpec(
+          relativePath: $0.relativePath,
+          sizeBytes: $0.sizeBytes,
+          expectedSHA256: $0.expectedSHA256
+        )
+      },
+      sourceURL: { try Self.pinnedDownloadURL(relativePath: $0) },
+      download: { try await self.fileDownloader.download(from: $0, to: $1) },
+      fileMissing: { WhisperKitModelInstallError.fileMissingAfterDownload($0) },
+      checksumMismatch: {
+        WhisperKitModelInstallError.checksumMismatch(relativePath: $0, expected: $1, actual: $2)
+      },
+      onProgress: { completedBytes in
+        self.transition(
+          to: .downloading(
+            WhisperKitModelDownloadProgress(
+              fractionComplete: totalBytes > 0 ? Double(completedBytes) / Double(totalBytes) : 0,
+              bytesReceived: completedBytes,
+              totalBytes: totalBytes
+            )))
       }
-      let data = try Data(contentsOf: destination)
-      let file = WhisperKitInstalledModelFile(
-        relativePath: expectedFile.relativePath,
-        sha256: Self.hexDigest(SHA256.hash(data: data)),
-        sizeBytes: Int64(data.count)
-      )
-      installedFiles.append(file)
-      completedBytes += expectedFile.sizeBytes
-      transition(
-        to: .downloading(
-          WhisperKitModelDownloadProgress(
-            fractionComplete: Double(completedBytes) / Double(Self.expectedModelSizeBytes),
-            bytesReceived: completedBytes,
-            totalBytes: Self.expectedModelSizeBytes
-          )))
-    }
-    return installedFiles.sorted { $0.relativePath < $1.relativePath }
+    )
+
+    return WhisperKitInstalledModel(
+      name: Self.modelName,
+      repository: Self.repository,
+      revision: Self.pinnedRevision,
+      files: staged.files.map {
+        WhisperKitInstalledModelFile(
+          relativePath: $0.relativePath,
+          sha256: $0.sha256,
+          sizeBytes: $0.sizeBytes
+        )
+      },
+      sizeBytes: staged.sizeBytes,
+      installedAt: now(),
+      localModelPath: staged.finalModelFolder.path
+    )
   }
 
   private func transition(to newState: WhisperKitModelInstallState) {
     state = newState
     stateStorage.saveState(newState)
   }
-
-  private static func defaultApplicationSupportDirectory() -> URL {
-    FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-  }
-
-  private nonisolated static func availableCapacity(at url: URL) throws -> Int64 {
-    let attributes = try FileManager.default.attributesOfFileSystem(forPath: url.path)
-    guard let freeSize = attributes[.systemFreeSize] as? NSNumber else {
-      return 0
-    }
-    return freeSize.int64Value
-  }
-
-  private static func removeIfPresent(_ url: URL) throws {
-    if FileManager.default.fileExists(atPath: url.path) {
-      try FileManager.default.removeItem(at: url)
-    }
-  }
-
-  private static func excludeFromBackup(_ url: URL) throws {
-    var mutableURL = url
-    var values = URLResourceValues()
-    values.isExcludedFromBackup = true
-    try mutableURL.setResourceValues(values)
-  }
-
-  private static func hexDigest(_ digest: SHA256.Digest) -> String {
-    digest.map { String(format: "%02x", $0) }.joined()
-  }
 }
 
 func whisperKitModelDownloadFailure(for error: Error) -> WhisperKitModelInstallFailure {
+  if case .checksumMismatch = error as? WhisperKitModelInstallError {
+    return WhisperKitModelInstallFailure(
+      kind: .checksum,
+      userSafeReason:
+        String(
+          localized:
+            "The downloaded WhisperKit model failed its integrity check and was discarded. Try downloading again."
+        ),
+      isRetryable: true
+    )
+  }
+
   if isWhisperKitDiskFull(error) {
     return WhisperKitModelInstallFailure(
       kind: .disk,
@@ -590,15 +555,5 @@ private func isWhisperKitDiskFull(_ error: Error) -> Bool {
   if case .insufficientDiskSpace = error as? WhisperKitModelInstallError {
     return true
   }
-  let nsError = error as NSError
-  if nsError.domain == NSCocoaErrorDomain && nsError.code == NSFileWriteOutOfSpaceError {
-    return true
-  }
-  if nsError.domain == NSPOSIXErrorDomain && nsError.code == Int(POSIXErrorCode.ENOSPC.rawValue) {
-    return true
-  }
-  if let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? Error {
-    return isWhisperKitDiskFull(underlying)
-  }
-  return false
+  return isModelInstallDiskFullNSError(error)
 }
