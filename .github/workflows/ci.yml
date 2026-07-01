@@ -17,6 +17,12 @@ on:
     branches:
       - main
   workflow_dispatch:
+  # why: the full a11y sweep + speaker calibration otherwise run only on manual dispatch or
+  # path-filter — a dependency/runner-image drift with no local file change would go
+  # unaudited indefinitely. Weekly is enough; the repo is public (standard runners unbilled),
+  # and every schedule-skipped job below keeps the PR lanes unchanged.
+  schedule:
+    - cron: "0 3 * * 1"
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -28,6 +34,7 @@ permissions:
 jobs:
   tests:
     name: Unit + core UI tests
+    if: github.event_name != 'schedule'
     runs-on: macos-26
     timeout-minutes: 45
     env:
@@ -46,6 +53,29 @@ jobs:
 
       - name: Select iOS simulator
         run: scripts/ci/select-ios-simulator.sh
+
+      # why: Xcode/simulator selection is dynamic (highest 26.x on the runner image), so a
+      # silent image bump changes the toolchain with no diff. Persist the resolved versions
+      # where they can be compared across runs instead of digging through step logs.
+      - name: Record resolved toolchain versions
+        run: |
+          set -euo pipefail
+          {
+            echo "## Resolved toolchain"
+            echo '```'
+            xcodebuild -version
+            echo "DEVELOPER_DIR=${DEVELOPER_DIR:-unset}"
+            echo "SIMULATOR_DESTINATION=${SIMULATOR_DESTINATION:-unset}"
+            sw_vers
+            echo '```'
+          } | tee toolchain-versions.txt >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload toolchain versions artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: toolchain-versions-${{ github.run_id }}
+          path: toolchain-versions.txt
+          retention-days: 14
 
       # why: one job, one build — the previous two-runner split built the identical scheme
       # twice (~2x macOS minutes). Sequential test phases on one runner keep the isolation
@@ -134,8 +164,8 @@ jobs:
   # stops burning hosted minutes per PR. Re-enable as a PR gate by adding pull_request/push
   # to this job's own `if`, or by making DspeechFull.xctestplan the scheme default.
   full-ui-a11y:
-    name: Full UI + a11y sweep (manual)
-    if: github.event_name == 'workflow_dispatch'
+    name: Full UI + a11y sweep (manual + weekly)
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
     runs-on: macos-26
     timeout-minutes: 60
     env:
@@ -153,6 +183,19 @@ jobs:
 
       - name: Select iOS simulator
         run: scripts/ci/select-ios-simulator.sh
+
+      - name: Record resolved toolchain versions
+        run: |
+          set -euo pipefail
+          {
+            echo "## Resolved toolchain"
+            echo '```'
+            xcodebuild -version
+            echo "DEVELOPER_DIR=${DEVELOPER_DIR:-unset}"
+            echo "SIMULATOR_DESTINATION=${SIMULATOR_DESTINATION:-unset}"
+            sw_vers
+            echo '```'
+          } | tee toolchain-versions.txt >> "$GITHUB_STEP_SUMMARY"
 
       - name: Build for testing
         run: |
@@ -190,6 +233,7 @@ jobs:
 
   lint-secret-scan:
     name: Swift format and secret scan
+    if: github.event_name != 'schedule'
     runs-on: macos-26
     timeout-minutes: 10
     steps:
@@ -256,6 +300,7 @@ jobs:
 
   release-archive:
     name: Release archive binary gate
+    if: github.event_name != 'schedule'
     runs-on: macos-26
     timeout-minutes: 15
     steps:
@@ -284,6 +329,7 @@ jobs:
 
   privacy-manifest:
     name: Privacy manifest validation
+    if: github.event_name != 'schedule'
     runs-on: macos-26
     timeout-minutes: 5
     steps:
@@ -343,6 +389,7 @@ jobs:
 
   replay-eval:
     name: Offline ATC voice-filter replay eval
+    if: github.event_name != 'schedule'
     runs-on: macos-26
     timeout-minutes: 10
     steps:
