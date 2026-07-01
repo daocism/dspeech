@@ -21,3 +21,4 @@ scripts/testdata/atc-runs.log.jsonl
 # Python bytecode (test-harness imports)
 __pycache__/
 *.pyc
+.serena/
