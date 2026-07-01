@@ -741,11 +741,24 @@ private struct TranscriptBottomOffsetPreferenceKey: PreferenceKey {
     func saveHasCompletedOnboarding(_ completed: Bool) {}
   }
 
+  // why: the Canvas preview's own tiny stand-in for AudioSessionRouting — the real fake now lives in
+  // the test target (never ships in the app). Static ready route, no mic hardware, empty event stream.
+  private struct PreviewAudioSessionRouting: AudioSessionRouting {
+    let currentRouteSnapshot: RouteSnapshot
+    let availableInputSnapshots: [PortSnapshot]
+    var routePreparationStatus: AudioRoutePreparationStatus { .ready }
+    func routeChangeEvents() -> AsyncStream<RouteChangeEvent> {
+      AsyncStream { $0.finish() }
+    }
+    func requestRecordPermission() async -> Bool { true }
+    func setPreferredInput(uid: String) throws {}
+  }
+
   @MainActor private func previewCockpit() -> ContentView {
     let mic = PortSnapshot(portType: .builtInMic, portName: "Built-in mic", uid: "preview-mic")
     return ContentView(
-      routing: FakeAudioSessionRouting(
-        currentRoute: RouteSnapshot(inputs: [mic]), availableInputs: [mic]),
+      routing: PreviewAudioSessionRouting(
+        currentRouteSnapshot: RouteSnapshot(inputs: [mic]), availableInputSnapshots: [mic]),
       onboarding: OnboardingState(storage: PreviewCompletedOnboardingStorage()))
   }
 
