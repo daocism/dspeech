@@ -211,6 +211,22 @@ final class AccessibilityAuditUITests: XCTestCase {
     audit(app, "main · de · AX-XL")
   }
 
+  // why: ru is the default locale of nearly every functional UI test yet was never itself
+  // accessibility-audited — German covers LENGTH, Cyrillic covers a different glyph metric
+  // (wider caps, different descenders) that can clip independently.
+  @MainActor func testMainSurface_ru_large() {
+    let app = launch(locale: "ru", contentSize: Self.largeType)
+    XCTAssertTrue(app.buttons["start-button"].waitForExistence(timeout: 8))
+    audit(app, "main · ru · AX-XL")
+  }
+
+  @MainActor func testSettings_ru_default() {
+    let app = launch(locale: "ru")
+    app.buttons["settings-button"].tap()
+    XCTAssertTrue(app.buttons["settings-done-button"].waitForExistence(timeout: 8))
+    audit(app, "settings · ru · default")
+  }
+
   // THE reported defect: a recognition failure shows the orange error banner at the bottom,
   // where the floating mic button used to overlap it. Drive Start → failure (no recognizer on
   // the sim), handle the permission prompt, then audit; elementDetection must stay clean.
