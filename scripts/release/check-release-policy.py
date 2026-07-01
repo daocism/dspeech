@@ -12,8 +12,15 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 EXPECTED_FLUIDAUDIO_URL = "https://github.com/FluidInference/FluidAudio.git"
-EXPECTED_FLUIDAUDIO_REVISION = "8048812869b0c7c6fa393e564a4fb6f95126ba23"
-EXPECTED_FLUIDAUDIO_VERSION = "0.14.7"
+EXPECTED_FLUIDAUDIO_REVISION = "b9d43724cbdb5a980e441fd54180964e94d470f7"
+EXPECTED_FLUIDAUDIO_VERSION = "0.15.4"
+# why: the speaker-diarization model pack (pyannote_segmentation + wespeaker_v2, HF revision
+# 1ed7a662) is versioned independently of the FluidAudio library. The 0.14.7 -> 0.15.4 library
+# bump did NOT change those model bytes (identical 10-file checksums, same pinned revision), so
+# the on-disk pack label stays "0.14.7" — bumping it would be a false artifact-version claim and
+# would churn installs for no behavioral change. Kept as a separate constant so the library pin
+# and the model-pack pin can drift on their own axes.
+EXPECTED_MODEL_PACK_VERSION = "0.14.7"
 EXPECTED_MODEL_SOURCE = "FluidInference/speaker-diarization-coreml"
 EXPECTED_MODEL_MANIFEST_COUNT = 10
 APP_PACKAGE_RESOLVED = Path("Dspeech.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved")
@@ -39,8 +46,9 @@ PRODUCTION_SOURCE_NETWORK_ALLOWLIST = {
     # User-initiated WhisperKit model download (ADR 0011): same explicit-download
     # boundary class as the voice pack — pinned HF revision, local-only afterwards.
     Path("Dspeech/Core/ASR/WhisperKitModelInstaller.swift"): {"URLSession", "URLRequest", "https://"},
-    # User-initiated Parakeet EOU model download (English-only third ASR engine): same explicit,
-    # pinned-revision Hugging Face download boundary as WhisperKit — local-only inference afterwards.
+    # User-initiated Parakeet EOU model download (ADR 0012): identical boundary class —
+    # pinned HF revision + per-file SHA-256, local-only afterwards. Contract enforced by
+    # check_parakeet_model_installer_contract so this allowlisted network access can't drift.
     Path("Dspeech/Core/ASR/ParakeetModelInstaller.swift"): {"URLSession", "URLRequest", "https://"},
 }
 
@@ -137,9 +145,13 @@ def check_project_package_reference(state: CheckState) -> None:
         return
     if EXPECTED_FLUIDAUDIO_URL not in text:
         state.fail("Xcode project must reference the canonical FluidAudio repository URL")
-    if f"kind = revision; revision = {EXPECTED_FLUIDAUDIO_REVISION};" not in text:
-        state.fail("Xcode project must pin FluidAudio by exact revision")
-    if "upToNextMajorVersion" in text or "branch =" in text:
+    # why: the FluidAudio pin moved from a raw-revision requirement to an exactVersion tag pin
+    # (0.14.7 revision-kind -> 0.15.4 exactVersion). exactVersion is non-floating — it resolves
+    # to a single published tag whose commit is what Package.resolved records (revision-checked by
+    # check_package_pin), so supply-chain determinism is preserved without a raw SHA in the pbxproj.
+    if f"kind = exactVersion; version = {EXPECTED_FLUIDAUDIO_VERSION};" not in text:
+        state.fail("Xcode project must pin FluidAudio by exact version")
+    if "upToNextMajorVersion" in text or "upToNextMinorVersion" in text or "branch =" in text:
         state.fail("Xcode project must not use floating SwiftPM package requirements")
 
 
@@ -149,7 +161,7 @@ def check_speaker_eval_package(state: CheckState) -> None:
         return
     expected = f'.package(url: "{EXPECTED_FLUIDAUDIO_URL}", exact: "{EXPECTED_FLUIDAUDIO_VERSION}")'
     if expected not in text:
-        state.fail("SpeakerEval Package.swift must pin FluidAudio exact 0.14.7")
+        state.fail(f"SpeakerEval Package.swift must pin FluidAudio exact {EXPECTED_FLUIDAUDIO_VERSION}")
 
 
 def check_model_pack_contract(state: CheckState) -> None:
@@ -158,7 +170,7 @@ def check_model_pack_contract(state: CheckState) -> None:
     if not text:
         return
     expected_literals = {
-        "packVersion": EXPECTED_FLUIDAUDIO_VERSION,
+        "packVersion": EXPECTED_MODEL_PACK_VERSION,
         "source": EXPECTED_MODEL_SOURCE,
     }
     for name, expected in expected_literals.items():
@@ -216,6 +228,8 @@ def check_parakeet_model_installer_contract(state: CheckState) -> None:
         state.fail("ParakeetModelInstaller must keep the pinned download boundary explicit")
     if '"https://' in text and "resolve/\\(sourceRevision)" not in text:
         state.fail("ParakeetModelInstaller downloads must resolve through the pinned revision")
+    if not re.search(r'expectedSHA256:\s*"[0-9a-f]{64}"', text):
+        state.fail("ParakeetModelInstaller must verify downloads against per-file SHA-256")
 
 
 def check_production_source_no_unexpected_network(state: CheckState) -> None:

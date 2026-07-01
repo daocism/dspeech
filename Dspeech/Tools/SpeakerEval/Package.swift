@@ -10,7 +10,7 @@ let package = Package(
   name: "SpeakerEval",
   platforms: [.macOS(.v15)],
   dependencies: [
-    .package(url: "https://github.com/FluidInference/FluidAudio.git", exact: "0.14.7")
+    .package(url: "https://github.com/FluidInference/FluidAudio.git", exact: "0.15.4")
   ],
   targets: [
     .executableTarget(
