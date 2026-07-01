@@ -9,6 +9,10 @@ name: Speaker calibration guard
 # manual only — never per feature-branch push — to respect the 10x macOS CI-minute multiplier.
 on:
   workflow_dispatch:
+  # why: path filters catch OUR changes; a FluidAudio release or runner-image drift changes
+  # the real model output with zero repo diff. Monthly re-measurement closes that hole.
+  schedule:
+    - cron: "0 4 1 * *"
   pull_request:
     paths:
       - 'Dspeech/Core/VoiceFilter/SpeakerMatcher.swift'
