@@ -100,7 +100,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "%@ di %@"
           }
         },
@@ -522,7 +522,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Modello ASR"
           }
         },
@@ -593,8 +593,8 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Filtro voce ATC"
+            "state": "translated",
+            "value": "Filtro vocale ATC"
           }
         },
         "ja": {
@@ -664,7 +664,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Filtro ATC/pilota"
           }
         },
@@ -735,7 +735,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Informazioni"
           }
         },
@@ -806,8 +806,8 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Filtro voce attivo"
+            "state": "translated",
+            "value": "Filtro vocale attivo"
           }
         },
         "ja": {
@@ -877,7 +877,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Nominativo aeromobile"
           }
         },
@@ -948,7 +948,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Vengono mostrati tutti i segmenti ATC."
           }
         },
@@ -1301,7 +1301,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Lingua dell'app"
           }
         },
@@ -1372,7 +1372,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Apple Speech"
           }
         },
@@ -2792,7 +2792,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Audio e trascrizioni restano su questo dispositivo. Nulla lascia il dispositivo."
           }
         },
@@ -3143,7 +3143,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "L'acquisizione audio è stata interrotta dal sistema. Registrazione in pausa."
           }
         },
@@ -3354,7 +3354,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Solo uscita audio — collega un ingresso."
           }
         },
@@ -3425,7 +3425,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Sorgente audio"
           }
         },
@@ -3496,7 +3496,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Annulla"
           }
         },
@@ -3567,7 +3567,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "La sorgente di acquisizione è cambiata: %@."
           }
         },
@@ -3638,7 +3638,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Sorgente di acquisizione non disponibile — controlla la connessione dell'ingresso."
           }
         },
@@ -3709,7 +3709,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Sorgente di acquisizione: %@"
           }
         },
@@ -3780,7 +3780,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Controlla le lingue di dettatura nelle impostazioni del dispositivo. Dspeech non sostituisce la modalità locale con il riconoscimento cloud."
           }
         },
@@ -3851,7 +3851,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Verifica delle lingue di riconoscimento sul dispositivo…"
           }
         },
@@ -3922,7 +3922,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Cancella"
           }
         },
@@ -4203,7 +4203,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "La voce pilota riconosciuta con sicurezza può essere fermata prima del riconoscimento. Il filtro di rilevanza del nominativo resta attivo separatamente."
           }
         },
@@ -4274,7 +4274,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Collega un ingresso per la precisione"
           }
         },
@@ -4415,8 +4415,8 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Continua senza filtro voce"
+            "state": "translated",
+            "value": "Continua senza filtro vocale"
           }
         },
         "ja": {
@@ -4486,7 +4486,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Core ML"
           }
         },
@@ -4557,7 +4557,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Impossibile eliminare il modello"
           }
         },
@@ -4628,7 +4628,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Impossibile eliminare il pacchetto del modello dal dispositivo. Controlla l'accesso allo spazio di archiviazione e riprova più tardi."
           }
         },
@@ -4909,7 +4909,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Impossibile scaricare il pacchetto del modello. Controlla la connessione di rete e riprova."
           }
         },
@@ -4980,7 +4980,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Impossibile inizializzare il riconoscitore locale dal pacchetto installato."
           }
         },
@@ -5051,7 +5051,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Impossibile installare il modello"
           }
         },
@@ -5192,7 +5192,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Impossibile caricare o applicare il modello FluidAudio locale dal pacchetto installato."
           }
         },
@@ -5403,7 +5403,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Impossibile preparare la traduzione sul dispositivo. Controlla il pacchetto lingua e riprova."
           }
         },
@@ -5474,7 +5474,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Impossibile riconoscere il parlato. Riprova."
           }
         },
@@ -5615,7 +5615,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Impossibile salvare il campione vocale. Riprova."
           }
         },
@@ -5686,7 +5686,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Impossibile avviare il riconoscimento. Controlla il microfono e riprova."
           }
         },
@@ -5757,7 +5757,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Impossibile avviare la registrazione."
           }
         },
@@ -5828,7 +5828,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Impossibile provare il livello: il formato audio di ingresso non è disponibile."
           }
         },
@@ -5899,7 +5899,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Impossibile preparare l’ingresso audio per la registrazione: %@"
           }
         },
@@ -5970,7 +5970,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Impossibile riconoscere il parlato: %@"
           }
         },
@@ -6041,7 +6041,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Impossibile selezionare questo ingresso: %@"
           }
         },
@@ -6112,7 +6112,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Impossibile avviare la registrazione: %@"
           }
         },
@@ -6183,7 +6183,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Impossibile avviare il controllo del livello: %@"
           }
         },
@@ -6254,7 +6254,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "DEMO"
           }
         },
@@ -6395,7 +6395,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Elimina pacchetto"
           }
         },
@@ -6466,7 +6466,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Elimina pacchetto (%@)"
           }
         },
@@ -6607,7 +6607,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Delta 905, mantenete prima della pista due sette, traffico in corto finale."
           }
         },
@@ -6959,7 +6959,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Fine"
           }
         },
@@ -7030,8 +7030,8 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Scarica il pacchetto filtro voce (≈ 15 MB)"
+            "state": "translated",
+            "value": "Scarica il pacchetto del filtro vocale (≈ 15 MB)"
           }
         },
         "ja": {
@@ -7101,7 +7101,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Download del modello…"
           }
         },
@@ -7172,8 +7172,8 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Download del modello del filtro voce…"
+            "state": "translated",
+            "value": "Download del modello del filtro vocale…"
           }
         },
         "ja": {
@@ -7383,7 +7383,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Dspeech non trasmette via radio né invia nulla. L'app si limita ad ascoltare e mostrare il testo."
           }
         },
@@ -7454,7 +7454,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Dspeech elabora l'audio solo in locale. L'audio non lascia mai il dispositivo."
           }
         },
@@ -7525,8 +7525,8 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Attiva filtro voce"
+            "state": "translated",
+            "value": "Attiva filtro vocale"
           }
         },
         "ja": {
@@ -7596,7 +7596,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Ingresso esterno"
           }
         },
@@ -7667,7 +7667,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Sorgente esterna persa — passaggio a %@. Registrazione in pausa."
           }
         },
@@ -8019,7 +8019,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Inizia"
           }
         },
@@ -8090,7 +8090,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Nascondi le trasmissioni del pilota e le chiamate ATC non pertinenti."
           }
         },
@@ -8161,7 +8161,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Ingresso"
           }
         },
@@ -8232,7 +8232,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Installazione del modello…"
           }
         },
@@ -8303,8 +8303,8 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Installazione del modello del filtro voce…"
+            "state": "translated",
+            "value": "Installazione del modello del filtro vocale…"
           }
         },
         "ja": {
@@ -8444,7 +8444,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "LIVE"
           }
         },
@@ -8515,7 +8515,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "LOCALE"
           }
         },
@@ -8586,7 +8586,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Livello"
           }
         },
@@ -8657,7 +8657,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "In ascolto -- scandisci il nominativo (per esempio: \"november one two three alpha bravo\")."
           }
         },
@@ -8798,7 +8798,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "In ascolto — scandisci il nominativo (per esempio: \"november one two three alpha bravo\")."
           }
         },
@@ -8869,7 +8869,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "In ascolto…"
           }
         },
@@ -8940,7 +8940,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Locale"
           }
         },
@@ -9011,7 +9011,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Locale per impostazione predefinita"
           }
         },
@@ -9082,7 +9082,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Le impostazioni locali sono danneggiate"
           }
         },
@@ -9223,7 +9223,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Modalità"
           }
         },
@@ -9294,7 +9294,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Modello installato e verificato"
           }
         },
@@ -9365,7 +9365,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Modello non installato"
           }
         },
@@ -9436,7 +9436,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Verifica del pacchetto del modello non riuscita."
           }
         },
@@ -9507,7 +9507,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Stato del modello danneggiato"
           }
         },
@@ -9648,7 +9648,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "N123AB, scendete e mantenete tremila, prevedete avvicinamento ILS pista due sette."
           }
         },
@@ -9719,7 +9719,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Avanti"
           }
         },
@@ -9790,7 +9790,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Nessuna sorgente di acquisizione — collega un ingresso e riprova."
           }
         },
@@ -10073,7 +10073,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Nessun ingresso"
           }
         },
@@ -10144,7 +10144,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Nessuna sorgente di ingresso rilevata. Collega un ingresso cablato (USB-C / TRRS) o usa il microfono integrato."
           }
         },
@@ -10215,7 +10215,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Nessun accesso al microfono. Consentilo in Impostazioni."
           }
         },
@@ -10286,7 +10286,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Nessun accesso al microfono. Consentilo nelle impostazioni del dispositivo."
           }
         },
@@ -10357,7 +10357,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Nessuna lingua di riconoscimento sul dispositivo disponibile. Apri le impostazioni di riconoscimento e controlla le lingue di dettatura."
           }
         },
@@ -10428,7 +10428,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Nessuna lingua di riconoscimento sul dispositivo disponibile."
           }
         },
@@ -10499,7 +10499,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Nessun modello di riconoscimento sul dispositivo disponibile per questa lingua. Scarica il pacchetto lingua o eseguilo sul dispositivo."
           }
         },
@@ -10570,7 +10570,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Nessuna lingua di riconoscimento disponibile"
           }
         },
@@ -10781,7 +10781,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Nessun accesso al riconoscimento vocale. Consentilo in Impostazioni."
           }
         },
@@ -10852,7 +10852,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Nessun accesso al riconoscimento vocale. Consentilo nelle impostazioni del dispositivo."
           }
         },
@@ -10923,7 +10923,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Nessun parlato riconosciuto — avvicinati al microfono."
           }
         },
@@ -10994,7 +10994,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Nessuna sorgente di acquisizione adatta."
           }
         },
@@ -11347,7 +11347,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Niente da tradurre: il segmento è vuoto."
           }
         },
@@ -11418,7 +11418,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Il riconoscimento offline per %@ non è installato. L’inserimento vocale del nominativo richiede un modello locale."
           }
         },
@@ -11489,7 +11489,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Elaborazione sul dispositivo"
           }
         },
@@ -11560,7 +11560,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Traduzione sul dispositivo"
           }
         },
@@ -11631,7 +11631,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "La configurazione della traduzione sul dispositivo è stata annullata. Riattiva la traduzione se ti serve."
           }
         },
@@ -11702,7 +11702,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Apri impostazioni dispositivo"
           }
         },
@@ -11913,7 +11913,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Solo uscita — nessun ingresso"
           }
         },
@@ -12054,7 +12054,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Pacchetto installato, filtro disattivato"
           }
         },
@@ -12125,7 +12125,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Pacchetto «%@» · embedding a %lld dimensioni · %@. Il riconoscimento viene eseguito offline."
           }
         },
@@ -12337,7 +12337,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Pilota 1"
           }
         },
@@ -12408,7 +12408,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Pilota 1 (comandante)"
           }
         },
@@ -12479,7 +12479,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Pilota 2"
           }
         },
@@ -12550,7 +12550,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Pilota 2 (primo ufficiale)"
           }
         },
@@ -12621,7 +12621,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Slot pilota non disponibile"
           }
         },
@@ -12692,7 +12692,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Classificazione voce pilota"
           }
         },
@@ -12763,7 +12763,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Filtro pre-ASR disattivato; tutti i buffer audio vengono passati al riconoscimento."
           }
         },
@@ -12834,7 +12834,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Privacy"
           }
         },
@@ -12905,7 +12905,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Solo ricezione"
           }
         },
@@ -12976,7 +12976,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Riconoscimento"
           }
         },
@@ -13047,7 +13047,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Lingua di riconoscimento"
           }
         },
@@ -13118,7 +13118,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Registra un campione vocale per il riconoscimento."
           }
         },
@@ -13189,7 +13189,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Registra voce"
           }
         },
@@ -13260,8 +13260,8 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Registrazione -- parla per alcuni secondi, poi tocca Stop."
+            "state": "translated",
+            "value": "Registrazione -- parla per alcuni secondi, poi tocca Ferma."
           }
         },
         "ja": {
@@ -13331,7 +13331,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "La registrazione è disponibile una volta connesso il riconoscitore."
           }
         },
@@ -13402,7 +13402,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Registrazione non riuscita -- riprova."
           }
         },
@@ -13473,7 +13473,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Registrazione non riuscita — riprova."
           }
         },
@@ -13544,7 +13544,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Registrazione — parla per qualche secondo, poi tocca Ferma."
           }
         },
@@ -13685,7 +13685,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Richiesta di accesso a microfono e riconoscimento vocale…"
           }
         },
@@ -13756,7 +13756,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Ripristina dati danneggiati"
           }
         },
@@ -13827,7 +13827,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Riavvia l'app per cambiare la lingua."
           }
         },
@@ -13898,7 +13898,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Riprova download"
           }
         },
@@ -14039,7 +14039,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "I segmenti senza corrispondenza del nominativo verranno nascosti finché la finestra di continuazione è attiva."
           }
         },
@@ -14250,7 +14250,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Imposta il nominativo a voce"
           }
         },
@@ -14321,7 +14321,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Impostazioni"
           }
         },
@@ -14392,7 +14392,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Le impostazioni sono qui"
           }
         },
@@ -14603,8 +14603,8 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Alcune impostazioni locali del filtro voce sono danneggiate. Ripristina i dati danneggiati per continuare in sicurezza."
+            "state": "translated",
+            "value": "Alcune impostazioni locali del filtro vocale sono danneggiate. Ripristina i dati danneggiati per continuare in sicurezza."
           }
         },
         "ja": {
@@ -14674,7 +14674,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "La classificazione vocale è disattivata; tutto l’audio passa al riconoscimento. Il filtro del nominativo può ancora nascondere ATC non rilevante."
           }
         },
@@ -14745,7 +14745,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Errore di riconoscimento vocale. Riprova."
           }
         },
@@ -14816,7 +14816,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Il riconoscimento vocale non è disponibile su questo dispositivo."
           }
         },
@@ -14887,7 +14887,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Speedbird 42, contattate la torre su uno uno otto decimale sette."
           }
         },
@@ -14958,7 +14958,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Avvia"
           }
         },
@@ -15029,7 +15029,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Ferma"
           }
         },
@@ -15100,7 +15100,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Ferma test"
           }
         },
@@ -15171,7 +15171,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Ferma input vocale"
           }
         },
@@ -15242,7 +15242,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Sistema"
           }
         },
@@ -15313,7 +15313,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Traduzione di sistema non riuscita. Riprova."
           }
         },
@@ -15384,7 +15384,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Tocca Avvia e parla — la trascrizione apparirà qui.\nElaborazione in locale; l'audio non lascia mai il dispositivo."
           }
         },
@@ -15455,7 +15455,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Tocca per avviare il riconoscimento"
           }
         },
@@ -15526,7 +15526,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Lingua di destinazione"
           }
         },
@@ -15597,7 +15597,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Prova livello ingresso"
           }
         },
@@ -15668,7 +15668,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Il modello FluidAudio (%@) viene scaricato una volta su questa richiesta. Solo la richiesta di download del modello lascia il dispositivo -- audio, trascrizioni e campioni vocali non vengono trasmessi."
           }
         },
@@ -15739,7 +15739,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Il modello FluidAudio (%@) viene scaricato una sola volta con questa richiesta. Dal dispositivo esce solo la richiesta di download del modello: audio, trascrizioni e campioni vocali non vengono trasmessi."
           }
         },
@@ -15810,7 +15810,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "La sessione audio è di nuovo disponibile. Controlla l'ingresso prima di ricominciare."
           }
         },
@@ -15881,7 +15881,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "La sessione audio è di nuovo disponibile. Riavvia l'acquisizione dopo aver controllato l'ingresso."
           }
         },
@@ -16093,7 +16093,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Il servizio audio di iOS è stato riavviato. Registrazione in pausa — controlla l'ingresso e ricomincia."
           }
         },
@@ -16164,7 +16164,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Il pacchetto installato non contiene alcun percorso del modello locale."
           }
         },
@@ -16235,7 +16235,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "La lingua «%@» non è ancora stata scaricata per il riconoscimento sul dispositivo."
           }
         },
@@ -16306,7 +16306,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "I file del modello FluidAudio locale mancano nel pacchetto installato."
           }
         },
@@ -16377,7 +16377,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Il riconoscitore locale risulta non disponibile dopo l'installazione del pacchetto."
           }
         },
@@ -16448,7 +16448,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Il microfono non è disponibile."
           }
         },
@@ -16519,7 +16519,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Il modello è installato, ma il riconoscitore locale non è disponibile in questa build."
           }
         },
@@ -16730,7 +16730,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Il pacchetto del modello non ha superato il controllo di checksum o integrità. Riprova il download per ottenere una copia verificata."
           }
         },
@@ -16801,7 +16801,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Il modello «%@» rimane sul dispositivo. Attiva il filtro sopra o elimina il pacchetto per liberare spazio."
           }
         },
@@ -16872,7 +16872,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Il modello di riconoscimento vocale sul dispositivo non è installato in questa build (vedi ADR 0007)."
           }
         },
@@ -16943,7 +16943,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Il pacchetto è installato, ma il riconoscitore locale non è connesso in questa build, quindi la registrazione vocale è disattivata."
           }
         },
@@ -17014,8 +17014,8 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Il filtro voce del pilota funziona solo dopo l'installazione del pacchetto del modello locale. Il download è una tantum, esplicito e su tua richiesta; l'audio non lascia mai il dispositivo."
+            "state": "translated",
+            "value": "Il filtro vocale del pilota funziona solo dopo l'installazione del pacchetto del modello locale. Il download è una tantum, esplicito e su tua richiesta; l'audio non lascia mai il dispositivo."
           }
         },
         "ja": {
@@ -17085,7 +17085,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Il filtro pre-ASR può nascondere solo il parlato riconosciuto con certezza come quello del pilota."
           }
         },
@@ -17156,7 +17156,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Il pacchetto lingua di riconoscimento non è scaricato. Attiva Dettatura e scarica la lingua in Impostazioni → Generali → Tastiera → Dettatura."
           }
         },
@@ -17227,7 +17227,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "La dimensione degli embedding del riconoscitore (%lld) non corrisponde a quella del pacchetto (%lld)."
           }
         },
@@ -17298,7 +17298,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Il nominativo salvato è danneggiato. Ripristinalo e imposta di nuovo il nominativo."
           }
         },
@@ -17369,8 +17369,8 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Lo stato salvato del pacchetto del modello vocale è danneggiato. Continua senza filtro voce e riscarica il pacchetto se necessario."
+            "state": "translated",
+            "value": "Lo stato salvato del pacchetto del modello vocale è danneggiato. Continua senza filtro vocale e riscarica il pacchetto se necessario."
           }
         },
         "ja": {
@@ -17440,7 +17440,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "I campioni vocali salvati sono danneggiati. Ripristina i dati danneggiati e registra di nuovo i campioni."
           }
         },
@@ -17511,7 +17511,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "La lingua di destinazione non è supportata per la traduzione sul dispositivo. Scegli un'altra lingua di traduzione."
           }
         },
@@ -17582,7 +17582,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Il pacchetto lingua di traduzione non è installato. Disattiva e riattiva la traduzione — iOS proporrà il download."
           }
         },
@@ -17653,8 +17653,8 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Il modello del filtro voce non è installato. Scarica il pacchetto per attivare il riconoscimento del pilota."
+            "state": "translated",
+            "value": "Il modello del filtro vocale non è installato. Scarica il pacchetto per attivare il riconoscimento del pilota."
           }
         },
         "ja": {
@@ -17724,7 +17724,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Poi: Generali -> Tastiera -> Lingue dettatura -- attiva Dettatura e aggiungi questa lingua. Il modello viene scaricato e il riconoscimento funziona offline."
           }
         },
@@ -17795,7 +17795,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Poi: Generali → Tastiera → Lingue dettatura — attiva Dettatura e aggiungi questa lingua. Il modello si scarica e il riconoscimento funziona offline."
           }
         },
@@ -17936,7 +17936,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Pulisce solo la vista cockpit. La cronologia delle sessioni salvate resta su questo dispositivo."
           }
         },
@@ -18007,7 +18007,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Elimina la trascrizione salvata da questo dispositivo. La vista attuale non cambia."
           }
         },
@@ -18078,7 +18078,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Questa lingua non è disponibile per il riconoscimento. Scegli un'altra lingua nelle impostazioni di riconoscimento."
           }
         },
@@ -18149,7 +18149,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Questa coppia di lingue non è supportata per la traduzione sul dispositivo. Scegli un'altra lingua di destinazione."
           }
         },
@@ -18220,7 +18220,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Questa lingua di riconoscimento non è supportata per la traduzione sul dispositivo. Scegli un'altra lingua di riconoscimento."
           }
         },
@@ -18291,7 +18291,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Troppo basso o troppo breve -- registra un campione più chiaro."
           }
         },
@@ -18362,7 +18362,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Troppo debole o troppo breve — registra un campione più chiaro."
           }
         },
@@ -18853,7 +18853,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Traduzione"
           }
         },
@@ -18924,7 +18924,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "La traduzione avviene sul dispositivo tramite i pacchetti lingua di sistema Apple. Alla prima attivazione, iOS propone di scaricare un pacchetto. Audio e testo non lasciano mai il dispositivo."
           }
         },
@@ -19065,7 +19065,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Ingresso sconosciuto"
           }
         },
@@ -19136,7 +19136,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Usa il microfono integrato per provarlo. In cabina, collega un ingresso cablato (USB-C / TRRS)."
           }
         },
@@ -19207,7 +19207,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "VERIFICA"
           }
         },
@@ -19348,7 +19348,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Versione"
           }
         },
@@ -19419,8 +19419,8 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Filtro voce disattivato. Il modello è installato e pronto."
+            "state": "translated",
+            "value": "Filtro vocale disattivato. Il modello è installato e pronto."
           }
         },
         "ja": {
@@ -19490,7 +19490,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Campione vocale registrato. Registra di nuovo per aggiornarlo."
           }
         },
@@ -19561,7 +19561,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Voce salvata per %@."
           }
         },
@@ -19632,7 +19632,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Senza un nominativo, il filtro lascia passare tutti i segmenti non del pilota. Tocca il microfono per impostarlo a voce."
           }
         },
@@ -19845,7 +19845,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "La scelta viene salvata per questo dispositivo. Il microfono integrato serve per le prove; in cabina, collega un ingresso cablato."
           }
         },
@@ -19916,7 +19916,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "microfono integrato"
           }
         },
@@ -19987,7 +19987,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "conf. %@"
           }
         },
@@ -20058,7 +20058,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Microfono integrato"
           }
         },
@@ -20129,7 +20129,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "nuovo ingresso"
           }
         },
@@ -20199,7 +20199,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Equipaggio %lld"
           }
         },
@@ -20269,7 +20269,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Aggiungi membro dell’equipaggio"
           }
         },
@@ -20339,7 +20339,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Registra di nuovo"
           }
         },
@@ -20409,7 +20409,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Registrazione vocale non disponibile"
           }
         },
@@ -20479,8 +20479,8 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Registrazione: continua a parlare per circa 4 secondi, poi tocca Stop."
+            "state": "translated",
+            "value": "Registrazione: continua a parlare per circa 4 secondi, poi tocca Ferma."
           }
         },
         "ja": {
@@ -20549,7 +20549,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Campione vocale registrato. Registra di nuovo per aggiornarlo."
           }
         },
@@ -20619,7 +20619,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Ancora nessuna voce dell’equipaggio. Aggiungi ogni persona con la cuffia per distinguere le sue trasmissioni da quelle dell’ATC."
           }
         },
@@ -20689,7 +20689,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Rimuovi %@"
           }
         },
@@ -20759,7 +20759,7 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Impossibile accedere a microfono e riconoscimento vocale. Controlla le autorizzazioni in Impostazioni iPhone, poi tocca di nuovo Avvia."
           }
         },
@@ -20829,8 +20829,8 @@
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Voce non sufficiente. Parla per circa 5 secondi in un luogo tranquillo, poi tocca Stop."
+            "state": "translated",
+            "value": "Voce non sufficiente. Parla per circa 5 secondi in un luogo tranquillo, poi tocca Ferma."
           }
         },
         "ja": {
