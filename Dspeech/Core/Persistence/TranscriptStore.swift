@@ -345,16 +345,7 @@ final class FileTranscriptStore: TranscriptStoring {
   }
 
   private static func defaultRootDirectory(fileManager: FileManager) throws -> URL {
-    guard
-      let applicationSupport = fileManager.urls(
-        for: .applicationSupportDirectory,
-        in: .userDomainMask
-      ).first
-    else {
-      throw TranscriptStoreError.ioFailure("Application Support directory is unavailable")
-    }
-    return
-      applicationSupport
+    try ApplicationSupport.directory(fileManager: fileManager)
       .appendingPathComponent(appDirectoryName, isDirectory: true)
       .appendingPathComponent(transcriptDirectoryName, isDirectory: true)
   }

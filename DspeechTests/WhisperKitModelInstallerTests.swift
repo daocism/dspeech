@@ -15,6 +15,12 @@ struct WhisperKitModelInstallerTests {
     )
     #expect(WhisperKitModelInstaller.expectedModelSizeBytes == 626_718_238)
     #expect(WhisperKitModelInstaller.expectedModelFiles.count == 17)
+    // why: B4 — every shipped file must carry a 64-hex-char SHA-256 so the install path verifies
+    // integrity (never fail-open). No placeholder/empty hashes.
+    #expect(
+      WhisperKitModelInstaller.expectedModelFiles.allSatisfy {
+        $0.expectedSHA256.count == 64 && $0.expectedSHA256.allSatisfy { $0.isHexDigit }
+      })
     #expect(
       try WhisperKitModelInstaller.pinnedDownloadURL(relativePath: "config.json").absoluteString
         == "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/97a5bf9bbc74c7d9c12c755d04dea59e672e3808/openai_whisper-large-v3-v20240930_626MB/config.json"
@@ -24,16 +30,16 @@ struct WhisperKitModelInstallerTests {
   @Test func installDownloadsPinnedFilesAndRecordsChecksumManifest() async throws {
     let appSupport = Self.makeApplicationSupportDirectory()
     defer { Self.remove(appSupport) }
+    let (files, contents) = Self.fixtureManifest()
     let storage = InMemoryWhisperKitModelStateStorage()
-    let downloader = FakeWhisperKitModelFileDownloader(
-      contents: Self.fixtureContents()
-    )
+    let downloader = FakeWhisperKitModelFileDownloader(contents: contents)
     let installer = WhisperKitModelInstaller(
       stateStorage: storage,
       fileDownloader: downloader,
       applicationSupportDirectory: appSupport,
-      availableCapacityProvider: { _ in WhisperKitModelInstaller.expectedModelSizeBytes * 2 },
-      now: { Date(timeIntervalSince1970: 1_718_000_000) }
+      availableCapacityProvider: { _ in 1_000_000_000 },
+      now: { Date(timeIntervalSince1970: 1_718_000_000) },
+      expectedFiles: files
     )
 
     await installer.install()
@@ -45,10 +51,13 @@ struct WhisperKitModelInstallerTests {
     let folderURL = try #require(installer.installedModelFolderURL)
     #expect(folderURL.path.hasSuffix("WhisperKit/Models/openai_whisper-large-v3-v20240930_626MB"))
     #expect(FileManager.default.fileExists(atPath: folderURL.path))
-    #expect(model.files.count == WhisperKitModelInstaller.expectedModelFiles.count)
-    #expect(
-      model.sizeBytes == Self.fixtureContents().values.reduce(Int64(0)) { $0 + Int64($1.count) })
+    #expect(model.files.count == files.count)
+    #expect(model.sizeBytes == contents.values.reduce(Int64(0)) { $0 + Int64($1.count) })
     #expect(model.revision == WhisperKitModelInstaller.pinnedRevision)
+    for file in files {
+      let recorded = try #require(model.files.first { $0.relativePath == file.relativePath })
+      #expect(recorded.sha256.lowercased() == file.expectedSHA256.lowercased())
+    }
     #expect(
       model.files.first { $0.relativePath == "config.json" }?.sha256
         == Self.sha256(Data("config".utf8)))
@@ -57,6 +66,46 @@ struct WhisperKitModelInstallerTests {
         == WhisperKitModelInstaller.expectedModelFiles.map(\.relativePath))
     #expect(storage.savedStates.contains { if case .downloading = $0 { true } else { false } })
     #expect(storage.state == .installed(model))
+  }
+
+  // why: B4 upgrade — a downloaded file whose bytes don't match the pinned SHA-256 must fail the
+  // install (never fail-open, never load a tampered/corrupt CoreML bundle), leaving no model folder.
+  @Test func checksumMismatchFailsInstallAndLeavesNoModelFolder() async {
+    let appSupport = Self.makeApplicationSupportDirectory()
+    defer { Self.remove(appSupport) }
+    let storage = InMemoryWhisperKitModelStateStorage()
+    // the REAL pinned manifest, but the downloader yields bytes that can't match any real hash
+    let contents = Dictionary(
+      uniqueKeysWithValues: WhisperKitModelInstaller.expectedModelFiles.map {
+        ($0.relativePath, Data("corrupted-bytes".utf8))
+      })
+    let downloader = FakeWhisperKitModelFileDownloader(contents: contents)
+    let installer = WhisperKitModelInstaller(
+      stateStorage: storage,
+      fileDownloader: downloader,
+      applicationSupportDirectory: appSupport,
+      availableCapacityProvider: { _ in WhisperKitModelInstaller.expectedModelSizeBytes * 2 }
+    )
+
+    await installer.install()
+
+    guard case .failed(let failure) = installer.state else {
+      Issue.record("expected failed state, got \(installer.state)")
+      return
+    }
+    #expect(failure.kind == .checksum)
+    #expect(installer.installedModelFolderURL == nil)
+    let finalFolder = appSupport.appendingPathComponent(
+      "WhisperKit/Models/openai_whisper-large-v3-v20240930_626MB")
+    #expect(!FileManager.default.fileExists(atPath: finalFolder.path))
+  }
+
+  @Test func checksumMismatchMapsToChecksumFailureTaxonomy() {
+    let failure = whisperKitModelDownloadFailure(
+      for: WhisperKitModelInstallError.checksumMismatch(
+        relativePath: "config.json", expected: "aaa", actual: "bbb"))
+    #expect(failure.kind == .checksum)
+    #expect(failure.isRetryable)
   }
 
   @Test func installedManifestPersistsRelativePathAndReloadsAbsolutePath() throws {
@@ -99,13 +148,15 @@ struct WhisperKitModelInstallerTests {
   @Test func deleteInstalledModelRemovesFolderAndReturnsToAbsent() async throws {
     let appSupport = Self.makeApplicationSupportDirectory()
     defer { Self.remove(appSupport) }
+    let (files, contents) = Self.fixtureManifest()
     let storage = InMemoryWhisperKitModelStateStorage()
-    let downloader = FakeWhisperKitModelFileDownloader(contents: Self.fixtureContents())
+    let downloader = FakeWhisperKitModelFileDownloader(contents: contents)
     let installer = WhisperKitModelInstaller(
       stateStorage: storage,
       fileDownloader: downloader,
       applicationSupportDirectory: appSupport,
-      availableCapacityProvider: { _ in WhisperKitModelInstaller.expectedModelSizeBytes * 2 }
+      availableCapacityProvider: { _ in 1_000_000_000 },
+      expectedFiles: files
     )
     await installer.install()
     let folderURL = try #require(installer.installedModelFolderURL)
@@ -122,7 +173,7 @@ struct WhisperKitModelInstallerTests {
     let appSupport = Self.makeApplicationSupportDirectory()
     defer { Self.remove(appSupport) }
     let storage = InMemoryWhisperKitModelStateStorage()
-    let downloader = FakeWhisperKitModelFileDownloader(contents: Self.fixtureContents())
+    let downloader = FakeWhisperKitModelFileDownloader(contents: Self.fixtureManifest().contents)
     let installer = WhisperKitModelInstaller(
       stateStorage: storage,
       fileDownloader: downloader,
@@ -159,13 +210,28 @@ struct WhisperKitModelInstallerTests {
     }
   }
 
-  private static func fixtureContents() -> [String: Data] {
-    Dictionary(
-      uniqueKeysWithValues: WhisperKitModelInstaller.expectedModelFiles.map {
-        ($0.relativePath, Data($0.relativePath.utf8))
-      }
-    )
-    .merging(["config.json": Data("config".utf8)]) { _, replacement in replacement }
+  // why: B4 — the installer now verifies each downloaded file against its manifest SHA-256, so the
+  // fake install path needs a manifest whose hashes match the fixture bytes (real model bytes can't
+  // be reproduced from preimages). Covers all 17 pinned relative paths; config.json keeps its short
+  // "config" fixture so the per-file sha assertion stays meaningful.
+  private static func fixtureManifest() -> (
+    files: [WhisperKitModelInstaller.ExpectedModelFile], contents: [String: Data]
+  ) {
+    var files: [WhisperKitModelInstaller.ExpectedModelFile] = []
+    var contents: [String: Data] = [:]
+    for expected in WhisperKitModelInstaller.expectedModelFiles {
+      let data =
+        expected.relativePath == "config.json"
+        ? Data("config".utf8) : Data(expected.relativePath.utf8)
+      contents[expected.relativePath] = data
+      files.append(
+        WhisperKitModelInstaller.ExpectedModelFile(
+          relativePath: expected.relativePath,
+          sizeBytes: Int64(data.count),
+          expectedSHA256: Self.sha256(data)
+        ))
+    }
+    return (files, contents)
   }
 
   private static func installedModel(localModelPath: String) -> WhisperKitInstalledModel {
