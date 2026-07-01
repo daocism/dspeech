@@ -1,3 +1,4 @@
+import DequeModule
 import Foundation
 
 @MainActor
@@ -11,7 +12,7 @@ final class SerialBufferRouter<Buffer> {
   private let classify: @Sendable ([Float], Double) async throws -> PreTranscriptionRoutingDecision
   private let append: (Buffer) -> Void
 
-  private var queue: [Item] = []
+  private var queue: Deque<Item> = []
   private var current: Item?
   private var isDraining = false
   private var finished = false
@@ -33,7 +34,7 @@ final class SerialBufferRouter<Buffer> {
   func finish() {
     guard !finished else { return }
     finished = true
-    let unresolved = [current].compactMap { $0 } + queue
+    let unresolved = [current].compactMap { $0 } + Array(queue)
     current = nil
     queue.removeAll()
     for item in unresolved {
