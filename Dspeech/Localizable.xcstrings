@@ -136,7 +136,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "%@，共 %@"
           }
         }
@@ -336,7 +336,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld 条已过滤通信"
+            "value": "%lld 条已筛选通信"
           }
         },
         "ru": {
@@ -558,7 +558,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "ASR 模型"
           }
         }
@@ -629,8 +629,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "ATC 语音过滤"
+            "state": "translated",
+            "value": "ATC 语音筛选器"
           }
         }
       }
@@ -700,8 +700,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "ATC/飞行员过滤"
+            "state": "translated",
+            "value": "ATC/飞行员筛选"
           }
         }
       }
@@ -771,7 +771,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "关于"
           }
         }
@@ -842,8 +842,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "主动语音过滤"
+            "state": "translated",
+            "value": "主动语音筛选器"
           }
         }
       }
@@ -913,7 +913,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "航空器呼号"
           }
         }
@@ -984,7 +984,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "显示所有 ATC 片段。"
           }
         }
@@ -1114,7 +1114,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "所有已过滤通信均已显示。"
+            "value": "所有已筛选通信均已显示。"
           }
         },
         "ru": {
@@ -1337,7 +1337,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "应用语言"
           }
         }
@@ -1408,7 +1408,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Apple Speech"
           }
         }
@@ -2828,7 +2828,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "音频和转写保留在此设备上。不会离开设备。"
           }
         }
@@ -3179,7 +3179,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "音频采集被系统中断。录制已暂停。"
           }
         }
@@ -3390,7 +3390,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "仅有音频输出——请连接输入。"
           }
         }
@@ -3461,7 +3461,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "音频源"
           }
         }
@@ -3532,7 +3532,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "取消"
           }
         }
@@ -3603,7 +3603,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "采集来源已更改： %@."
           }
         }
@@ -3674,7 +3674,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "采集源不可用——请检查输入连接。"
           }
         }
@@ -3745,7 +3745,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "采集来源：%@"
           }
         }
@@ -3816,7 +3816,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "请在设备设置中检查听写语言。Dspeech 不会用云端识别替代本地模式。"
           }
         }
@@ -3887,7 +3887,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "正在检查设备端识别语言……"
           }
         }
@@ -3958,7 +3958,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "清除"
           }
         }
@@ -4239,8 +4239,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "高置信度的飞行员语音可在识别前停止。呼号相关性过滤会单独保持启用。"
+            "state": "translated",
+            "value": "高置信度的飞行员语音可在识别前停止。呼号相关性筛选会单独保持启用。"
           }
         }
       }
@@ -4310,7 +4310,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "连接输入以提高准确度"
           }
         }
@@ -4451,8 +4451,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "不使用语音过滤继续"
+            "state": "translated",
+            "value": "不使用语音筛选器继续"
           }
         }
       }
@@ -4522,7 +4522,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Core ML"
           }
         }
@@ -4593,7 +4593,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "无法删除模型"
           }
         }
@@ -4664,7 +4664,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "无法从设备删除模型包。请检查存储权限并稍后重试。"
           }
         }
@@ -4945,7 +4945,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "无法下载模型包。请检查网络连接后重试。"
           }
         }
@@ -5016,7 +5016,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "无法从已安装的包初始化本地识别器。"
           }
         }
@@ -5087,7 +5087,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "无法安装模型"
           }
         }
@@ -5228,7 +5228,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "无法从已安装的包加载或应用本地 FluidAudio 模型。"
           }
         }
@@ -5439,7 +5439,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "无法准备设备端翻译。请检查语言包后重试。"
           }
         }
@@ -5510,7 +5510,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "无法识别语音。请重试。"
           }
         }
@@ -5651,7 +5651,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "无法保存语音样本。请重试。"
           }
         }
@@ -5722,7 +5722,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "无法开始识别。请检查麦克风后重试。"
           }
         }
@@ -5793,7 +5793,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "无法开始录制。"
           }
         }
@@ -5864,7 +5864,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "无法测试电平：输入音频格式不可用。"
           }
         }
@@ -5935,7 +5935,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "无法为录制准备音频输入：%@"
           }
         }
@@ -6006,7 +6006,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "无法识别语音：%@"
           }
         }
@@ -6077,7 +6077,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "无法选择此输入：%@"
           }
         }
@@ -6148,7 +6148,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "无法开始录制：%@"
           }
         }
@@ -6219,7 +6219,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "无法开始电平检测：%@"
           }
         }
@@ -6290,7 +6290,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "演示"
           }
         }
@@ -6431,7 +6431,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "删除包"
           }
         }
@@ -6502,7 +6502,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "删除包 (%@)"
           }
         }
@@ -6643,7 +6643,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Delta 905，在 27 号跑道外等待，有航空器正在五边短五边。"
           }
         }
@@ -6995,7 +6995,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "完成"
           }
         }
@@ -7066,8 +7066,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "下载语音过滤包（约 15 MB）"
+            "state": "translated",
+            "value": "下载语音筛选器包（约 15 MB）"
           }
         }
       }
@@ -7137,7 +7137,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "正在下载模型……"
           }
         }
@@ -7208,8 +7208,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "正在下载语音过滤模型……"
+            "state": "translated",
+            "value": "正在下载语音筛选器模型……"
           }
         }
       }
@@ -7419,7 +7419,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Dspeech 不会在空中发射或通过无线电发送任何内容。本应用只聆听并显示文本。"
           }
         }
@@ -7490,7 +7490,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Dspeech 仅在本地处理音频。音频绝不离开您的设备。"
           }
         }
@@ -7561,8 +7561,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "启用语音过滤"
+            "state": "translated",
+            "value": "启用语音筛选器"
           }
         }
       }
@@ -7632,7 +7632,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "外部输入"
           }
         }
@@ -7703,7 +7703,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "外部来源已丢失——正在切换到 %@。录制已暂停。"
           }
         }
@@ -8055,7 +8055,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "开始使用"
           }
         }
@@ -8126,7 +8126,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "隐藏飞行员通话和无关的 ATC 呼叫。"
           }
         }
@@ -8197,7 +8197,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "输入"
           }
         }
@@ -8268,7 +8268,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "正在安装模型……"
           }
         }
@@ -8339,8 +8339,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "正在安装语音过滤模型……"
+            "state": "translated",
+            "value": "正在安装语音筛选器模型……"
           }
         }
       }
@@ -8480,7 +8480,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "实时"
           }
         }
@@ -8551,7 +8551,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "本地"
           }
         }
@@ -8622,7 +8622,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "电平"
           }
         }
@@ -8693,7 +8693,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "正在听取 -- 请拼读呼号（例如：“november one two three alpha bravo”）。"
           }
         }
@@ -8834,7 +8834,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "正在聆听——请逐字念出呼号（例如：“november one two three alpha bravo”）。"
           }
         }
@@ -8905,7 +8905,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "正在聆听……"
           }
         }
@@ -8976,7 +8976,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "本地"
           }
         }
@@ -9047,7 +9047,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "默认本地"
           }
         }
@@ -9118,7 +9118,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "本地设置已损坏"
           }
         }
@@ -9259,7 +9259,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "模式"
           }
         }
@@ -9330,7 +9330,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "模型已安装并验证"
           }
         }
@@ -9401,7 +9401,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "模型未安装"
           }
         }
@@ -9472,7 +9472,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "模型包验证失败。"
           }
         }
@@ -9543,7 +9543,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "模型状态已损坏"
           }
         }
@@ -9684,7 +9684,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "N123AB，下降并保持三千，预期 27 号跑道 ILS 进近。"
           }
         }
@@ -9755,7 +9755,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "下一步"
           }
         }
@@ -9826,7 +9826,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "没有采集源——请连接输入后重试。"
           }
         }
@@ -9956,7 +9956,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "无已过滤通信"
+            "value": "无已筛选通信"
           }
         },
         "ru": {
@@ -10109,7 +10109,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "无输入"
           }
         }
@@ -10180,7 +10180,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "未检测到输入源。请连接有线输入（USB-C / TRRS）或使用内置麦克风。"
           }
         }
@@ -10251,7 +10251,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "无麦克风权限。请在设置中允许。"
           }
         }
@@ -10322,7 +10322,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "无麦克风权限。请在设备设置中允许。"
           }
         }
@@ -10393,7 +10393,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "无可用的设备端识别语言。请打开识别设置并检查您的听写语言。"
           }
         }
@@ -10464,7 +10464,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "无可用的设备端识别语言。"
           }
         }
@@ -10535,7 +10535,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "此语言没有可用的设备端识别模型。请下载其语言包或在设备端运行。"
           }
         }
@@ -10606,7 +10606,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "无可用的识别语言"
           }
         }
@@ -10817,7 +10817,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "无语音识别权限。请在设置中允许。"
           }
         }
@@ -10888,7 +10888,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "无语音识别权限。请在设备设置中允许。"
           }
         }
@@ -10959,7 +10959,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "未识别到语音——请靠近麦克风讲话。"
           }
         }
@@ -11030,7 +11030,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "没有合适的采集源。"
           }
         }
@@ -11383,7 +11383,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "没有可翻译内容：该片段为空。"
           }
         }
@@ -11454,7 +11454,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "未安装 %@ 的离线识别。语音输入呼号需要本地模型。"
           }
         }
@@ -11525,7 +11525,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "设备端处理"
           }
         }
@@ -11596,7 +11596,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "设备端翻译"
           }
         }
@@ -11667,7 +11667,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "设备端翻译设置已取消。如需使用，请重新开启翻译。"
           }
         }
@@ -11738,7 +11738,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "打开设备设置"
           }
         }
@@ -11949,7 +11949,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "仅输出——无输入"
           }
         }
@@ -12090,8 +12090,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "包已安装，过滤关闭"
+            "state": "translated",
+            "value": "包已安装，筛选器关闭"
           }
         }
       }
@@ -12161,7 +12161,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "包“%@” · %lld 维嵌入 · %@。识别在离线状态下运行。"
           }
         }
@@ -12373,7 +12373,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "飞行员 1"
           }
         }
@@ -12444,7 +12444,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "飞行员 1（机长）"
           }
         }
@@ -12515,7 +12515,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "飞行员 2"
           }
         }
@@ -12586,7 +12586,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "飞行员 2（副驾驶）"
           }
         }
@@ -12657,7 +12657,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "飞行员槽位不可用"
           }
         }
@@ -12728,7 +12728,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "飞行员语音分类"
           }
         }
@@ -12799,8 +12799,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "ASR 前过滤已关闭；所有音频缓冲都将送入识别。"
+            "state": "translated",
+            "value": "ASR 前筛选已关闭；所有音频缓冲都将送入识别。"
           }
         }
       }
@@ -12870,7 +12870,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "隐私"
           }
         }
@@ -12941,7 +12941,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "仅接收"
           }
         }
@@ -13012,7 +13012,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "识别"
           }
         }
@@ -13083,7 +13083,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "识别语言"
           }
         }
@@ -13154,7 +13154,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "录制用于识别的语音样本。"
           }
         }
@@ -13225,7 +13225,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "录制语音"
           }
         }
@@ -13296,7 +13296,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "正在录制 -- 请说几秒钟，然后轻点停止。"
           }
         }
@@ -13367,7 +13367,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "识别器连接后即可录制。"
           }
         }
@@ -13438,7 +13438,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "录制失败 -- 请重试。"
           }
         }
@@ -13509,7 +13509,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "录制失败——请重试。"
           }
         }
@@ -13580,7 +13580,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "录制中——讲几秒钟，然后点击停止。"
           }
         }
@@ -13721,7 +13721,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "正在请求麦克风和语音识别权限……"
           }
         }
@@ -13792,7 +13792,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "重置损坏的数据"
           }
         }
@@ -13863,7 +13863,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "重启应用以更改语言。"
           }
         }
@@ -13934,7 +13934,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "重试下载"
           }
         }
@@ -14075,7 +14075,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "在续接窗口生效期间，呼号不匹配的片段将被隐藏。"
           }
         }
@@ -14286,7 +14286,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "通过语音设置呼号"
           }
         }
@@ -14357,7 +14357,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "设置"
           }
         }
@@ -14428,7 +14428,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "设置在这里"
           }
         }
@@ -14639,8 +14639,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "部分本地语音过滤设置已损坏。请重置损坏的数据以安全继续。"
+            "state": "translated",
+            "value": "部分本地语音筛选器设置已损坏。请重置损坏的数据以安全继续。"
           }
         }
       }
@@ -14710,8 +14710,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "说话人分类已关闭；所有音频缓冲都会进入识别。呼号相关性过滤仍可隐藏无关 ATC。"
+            "state": "translated",
+            "value": "说话人分类已关闭；所有音频缓冲都会进入识别。呼号相关性筛选仍可隐藏无关 ATC。"
           }
         }
       }
@@ -14781,7 +14781,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "语音识别错误。请重试。"
           }
         }
@@ -14852,7 +14852,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "此设备不支持语音识别。"
           }
         }
@@ -14923,7 +14923,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Speedbird 42，联系塔台 118.7。"
           }
         }
@@ -14994,7 +14994,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "开始"
           }
         }
@@ -15065,7 +15065,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "停止"
           }
         }
@@ -15136,7 +15136,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "停止测试"
           }
         }
@@ -15207,7 +15207,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "停止语音输入"
           }
         }
@@ -15278,7 +15278,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "系统"
           }
         }
@@ -15349,7 +15349,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "系统翻译失败。请重试。"
           }
         }
@@ -15420,7 +15420,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "点击开始并讲话——转写文本将在此显示。\n本地处理；音频绝不离开您的设备。"
           }
         }
@@ -15491,7 +15491,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "点击开始识别"
           }
         }
@@ -15562,7 +15562,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "目标语言"
           }
         }
@@ -15633,7 +15633,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "测试输入电平"
           }
         }
@@ -15704,7 +15704,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "FluidAudio 模型（%@）只会按此请求下载一次。只有模型下载请求会离开设备 -- 音频、转写和语音样本不会传输。"
           }
         }
@@ -15775,8 +15775,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "FluidAudio 模型（%@）会在此次请求时下载一次。仅有模型下载请求会离开设备——音频、转录文本和语音样本不会被传输。"
+            "state": "translated",
+            "value": "FluidAudio 模型（%@）会在此次请求时下载一次。仅有模型下载请求会离开设备——音频、转写文本和语音样本不会被传输。"
           }
         }
       }
@@ -15846,7 +15846,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "音频会话再次可用。再次开始前请先检查输入。"
           }
         }
@@ -15917,7 +15917,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "音频会话再次可用。检查输入后重新开始采集。"
           }
         }
@@ -16129,7 +16129,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "iOS 音频服务已重启。录制已暂停——请检查输入后重新开始。"
           }
         }
@@ -16200,7 +16200,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "已安装的包不含本地模型路径。"
           }
         }
@@ -16271,7 +16271,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "语言“%@”尚未下载，无法在设备上进行识别。"
           }
         }
@@ -16342,7 +16342,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "已安装的包中缺少本地 FluidAudio 模型文件。"
           }
         }
@@ -16413,7 +16413,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "安装该包后本地识别器报告不可用。"
           }
         }
@@ -16484,7 +16484,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "麦克风不可用。"
           }
         }
@@ -16555,7 +16555,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "模型已安装，但此版本中本地识别器不可用。"
           }
         }
@@ -16766,7 +16766,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "模型包未通过校验和或完整性检查。请重试下载以获取经验证的副本。"
           }
         }
@@ -16837,8 +16837,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "模型“%@”保留在设备上。启用上方的过滤器，或删除该包以释放空间。"
+            "state": "translated",
+            "value": "模型“%@”保留在设备上。启用上方的筛选器，或删除该包以释放空间。"
           }
         }
       }
@@ -16908,7 +16908,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "此版本未安装设备端语音识别模型（见 ADR 0007）。"
           }
         }
@@ -16979,7 +16979,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "该包已安装，但此版本中未连接本地识别器，因此语音录制已禁用。"
           }
         }
@@ -17050,8 +17050,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "飞行员语音过滤仅在安装本地模型包后才能使用。下载为一次性、明确且应您要求进行；音频绝不离开您的设备。"
+            "state": "translated",
+            "value": "飞行员语音筛选器仅在安装本地模型包后才能使用。下载为一次性、明确且应您要求进行；音频绝不离开您的设备。"
           }
         }
       }
@@ -17121,8 +17121,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "ASR 前过滤仅能隐藏被确定识别为飞行员的语音。"
+            "state": "translated",
+            "value": "ASR 前筛选仅能隐藏被确定识别为飞行员的语音。"
           }
         }
       }
@@ -17192,7 +17192,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "识别语言包尚未下载。请在 设置 → 通用 → 键盘 → 听写 中开启听写并下载该语言。"
           }
         }
@@ -17263,7 +17263,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "识别器的嵌入维度 (%lld) 与包 (%lld) 不匹配。"
           }
         }
@@ -17334,7 +17334,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "已保存的呼号已损坏。请重置并重新设置呼号。"
           }
         }
@@ -17405,8 +17405,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "语音模型包的已保存状态已损坏。请不使用语音过滤继续，并在需要时重新下载该包。"
+            "state": "translated",
+            "value": "语音模型包的已保存状态已损坏。请不使用语音筛选器继续，并在需要时重新下载该包。"
           }
         }
       }
@@ -17476,7 +17476,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "已保存的语音样本已损坏。请重置损坏的数据并重新录制样本。"
           }
         }
@@ -17547,7 +17547,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "该目标语言不支持设备端翻译。请选择其他翻译语言。"
           }
         }
@@ -17618,7 +17618,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "翻译语言包未安装。请关闭翻译再重新开启——iOS 会提示下载。"
           }
         }
@@ -17689,8 +17689,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "语音过滤模型未安装。请下载该包以启用飞行员识别。"
+            "state": "translated",
+            "value": "语音筛选器模型未安装。请下载该包以启用飞行员识别。"
           }
         }
       }
@@ -17760,7 +17760,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "然后：通用 -> 键盘 -> 听写语言 -- 打开听写并添加此语言。模型会下载，识别可离线工作。"
           }
         }
@@ -17831,7 +17831,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "然后：通用 → 键盘 → 听写语言——开启听写并添加此语言。模型会下载，识别即可离线工作。"
           }
         }
@@ -17972,7 +17972,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "这只会清空驾驶舱视图。已保存的会话历史仍保留在此设备上。"
           }
         }
@@ -18043,7 +18043,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "这会从此设备删除已保存的转写。当前视图不变。"
           }
         }
@@ -18114,7 +18114,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "此语言不支持识别。请在识别设置中选择其他语言。"
           }
         }
@@ -18185,7 +18185,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "此语言对不支持设备端翻译。请选择其他目标语言。"
           }
         }
@@ -18256,7 +18256,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "此识别语言不支持设备端翻译。请选择其他识别语言。"
           }
         }
@@ -18327,7 +18327,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "太轻或太短 -- 请录制更清晰的样本。"
           }
         }
@@ -18398,7 +18398,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "太轻或太短——请录制更清晰的样本。"
           }
         }
@@ -18889,7 +18889,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "翻译"
           }
         }
@@ -18960,7 +18960,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "翻译通过 Apple 系统语言包在设备上运行。首次启用时，iOS 会提示下载语言包。音频和文本绝不会离开设备。"
           }
         }
@@ -19101,7 +19101,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "未知输入"
           }
         }
@@ -19172,7 +19172,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "使用内置麦克风即可试用。座舱中请连接有线输入（USB-C / TRRS）。"
           }
         }
@@ -19243,8 +19243,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "核验"
+            "state": "translated",
+            "value": "验证"
           }
         }
       }
@@ -19384,7 +19384,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "版本"
           }
         }
@@ -19455,8 +19455,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "语音过滤已关闭。模型已安装并就绪。"
+            "state": "translated",
+            "value": "语音筛选器已关闭。模型已安装并就绪。"
           }
         }
       }
@@ -19526,7 +19526,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "已录制语音样本。再次录制可更新。"
           }
         }
@@ -19597,7 +19597,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "已保存语音，用于 %@."
           }
         }
@@ -19668,8 +19668,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "未设置呼号时，过滤会放行所有非飞行员片段。点击麦克风以通过语音设置。"
+            "state": "translated",
+            "value": "未设置呼号时，筛选器会放行所有非飞行员片段。点击麦克风以通过语音设置。"
           }
         }
       }
@@ -19728,7 +19728,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "未设置呼号时，过滤器将放行所有非飞行员通信。点按麦克风可通过语音设置呼号。"
+            "value": "未设置呼号时，筛选器将放行所有非飞行员通信。点按麦克风可通过语音设置呼号。"
           }
         },
         "ru": {
@@ -19881,7 +19881,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "您的选择已为本设备保存。内置麦克风用于测试；座舱中请连接有线输入。"
           }
         }
@@ -19952,7 +19952,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "内置麦克风"
           }
         }
@@ -20023,7 +20023,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "置信 %@"
           }
         }
@@ -20094,7 +20094,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "内置麦克风"
           }
         }
@@ -20165,7 +20165,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "新输入"
           }
         }
@@ -20235,7 +20235,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "机组 %lld"
           }
         }
@@ -20305,7 +20305,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "添加机组成员"
           }
         }
@@ -20375,7 +20375,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "重新录制"
           }
         }
@@ -20445,7 +20445,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "无法录制语音"
           }
         }
@@ -20515,8 +20515,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "录音中——请继续说约4秒,然后点按“停止”。"
+            "state": "translated",
+            "value": "录音中——请继续说约 4 秒，然后点按“停止”。"
           }
         }
       }
@@ -20585,7 +20585,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "已录制语音样本。重新录制可更新。"
           }
         }
@@ -20655,8 +20655,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "尚无机组语音。添加每位戴耳机的人员,即可将其通话与空管区分开。"
+            "state": "translated",
+            "value": "尚无机组语音。添加每位戴耳机的人员，即可将其通话与 ATC 区分开。"
           }
         }
       }
@@ -20725,7 +20725,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "移除 %@"
           }
         }
@@ -20795,8 +20795,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "无法访问麦克风和语音识别。请在 iPhone 设置中检查权限,然后再次点按“开始”。"
+            "state": "translated",
+            "value": "无法访问麦克风和语音识别。请在 iPhone 设置中检查权限，然后再次点按“开始”。"
           }
         }
       }
@@ -20865,8 +20865,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "没有录到足够的语音。请在安静处说约5秒,然后点按“停止”。"
+            "state": "translated",
+            "value": "没有录到足够的语音。请在安静处说约 5 秒，然后点按“停止”。"
           }
         }
       }
