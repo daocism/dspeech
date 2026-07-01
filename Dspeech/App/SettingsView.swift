@@ -98,7 +98,7 @@ struct SettingsView: View {
           if let routeFailure = audioSource.routePreparationFailure {
             Text(routeFailure.userFacingMessage)
               .font(.footnote)
-              .foregroundStyle(.red)
+              .foregroundStyle(DspeechTheme.danger)
               .frame(maxWidth: .infinity, alignment: .leading)
               .fixedSize(horizontal: false, vertical: true)
               .accessibilityIdentifier("audio-route-preparation-error")
@@ -125,7 +125,7 @@ struct SettingsView: View {
           if let selectionError = audioSource.selectionError {
             Text(selectionError)
               .font(.footnote)
-              .foregroundStyle(.orange)
+              .foregroundStyle(DspeechTheme.warning)
               .frame(maxWidth: .infinity, alignment: .leading)
               .fixedSize(horizontal: false, vertical: true)
               .accessibilityIdentifier("audio-source-error")
@@ -156,7 +156,7 @@ struct SettingsView: View {
           if let inputLevelError = audioSource.inputLevelError {
             Text(inputLevelError)
               .font(.footnote)
-              .foregroundStyle(.orange)
+              .foregroundStyle(DspeechTheme.warning)
               .frame(maxWidth: .infinity, alignment: .leading)
               .fixedSize(horizontal: false, vertical: true)
               .accessibilityIdentifier("audio-meter-error")
@@ -198,7 +198,7 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 6) {
               Text(String(localized: "No on-device recognition languages available."))
                 .font(.footnote)
-                .foregroundStyle(.orange)
+                .foregroundStyle(DspeechTheme.warning)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
               Text(
@@ -223,7 +223,7 @@ struct SettingsView: View {
                 )
               )
               .font(.footnote)
-              .foregroundStyle(.orange)
+              .foregroundStyle(DspeechTheme.warning)
               .frame(maxWidth: .infinity, alignment: .leading)
               .fixedSize(horizontal: false, vertical: true)
               .accessibilityIdentifier("recognition-download-hint")
@@ -294,7 +294,7 @@ struct SettingsView: View {
               systemImage: "exclamationmark.triangle.fill"
             )
             .font(.footnote)
-            .foregroundStyle(.orange)
+            .foregroundStyle(DspeechTheme.warning)
             .frame(maxWidth: .infinity, alignment: .leading)
             .fixedSize(horizontal: false, vertical: true)
             .accessibilityIdentifier("translation-failure")
@@ -440,7 +440,7 @@ struct SettingsView: View {
           )
         )
         .font(.footnote)
-        .foregroundStyle(.orange)
+        .foregroundStyle(DspeechTheme.warning)
         .frame(maxWidth: .infinity, alignment: .leading)
         .fixedSize(horizontal: false, vertical: true)
       }
@@ -491,7 +491,7 @@ struct SettingsView: View {
         Task { await parakeetInstaller.deleteInstalledModel() }
       }
       .buttonStyle(.bordered)
-      .tint(.red)
+      .tint(DspeechTheme.danger)
       .accessibilityIdentifier("parakeet-model-delete")
     }
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -558,7 +558,7 @@ struct SettingsView: View {
           )
         )
         .font(.footnote)
-        .foregroundStyle(.orange)
+        .foregroundStyle(DspeechTheme.warning)
         .frame(maxWidth: .infinity, alignment: .leading)
         .fixedSize(horizontal: false, vertical: true)
       }
@@ -607,7 +607,7 @@ struct SettingsView: View {
         Task { await whisperKitInstaller.deleteInstalledModel() }
       }
       .buttonStyle(.bordered)
-      .tint(.red)
+      .tint(DspeechTheme.danger)
       .accessibilityIdentifier("whisperkit-model-delete")
     }
     .frame(maxWidth: .infinity, alignment: .leading)

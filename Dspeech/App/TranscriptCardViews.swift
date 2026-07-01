@@ -25,7 +25,9 @@ struct HintBubble: View {
       .frame(maxWidth: 230, alignment: .trailing)
       .padding(.horizontal, 14)
       .padding(.vertical, 10)
-      .background(.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+      .background(
+        .white,
+        in: RoundedRectangle(cornerRadius: DspeechTheme.bubbleCornerRadius, style: .continuous))
   }
 
   var body: some View {
@@ -62,7 +64,7 @@ struct InputLevelBar: View {
       ZStack(alignment: .leading) {
         Capsule().fill(.white.opacity(0.15))
         Capsule()
-          .fill(.cyan)
+          .fill(DspeechTheme.accent)
           .frame(width: geo.size.width * CGFloat(max(0, min(1, level))))
       }
     }
@@ -94,7 +96,7 @@ struct FilteredTransmissionsReviewSheet: View {
                   // badge never clips (caught by the de · AX-XL audit).
                   .lineLimit(2)
                   .minimumScaleFactor(0.6)
-                  .foregroundStyle(.yellow)
+                  .foregroundStyle(DspeechTheme.filtered)
                   .accessibilityIdentifier("transmission-reason-badge")
                 Text(transmission.text)
                   .font(.body.monospaced())
@@ -158,7 +160,10 @@ struct NoAnchorTransmissionHint: View {
     }
     .padding(.horizontal, 14)
     .padding(.vertical, 10)
-    .background(.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    .background(
+      .white,
+      in: RoundedRectangle(cornerRadius: DspeechTheme.bubbleCornerRadius, style: .continuous)
+    )
     // why: vertical-only — both-axes fixedSize measured the wrapped text against an
     // intrinsic single-line width and the background stayed 2 lines tall while the
     // text drew 4 (2026-06-12 visual review).
@@ -184,10 +189,10 @@ struct PartialTranscriptCard: View {
           .font(.caption.monospaced().weight(.bold))
           .lineLimit(1)
           .fixedSize()
-          .foregroundStyle(.cyan)
-          .padding(.horizontal, 7)
-          .padding(.vertical, 3)
-          .background(.cyan.opacity(0.16), in: Capsule())
+          .foregroundStyle(DspeechTheme.accent)
+          .padding(.horizontal, DspeechTheme.chipHorizontalPadding)
+          .padding(.vertical, DspeechTheme.chipVerticalPadding)
+          .background(DspeechTheme.accent.opacity(DspeechTheme.chipFillOpacity), in: Capsule())
         Spacer()
       }
       Text(text)
@@ -198,7 +203,7 @@ struct PartialTranscriptCard: View {
     .padding(.horizontal, 14)
     .padding(.vertical, 12)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .transcriptCardChrome(stroke: .cyan.opacity(0.35))
+    .transcriptCardChrome(stroke: DspeechTheme.accent.opacity(0.35))
     .accessibilityIdentifier("partial-transcript")
   }
 }
@@ -238,8 +243,8 @@ struct TransmissionTranscriptCard: View {
         .font(.caption.monospaced().weight(.bold))
         .lineLimit(1)
         .minimumScaleFactor(0.75)
-        .padding(.horizontal, 7)
-        .padding(.vertical, 3)
+        .padding(.horizontal, DspeechTheme.chipHorizontalPadding)
+        .padding(.vertical, DspeechTheme.chipVerticalPadding)
         .background(.white.opacity(0.12), in: Capsule())
 
       Text(transmissionReasonLabel(for: transmission.classification))
@@ -248,8 +253,8 @@ struct TransmissionTranscriptCard: View {
         .lineLimit(2)
         .minimumScaleFactor(0.6)
         .foregroundStyle(reasonColor)
-        .padding(.horizontal, 7)
-        .padding(.vertical, 3)
+        .padding(.horizontal, DspeechTheme.chipHorizontalPadding)
+        .padding(.vertical, DspeechTheme.chipVerticalPadding)
         .background(reasonColor.opacity(0.14), in: Capsule())
         .accessibilityIdentifier("transmission-reason-badge")
 
@@ -275,15 +280,15 @@ struct TransmissionTranscriptCard: View {
   private var reasonColor: Color {
     switch transmission.classification {
     case .displayed(.callSignMatch), .displayed(.continuationOfRecentCall):
-      return .cyan
+      return DspeechTheme.accent
     case .displayed(.noAnchorConfigured), .displayed(.insufficientEvidence):
-      return .yellow
+      return DspeechTheme.filtered
     case .displayed(.urgencyBroadcast):
-      return .red
+      return DspeechTheme.danger
     case .displayed(.nonPilotVoice):
-      return .green
+      return DspeechTheme.success
     case .filtered:
-      return .yellow
+      return DspeechTheme.filtered
     }
   }
 
@@ -344,8 +349,8 @@ struct TranscriptSegmentCard: View {
         .font(.caption.monospaced().weight(.bold))
         .lineLimit(1)
         .fixedSize()
-        .padding(.horizontal, 7)
-        .padding(.vertical, 3)
+        .padding(.horizontal, DspeechTheme.chipHorizontalPadding)
+        .padding(.vertical, DspeechTheme.chipVerticalPadding)
         .background(.white.opacity(0.12), in: Capsule())
 
       if segment.source == .demo {
@@ -353,10 +358,10 @@ struct TranscriptSegmentCard: View {
           .font(.caption.monospaced().weight(.bold))
           .lineLimit(1)
           .fixedSize()
-          .foregroundStyle(.cyan.opacity(0.9))
-          .padding(.horizontal, 7)
-          .padding(.vertical, 3)
-          .background(.cyan.opacity(0.14), in: Capsule())
+          .foregroundStyle(DspeechTheme.accent.opacity(0.9))
+          .padding(.horizontal, DspeechTheme.chipHorizontalPadding)
+          .padding(.vertical, DspeechTheme.chipVerticalPadding)
+          .background(DspeechTheme.accent.opacity(0.14), in: Capsule())
       }
 
       if segment.requiresVerification {
@@ -364,10 +369,10 @@ struct TranscriptSegmentCard: View {
           .font(.caption.monospaced().weight(.bold))
           .lineLimit(1)
           .fixedSize()
-          .foregroundStyle(.yellow)
-          .padding(.horizontal, 7)
-          .padding(.vertical, 3)
-          .background(.yellow.opacity(0.16), in: Capsule())
+          .foregroundStyle(DspeechTheme.filtered)
+          .padding(.horizontal, DspeechTheme.chipHorizontalPadding)
+          .padding(.vertical, DspeechTheme.chipVerticalPadding)
+          .background(DspeechTheme.filtered.opacity(DspeechTheme.chipFillOpacity), in: Capsule())
       }
 
       Spacer()
@@ -396,7 +401,7 @@ struct TranscriptSegmentCard: View {
       Text(translatedText)
         .font(.system(isLandscape ? .body : .title3, design: .rounded))
         .italic()
-        .foregroundStyle(.cyan)
+        .foregroundStyle(DspeechTheme.accent)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityIdentifier("transcript-translation")
     }
@@ -441,8 +446,8 @@ private func filterReasonLabel(for reason: TransmissionFilterReason) -> String {
 }
 
 private enum TranscriptCardChrome {
-  static let background = Color(red: 0.07, green: 0.08, blue: 0.10)
-  static let cornerRadius: CGFloat = 18
+  static let background = DspeechTheme.cardFill
+  static let cornerRadius = DspeechTheme.cardCornerRadius
 }
 
 extension View {

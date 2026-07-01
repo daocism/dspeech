@@ -259,7 +259,7 @@ struct ContentView: View {
 
       ZStack {
         LinearGradient(
-          colors: [Color.black, Color(red: 0.03, green: 0.06, blue: 0.10)],
+          colors: [DspeechTheme.backgroundTop, DspeechTheme.backgroundBottom],
           startPoint: .top,
           endPoint: .bottom
         )
@@ -665,7 +665,7 @@ struct ContentView: View {
                 .foregroundStyle(.black)
                 .padding(.horizontal, 14)
                 .frame(minHeight: 44)
-                .background(.cyan, in: Capsule())
+                .background(DspeechTheme.accent, in: Capsule())
             }
             .buttonStyle(.plain)
             .padding(.bottom, 90)

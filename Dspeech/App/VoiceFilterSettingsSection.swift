@@ -94,7 +94,9 @@ struct VoiceFilterSettingsSection: View {
         }
         Text(dictationHint)
           .font(.footnote)
-          .foregroundStyle(dictation.unavailableReason == nil ? Color.secondary : Color.orange)
+          .foregroundStyle(
+            dictation.unavailableReason == nil ? Color.secondary : DspeechTheme.warning
+          )
           .frame(maxWidth: .infinity, alignment: .leading)
           .fixedSize(horizontal: false, vertical: true)
       }
@@ -132,7 +134,7 @@ struct VoiceFilterSettingsSection: View {
     } label: {
       Image(systemName: dictation.isListening ? "stop.circle.fill" : "mic.circle.fill")
         .font(.system(size: 26))
-        .foregroundStyle(dictation.isListening ? Color.red : Color.cyan)
+        .foregroundStyle(dictation.isListening ? DspeechTheme.danger : DspeechTheme.accent)
         .symbolEffect(.pulse, isActive: dictation.isListening)
     }
     .buttonStyle(.plain)
@@ -170,7 +172,7 @@ struct VoiceFilterSettingsSection: View {
         systemImage: "exclamationmark.triangle.fill"
       )
       .font(.subheadline.weight(.semibold))
-      .foregroundStyle(.orange)
+      .foregroundStyle(DspeechTheme.warning)
       Text(VoiceFilterStorageIssue.userFacingSummary(storageIssues))
         .font(.footnote)
         .foregroundStyle(.secondary)
@@ -335,7 +337,7 @@ struct VoiceFilterSettingsSection: View {
         .padding(.vertical, 3)
       }
       .buttonStyle(.borderedProminent)
-      .tint(.cyan)
+      .tint(DspeechTheme.accent)
       .foregroundStyle(.black)
       .controlSize(.large)
       .padding(.top, 2)
@@ -389,7 +391,7 @@ struct VoiceFilterSettingsSection: View {
     VStack(alignment: .leading, spacing: 10) {
       Label(String(localized: "Model installed and verified"), systemImage: "checkmark.seal.fill")
         .font(.subheadline.weight(.semibold))
-        .foregroundStyle(.green)
+        .foregroundStyle(DspeechTheme.success)
       Text(
         String(
           localized:
@@ -408,7 +410,7 @@ struct VoiceFilterSettingsSection: View {
             systemImage: "exclamationmark.triangle.fill"
           )
           .font(.subheadline.weight(.semibold))
-          .foregroundStyle(.orange)
+          .foregroundStyle(DspeechTheme.warning)
           Text(
             String(
               localized:
@@ -428,7 +430,7 @@ struct VoiceFilterSettingsSection: View {
       if let enrollMessage {
         Text(enrollMessage)
           .font(.footnote)
-          .foregroundStyle(.cyan)
+          .foregroundStyle(DspeechTheme.accent)
           .frame(maxWidth: .infinity, alignment: .leading)
           .fixedSize(horizontal: false, vertical: true)
           .accessibilityIdentifier("voicefilter-enroll-message")
@@ -438,7 +440,7 @@ struct VoiceFilterSettingsSection: View {
         Task { await deleteModelPack(pack) }
       }
       .buttonStyle(.bordered)
-      .tint(.red)
+      .tint(DspeechTheme.danger)
       .accessibilityIdentifier("voicefilter-modelpack-delete")
     }
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -450,7 +452,7 @@ struct VoiceFilterSettingsSection: View {
     VStack(alignment: .leading, spacing: 8) {
       Label(modelPackFailureTitle(failure), systemImage: "xmark.octagon.fill")
         .font(.subheadline.weight(.semibold))
-        .foregroundStyle(.red)
+        .foregroundStyle(DspeechTheme.danger)
       Text(failure.userSafeReason)
         .font(.footnote)
         .foregroundStyle(.secondary)
@@ -461,7 +463,7 @@ struct VoiceFilterSettingsSection: View {
           modelPackAcquisition.startDownload()
         }
         .buttonStyle(.borderedProminent)
-        .tint(.cyan)
+        .tint(DspeechTheme.accent)
         .foregroundStyle(.black)
         .accessibilityIdentifier("voicefilter-modelpack-retry")
       }
@@ -501,7 +503,7 @@ struct VoiceFilterSettingsSection: View {
         Task { await deleteModelPack(pack) }
       }
       .buttonStyle(.bordered)
-      .tint(.red)
+      .tint(DspeechTheme.danger)
       .accessibilityIdentifier("voicefilter-modelpack-delete")
     }
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -531,7 +533,7 @@ struct VoiceFilterSettingsSection: View {
       .font(.subheadline.weight(.semibold))
     }
     .buttonStyle(.bordered)
-    .tint(.cyan)
+    .tint(DspeechTheme.accent)
     .disabled(!identifierAvailable || recordingTarget != nil)
     .accessibilityIdentifier("voicefilter-add-crew")
 
@@ -595,7 +597,7 @@ struct VoiceFilterSettingsSection: View {
       Task { await toggleEnrollment(target: target) }
     }
     .buttonStyle(.bordered)
-    .tint(isRecording ? .red : nil)
+    .tint(isRecording ? DspeechTheme.danger : nil)
     .lineLimit(1)
     .disabled(!identifierAvailable || (recordingTarget != nil && !isRecording))
     .accessibilityIdentifier("voicefilter-enroll-crew-\(index)")
@@ -609,7 +611,7 @@ struct VoiceFilterSettingsSection: View {
       } label: {
         Image(systemName: "minus.circle.fill")
           .font(.system(size: 22))
-          .foregroundStyle(.red)
+          .foregroundStyle(DspeechTheme.danger)
           .frame(width: 44, height: 44)
           .contentShape(Rectangle())
       }

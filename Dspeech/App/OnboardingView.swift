@@ -56,7 +56,7 @@ struct OnboardingView: View {
 
       ZStack {
         LinearGradient(
-          colors: [Color.black, Color(red: 0.03, green: 0.06, blue: 0.10)],
+          colors: [DspeechTheme.backgroundTop, DspeechTheme.backgroundBottom],
           startPoint: .top,
           endPoint: .bottom
         )
@@ -76,7 +76,7 @@ struct OnboardingView: View {
               .font(.headline)
               .frame(maxWidth: .infinity)
               .padding(.vertical, 14)
-              .background(Capsule().fill(Color.cyan))
+              .background(Capsule().fill(DspeechTheme.accent))
               .foregroundStyle(.black)
           }
           .buttonStyle(.plain)
@@ -125,7 +125,7 @@ struct OnboardingView: View {
       if includeSpacers { Spacer() }
       Image(systemName: card.systemImage)
         .font(.system(size: iconSize, weight: .semibold))
-        .foregroundStyle(.cyan)
+        .foregroundStyle(DspeechTheme.accent)
       Text(card.title)
         .font(.system(.title, design: .rounded).weight(.bold))
         .foregroundStyle(.white)

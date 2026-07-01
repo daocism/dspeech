@@ -170,7 +170,7 @@ struct PrivacyBadge: View {
   // hardcoded green/"On-device" — so a future off-device mode can't render green or be
   // mislabeled "On-device processing" (ADR 0002 demands the badge tell the truth).
   private var tint: Color {
-    mode.sendsAudioOffDevice ? .orange : .green
+    mode.sendsAudioOffDevice ? DspeechTheme.warning : DspeechTheme.success
   }
 
   private var voiceOverLabel: String {
@@ -185,11 +185,11 @@ struct PrivacyBadge: View {
       .lineLimit(1)
       .minimumScaleFactor(0.65)
       .foregroundStyle(tint)
-      .padding(.horizontal, 7)
-      .padding(.vertical, 3)
-      .background(tint.opacity(0.16), in: Capsule())
+      .padding(.horizontal, DspeechTheme.chipHorizontalPadding)
+      .padding(.vertical, DspeechTheme.chipVerticalPadding)
+      .background(tint.opacity(DspeechTheme.chipFillOpacity), in: Capsule())
       .overlay(
-        Capsule().stroke(tint.opacity(0.45), lineWidth: 1)
+        Capsule().stroke(tint.opacity(DspeechTheme.chipStrokeOpacity), lineWidth: 1)
       )
       .accessibilityIdentifier("privacy-badge")
       .accessibilityLabel(voiceOverLabel)
@@ -201,10 +201,10 @@ struct RouteHealthChip: View {
 
   private var tint: Color {
     switch health {
-    case .suitableExternal: return .green
-    case .cautionBuiltIn: return .orange
-    case .unknownExternal, .unsuitableOutputOnly: return .yellow
-    case .noInput: return .red
+    case .suitableExternal: return DspeechTheme.success
+    case .cautionBuiltIn: return DspeechTheme.warning
+    case .unknownExternal, .unsuitableOutputOnly: return DspeechTheme.filtered
+    case .noInput: return DspeechTheme.danger
     }
   }
 
@@ -230,11 +230,11 @@ struct RouteHealthChip: View {
         .minimumScaleFactor(0.65)
     }
     .foregroundStyle(tint)
-    .padding(.horizontal, 7)
-    .padding(.vertical, 3)
-    .background(tint.opacity(0.16), in: Capsule())
+    .padding(.horizontal, DspeechTheme.chipHorizontalPadding)
+    .padding(.vertical, DspeechTheme.chipVerticalPadding)
+    .background(tint.opacity(DspeechTheme.chipFillOpacity), in: Capsule())
     .overlay(
-      Capsule().stroke(tint.opacity(0.45), lineWidth: 1)
+      Capsule().stroke(tint.opacity(DspeechTheme.chipStrokeOpacity), lineWidth: 1)
     )
     .accessibilityIdentifier("route-health-chip")
     .accessibilityLabel(String(localized: "Capture source: \(health.displayLabel)"))
@@ -267,21 +267,24 @@ private struct StartButton: View {
     Button(action: action) {
       ZStack {
         Circle()
-          .fill(isStopVisible ? Color.red.opacity(0.85) : Color.gray.opacity(0.55))
+          .fill(isStopVisible ? DspeechTheme.danger.opacity(0.85) : Color.gray.opacity(0.55))
         if !isStopVisible {
           // why: a glow that travels around the rim (rotating angular gradient) plus a
           // cyan dashed border, to pull attention to the idle Start control.
           Circle()
             .stroke(
               AngularGradient(
-                gradient: Gradient(colors: [.cyan.opacity(0), .cyan, .cyan.opacity(0)]),
+                gradient: Gradient(colors: [
+                  DspeechTheme.accent.opacity(0), DspeechTheme.accent,
+                  DspeechTheme.accent.opacity(0),
+                ]),
                 center: .center),
               lineWidth: 4
             )
             .blur(radius: 5)
             .rotationEffect(.degrees(glowAngle))
           Circle()
-            .strokeBorder(Color.cyan, style: StrokeStyle(lineWidth: 2.5, dash: [5, 4]))
+            .strokeBorder(DspeechTheme.accent, style: StrokeStyle(lineWidth: 2.5, dash: [5, 4]))
         }
         Image(systemName: isStopVisible ? "stop.fill" : "mic.fill")
           .font(.system(size: 26, weight: .bold))
