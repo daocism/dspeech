@@ -60,7 +60,9 @@ for the packages pinned in `Package.resolved`.
 
 ## Release gates outside this script
 
-- Final app icon and styled screenshot frame assets are not present in this
-  repository slice.
+- The 1024px app icon is present and wired
+  (`Dspeech/Assets.xcassets/AppIcon.appiconset/icon-1024.png`, build setting
+  `ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon`). Styled screenshot frame
+  assets are not present in this repository slice.
 - App Store Connect upload is blocked on Andrei-held Apple Developer access.
 - Privacy labels must be approved separately before publication.
