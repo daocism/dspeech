@@ -130,7 +130,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "%@ з %@"
           }
         },
@@ -552,7 +552,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Модель ASR"
           }
         },
@@ -623,7 +623,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Голосовий фільтр ATC"
           }
         },
@@ -694,7 +694,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Фільтр ATC/пілот"
           }
         },
@@ -765,7 +765,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Про застосунок"
           }
         },
@@ -836,7 +836,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Активний голосовий фільтр"
           }
         },
@@ -907,7 +907,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Позивний борту"
           }
         },
@@ -978,7 +978,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Показано всі сегменти ATC."
           }
         },
@@ -1331,7 +1331,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Мова застосунку"
           }
         },
@@ -1402,7 +1402,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Apple Speech"
           }
         },
@@ -2822,8 +2822,8 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Аудіо й транскрипти залишаються на цьому пристрої. Нічого не залишає пристрій."
+            "state": "translated",
+            "value": "Аудіо й розшифрування залишаються на цьому пристрої. Нічого не залишає пристрій."
           }
         },
         "zh-Hans": {
@@ -3173,7 +3173,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Захоплення аудіо перервано системою. Запис призупинено."
           }
         },
@@ -3384,7 +3384,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Лише аудіовихід — підключіть вхід."
           }
         },
@@ -3455,7 +3455,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Джерело аудіо"
           }
         },
@@ -3526,7 +3526,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Скасувати"
           }
         },
@@ -3597,7 +3597,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Джерело захоплення змінилося: %@."
           }
         },
@@ -3668,7 +3668,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Джерело захоплення недоступне — перевірте підключення входу."
           }
         },
@@ -3739,7 +3739,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Джерело захоплення: %@"
           }
         },
@@ -3810,7 +3810,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Перевірте мови диктування в налаштуваннях пристрою. Dspeech не замінює локальний режим хмарним розпізнаванням."
           }
         },
@@ -3881,7 +3881,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Перевірка мов розпізнавання на пристрої…"
           }
         },
@@ -3952,7 +3952,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Очистити"
           }
         },
@@ -4233,7 +4233,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Упевнено розпізнану мову пілота можна зупиняти до розпізнавання. Фільтр релевантності позивного працює окремо."
           }
         },
@@ -4304,7 +4304,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Підключіть вхід для точності"
           }
         },
@@ -4445,7 +4445,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Продовжити без голосового фільтра"
           }
         },
@@ -4516,7 +4516,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Core ML"
           }
         },
@@ -4587,7 +4587,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Не вдалося видалити модель"
           }
         },
@@ -4658,7 +4658,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Не вдалося видалити пакет моделі з пристрою. Перевірте доступ до сховища та спробуйте пізніше."
           }
         },
@@ -4939,7 +4939,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Не вдалося завантажити пакет моделі. Перевірте підключення до мережі та спробуйте ще раз."
           }
         },
@@ -5010,7 +5010,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Не вдалося ініціалізувати локальний розпізнавач зі встановленого пакета."
           }
         },
@@ -5081,7 +5081,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Не вдалося встановити модель"
           }
         },
@@ -5222,7 +5222,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Не вдалося завантажити або застосувати локальну модель FluidAudio зі встановленого пакета."
           }
         },
@@ -5433,7 +5433,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Не вдалося підготувати переклад на пристрої. Перевірте мовний пакет і спробуйте ще раз."
           }
         },
@@ -5504,7 +5504,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Не вдалося розпізнати мовлення. Спробуйте ще раз."
           }
         },
@@ -5645,7 +5645,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Не вдалося зберегти голосовий зразок. Спробуйте ще раз."
           }
         },
@@ -5716,7 +5716,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Не вдалося почати розпізнавання. Перевірте мікрофон і спробуйте ще раз."
           }
         },
@@ -5787,7 +5787,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Не вдалося почати запис."
           }
         },
@@ -5858,7 +5858,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Не вдалося перевірити рівень: формат вхідного аудіо недоступний."
           }
         },
@@ -5929,7 +5929,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Не вдалося підготувати аудіовхід для запису: %@"
           }
         },
@@ -6000,7 +6000,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Не вдалося розпізнати мовлення: %@"
           }
         },
@@ -6071,7 +6071,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Не вдалося вибрати цей вхід: %@"
           }
         },
@@ -6142,7 +6142,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Не вдалося розпочати запис: %@"
           }
         },
@@ -6213,7 +6213,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Не вдалося розпочати перевірку рівня: %@"
           }
         },
@@ -6284,7 +6284,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "ДЕМО"
           }
         },
@@ -6425,7 +6425,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Видалити пакет"
           }
         },
@@ -6496,7 +6496,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Видалити пакет (%@)"
           }
         },
@@ -6637,7 +6637,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Delta 905, зупиніться перед смугою два сім, борт на короткій прямій."
           }
         },
@@ -6989,7 +6989,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Готово"
           }
         },
@@ -7060,7 +7060,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Завантажити пакет голосового фільтра (≈ 15 МБ)"
           }
         },
@@ -7131,7 +7131,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Завантаження моделі…"
           }
         },
@@ -7202,7 +7202,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Завантаження моделі голосового фільтра…"
           }
         },
@@ -7413,7 +7413,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Dspeech не виходить в ефір і нічого не передає по радіо. Застосунок лише слухає й показує текст."
           }
         },
@@ -7484,7 +7484,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Dspeech обробляє аудіо лише локально. Аудіо ніколи не залишає ваш пристрій."
           }
         },
@@ -7555,7 +7555,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Увімкнути голосовий фільтр"
           }
         },
@@ -7626,7 +7626,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Зовнішній вхід"
           }
         },
@@ -7697,7 +7697,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Зовнішнє джерело зникло — перемикання на %@. Запис призупинено."
           }
         },
@@ -8049,7 +8049,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Почати"
           }
         },
@@ -8120,7 +8120,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Приховувати передачі пілота та сторонні виклики ATC."
           }
         },
@@ -8191,7 +8191,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Вхід"
           }
         },
@@ -8262,7 +8262,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Встановлення моделі…"
           }
         },
@@ -8333,7 +8333,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Встановлення моделі голосового фільтра…"
           }
         },
@@ -8474,7 +8474,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "НАЖИВО"
           }
         },
@@ -8545,7 +8545,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "ЛОКАЛЬНО"
           }
         },
@@ -8616,7 +8616,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Рівень"
           }
         },
@@ -8687,7 +8687,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Слухаю -- промовте позивний по літерах (наприклад: \"november one two three alpha bravo\")."
           }
         },
@@ -8828,7 +8828,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Слухаю — продиктуйте позивний по літерах (наприклад: «новембер один два три альфа браво»)."
           }
         },
@@ -8899,7 +8899,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Слухаю…"
           }
         },
@@ -8970,7 +8970,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Локальна"
           }
         },
@@ -9041,7 +9041,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Локально за замовчуванням"
           }
         },
@@ -9112,7 +9112,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Локальні налаштування пошкоджено"
           }
         },
@@ -9253,7 +9253,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Режим"
           }
         },
@@ -9324,7 +9324,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Модель встановлено й перевірено"
           }
         },
@@ -9395,7 +9395,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Модель не встановлено"
           }
         },
@@ -9466,7 +9466,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Перевірка пакета моделі не вдалася."
           }
         },
@@ -9537,7 +9537,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Стан моделі пошкоджено"
           }
         },
@@ -9678,7 +9678,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "N123AB, знижуйтесь та витримуйте три тисячі, очікуйте захід ILS на смугу два сім."
           }
         },
@@ -9749,7 +9749,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Далі"
           }
         },
@@ -9820,7 +9820,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Немає джерела захоплення — підключіть вхід і спробуйте ще раз."
           }
         },
@@ -10103,7 +10103,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Немає входу"
           }
         },
@@ -10174,7 +10174,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Джерело входу не виявлено. Підключіть провідний вхід (USB-C / TRRS) або скористайтеся вбудованим мікрофоном."
           }
         },
@@ -10245,7 +10245,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Немає доступу до мікрофона. Дозвольте його в Налаштуваннях."
           }
         },
@@ -10316,7 +10316,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Немає доступу до мікрофона. Дозвольте його в налаштуваннях пристрою."
           }
         },
@@ -10387,7 +10387,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Немає доступної мови розпізнавання на пристрої. Відкрийте налаштування розпізнавання й перевірте мови диктування."
           }
         },
@@ -10458,7 +10458,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Немає доступних мов розпізнавання на пристрої."
           }
         },
@@ -10529,7 +10529,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Немає моделі розпізнавання на пристрої для цієї мови. Завантажте її мовний пакет або запустіть локально."
           }
         },
@@ -10600,7 +10600,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Немає доступної мови розпізнавання"
           }
         },
@@ -10811,7 +10811,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Немає доступу до розпізнавання мовлення. Дозвольте його в Налаштуваннях."
           }
         },
@@ -10882,7 +10882,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Немає доступу до розпізнавання мовлення. Дозвольте його в налаштуваннях пристрою."
           }
         },
@@ -10953,7 +10953,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Мовлення не розпізнано — говоріть ближче до мікрофона."
           }
         },
@@ -11024,7 +11024,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Немає придатного джерела захоплення."
           }
         },
@@ -11377,7 +11377,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Немає чого перекладати: сегмент порожній."
           }
         },
@@ -11448,7 +11448,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Офлайн-розпізнавання для %@ не встановлено. Голосове введення позивного потребує локальної моделі."
           }
         },
@@ -11519,7 +11519,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Обробка на пристрої"
           }
         },
@@ -11590,7 +11590,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Переклад на пристрої"
           }
         },
@@ -11661,7 +11661,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Налаштування перекладу на пристрої скасовано. Знову ввімкніть переклад, якщо він потрібен."
           }
         },
@@ -11732,7 +11732,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Відкрити налаштування пристрою"
           }
         },
@@ -11943,7 +11943,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Лише вихід — без входу"
           }
         },
@@ -12084,7 +12084,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Пакет встановлено, фільтр вимкнено"
           }
         },
@@ -12155,7 +12155,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Пакет «%@» · %lld-вимірні ембединги · %@. Розпізнавання виконується офлайн."
           }
         },
@@ -12367,7 +12367,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Пілот 1"
           }
         },
@@ -12438,7 +12438,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Пілот 1 (капітан)"
           }
         },
@@ -12509,7 +12509,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Пілот 2"
           }
         },
@@ -12580,7 +12580,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Пілот 2 (другий пілот)"
           }
         },
@@ -12651,7 +12651,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Слот пілота недоступний"
           }
         },
@@ -12722,7 +12722,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Класифікація голосу пілота"
           }
         },
@@ -12793,7 +12793,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Фільтр до ASR вимкнено; усі аудіобуфери передаються на розпізнавання."
           }
         },
@@ -12864,7 +12864,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Конфіденційність"
           }
         },
@@ -12935,7 +12935,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Лише прийом"
           }
         },
@@ -13006,7 +13006,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Розпізнавання"
           }
         },
@@ -13077,7 +13077,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Мова розпізнавання"
           }
         },
@@ -13148,7 +13148,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Запишіть голосовий зразок для розпізнавання."
           }
         },
@@ -13219,7 +13219,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Записати голос"
           }
         },
@@ -13290,7 +13290,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Триває запис -- говоріть кілька секунд, потім натисніть «Стоп»."
           }
         },
@@ -13361,7 +13361,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Запис стане доступним після підключення розпізнавача."
           }
         },
@@ -13432,7 +13432,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Не вдалося записати -- спробуйте ще раз."
           }
         },
@@ -13503,7 +13503,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Не вдалося записати — спробуйте ще раз."
           }
         },
@@ -13574,7 +13574,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Запис — говоріть кілька секунд, потім натисніть «Стоп»."
           }
         },
@@ -13715,7 +13715,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Запит доступу до мікрофона й розпізнавання мовлення…"
           }
         },
@@ -13786,7 +13786,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Скинути пошкоджені дані"
           }
         },
@@ -13857,7 +13857,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Перезапустіть застосунок, щоб змінити мову."
           }
         },
@@ -13928,7 +13928,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Повторити завантаження"
           }
         },
@@ -14069,7 +14069,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Сегменти без збігу позивного приховуватимуться, доки активне вікно продовження."
           }
         },
@@ -14280,7 +14280,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Задати позивний голосом"
           }
         },
@@ -14351,7 +14351,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Налаштування"
           }
         },
@@ -14422,7 +14422,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Налаштування тут"
           }
         },
@@ -14633,7 +14633,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Деякі локальні налаштування голосового фільтра пошкоджено. Скиньте пошкоджені дані, щоб безпечно продовжити."
           }
         },
@@ -14704,7 +14704,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Класифікацію голосу вимкнено; усі аудіобуфери йдуть на розпізнавання. Фільтр позивного все ще може приховувати нерелевантний ATC."
           }
         },
@@ -14775,7 +14775,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Помилка розпізнавання мовлення. Спробуйте ще раз."
           }
         },
@@ -14846,7 +14846,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Розпізнавання мовлення недоступне на цьому пристрої."
           }
         },
@@ -14917,7 +14917,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Speedbird 42, працюйте з вежею на сто вісімнадцять кома сім."
           }
         },
@@ -14988,7 +14988,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Старт"
           }
         },
@@ -15059,7 +15059,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Стоп"
           }
         },
@@ -15130,7 +15130,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Зупинити тест"
           }
         },
@@ -15201,7 +15201,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Зупинити голосове введення"
           }
         },
@@ -15272,7 +15272,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Системна"
           }
         },
@@ -15343,7 +15343,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Помилка системного перекладу. Спробуйте ще раз."
           }
         },
@@ -15414,8 +15414,8 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Натисніть «Старт» і говоріть — транскрипт зʼявиться тут.\nОбробка локальна; аудіо ніколи не залишає ваш пристрій."
+            "state": "translated",
+            "value": "Натисніть «Старт» і говоріть — розшифрування зʼявиться тут.\nОбробка локальна; аудіо ніколи не залишає ваш пристрій."
           }
         },
         "zh-Hans": {
@@ -15485,7 +15485,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Натисніть, щоб почати розпізнавання"
           }
         },
@@ -15556,7 +15556,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Цільова мова"
           }
         },
@@ -15627,7 +15627,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Перевірити рівень входу"
           }
         },
@@ -15698,8 +15698,8 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Модель FluidAudio (%@) завантажується один раз за цим запитом. З пристрою виходить лише запит завантаження моделі -- аудіо, транскрипти й зразки голосу не передаються."
+            "state": "translated",
+            "value": "Модель FluidAudio (%@) завантажується один раз за цим запитом. З пристрою виходить лише запит завантаження моделі -- аудіо, розшифрування й зразки голосу не передаються."
           }
         },
         "zh-Hans": {
@@ -15769,8 +15769,8 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Модель FluidAudio (%@) завантажується один раз за цим запитом. З пристрою йде лише запит на завантаження моделі — аудіо, розшифровки та зразки голосу не передаються."
+            "state": "translated",
+            "value": "Модель FluidAudio (%@) завантажується один раз за цим запитом. З пристрою йде лише запит на завантаження моделі — аудіо, розшифрування та зразки голосу не передаються."
           }
         },
         "zh-Hans": {
@@ -15840,7 +15840,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Аудіосесія знову доступна. Перевірте вхід, перш ніж почати знову."
           }
         },
@@ -15911,7 +15911,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Аудіосесія знову доступна. Перезапустіть захоплення після перевірки входу."
           }
         },
@@ -16123,7 +16123,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Аудіослужбу iOS перезапущено. Запис призупинено — перевірте вхід і почніть знову."
           }
         },
@@ -16194,7 +16194,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Встановлений пакет не містить шляху до локальної моделі."
           }
         },
@@ -16265,7 +16265,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Мову «%@» ще не завантажено для розпізнавання на пристрої."
           }
         },
@@ -16336,7 +16336,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "У встановленому пакеті відсутні файли локальної моделі FluidAudio."
           }
         },
@@ -16407,7 +16407,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Локальний розпізнавач повідомив про недоступність після встановлення пакета."
           }
         },
@@ -16478,7 +16478,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Мікрофон недоступний."
           }
         },
@@ -16549,7 +16549,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Модель встановлено, але локальний розпізнавач недоступний у цій збірці."
           }
         },
@@ -16760,7 +16760,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Пакет моделі не пройшов перевірку контрольної суми або цілісності. Повторіть завантаження, щоб отримати перевірену копію."
           }
         },
@@ -16831,7 +16831,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Модель «%@» залишається на пристрої. Увімкніть фільтр вище або видаліть пакет, щоб звільнити місце."
           }
         },
@@ -16902,7 +16902,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Модель голосового розпізнавання на пристрої не встановлено в цій збірці (див. ADR 0007)."
           }
         },
@@ -16973,7 +16973,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Пакет встановлено, але локальний розпізнавач не підключено в цій збірці, тож запис голосу вимкнено."
           }
         },
@@ -17044,7 +17044,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Голосовий фільтр пілота працює лише після встановлення локального пакета моделі. Завантаження разове, явне і на ваш запит; аудіо ніколи не залишає ваш пристрій."
           }
         },
@@ -17115,7 +17115,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Фільтр до ASR може приховати лише мовлення, впевнено розпізнане як ваше пілотське."
           }
         },
@@ -17186,7 +17186,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Мовний пакет розпізнавання не завантажено. Увімкніть диктування й завантажте мову в Налаштуваннях → Основні → Клавіатура → Диктування."
           }
         },
@@ -17257,7 +17257,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Розмірність ембедингів розпізнавача (%lld) не збігається з пакетом (%lld)."
           }
         },
@@ -17328,7 +17328,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Збережений позивний пошкоджено. Скиньте його й задайте позивний знову."
           }
         },
@@ -17399,7 +17399,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Збережений стан пакета голосової моделі пошкоджено. Продовжте без голосового фільтра й за потреби завантажте пакет знову."
           }
         },
@@ -17470,7 +17470,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Збережені голосові зразки пошкоджено. Скиньте пошкоджені дані й запишіть зразки знову."
           }
         },
@@ -17541,7 +17541,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Цільова мова не підтримується для перекладу на пристрої. Виберіть іншу мову перекладу."
           }
         },
@@ -17612,7 +17612,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Мовний пакет перекладу не встановлено. Вимкніть і знову ввімкніть переклад — iOS запропонує завантаження."
           }
         },
@@ -17683,7 +17683,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Модель голосового фільтра не встановлено. Завантажте пакет, щоб увімкнути розпізнавання пілота."
           }
         },
@@ -17754,7 +17754,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Далі: Основні -> Клавіатура -> Мови диктування -- увімкніть диктування й додайте цю мову. Модель завантажиться, і розпізнавання працюватиме офлайн."
           }
         },
@@ -17825,7 +17825,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Далі: Основні → Клавіатура → Мови диктування — увімкніть диктування й додайте цю мову. Модель завантажиться, і розпізнавання працюватиме офлайн."
           }
         },
@@ -17966,7 +17966,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Очищується лише вигляд кабіни. Історія збережених сесій залишається на цьому пристрої."
           }
         },
@@ -18037,8 +18037,8 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Збережений транскрипт буде видалено з цього пристрою. Поточний вигляд не зміниться."
+            "state": "translated",
+            "value": "Збережене розшифрування буде видалено з цього пристрою. Поточний вигляд не зміниться."
           }
         },
         "zh-Hans": {
@@ -18108,7 +18108,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Ця мова недоступна для розпізнавання. Виберіть іншу мову в налаштуваннях розпізнавання."
           }
         },
@@ -18179,7 +18179,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Ця мовна пара не підтримується для перекладу на пристрої. Виберіть іншу цільову мову."
           }
         },
@@ -18250,7 +18250,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Ця мова розпізнавання не підтримується для перекладу на пристрої. Виберіть іншу мову розпізнавання."
           }
         },
@@ -18321,7 +18321,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Занадто тихо або коротко -- запишіть чіткіший зразок."
           }
         },
@@ -18392,7 +18392,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Надто тихо або надто коротко — запишіть чіткіший зразок."
           }
         },
@@ -18883,7 +18883,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Переклад"
           }
         },
@@ -18954,7 +18954,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Переклад виконується на пристрої через системні мовні пакети Apple. Під час першого ввімкнення iOS запропонує завантажити мовний пакет. Аудіо й текст не залишають пристрій."
           }
         },
@@ -19095,7 +19095,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Невідомий вхід"
           }
         },
@@ -19166,7 +19166,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Скористайтеся вбудованим мікрофоном, щоб спробувати. Для кабіни підключіть провідний вхід (USB-C / TRRS)."
           }
         },
@@ -19237,7 +19237,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "ПЕРЕВІРИТИ"
           }
         },
@@ -19378,7 +19378,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Версія"
           }
         },
@@ -19449,7 +19449,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Голосовий фільтр вимкнено. Модель встановлено й готову."
           }
         },
@@ -19520,7 +19520,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Голосовий зразок записано. Запишіть знову, щоб оновити."
           }
         },
@@ -19591,7 +19591,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Голос збережено для %@."
           }
         },
@@ -19662,7 +19662,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Без позивного фільтр пропускає всі непілотські сегменти. Натисніть мікрофон, щоб задати його голосом."
           }
         },
@@ -19875,7 +19875,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Ваш вибір збережено для цього пристрою. Вбудований мікрофон — для тесту; для кабіни підключіть провідний вхід."
           }
         },
@@ -19946,7 +19946,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "вбудований мікрофон"
           }
         },
@@ -20017,7 +20017,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "дов. %@"
           }
         },
@@ -20088,7 +20088,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Вбудований мікрофон"
           }
         },
@@ -20159,7 +20159,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "новий вхід"
           }
         },
@@ -20229,7 +20229,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Екіпаж %lld"
           }
         },
@@ -20299,7 +20299,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Додати члена екіпажу"
           }
         },
@@ -20369,7 +20369,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Перезаписати"
           }
         },
@@ -20439,7 +20439,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Запис голосу недоступний"
           }
         },
@@ -20509,7 +20509,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Запис — говоріть ще близько 4 секунд, потім натисніть «Стоп»."
           }
         },
@@ -20579,7 +20579,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Зразок голосу записано. Перезапишіть, щоб оновити."
           }
         },
@@ -20649,7 +20649,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Голосів екіпажу ще немає. Додайте кожного в гарнітурі, щоб відрізняти їхні передачі від диспетчера."
           }
         },
@@ -20719,7 +20719,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Видалити %@"
           }
         },
@@ -20789,7 +20789,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Не вдалося отримати доступ до мікрофона та розпізнавання мовлення. Перевірте дозволи в Налаштуваннях iPhone і знову натисніть «Старт»."
           }
         },
@@ -20859,7 +20859,7 @@
         },
         "uk": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Не вдалося записати достатньо голосу. Говоріть близько 5 секунд у тихому місці, потім натисніть «Стоп»."
           }
         },
