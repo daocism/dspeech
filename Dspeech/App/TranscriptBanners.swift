@@ -14,17 +14,17 @@ struct RouteBanner: View {
         .fixedSize(horizontal: false, vertical: true)
       Spacer(minLength: 0)
     }
-    .foregroundStyle(canStart ? Color.orange : Color.red)
+    .foregroundStyle(canStart ? DspeechTheme.warning : DspeechTheme.danger)
     .padding(.horizontal, 12)
     .padding(.vertical, 8)
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(
-      (canStart ? Color.orange : Color.red).opacity(0.14),
-      in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+      (canStart ? DspeechTheme.warning : DspeechTheme.danger).opacity(0.14),
+      in: RoundedRectangle(cornerRadius: DspeechTheme.bannerCornerRadius, style: .continuous)
     )
     .overlay {
-      RoundedRectangle(cornerRadius: 12, style: .continuous)
-        .stroke((canStart ? Color.orange : Color.red).opacity(0.4), lineWidth: 1)
+      RoundedRectangle(cornerRadius: DspeechTheme.bannerCornerRadius, style: .continuous)
+        .stroke((canStart ? DspeechTheme.warning : DspeechTheme.danger).opacity(0.4), lineWidth: 1)
     }
     .accessibilityIdentifier("route-banner")
   }
@@ -56,9 +56,11 @@ struct BackgroundStopNoticeBanner: View {
     .padding(.horizontal, 12)
     .padding(.vertical, 8)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background(Color.white.opacity(0.10), in: RoundedRectangle(cornerRadius: 12))
+    .background(
+      Color.white.opacity(0.10), in: RoundedRectangle(cornerRadius: DspeechTheme.bannerCornerRadius)
+    )
     .overlay {
-      RoundedRectangle(cornerRadius: 12)
+      RoundedRectangle(cornerRadius: DspeechTheme.bannerCornerRadius)
         .stroke(Color.white.opacity(0.26), lineWidth: 1)
     }
     .accessibilityIdentifier("background-stop-banner")
@@ -88,14 +90,17 @@ struct PersistenceFailureBanner: View {
       .accessibilityIdentifier("persistence-failure-dismiss")
       .accessibilityLabel(String(localized: "Dismiss transcript storage warning"))
     }
-    .foregroundStyle(Color.orange)
+    .foregroundStyle(DspeechTheme.warning)
     .padding(.horizontal, 12)
     .padding(.vertical, 8)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background(Color.orange.opacity(0.14), in: RoundedRectangle(cornerRadius: 12))
+    .background(
+      DspeechTheme.warning.opacity(0.14),
+      in: RoundedRectangle(cornerRadius: DspeechTheme.bannerCornerRadius)
+    )
     .overlay {
-      RoundedRectangle(cornerRadius: 12)
-        .stroke(Color.orange.opacity(0.4), lineWidth: 1)
+      RoundedRectangle(cornerRadius: DspeechTheme.bannerCornerRadius)
+        .stroke(DspeechTheme.warning.opacity(0.4), lineWidth: 1)
     }
     .accessibilityIdentifier("persistence-failure-banner")
   }
@@ -130,14 +135,17 @@ struct TranslationFailureBanner: View {
       .buttonStyle(.plain)
       .accessibilityIdentifier("translation-settings-action")
     }
-    .foregroundStyle(Color.cyan)
+    .foregroundStyle(DspeechTheme.accent)
     .padding(.horizontal, 12)
     .padding(.vertical, 8)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background(Color.cyan.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+    .background(
+      DspeechTheme.accent.opacity(0.12),
+      in: RoundedRectangle(cornerRadius: DspeechTheme.bannerCornerRadius)
+    )
     .overlay {
-      RoundedRectangle(cornerRadius: 12)
-        .stroke(Color.cyan.opacity(0.38), lineWidth: 1)
+      RoundedRectangle(cornerRadius: DspeechTheme.bannerCornerRadius)
+        .stroke(DspeechTheme.accent.opacity(0.38), lineWidth: 1)
     }
     .accessibilityIdentifier("translation-failure-banner")
   }
@@ -157,12 +165,12 @@ struct FilteredCountPill: View {
       .lineLimit(1)
       .minimumScaleFactor(0.75)
       .fixedSize()
-      .foregroundStyle(.yellow)
+      .foregroundStyle(DspeechTheme.filtered)
       .padding(.horizontal, 12)
       .frame(minHeight: 44)
-      .background(.yellow.opacity(0.14), in: Capsule())
+      .background(DspeechTheme.filtered.opacity(0.14), in: Capsule())
       .overlay {
-        Capsule().stroke(.yellow.opacity(0.42), lineWidth: 1)
+        Capsule().stroke(DspeechTheme.filtered.opacity(0.42), lineWidth: 1)
       }
     }
     .buttonStyle(.plain)

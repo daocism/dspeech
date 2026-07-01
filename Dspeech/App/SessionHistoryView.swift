@@ -15,7 +15,7 @@ struct SessionHistoryView: View {
         if let failureMessage {
           Text(failureMessage)
             .font(.footnote)
-            .foregroundStyle(.orange)
+            .foregroundStyle(DspeechTheme.warning)
         }
         if sessions.isEmpty {
           ContentUnavailableView(
@@ -114,11 +114,11 @@ private struct SessionSummaryRow: View {
         .font(.caption.weight(.semibold))
         .lineLimit(1)
         .fixedSize()
-        .foregroundStyle(session.endedAt == nil ? Color.orange : Color.green)
+        .foregroundStyle(session.endedAt == nil ? DspeechTheme.warning : DspeechTheme.success)
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
         .background(
-          (session.endedAt == nil ? Color.orange : Color.green).opacity(0.15),
+          (session.endedAt == nil ? DspeechTheme.warning : DspeechTheme.success).opacity(0.15),
           in: Capsule()
         )
     }
@@ -139,7 +139,7 @@ private struct SessionHistoryDetailView: View {
       if let failureMessage {
         Text(failureMessage)
           .font(.footnote)
-          .foregroundStyle(.orange)
+          .foregroundStyle(DspeechTheme.warning)
       }
       Section {
         ForEach(segments) { segment in
