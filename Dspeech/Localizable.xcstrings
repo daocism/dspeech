@@ -106,7 +106,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "%@ 中 %@"
           }
         },
@@ -528,7 +528,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "ASRモデル"
           }
         },
@@ -599,8 +599,8 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "ATC音声フィルタ"
+            "state": "translated",
+            "value": "ATC音声フィルター"
           }
         },
         "ko": {
@@ -670,8 +670,8 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "ATC/パイロットフィルタ"
+            "state": "translated",
+            "value": "ATC/パイロットフィルター"
           }
         },
         "ko": {
@@ -741,7 +741,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "情報"
           }
         },
@@ -812,8 +812,8 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "音声フィルタ"
+            "state": "translated",
+            "value": "音声フィルター"
           }
         },
         "ko": {
@@ -883,7 +883,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "機体コールサイン"
           }
         },
@@ -954,7 +954,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "すべてのATCセグメントが表示されます。"
           }
         },
@@ -1307,7 +1307,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "アプリの言語"
           }
         },
@@ -1378,7 +1378,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Apple Speech"
           }
         },
@@ -2798,7 +2798,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "音声と文字起こしはこのデバイス上に残ります。何もデバイス外へ送信されません。"
           }
         },
@@ -3149,7 +3149,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "音声キャプチャがシステムにより中断されました。録音を一時停止しました。"
           }
         },
@@ -3360,7 +3360,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "音声出力のみ — 入力を接続してください。"
           }
         },
@@ -3431,7 +3431,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "音声ソース"
           }
         },
@@ -3502,7 +3502,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "キャンセル"
           }
         },
@@ -3573,7 +3573,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "キャプチャソースが変更されました: %@."
           }
         },
@@ -3644,7 +3644,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "キャプチャソースが利用できません — 入力の接続を確認してください。"
           }
         },
@@ -3715,7 +3715,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "キャプチャソース: %@"
           }
         },
@@ -3786,7 +3786,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "デバイス設定で音声入力言語を確認してください。Dspeech はローカルモードの代わりにクラウド認識へ切り替えません。"
           }
         },
@@ -3857,7 +3857,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "端末内認識言語を確認しています…"
           }
         },
@@ -3928,7 +3928,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "消去"
           }
         },
@@ -4209,8 +4209,8 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "高い確度のパイロット音声は認識前に止められます。コールサイン関連性フィルタは別に有効のままです。"
+            "state": "translated",
+            "value": "高い確度のパイロット音声は認識前に止められます。コールサイン関連性フィルターは別に有効のままです。"
           }
         },
         "ko": {
@@ -4280,7 +4280,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "精度のため入力を接続"
           }
         },
@@ -4421,8 +4421,8 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "音声フィルタなしで続行"
+            "state": "translated",
+            "value": "音声フィルターなしで続行"
           }
         },
         "ko": {
@@ -4492,7 +4492,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Core ML"
           }
         },
@@ -4563,7 +4563,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "モデルを削除できませんでした"
           }
         },
@@ -4634,7 +4634,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "端末からモデルパックを削除できませんでした。ストレージへのアクセスを確認して後でもう一度お試しください。"
           }
         },
@@ -4915,7 +4915,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "モデルパックをダウンロードできませんでした。ネットワーク接続を確認してもう一度お試しください。"
           }
         },
@@ -4986,7 +4986,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "インストール済みのパックからローカル認識エンジンを初期化できませんでした。"
           }
         },
@@ -5057,7 +5057,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "モデルをインストールできませんでした"
           }
         },
@@ -5198,7 +5198,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "インストール済みのパックからローカルFluidAudioモデルを読み込みまたは適用できませんでした。"
           }
         },
@@ -5409,7 +5409,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "端末内翻訳を準備できませんでした。言語パックを確認してもう一度お試しください。"
           }
         },
@@ -5480,7 +5480,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "音声を認識できませんでした。もう一度お試しください。"
           }
         },
@@ -5621,7 +5621,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "音声サンプルを保存できませんでした。もう一度お試しください。"
           }
         },
@@ -5692,7 +5692,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "認識を開始できませんでした。マイクを確認してもう一度お試しください。"
           }
         },
@@ -5763,7 +5763,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "録音を開始できませんでした。"
           }
         },
@@ -5834,7 +5834,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "レベルをテストできませんでした：入力音声フォーマットが利用できません。"
           }
         },
@@ -5905,7 +5905,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "録音用の音声入力を準備できませんでした: %@"
           }
         },
@@ -5976,7 +5976,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "音声を認識できませんでした: %@"
           }
         },
@@ -6047,7 +6047,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "この入力を選択できませんでした: %@"
           }
         },
@@ -6118,7 +6118,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "録音を開始できませんでした: %@"
           }
         },
@@ -6189,7 +6189,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "レベルチェックを開始できませんでした: %@"
           }
         },
@@ -6260,7 +6260,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "デモ"
           }
         },
@@ -6401,7 +6401,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "パックを削除"
           }
         },
@@ -6472,7 +6472,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "パックを削除 (%@)"
           }
         },
@@ -6613,7 +6613,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Delta 905、滑走路27手前で待機、ショートファイナルに他機あり。"
           }
         },
@@ -6965,7 +6965,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "完了"
           }
         },
@@ -7036,8 +7036,8 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "音声フィルタパックをダウンロード（約15 MB）"
+            "state": "translated",
+            "value": "音声フィルターパックをダウンロード（約15 MB）"
           }
         },
         "ko": {
@@ -7107,7 +7107,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "モデルをダウンロード中…"
           }
         },
@@ -7178,8 +7178,8 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "音声フィルタモデルをダウンロード中…"
+            "state": "translated",
+            "value": "音声フィルターモデルをダウンロード中…"
           }
         },
         "ko": {
@@ -7389,7 +7389,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Dspeechは送信や無線への送出を一切行いません。アプリは受信してテキストを表示するだけです。"
           }
         },
@@ -7460,7 +7460,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Dspeechは音声を端末内のみで処理します。音声が端末外に出ることはありません。"
           }
         },
@@ -7531,8 +7531,8 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "音声フィルタを有効にする"
+            "state": "translated",
+            "value": "音声フィルターを有効にする"
           }
         },
         "ko": {
@@ -7602,7 +7602,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "外部入力"
           }
         },
@@ -7673,7 +7673,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "外部ソースが失われました—%@ に切り替えます。録音を一時停止しました。"
           }
         },
@@ -8025,7 +8025,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "はじめる"
           }
         },
@@ -8096,8 +8096,8 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "パイロットの送信と無関係なATC交信を非表示にします。"
+            "state": "translated",
+            "value": "パイロットの通信と無関係なATC交信を非表示にします。"
           }
         },
         "ko": {
@@ -8167,7 +8167,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "入力"
           }
         },
@@ -8238,7 +8238,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "モデルをインストール中…"
           }
         },
@@ -8309,8 +8309,8 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "音声フィルタモデルをインストール中…"
+            "state": "translated",
+            "value": "音声フィルターモデルをインストール中…"
           }
         },
         "ko": {
@@ -8450,7 +8450,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "ライブ"
           }
         },
@@ -8521,7 +8521,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "ローカル"
           }
         },
@@ -8592,7 +8592,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "レベル"
           }
         },
@@ -8663,7 +8663,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "聞き取り中 -- コールサインを綴ってください（例: \"november one two three alpha bravo\"）。"
           }
         },
@@ -8804,7 +8804,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "受信中 — コールサインを一字ずつ読み上げてください（例：「november one two three alpha bravo」）。"
           }
         },
@@ -8875,7 +8875,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "受信中…"
           }
         },
@@ -8946,7 +8946,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "ローカル"
           }
         },
@@ -9017,7 +9017,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "デフォルトで端末内処理"
           }
         },
@@ -9088,7 +9088,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "ローカル設定が破損しています"
           }
         },
@@ -9229,7 +9229,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "モード"
           }
         },
@@ -9300,7 +9300,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "モデルをインストールし検証しました"
           }
         },
@@ -9371,7 +9371,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "モデルがインストールされていません"
           }
         },
@@ -9442,7 +9442,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "モデルパックの検証に失敗しました。"
           }
         },
@@ -9513,7 +9513,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "モデルの状態が破損しています"
           }
         },
@@ -9654,7 +9654,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "N123AB、降下して3000維持、滑走路27ILSアプローチを予期。"
           }
         },
@@ -9725,7 +9725,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "次へ"
           }
         },
@@ -9796,7 +9796,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "キャプチャソースがありません — 入力を接続してもう一度お試しください。"
           }
         },
@@ -10079,7 +10079,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "入力なし"
           }
         },
@@ -10150,7 +10150,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "入力ソースが検出されません。有線入力（USB-C / TRRS）を接続するか、内蔵マイクを使用してください。"
           }
         },
@@ -10221,7 +10221,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "マイクへのアクセスがありません。設定で許可してください。"
           }
         },
@@ -10292,7 +10292,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "マイクへのアクセスがありません。デバイスの設定で許可してください。"
           }
         },
@@ -10363,7 +10363,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "利用可能な端末内認識言語がありません。認識設定を開いて音声入力の言語を確認してください。"
           }
         },
@@ -10434,7 +10434,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "利用可能な端末内認識言語がありません。"
           }
         },
@@ -10505,7 +10505,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "この言語に対応する端末内認識モデルがありません。言語パックをダウンロードするか、端末内で実行してください。"
           }
         },
@@ -10576,7 +10576,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "利用可能な認識言語がありません"
           }
         },
@@ -10787,7 +10787,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "音声認識へのアクセスがありません。設定で許可してください。"
           }
         },
@@ -10858,7 +10858,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "音声認識へのアクセスがありません。デバイスの設定で許可してください。"
           }
         },
@@ -10929,7 +10929,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "音声が認識されませんでした — マイクに近づいて話してください。"
           }
         },
@@ -11000,7 +11000,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "適切なキャプチャソースがありません。"
           }
         },
@@ -11353,7 +11353,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "翻訳する内容がありません：セグメントが空です。"
           }
         },
@@ -11424,7 +11424,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "%@ のオフライン認識がインストールされていません。コールサインの音声入力にはローカルモデルが必要です。"
           }
         },
@@ -11495,7 +11495,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "端末内処理"
           }
         },
@@ -11566,7 +11566,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "端末内翻訳"
           }
         },
@@ -11637,7 +11637,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "端末内翻訳のセットアップがキャンセルされました。必要な場合は翻訳を再度オンにしてください。"
           }
         },
@@ -11708,7 +11708,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "デバイス設定を開く"
           }
         },
@@ -11919,7 +11919,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "出力のみ — 入力なし"
           }
         },
@@ -12060,8 +12060,8 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "パックインストール済み、フィルタオフ"
+            "state": "translated",
+            "value": "パックインストール済み、フィルターオフ"
           }
         },
         "ko": {
@@ -12131,7 +12131,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "パック「%@」 · %lld 次元の埋め込み · %@。認識はオフラインで実行されます。"
           }
         },
@@ -12343,7 +12343,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "パイロット 1"
           }
         },
@@ -12414,7 +12414,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "パイロット 1（機長）"
           }
         },
@@ -12485,7 +12485,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "パイロット 2"
           }
         },
@@ -12556,7 +12556,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "パイロット 2（副操縦士）"
           }
         },
@@ -12627,7 +12627,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "パイロット枠が利用できません"
           }
         },
@@ -12698,7 +12698,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "パイロット音声分類"
           }
         },
@@ -12769,8 +12769,8 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "ASR前フィルタはオフです。すべての音声バッファが認識に渡されます。"
+            "state": "translated",
+            "value": "ASR前フィルターはオフです。すべての音声バッファが認識に渡されます。"
           }
         },
         "ko": {
@@ -12840,7 +12840,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "プライバシー"
           }
         },
@@ -12911,7 +12911,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "受信専用"
           }
         },
@@ -12982,7 +12982,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "認識"
           }
         },
@@ -13053,7 +13053,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "認識言語"
           }
         },
@@ -13124,7 +13124,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "認識用の音声サンプルを録音してください。"
           }
         },
@@ -13195,7 +13195,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "音声を録音"
           }
         },
@@ -13266,7 +13266,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "録音中 -- 数秒話してから停止をタップしてください。"
           }
         },
@@ -13337,7 +13337,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "認識エンジンが接続されると録音が可能になります。"
           }
         },
@@ -13408,7 +13408,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "録音に失敗しました -- もう一度試してください。"
           }
         },
@@ -13479,7 +13479,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "録音に失敗しました — もう一度お試しください。"
           }
         },
@@ -13550,7 +13550,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "録音中 — 数秒間話してから停止をタップしてください。"
           }
         },
@@ -13691,7 +13691,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "マイクと音声認識へのアクセスを要求しています…"
           }
         },
@@ -13762,7 +13762,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "破損データをリセット"
           }
         },
@@ -13833,7 +13833,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "言語を変更するにはアプリを再起動してください。"
           }
         },
@@ -13904,7 +13904,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "ダウンロードを再試行"
           }
         },
@@ -14045,7 +14045,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "継続ウィンドウが有効な間、コールサインに一致しないセグメントは非表示になります。"
           }
         },
@@ -14256,7 +14256,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "コールサインを音声で設定"
           }
         },
@@ -14327,7 +14327,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "設定"
           }
         },
@@ -14398,7 +14398,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "設定はこちら"
           }
         },
@@ -14609,8 +14609,8 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "一部のローカル音声フィルタ設定が破損しています。安全に続行するには破損データをリセットしてください。"
+            "state": "translated",
+            "value": "一部のローカル音声フィルター設定が破損しています。安全に続行するには破損データをリセットしてください。"
           }
         },
         "ko": {
@@ -14680,8 +14680,8 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "話者分類はオフです。すべての音声バッファは認識へ送られます。コールサイン関連性フィルタは無関係なATCを非表示にできます。"
+            "state": "translated",
+            "value": "話者分類はオフです。すべての音声バッファは認識へ送られます。コールサイン関連性フィルターは無関係なATCを非表示にできます。"
           }
         },
         "ko": {
@@ -14751,7 +14751,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "音声認識エラー。もう一度お試しください。"
           }
         },
@@ -14822,7 +14822,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "この端末では音声認識を利用できません。"
           }
         },
@@ -14893,7 +14893,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Speedbird 42、タワー118.7にコンタクト。"
           }
         },
@@ -14964,7 +14964,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "開始"
           }
         },
@@ -15035,7 +15035,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "停止"
           }
         },
@@ -15106,7 +15106,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "テストを停止"
           }
         },
@@ -15177,7 +15177,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "音声入力を停止"
           }
         },
@@ -15248,7 +15248,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "システム"
           }
         },
@@ -15319,7 +15319,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "システム翻訳に失敗しました。もう一度お試しください。"
           }
         },
@@ -15390,7 +15390,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "開始をタップして話してください — ここに文字起こしが表示されます。\nすべて端末内で処理され、音声が端末外に出ることはありません。"
           }
         },
@@ -15461,7 +15461,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "タップして認識を開始"
           }
         },
@@ -15532,7 +15532,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "翻訳先言語"
           }
         },
@@ -15603,7 +15603,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "入力レベルをテスト"
           }
         },
@@ -15674,7 +15674,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "FluidAudio モデル（%@）はこのリクエストで一度だけダウンロードされます。デバイス外へ送信されるのはモデルダウンロード要求だけです -- 音声、文字起こし、音声サンプルは送信されません。"
           }
         },
@@ -15745,7 +15745,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "FluidAudio モデル（%@）はこのリクエスト時に一度だけダウンロードされます。デバイスから送信されるのはモデルのダウンロードリクエストのみで、音声・文字起こし・音声サンプルは送信されません。"
           }
         },
@@ -15816,7 +15816,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "オーディオセッションが再び利用可能になりました。再開する前に入力を確認してください。"
           }
         },
@@ -15887,7 +15887,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "オーディオセッションが再び利用可能になりました。入力を確認してからキャプチャを再開してください。"
           }
         },
@@ -16099,7 +16099,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "iOSのオーディオサービスが再起動しました。録音を一時停止しました — 入力を確認してから再開してください。"
           }
         },
@@ -16170,7 +16170,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "インストール済みのパックにローカルモデルのパスが含まれていません。"
           }
         },
@@ -16241,7 +16241,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "言語「%@」はデバイス上での認識用にまだダウンロードされていません。"
           }
         },
@@ -16312,7 +16312,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "インストール済みのパックにローカルFluidAudioモデルのファイルがありません。"
           }
         },
@@ -16383,7 +16383,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "パックのインストール後、ローカル認識エンジンが利用不可と報告しました。"
           }
         },
@@ -16454,7 +16454,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "マイクが利用できません。"
           }
         },
@@ -16525,7 +16525,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "モデルはインストールされていますが、このビルドではローカル認識エンジンが利用できません。"
           }
         },
@@ -16736,7 +16736,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "モデルパックのチェックサムまたは整合性チェックに失敗しました。検証済みのコピーを取得するためダウンロードを再試行してください。"
           }
         },
@@ -16807,8 +16807,8 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "モデル「%@」はデバイス上に残ります。上のフィルターを有効にするか、パックを削除して空き容量を確保してください。"
+            "state": "translated",
+            "value": "モデル「%@」はデバイス上に残ります。上のフィルターーを有効にするか、パックを削除して空き容量を確保してください。"
           }
         },
         "ko": {
@@ -16878,7 +16878,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "端末内音声認識モデルはこのビルドにインストールされていません（ADR 0007参照）。"
           }
         },
@@ -16949,7 +16949,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "パックはインストールされていますが、このビルドではローカル認識エンジンが接続されていないため、音声録音は無効です。"
           }
         },
@@ -17020,8 +17020,8 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "パイロット音声フィルタは、ローカルモデルパックのインストール後のみ動作します。ダウンロードは一回限りで、明示的にあなたの要求で行われます。音声が端末外に出ることはありません。"
+            "state": "translated",
+            "value": "パイロット音声フィルターは、ローカルモデルパックのインストール後のみ動作します。ダウンロードは一回限りで、明示的にあなたの要求で行われます。音声が端末外に出ることはありません。"
           }
         },
         "ko": {
@@ -17091,8 +17091,8 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "ASR前フィルタは、確実にパイロットの音声と認識された場合のみ非表示にできます。"
+            "state": "translated",
+            "value": "ASR前フィルターは、確実にパイロットの音声と認識された場合のみ非表示にできます。"
           }
         },
         "ko": {
@@ -17162,7 +17162,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "認識言語パックがダウンロードされていません。設定 → 一般 → キーボード → 音声入力で、音声入力をオンにして言語をダウンロードしてください。"
           }
         },
@@ -17233,7 +17233,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "認識器の埋め込み次元 (%lld) がパック (%lld) と一致しません。"
           }
         },
@@ -17304,7 +17304,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "保存されたコールサインが破損しています。リセットしてコールサインを設定し直してください。"
           }
         },
@@ -17375,8 +17375,8 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "音声モデルパックの保存状態が破損しています。音声フィルタなしで続行し、必要に応じてパックを再ダウンロードしてください。"
+            "state": "translated",
+            "value": "音声モデルパックの保存状態が破損しています。音声フィルターなしで続行し、必要に応じてパックを再ダウンロードしてください。"
           }
         },
         "ko": {
@@ -17446,7 +17446,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "保存された音声サンプルが破損しています。破損データをリセットしてサンプルを録音し直してください。"
           }
         },
@@ -17517,7 +17517,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "翻訳先言語は端末内翻訳に対応していません。別の翻訳言語を選択してください。"
           }
         },
@@ -17588,7 +17588,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "翻訳言語パックがインストールされていません。翻訳をオフにして再度オンにすると、iOSがダウンロードを提案します。"
           }
         },
@@ -17659,8 +17659,8 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "音声フィルタモデルがインストールされていません。パイロット認識を有効にするにはパックをダウンロードしてください。"
+            "state": "translated",
+            "value": "音声フィルターモデルがインストールされていません。パイロット認識を有効にするにはパックをダウンロードしてください。"
           }
         },
         "ko": {
@@ -17730,7 +17730,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "次に: 一般 -> キーボード -> 音声入力言語 -- 音声入力をオンにしてこの言語を追加します。モデルがダウンロードされ、認識はオフラインで動作します。"
           }
         },
@@ -17801,7 +17801,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "次に：一般 → キーボード → 音声入力の言語 — 音声入力をオンにし、この言語を追加します。モデルがダウンロードされ、オフラインで認識できます。"
           }
         },
@@ -17942,7 +17942,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "コックピット表示だけを消去します。保存済みセッション履歴はこのデバイス上に残ります。"
           }
         },
@@ -18013,7 +18013,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "保存済みの文字起こしをこのデバイスから削除します。現在の表示は変わりません。"
           }
         },
@@ -18084,7 +18084,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "この言語は認識に対応していません。認識設定で別の言語を選択してください。"
           }
         },
@@ -18155,7 +18155,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "この言語ペアは端末内翻訳に対応していません。別の翻訳先言語を選択してください。"
           }
         },
@@ -18226,7 +18226,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "この認識言語は端末内翻訳に対応していません。別の認識言語を選択してください。"
           }
         },
@@ -18297,7 +18297,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "小さすぎるか短すぎます -- より明瞭なサンプルを録音してください。"
           }
         },
@@ -18368,7 +18368,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "音量が小さすぎるか短すぎます — より明瞭なサンプルを録音してください。"
           }
         },
@@ -18859,7 +18859,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "翻訳"
           }
         },
@@ -18930,7 +18930,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "翻訳は Apple のシステム言語パックを使ってデバイス上で実行されます。初回有効化時に iOS が言語パックのダウンロードを案内します。音声とテキストはデバイス外へ送信されません。"
           }
         },
@@ -19071,7 +19071,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "不明な入力"
           }
         },
@@ -19142,7 +19142,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "内蔵マイクでお試しください。コックピットでは有線入力（USB-C / TRRS）を接続してください。"
           }
         },
@@ -19213,7 +19213,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "確認"
           }
         },
@@ -19354,7 +19354,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "バージョン"
           }
         },
@@ -19425,8 +19425,8 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "音声フィルタはオフです。モデルはインストール済みで準備完了です。"
+            "state": "translated",
+            "value": "音声フィルターはオフです。モデルはインストール済みで準備完了です。"
           }
         },
         "ko": {
@@ -19496,7 +19496,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "音声サンプルを録音しました。更新するにはもう一度録音してください。"
           }
         },
@@ -19567,7 +19567,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "音声を保存しました: %@."
           }
         },
@@ -19638,8 +19638,8 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "コールサインがない場合、フィルタはパイロット以外のすべてのセグメントを通過させます。マイクをタップして音声で設定してください。"
+            "state": "translated",
+            "value": "コールサインがない場合、フィルターはパイロット以外のすべてのセグメントを通過させます。マイクをタップして音声で設定してください。"
           }
         },
         "ko": {
@@ -19851,7 +19851,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "選択内容はこの端末に保存されます。内蔵マイクはテスト用です。コックピットでは有線入力を接続してください。"
           }
         },
@@ -19922,7 +19922,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "内蔵マイク"
           }
         },
@@ -19993,7 +19993,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "信頼度 %@"
           }
         },
@@ -20064,7 +20064,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "内蔵マイク"
           }
         },
@@ -20135,7 +20135,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "新しい入力"
           }
         },
@@ -20205,7 +20205,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "クルー %lld"
           }
         },
@@ -20275,7 +20275,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "クルーを追加"
           }
         },
@@ -20345,7 +20345,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "録音し直す"
           }
         },
@@ -20415,7 +20415,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "音声録音は利用できません"
           }
         },
@@ -20485,7 +20485,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "録音中 — 約4秒間話し続けてから「停止」をタップしてください。"
           }
         },
@@ -20555,7 +20555,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "音声サンプルを録音しました。更新するには録音し直してください。"
           }
         },
@@ -20625,8 +20625,8 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "クルーの音声はまだありません。ヘッドセットを着けている各人を追加すると、その送信をATCと区別できます。"
+            "state": "translated",
+            "value": "クルーの音声はまだありません。ヘッドセットを着けている各人を追加すると、その通信をATCと区別できます。"
           }
         },
         "ko": {
@@ -20695,7 +20695,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "%@ を削除"
           }
         },
@@ -20765,7 +20765,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "マイクと音声認識へのアクセスを取得できませんでした。iPhoneの設定で権限を確認し、もう一度「開始」をタップしてください。"
           }
         },
@@ -20835,7 +20835,7 @@
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "声を十分に聞き取れませんでした。静かな場所で約5秒話してから「停止」をタップしてください。"
           }
         },
