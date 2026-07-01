@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# why: the simulator/test lane misses device-arch-only Swift 6 errors; this gate
+# has caught real compile breaks before they reached CI (project memory
+# dspeech-local-app-compile-works). Skip with DSPEECH_SKIP_PREPUSH=1 only for
+# emergency pushes of non-Swift changes.
+if [ "${DSPEECH_SKIP_PREPUSH:-0}" = "1" ]; then
+  echo "pre-push: DSPEECH_SKIP_PREPUSH=1 — skipping device-arch compile gate." >&2
+  exit 0
+fi
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+
+if ! command -v xcodebuild >/dev/null 2>&1; then
+  echo "pre-push: xcodebuild not found — cannot run the device-arch compile gate." >&2
+  exit 1
+fi
+
+developer_dir="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
+
+echo "pre-push: device-arch compile gate (generic/platform=iOS)..." >&2
+DEVELOPER_DIR="$developer_dir" xcodebuild \
+  -project Dspeech.xcodeproj \
+  -scheme Dspeech \
+  -destination 'generic/platform=iOS' \
+  CODE_SIGNING_ALLOWED=NO \
+  -quiet build
+
+echo "pre-push: device-arch compile gate passed." >&2
