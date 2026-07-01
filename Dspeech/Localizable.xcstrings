@@ -76,7 +76,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "%@ von %@"
           }
         },
@@ -88,13 +88,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "%@ de %@"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "%@ sur %@"
           }
         },
@@ -498,7 +498,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "ASR-Modell"
           }
         },
@@ -510,13 +510,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Modelo ASR"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Modèle ASR"
           }
         },
@@ -569,8 +569,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "ATC-Stimmfilter"
+            "state": "translated",
+            "value": "ATC-Sprachfilter"
           }
         },
         "en": {
@@ -581,14 +581,14 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Filtro de voz ATC"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Filtre de voix ATC"
+            "state": "translated",
+            "value": "Filtre vocal ATC"
           }
         },
         "it": {
@@ -640,7 +640,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "ATC/Pilot-Filter"
           }
         },
@@ -652,13 +652,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Filtro ATC/piloto"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Filtre ATC/pilote"
           }
         },
@@ -711,7 +711,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Info"
           }
         },
@@ -723,13 +723,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Acerca de"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "À propos"
           }
         },
@@ -782,8 +782,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Aktiver Stimmfilter"
+            "state": "translated",
+            "value": "Aktiver Sprachfilter"
           }
         },
         "en": {
@@ -794,14 +794,14 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Filtro de voz activo"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Filtre de voix actif"
+            "state": "translated",
+            "value": "Filtre vocal actif"
           }
         },
         "it": {
@@ -853,7 +853,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Luftfahrzeug-Rufzeichen"
           }
         },
@@ -865,14 +865,14 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Indicativo de la aeronave"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Indicatif de l'appareil"
+            "state": "translated",
+            "value": "Indicatif de l'aéronef"
           }
         },
         "it": {
@@ -924,7 +924,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Alle ATC-Segmente werden angezeigt."
           }
         },
@@ -936,13 +936,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Se muestran todos los segmentos ATC."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Tous les segments ATC sont affichés."
           }
         },
@@ -1219,7 +1219,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Otra tarea de grabación está usando el micrófono. Deténgala antes de iniciar la transcripción en vivo."
+            "value": "Otra tarea de grabación está usando el micrófono. Detenla antes de iniciar la transcripción en vivo."
           }
         },
         "fr": {
@@ -1277,7 +1277,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "App-Sprache"
           }
         },
@@ -1289,13 +1289,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Idioma de la app"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Langue de l'app"
           }
         },
@@ -1348,7 +1348,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Apple Speech"
           }
         },
@@ -1360,13 +1360,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Apple Speech"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Apple Speech"
           }
         },
@@ -2768,7 +2768,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Audio und Transkripte bleiben auf diesem Gerät. Nichts verlässt das Gerät."
           }
         },
@@ -2780,13 +2780,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "El audio y las transcripciones permanecen en este dispositivo. Nada sale del dispositivo."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "L'audio et les transcriptions restent sur cet appareil. Rien ne quitte l'appareil."
           }
         },
@@ -2851,7 +2851,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "La captura de audio ya está en uso. Detenga la transcripción antes de grabar una muestra de inscripción."
+            "value": "La captura de audio ya está en uso. Detén la transcripción antes de grabar una muestra de inscripción."
           }
         },
         "fr": {
@@ -2921,7 +2921,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "La captura de audio ya está en uso. Detenga la transcripción antes de probar el nivel de entrada."
+            "value": "La captura de audio ya está en uso. Detén la transcripción antes de probar el nivel de entrada."
           }
         },
         "fr": {
@@ -2991,7 +2991,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "La captura de audio ya está en uso. Detenga la transcripción antes de usar la entrada por voz."
+            "value": "La captura de audio ya está en uso. Detén la transcripción antes de usar la entrada por voz."
           }
         },
         "fr": {
@@ -3061,7 +3061,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "La captura de audio se detuvo, pero iOS no pudo liberar la sesión de audio. Revise la entrada antes de volver a iniciar."
+            "value": "La captura de audio se detuvo, pero iOS no pudo liberar la sesión de audio. Revisa la entrada antes de volver a iniciar."
           }
         },
         "fr": {
@@ -3119,7 +3119,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Die Audioaufnahme wurde vom System unterbrochen. Aufnahme pausiert."
           }
         },
@@ -3131,13 +3131,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "El sistema interrumpió la captura de audio. Grabación en pausa."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "La capture audio a été interrompue par le système. Enregistrement en pause."
           }
         },
@@ -3202,7 +3202,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "La entrada de audio cambió y el reconocimiento no pudo recuperarse. Revise la entrada e inicie de nuevo."
+            "value": "La entrada de audio cambió y el reconocimiento no pudo recuperarse. Revisa la entrada e inicia de nuevo."
           }
         },
         "fr": {
@@ -3272,7 +3272,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "La entrada de audio se detuvo inesperadamente. Revise la entrada e inicie de nuevo."
+            "value": "La entrada de audio se detuvo inesperadamente. Revisa la entrada e inicia de nuevo."
           }
         },
         "fr": {
@@ -3330,8 +3330,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Nur Audioausgang — schließe einen Eingang an."
+            "state": "translated",
+            "value": "Nur Audioausgang — schließen Sie einen Eingang an."
           }
         },
         "en": {
@@ -3342,13 +3342,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Solo salida de audio: conecta una entrada."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Sortie audio seule — branchez une entrée."
           }
         },
@@ -3401,7 +3401,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Audioquelle"
           }
         },
@@ -3413,13 +3413,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Fuente de audio"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Source audio"
           }
         },
@@ -3472,7 +3472,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Abbrechen"
           }
         },
@@ -3484,13 +3484,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Cancelar"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Annuler"
           }
         },
@@ -3543,7 +3543,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Aufnahmequelle geändert: %@."
           }
         },
@@ -3555,13 +3555,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "La fuente de captura cambió: %@."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "La source de capture a changé : %@."
           }
         },
@@ -3614,8 +3614,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Aufnahmequelle nicht verfügbar — prüfe die Eingangsverbindung."
+            "state": "translated",
+            "value": "Aufnahmequelle nicht verfügbar — prüfen Sie die Eingangsverbindung."
           }
         },
         "en": {
@@ -3626,13 +3626,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Fuente de captura no disponible: comprueba la conexión de entrada."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Source de capture indisponible — vérifiez la connexion de l'entrée."
           }
         },
@@ -3685,7 +3685,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Aufnahmequelle: %@"
           }
         },
@@ -3697,13 +3697,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Fuente de captura: %@"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Source de capture : %@"
           }
         },
@@ -3756,8 +3756,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Prüfe die Diktier-Sprachen in den Geräteeinstellungen. Dspeech ersetzt den lokalen Modus nicht durch Cloud-Erkennung."
+            "state": "translated",
+            "value": "Prüfen Sie die Diktiersprachen in den Geräteeinstellungen. Dspeech ersetzt den lokalen Modus nicht durch Cloud-Erkennung."
           }
         },
         "en": {
@@ -3768,13 +3768,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Revise los idiomas de dictado en Ajustes del dispositivo. Dspeech no sustituye el modo local con reconocimiento en la nube."
+            "state": "translated",
+            "value": "Revisa los idiomas de dictado en Ajustes del dispositivo. Dspeech no sustituye el modo local con reconocimiento en la nube."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Vérifiez les langues de dictée dans les réglages de l'appareil. Dspeech ne remplace pas le mode local par la reconnaissance cloud."
           }
         },
@@ -3827,7 +3827,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "On-Device-Erkennungssprachen werden geprüft…"
           }
         },
@@ -3839,13 +3839,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Comprobando los idiomas de reconocimiento en el dispositivo…"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Vérification des langues de reconnaissance sur l'appareil…"
           }
         },
@@ -3898,7 +3898,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Löschen"
           }
         },
@@ -3910,13 +3910,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Borrar"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Effacer"
           }
         },
@@ -4179,7 +4179,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Sicher erkannte Pilotenansagen können vor der Erkennung gestoppt werden. Die Rufzeichen-Relevanzfilterung bleibt separat aktiv."
           }
         },
@@ -4191,13 +4191,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "La voz del piloto identificada con confianza puede detenerse antes del reconocimiento. El filtro de relevancia del indicativo sigue activo por separado."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "La voix pilote reconnue avec confiance peut être arrêtée avant la reconnaissance. Le filtrage de pertinence de l'indicatif reste actif séparément."
           }
         },
@@ -4250,7 +4250,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Eingang für mehr Genauigkeit anschließen"
           }
         },
@@ -4262,13 +4262,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Conecta una entrada para mayor precisión"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Branchez une entrée pour plus de précision"
           }
         },
@@ -4391,8 +4391,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Ohne Stimmfilter fortfahren"
+            "state": "translated",
+            "value": "Ohne Sprachfilter fortfahren"
           }
         },
         "en": {
@@ -4403,14 +4403,14 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Continuar sin filtro de voz"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Continuer sans filtre de voix"
+            "state": "translated",
+            "value": "Continuer sans filtre vocal"
           }
         },
         "it": {
@@ -4462,7 +4462,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Core ML"
           }
         },
@@ -4474,13 +4474,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Core ML"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Core ML"
           }
         },
@@ -4533,7 +4533,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Modell konnte nicht gelöscht werden"
           }
         },
@@ -4545,13 +4545,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "No se pudo eliminar el modelo"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Impossible de supprimer le modèle"
           }
         },
@@ -4604,8 +4604,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Das Modellpaket konnte nicht vom Gerät gelöscht werden. Prüfe den Speicherzugriff und versuche es später erneut."
+            "state": "translated",
+            "value": "Das Modellpaket konnte nicht vom Gerät gelöscht werden. Prüfen Sie den Speicherzugriff und versuchen Sie es später erneut."
           }
         },
         "en": {
@@ -4616,13 +4616,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "No se pudo eliminar el paquete del modelo del dispositivo. Comprueba el acceso al almacenamiento e inténtalo más tarde."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Impossible de supprimer le pack du modèle de l'appareil. Vérifiez l'accès au stockage et réessayez plus tard."
           }
         },
@@ -4687,7 +4687,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "No se pudo borrar el paquete del modelo del dispositivo. El dispositivo informó un error de almacenamiento o acceso a archivos. Inténtelo más tarde."
+            "value": "No se pudo borrar el paquete del modelo del dispositivo. El dispositivo informó un error de almacenamiento o acceso a archivos. Inténtalo más tarde."
           }
         },
         "fr": {
@@ -4827,7 +4827,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "No se pudo descargar el paquete del modelo porque falló la solicitud de red. Revise la conexión e inténtelo de nuevo."
+            "value": "No se pudo descargar el paquete del modelo porque falló la solicitud de red. Revisa la conexión e inténtalo de nuevo."
           }
         },
         "fr": {
@@ -4885,8 +4885,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Modellpaket konnte nicht geladen werden. Prüfe deine Netzwerkverbindung und versuche es erneut."
+            "state": "translated",
+            "value": "Modellpaket konnte nicht geladen werden. Prüfen Sie Ihre Netzwerkverbindung und versuchen Sie es erneut."
           }
         },
         "en": {
@@ -4897,13 +4897,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "No se pudo descargar el paquete del modelo. Comprueba tu conexión de red e inténtalo de nuevo."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Impossible de télécharger le pack du modèle. Vérifiez votre connexion réseau et réessayez."
           }
         },
@@ -4956,7 +4956,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Der lokale Erkenner konnte aus dem installierten Paket nicht initialisiert werden."
           }
         },
@@ -4968,13 +4968,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "No se pudo inicializar el reconocedor local desde el paquete instalado."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Impossible d'initialiser le moteur de reconnaissance local à partir du pack installé."
           }
         },
@@ -5027,7 +5027,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Modell konnte nicht installiert werden"
           }
         },
@@ -5039,13 +5039,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "No se pudo instalar el modelo"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Impossible d'installer le modèle"
           }
         },
@@ -5168,7 +5168,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Das lokale FluidAudio-Modell konnte aus dem installierten Paket nicht geladen oder angewendet werden."
           }
         },
@@ -5180,13 +5180,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "No se pudo cargar ni aplicar el modelo local de FluidAudio desde el paquete instalado."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Impossible de charger ou d'appliquer le modèle FluidAudio local à partir du pack installé."
           }
         },
@@ -5379,8 +5379,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "On-Device-Übersetzung konnte nicht vorbereitet werden. Prüfe das Sprachpaket und versuche es erneut."
+            "state": "translated",
+            "value": "On-Device-Übersetzung konnte nicht vorbereitet werden. Prüfen Sie das Sprachpaket und versuchen Sie es erneut."
           }
         },
         "en": {
@@ -5391,13 +5391,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "No se pudo preparar la traducción en el dispositivo. Comprueba el paquete de idioma e inténtalo de nuevo."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Impossible de préparer la traduction sur l'appareil. Vérifiez le pack linguistique et réessayez."
           }
         },
@@ -5450,8 +5450,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Sprache konnte nicht erkannt werden. Versuche es erneut."
+            "state": "translated",
+            "value": "Sprache konnte nicht erkannt werden. Versuchen Sie es erneut."
           }
         },
         "en": {
@@ -5462,13 +5462,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "No se pudo reconocer la voz. Inténtalo de nuevo."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Impossible de reconnaître la parole. Réessayez."
           }
         },
@@ -5591,8 +5591,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Die Stimmprobe konnte nicht gespeichert werden. Versuche es erneut."
+            "state": "translated",
+            "value": "Die Stimmprobe konnte nicht gespeichert werden. Versuchen Sie es erneut."
           }
         },
         "en": {
@@ -5603,13 +5603,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "No se pudo guardar la muestra de voz. Inténtalo de nuevo."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Impossible d'enregistrer l'échantillon vocal. Réessayez."
           }
         },
@@ -5662,8 +5662,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Erkennung konnte nicht gestartet werden. Prüfe das Mikrofon und versuche es erneut."
+            "state": "translated",
+            "value": "Erkennung konnte nicht gestartet werden. Prüfen Sie das Mikrofon und versuchen Sie es erneut."
           }
         },
         "en": {
@@ -5674,13 +5674,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "No se pudo iniciar el reconocimiento. Comprueba el micrófono e inténtalo de nuevo."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Impossible de lancer la reconnaissance. Vérifiez le microphone et réessayez."
           }
         },
@@ -5733,7 +5733,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Aufnahme konnte nicht gestartet werden."
           }
         },
@@ -5745,13 +5745,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "No se pudo iniciar la grabación."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Impossible de lancer l'enregistrement."
           }
         },
@@ -5804,7 +5804,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Der Pegel konnte nicht getestet werden: Das Eingangs-Audioformat ist nicht verfügbar."
           }
         },
@@ -5816,13 +5816,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "No se pudo probar el nivel: el formato de audio de entrada no está disponible."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Impossible de tester le niveau : le format audio d'entrée est indisponible."
           }
         },
@@ -5875,7 +5875,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Der Audioeingang für die Aufnahme konnte nicht vorbereitet werden: %@"
           }
         },
@@ -5887,13 +5887,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "No se pudo preparar la entrada de audio para la grabación: %@"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Impossible de préparer l’entrée audio pour l’enregistrement : %@"
           }
         },
@@ -5946,7 +5946,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Sprache konnte nicht erkannt werden: %@"
           }
         },
@@ -5958,13 +5958,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "No se pudo reconocer el habla: %@"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Impossible de reconnaître la parole : %@"
           }
         },
@@ -6017,7 +6017,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Dieser Eingang konnte nicht ausgewählt werden: %@"
           }
         },
@@ -6029,13 +6029,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "No se pudo seleccionar esta entrada: %@"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Impossible de sélectionner cette entrée : %@"
           }
         },
@@ -6088,7 +6088,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Aufnahme konnte nicht gestartet werden: %@"
           }
         },
@@ -6100,13 +6100,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "No se pudo iniciar la grabación: %@"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Impossible de démarrer l’enregistrement : %@"
           }
         },
@@ -6159,7 +6159,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Die Pegelprüfung konnte nicht gestartet werden: %@"
           }
         },
@@ -6171,13 +6171,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "No se pudo iniciar la comprobación de nivel: %@"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Impossible de démarrer la vérification du niveau : %@"
           }
         },
@@ -6230,7 +6230,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "DEMO"
           }
         },
@@ -6242,13 +6242,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "DEMO"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "DÉMO"
           }
         },
@@ -6371,7 +6371,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Paket löschen"
           }
         },
@@ -6383,13 +6383,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Eliminar paquete"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Supprimer le pack"
           }
         },
@@ -6442,7 +6442,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Paket löschen (%@)"
           }
         },
@@ -6454,13 +6454,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Eliminar paquete (%@)"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Supprimer le pack (%@)"
           }
         },
@@ -6583,7 +6583,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Delta 905, hold short of runway two seven, traffic on short final."
           }
         },
@@ -6595,13 +6595,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Delta 905, mantenga antes de la pista dos siete, tráfico en final corta."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Delta 905, maintenez avant la piste deux sept, trafic en courte finale."
           }
         },
@@ -6935,7 +6935,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Fertig"
           }
         },
@@ -6947,13 +6947,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Listo"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "OK"
           }
         },
@@ -7006,8 +7006,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Stimmfilter-Paket laden (≈ 15 MB)"
+            "state": "translated",
+            "value": "Sprachfilter-Paket laden (≈ 15 MB)"
           }
         },
         "en": {
@@ -7018,14 +7018,14 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Descargar paquete del filtro de voz (≈ 15 MB)"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Télécharger le pack du filtre de voix (≈ 15 Mo)"
+            "state": "translated",
+            "value": "Télécharger le pack du filtre vocal (≈ 15 Mo)"
           }
         },
         "it": {
@@ -7077,7 +7077,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Modell wird geladen…"
           }
         },
@@ -7089,13 +7089,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Descargando modelo…"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Téléchargement du modèle…"
           }
         },
@@ -7148,8 +7148,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Stimmfilter-Modell wird geladen…"
+            "state": "translated",
+            "value": "Sprachfilter-Modell wird geladen…"
           }
         },
         "en": {
@@ -7160,14 +7160,14 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Descargando el modelo del filtro de voz…"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Téléchargement du modèle du filtre de voix…"
+            "state": "translated",
+            "value": "Téléchargement du modèle du filtre vocal…"
           }
         },
         "it": {
@@ -7359,7 +7359,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Dspeech sendet nicht auf Frequenz und überträgt nichts per Funk. Die App hört nur zu und zeigt Text an."
           }
         },
@@ -7371,13 +7371,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Dspeech no transmite por radio ni envía nada por las ondas. La app solo escucha y muestra texto."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Dspeech n'émet rien sur les ondes ni par radio. L'app se contente d'écouter et d'afficher du texte."
           }
         },
@@ -7430,8 +7430,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Dspeech verarbeitet Audio ausschließlich lokal. Audio verlässt nie dein Gerät."
+            "state": "translated",
+            "value": "Dspeech verarbeitet Audio ausschließlich lokal. Audio verlässt nie Ihr Gerät."
           }
         },
         "en": {
@@ -7442,13 +7442,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Dspeech procesa el audio solo de forma local. El audio nunca sale de tu dispositivo."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Dspeech traite l'audio uniquement en local. L'audio ne quitte jamais votre appareil."
           }
         },
@@ -7501,8 +7501,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Stimmfilter aktivieren"
+            "state": "translated",
+            "value": "Sprachfilter aktivieren"
           }
         },
         "en": {
@@ -7513,14 +7513,14 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Activar filtro de voz"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Activer le filtre de voix"
+            "state": "translated",
+            "value": "Activer le filtre vocal"
           }
         },
         "it": {
@@ -7572,7 +7572,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Externer Eingang"
           }
         },
@@ -7584,13 +7584,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Entrada externa"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Entrée externe"
           }
         },
@@ -7643,7 +7643,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Externe Quelle verloren — Wechsel zu %@. Aufnahme pausiert."
           }
         },
@@ -7655,13 +7655,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Se perdió la fuente externa: cambiando a %@. Grabación en pausa."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Source externe perdue — passage à %@. Enregistrement en pause."
           }
         },
@@ -7995,7 +7995,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Los geht's"
           }
         },
@@ -8007,13 +8007,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Empezar"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Commencer"
           }
         },
@@ -8066,8 +8066,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Piloten-Funksprüche und irrelevante ATC-Anrufe ausblenden."
+            "state": "translated",
+            "value": "Piloten-Funksprüche und irrelevante ATC-Meldungen ausblenden."
           }
         },
         "en": {
@@ -8078,13 +8078,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Oculta las transmisiones del piloto y las llamadas ATC irrelevantes."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Masquer les transmissions du pilote et les appels ATC non pertinents."
           }
         },
@@ -8137,7 +8137,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Eingang"
           }
         },
@@ -8149,13 +8149,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Entrada"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Entrée"
           }
         },
@@ -8208,7 +8208,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Modell wird installiert…"
           }
         },
@@ -8220,13 +8220,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Instalando modelo…"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Installation du modèle…"
           }
         },
@@ -8279,8 +8279,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Stimmfilter-Modell wird installiert…"
+            "state": "translated",
+            "value": "Sprachfilter-Modell wird installiert…"
           }
         },
         "en": {
@@ -8291,14 +8291,14 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Instalando el modelo del filtro de voz…"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Installation du modèle du filtre de voix…"
+            "state": "translated",
+            "value": "Installation du modèle du filtre vocal…"
           }
         },
         "it": {
@@ -8420,7 +8420,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "LIVE"
           }
         },
@@ -8432,13 +8432,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "EN VIVO"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "DIRECT"
           }
         },
@@ -8491,7 +8491,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "LOKAL"
           }
         },
@@ -8503,13 +8503,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "LOCAL"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "LOCAL"
           }
         },
@@ -8562,7 +8562,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Pegel"
           }
         },
@@ -8574,13 +8574,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Nivel"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Niveau"
           }
         },
@@ -8633,8 +8633,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Hört zu -- buchstabiere das Rufzeichen (zum Beispiel: \"november one two three alpha bravo\")."
+            "state": "translated",
+            "value": "Höre zu -- buchstabieren Sie das Rufzeichen (zum Beispiel: „november one two three alpha bravo“)."
           }
         },
         "en": {
@@ -8645,13 +8645,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Escuchando -- deletree el indicativo (por ejemplo: \"november one two three alpha bravo\")."
+            "state": "translated",
+            "value": "Escuchando -- deletrea el indicativo (por ejemplo: «november one two three alpha bravo»)."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Écoute -- épelez l’indicatif (par exemple : \"november one two three alpha bravo\")."
           }
         },
@@ -8774,8 +8774,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Höre zu — buchstabiere das Rufzeichen (zum Beispiel: „november one two three alpha bravo“)."
+            "state": "translated",
+            "value": "Höre zu — buchstabieren Sie das Rufzeichen (zum Beispiel: „november one two three alpha bravo“)."
           }
         },
         "en": {
@@ -8786,13 +8786,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Escuchando: deletrea el indicativo (por ejemplo: «november one two three alpha bravo»)."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Écoute — épelez l'indicatif (par exemple : « november one two three alpha bravo »)."
           }
         },
@@ -8845,7 +8845,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Höre zu…"
           }
         },
@@ -8857,13 +8857,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Escuchando…"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Écoute en cours…"
           }
         },
@@ -8916,7 +8916,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Lokal"
           }
         },
@@ -8928,13 +8928,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Local"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Local"
           }
         },
@@ -8987,7 +8987,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Standardmäßig lokal"
           }
         },
@@ -8999,13 +8999,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Local por defecto"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Local par défaut"
           }
         },
@@ -9058,7 +9058,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Lokale Einstellungen sind beschädigt"
           }
         },
@@ -9070,13 +9070,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Los ajustes locales están dañados"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Les réglages locaux sont corrompus"
           }
         },
@@ -9199,7 +9199,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Modus"
           }
         },
@@ -9211,13 +9211,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Modo"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Mode"
           }
         },
@@ -9270,7 +9270,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Modell installiert und verifiziert"
           }
         },
@@ -9282,13 +9282,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Modelo instalado y verificado"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Modèle installé et vérifié"
           }
         },
@@ -9341,7 +9341,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Modell nicht installiert"
           }
         },
@@ -9353,13 +9353,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Modelo no instalado"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Modèle non installé"
           }
         },
@@ -9412,7 +9412,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Verifizierung des Modellpakets fehlgeschlagen."
           }
         },
@@ -9424,13 +9424,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "La verificación del paquete del modelo falló."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Échec de la vérification du pack du modèle."
           }
         },
@@ -9483,7 +9483,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Modellzustand beschädigt"
           }
         },
@@ -9495,13 +9495,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Estado del modelo dañado"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "État du modèle corrompu"
           }
         },
@@ -9624,7 +9624,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "N123AB, descend and maintain three thousand, expect ILS approach runway two seven."
           }
         },
@@ -9636,13 +9636,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "N123AB, descienda y mantenga tres mil, espere aproximación ILS pista dos siete."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "N123AB, descendez et maintenez trois mille, prévoyez approche ILS piste deux sept."
           }
         },
@@ -9695,7 +9695,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Weiter"
           }
         },
@@ -9707,13 +9707,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Siguiente"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Suivant"
           }
         },
@@ -9766,8 +9766,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Keine Aufnahmequelle — schließe einen Eingang an und versuche es erneut."
+            "state": "translated",
+            "value": "Keine Aufnahmequelle — schließen Sie einen Eingang an und versuchen Sie es erneut."
           }
         },
         "en": {
@@ -9778,13 +9778,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "No hay fuente de captura: conecta una entrada e inténtalo de nuevo."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Aucune source de capture — branchez une entrée et réessayez."
           }
         },
@@ -10049,7 +10049,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Kein Eingang"
           }
         },
@@ -10061,13 +10061,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Sin entrada"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Aucune entrée"
           }
         },
@@ -10120,8 +10120,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Keine Eingangsquelle erkannt. Schließe einen kabelgebundenen Eingang an (USB-C / TRRS) oder nutze das integrierte Mikrofon."
+            "state": "translated",
+            "value": "Keine Eingangsquelle erkannt. Schließen Sie einen kabelgebundenen Eingang an (USB-C / TRRS) oder nutzen Sie das integrierte Mikrofon."
           }
         },
         "en": {
@@ -10132,13 +10132,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "No se detectó ninguna fuente de entrada. Conecta una entrada con cable (USB-C / TRRS) o usa el micrófono integrado."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Aucune source d'entrée détectée. Branchez une entrée filaire (USB-C / TRRS) ou utilisez le microphone intégré."
           }
         },
@@ -10191,8 +10191,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Kein Mikrofonzugriff. Erlaube ihn in den Einstellungen."
+            "state": "translated",
+            "value": "Kein Mikrofonzugriff. Erlauben Sie ihn in den Einstellungen."
           }
         },
         "en": {
@@ -10203,13 +10203,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Sin acceso al micrófono. Permítelo en Ajustes."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Aucun accès au microphone. Autorisez-le dans les Réglages."
           }
         },
@@ -10262,8 +10262,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Kein Mikrofonzugriff. Erlaube ihn in den Geräteeinstellungen."
+            "state": "translated",
+            "value": "Kein Mikrofonzugriff. Erlauben Sie ihn in den Geräteeinstellungen."
           }
         },
         "en": {
@@ -10274,13 +10274,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Sin acceso al micrófono. Permítelo en Ajustes del dispositivo."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Aucun accès au microphone. Autorisez-le dans les réglages de l'appareil."
           }
         },
@@ -10333,8 +10333,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Keine On-Device-Erkennungssprache verfügbar. Öffne die Erkennungseinstellungen und prüfe deine Diktiersprachen."
+            "state": "translated",
+            "value": "Keine On-Device-Erkennungssprache verfügbar. Öffnen Sie die Erkennungseinstellungen und prüfen Sie Ihre Diktiersprachen."
           }
         },
         "en": {
@@ -10345,13 +10345,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "No hay ningún idioma de reconocimiento disponible en el dispositivo. Abre los ajustes de reconocimiento y comprueba tus idiomas de dictado."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Aucune langue de reconnaissance disponible sur l'appareil. Ouvrez les réglages de reconnaissance et vérifiez vos langues de dictée."
           }
         },
@@ -10404,7 +10404,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Keine On-Device-Erkennungssprachen verfügbar."
           }
         },
@@ -10416,13 +10416,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "No hay idiomas de reconocimiento disponibles en el dispositivo."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Aucune langue de reconnaissance disponible sur l'appareil."
           }
         },
@@ -10475,8 +10475,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Für diese Sprache ist kein On-Device-Erkennungsmodell verfügbar. Lade das zugehörige Sprachpaket oder führe es auf dem Gerät aus."
+            "state": "translated",
+            "value": "Für diese Sprache ist kein On-Device-Erkennungsmodell verfügbar. Laden Sie das zugehörige Sprachpaket oder führen Sie es auf dem Gerät aus."
           }
         },
         "en": {
@@ -10487,13 +10487,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "No hay ningún modelo de reconocimiento en el dispositivo disponible para este idioma. Descarga su paquete de idioma o ejecútalo en el dispositivo."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Aucun modèle de reconnaissance sur l'appareil disponible pour cette langue. Téléchargez son pack linguistique ou exécutez-le sur l'appareil."
           }
         },
@@ -10546,7 +10546,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Keine Erkennungssprache verfügbar"
           }
         },
@@ -10558,13 +10558,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "No hay ningún idioma de reconocimiento disponible"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Aucune langue de reconnaissance disponible"
           }
         },
@@ -10757,8 +10757,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Kein Zugriff auf Spracherkennung. Erlaube ihn in den Einstellungen."
+            "state": "translated",
+            "value": "Kein Zugriff auf Spracherkennung. Erlauben Sie ihn in den Einstellungen."
           }
         },
         "en": {
@@ -10769,13 +10769,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Sin acceso al reconocimiento de voz. Permítelo en Ajustes."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Aucun accès à la reconnaissance vocale. Autorisez-le dans les Réglages."
           }
         },
@@ -10828,8 +10828,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Kein Zugriff auf Spracherkennung. Erlaube ihn in den Geräteeinstellungen."
+            "state": "translated",
+            "value": "Kein Zugriff auf Spracherkennung. Erlauben Sie ihn in den Geräteeinstellungen."
           }
         },
         "en": {
@@ -10840,13 +10840,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Sin acceso al reconocimiento de voz. Permítelo en Ajustes del dispositivo."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Aucun accès à la reconnaissance vocale. Autorisez-le dans les réglages de l'appareil."
           }
         },
@@ -10899,8 +10899,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Keine Sprache erkannt — sprich näher am Mikrofon."
+            "state": "translated",
+            "value": "Keine Sprache erkannt — sprechen Sie näher am Mikrofon."
           }
         },
         "en": {
@@ -10911,13 +10911,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "No se reconoció voz: habla más cerca del micrófono."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Aucune parole reconnue — rapprochez-vous du microphone."
           }
         },
@@ -10970,7 +10970,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Keine geeignete Aufnahmequelle."
           }
         },
@@ -10982,13 +10982,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "No hay ninguna fuente de captura adecuada."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Aucune source de capture adaptée."
           }
         },
@@ -11265,7 +11265,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "No hay suficiente voz. Hable con claridad durante al menos %@ segundos e inténtelo de nuevo."
+            "value": "No hay suficiente voz. Habla con claridad durante al menos %@ segundos e inténtalo de nuevo."
           }
         },
         "fr": {
@@ -11323,7 +11323,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Nichts zu übersetzen: Das Segment ist leer."
           }
         },
@@ -11335,13 +11335,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Nada que traducir: el segmento está vacío."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Rien à traduire : le segment est vide."
           }
         },
@@ -11394,7 +11394,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Die Offline-Erkennung für %@ ist nicht installiert. Die Spracheingabe des Rufzeichens erfordert ein lokales Modell."
           }
         },
@@ -11406,13 +11406,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "El reconocimiento sin conexión para %@ no está instalado. La entrada por voz del indicativo requiere un modelo local."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "La reconnaissance hors ligne pour %@ n’est pas installée. La saisie vocale de l’indicatif nécessite un modèle local."
           }
         },
@@ -11465,7 +11465,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Verarbeitung auf dem Gerät"
           }
         },
@@ -11477,13 +11477,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Procesamiento en el dispositivo"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Traitement sur l'appareil"
           }
         },
@@ -11536,7 +11536,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "On-Device-Übersetzung"
           }
         },
@@ -11548,13 +11548,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Traducción en el dispositivo"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Traduction sur l'appareil"
           }
         },
@@ -11607,8 +11607,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Die Einrichtung der On-Device-Übersetzung wurde abgebrochen. Aktiviere die Übersetzung erneut, falls du sie brauchst."
+            "state": "translated",
+            "value": "Die Einrichtung der On-Device-Übersetzung wurde abgebrochen. Aktivieren Sie die Übersetzung erneut, falls Sie sie benötigen."
           }
         },
         "en": {
@@ -11619,13 +11619,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Se canceló la configuración de la traducción en el dispositivo. Vuelve a activar la traducción si la necesitas."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "La configuration de la traduction sur l'appareil a été annulée. Réactivez la traduction si vous en avez besoin."
           }
         },
@@ -11678,7 +11678,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Geräteeinstellungen öffnen"
           }
         },
@@ -11690,13 +11690,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Abrir Ajustes del dispositivo"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Ouvrir les réglages de l'appareil"
           }
         },
@@ -11889,7 +11889,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Nur Ausgang — kein Eingang"
           }
         },
@@ -11901,13 +11901,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Solo salida: sin entrada"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Sortie seule — aucune entrée"
           }
         },
@@ -12030,7 +12030,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Paket installiert, Filter aus"
           }
         },
@@ -12042,13 +12042,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Paquete instalado, filtro desactivado"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Pack installé, filtre désactivé"
           }
         },
@@ -12101,7 +12101,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Paket „%@“ · %lld-dimensionale Embeddings · %@. Die Erkennung läuft offline."
           }
         },
@@ -12113,13 +12113,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Paquete «%@» · incrustaciones de %lld dimensiones · %@. El reconocimiento se ejecuta sin conexión."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Pack « %@ » · embeddings à %lld dimensions · %@. La reconnaissance s’exécute hors ligne."
           }
         },
@@ -12313,7 +12313,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Pilot 1"
           }
         },
@@ -12325,13 +12325,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Piloto 1"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Pilote 1"
           }
         },
@@ -12384,7 +12384,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Pilot 1 (Kapitän)"
           }
         },
@@ -12396,13 +12396,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Piloto 1 (capitán)"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Pilote 1 (commandant)"
           }
         },
@@ -12455,7 +12455,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Pilot 2"
           }
         },
@@ -12467,13 +12467,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Piloto 2"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Pilote 2"
           }
         },
@@ -12526,7 +12526,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Pilot 2 (Erster Offizier)"
           }
         },
@@ -12538,13 +12538,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Piloto 2 (primer oficial)"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Pilote 2 (copilote)"
           }
         },
@@ -12597,7 +12597,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Piloten-Slot nicht verfügbar"
           }
         },
@@ -12609,13 +12609,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Espacio de piloto no disponible"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Emplacement pilote indisponible"
           }
         },
@@ -12668,7 +12668,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Pilotenstimmen-Klassifizierung"
           }
         },
@@ -12680,13 +12680,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Clasificación de voz del piloto"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Classification de la voix pilote"
           }
         },
@@ -12739,7 +12739,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Pre-ASR-Filter ist aus; alle Audiopuffer werden an die Erkennung weitergegeben."
           }
         },
@@ -12751,13 +12751,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "El filtro previo al ASR está desactivado; todos los búferes de audio pasan al reconocimiento."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Le filtre pré-ASR est désactivé ; tous les tampons audio sont transmis à la reconnaissance."
           }
         },
@@ -12810,7 +12810,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Datenschutz"
           }
         },
@@ -12822,13 +12822,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Privacidad"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Confidentialité"
           }
         },
@@ -12881,7 +12881,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Nur Empfang"
           }
         },
@@ -12893,13 +12893,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Solo recepción"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Réception seule"
           }
         },
@@ -12952,7 +12952,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Erkennung"
           }
         },
@@ -12964,13 +12964,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Reconocimiento"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Reconnaissance"
           }
         },
@@ -13023,7 +13023,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Erkennungssprache"
           }
         },
@@ -13035,13 +13035,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Idioma de reconocimiento"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Langue de reconnaissance"
           }
         },
@@ -13094,8 +13094,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Nimm eine Stimmprobe für die Erkennung auf."
+            "state": "translated",
+            "value": "Nehmen Sie eine Stimmprobe für die Erkennung auf."
           }
         },
         "en": {
@@ -13106,13 +13106,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Graba una muestra de voz para el reconocimiento."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Enregistrez un échantillon vocal pour la reconnaissance."
           }
         },
@@ -13165,7 +13165,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Stimme aufnehmen"
           }
         },
@@ -13177,13 +13177,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Grabar voz"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Enregistrer la voix"
           }
         },
@@ -13236,8 +13236,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Aufnahme -- sprich einige Sekunden und tippe dann auf Stopp."
+            "state": "translated",
+            "value": "Aufnahme -- sprechen Sie einige Sekunden und tippen Sie dann auf Stopp."
           }
         },
         "en": {
@@ -13248,13 +13248,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Grabando -- hable unos segundos y toque Detener."
+            "state": "translated",
+            "value": "Grabando -- habla durante unos segundos y luego toca Detener."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Enregistrement -- parlez quelques secondes, puis touchez Arrêter."
           }
         },
@@ -13307,7 +13307,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Aufnahme ist verfügbar, sobald der Erkenner verbunden ist."
           }
         },
@@ -13319,13 +13319,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "La grabación estará disponible una vez que el reconocedor esté conectado."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "L'enregistrement sera disponible une fois le moteur de reconnaissance connecté."
           }
         },
@@ -13378,8 +13378,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Aufnahme fehlgeschlagen -- versuche es erneut."
+            "state": "translated",
+            "value": "Aufnahme fehlgeschlagen -- versuchen Sie es erneut."
           }
         },
         "en": {
@@ -13390,13 +13390,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "La grabación falló -- inténtelo de nuevo."
+            "state": "translated",
+            "value": "La grabación falló -- inténtalo de nuevo."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "L'enregistrement a échoué -- réessayez."
           }
         },
@@ -13449,8 +13449,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Aufnahme fehlgeschlagen — versuche es erneut."
+            "state": "translated",
+            "value": "Aufnahme fehlgeschlagen — versuchen Sie es erneut."
           }
         },
         "en": {
@@ -13461,13 +13461,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "La grabación falló: inténtalo de nuevo."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Échec de l'enregistrement — réessayez."
           }
         },
@@ -13520,8 +13520,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Aufnahme — sprich einige Sekunden, dann auf Stopp tippen."
+            "state": "translated",
+            "value": "Aufnahme — sprechen Sie einige Sekunden und tippen Sie dann auf Stopp."
           }
         },
         "en": {
@@ -13532,13 +13532,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Grabando: habla durante unos segundos y luego pulsa Detener."
+            "state": "translated",
+            "value": "Grabando: habla durante unos segundos y luego toca Detener."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Enregistrement — parlez quelques secondes, puis appuyez sur Arrêter."
           }
         },
@@ -13661,7 +13661,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Zugriff auf Mikrofon und Spracherkennung wird angefordert…"
           }
         },
@@ -13673,13 +13673,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Solicitando acceso al micrófono y al reconocimiento de voz…"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Demande d'accès au microphone et à la reconnaissance vocale…"
           }
         },
@@ -13732,7 +13732,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Beschädigte Daten zurücksetzen"
           }
         },
@@ -13744,13 +13744,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Restablecer datos dañados"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Réinitialiser les données corrompues"
           }
         },
@@ -13803,8 +13803,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Starte die App neu, um die Sprache zu ändern."
+            "state": "translated",
+            "value": "Starten Sie die App neu, um die Sprache zu ändern."
           }
         },
         "en": {
@@ -13815,13 +13815,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Reinicia la app para cambiar el idioma."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Redémarrez l'app pour changer de langue."
           }
         },
@@ -13874,7 +13874,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Download wiederholen"
           }
         },
@@ -13886,13 +13886,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Reintentar descarga"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Réessayer le téléchargement"
           }
         },
@@ -14015,7 +14015,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Segmente ohne Rufzeichen-Treffer werden ausgeblendet, solange das Fortsetzungsfenster aktiv ist."
           }
         },
@@ -14027,13 +14027,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Los segmentos que no coincidan con ningún indicativo se ocultarán mientras la ventana de continuación esté activa."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Les segments sans correspondance d'indicatif seront masqués tant que la fenêtre de continuité est active."
           }
         },
@@ -14226,7 +14226,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Rufzeichen per Stimme festlegen"
           }
         },
@@ -14238,13 +14238,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Definir indicativo por voz"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Définir l'indicatif à la voix"
           }
         },
@@ -14297,7 +14297,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Einstellungen"
           }
         },
@@ -14309,13 +14309,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Ajustes"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Réglages"
           }
         },
@@ -14368,7 +14368,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Einstellungen sind hier"
           }
         },
@@ -14380,13 +14380,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Los ajustes están aquí"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Les réglages sont ici"
           }
         },
@@ -14579,8 +14579,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Einige lokale Stimmfilter-Einstellungen sind beschädigt. Setze die beschädigten Daten zurück, um sicher fortzufahren."
+            "state": "translated",
+            "value": "Einige lokale Sprachfilter-Einstellungen sind beschädigt. Setzen Sie die beschädigten Daten zurück, um sicher fortzufahren."
           }
         },
         "en": {
@@ -14591,14 +14591,14 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Algunos ajustes locales del filtro de voz están dañados. Restablece los datos dañados para continuar de forma segura."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Certains réglages locaux du filtre de voix sont corrompus. Réinitialisez les données corrompues pour continuer en toute sécurité."
+            "state": "translated",
+            "value": "Certains réglages locaux du filtre vocal sont corrompus. Réinitialisez les données corrompues pour continuer en toute sécurité."
           }
         },
         "it": {
@@ -14650,7 +14650,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Die Sprecherklassifizierung ist aus; alle Audiopuffer gehen zur Erkennung. Die Rufzeichenfilterung kann weiterhin irrelevanten ATC ausblenden."
           }
         },
@@ -14662,13 +14662,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "La clasificación de voz está desactivada; todo el audio pasa al reconocimiento. El filtro de indicativo aún puede ocultar ATC no relevante."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "La classification vocale est désactivée ; tout l'audio passe à la reconnaissance. Le filtre d'indicatif peut encore masquer l'ATC non pertinent."
           }
         },
@@ -14721,8 +14721,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Fehler bei der Spracherkennung. Versuche es erneut."
+            "state": "translated",
+            "value": "Fehler bei der Spracherkennung. Versuchen Sie es erneut."
           }
         },
         "en": {
@@ -14733,13 +14733,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Error de reconocimiento de voz. Inténtalo de nuevo."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Erreur de reconnaissance vocale. Réessayez."
           }
         },
@@ -14792,7 +14792,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Spracherkennung ist auf diesem Gerät nicht verfügbar."
           }
         },
@@ -14804,13 +14804,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "El reconocimiento de voz no está disponible en este dispositivo."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "La reconnaissance vocale n'est pas disponible sur cet appareil."
           }
         },
@@ -14863,7 +14863,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Speedbird 42, contact tower on one one eight decimal seven."
           }
         },
@@ -14875,13 +14875,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Speedbird 42, contacte torre en uno uno ocho decimal siete."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Speedbird 42, contactez la tour sur cent dix-huit décimale sept."
           }
         },
@@ -14934,7 +14934,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Start"
           }
         },
@@ -14946,13 +14946,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Iniciar"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Démarrer"
           }
         },
@@ -15005,7 +15005,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Stopp"
           }
         },
@@ -15017,13 +15017,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Detener"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Arrêter"
           }
         },
@@ -15076,7 +15076,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Test stoppen"
           }
         },
@@ -15088,13 +15088,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Detener prueba"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Arrêter le test"
           }
         },
@@ -15147,7 +15147,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Spracheingabe stoppen"
           }
         },
@@ -15159,13 +15159,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Detener entrada de voz"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Arrêter l'entrée vocale"
           }
         },
@@ -15218,7 +15218,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "System"
           }
         },
@@ -15230,13 +15230,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Sistema"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Système"
           }
         },
@@ -15289,8 +15289,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Systemübersetzung fehlgeschlagen. Versuche es erneut."
+            "state": "translated",
+            "value": "Systemübersetzung fehlgeschlagen. Versuchen Sie es erneut."
           }
         },
         "en": {
@@ -15301,13 +15301,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "La traducción del sistema falló. Inténtalo de nuevo."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Échec de la traduction système. Réessayez."
           }
         },
@@ -15360,8 +15360,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Auf Start tippen und sprechen — das Transkript erscheint hier.\nVerarbeitung lokal; Audio verlässt nie dein Gerät."
+            "state": "translated",
+            "value": "Auf Start tippen und sprechen — das Transkript erscheint hier.\nVerarbeitung lokal; Audio verlässt nie Ihr Gerät."
           }
         },
         "en": {
@@ -15372,13 +15372,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Pulsa Iniciar y habla; la transcripción aparecerá aquí.\nProcesado localmente; el audio nunca sale de tu dispositivo."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Appuyez sur Démarrer et parlez — la transcription apparaîtra ici.\nTraitement local ; l'audio ne quitte jamais votre appareil."
           }
         },
@@ -15431,7 +15431,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Tippen, um Erkennung zu starten"
           }
         },
@@ -15443,13 +15443,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Pulsa para iniciar el reconocimiento"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Appuyez pour lancer la reconnaissance"
           }
         },
@@ -15502,7 +15502,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Zielsprache"
           }
         },
@@ -15514,13 +15514,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Idioma de destino"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Langue cible"
           }
         },
@@ -15573,7 +15573,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Eingangspegel testen"
           }
         },
@@ -15585,13 +15585,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Probar nivel de entrada"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Tester le niveau d'entrée"
           }
         },
@@ -15644,7 +15644,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Das FluidAudio-Modell (%@) wird auf diese Anforderung einmalig geladen. Nur die Modelldownload-Anforderung verlässt das Gerät -- Audio, Transkripte und Stimmproben werden nicht übertragen."
           }
         },
@@ -15656,13 +15656,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "El modelo FluidAudio (%@) se descarga una vez con esta solicitud. Solo sale del dispositivo la solicitud de descarga del modelo -- no se transmiten audio, transcripciones ni muestras de voz."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Le modèle FluidAudio (%@) se télécharge une seule fois à cette demande. Seule la demande de téléchargement du modèle quitte l'appareil -- l'audio, les transcriptions et les échantillons vocaux ne sont pas transmis."
           }
         },
@@ -15715,8 +15715,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "%@ wird nur auf Anfrage geladen. Audio, Transkripte und Stimmproben werden nicht übertragen."
+            "state": "translated",
+            "value": "Das FluidAudio-Modell (%@) wird auf diese Anforderung einmalig geladen. Nur die Modelldownload-Anforderung verlässt das Gerät — Audio, Transkripte und Stimmproben werden nicht übertragen."
           }
         },
         "en": {
@@ -15727,13 +15727,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "El modelo FluidAudio (%@) se descarga una sola vez con esta solicitud. Del dispositivo solo sale la solicitud de descarga del modelo: el audio, las transcripciones y las muestras de voz no se transmiten."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Le modèle FluidAudio (%@) est téléchargé une seule fois à cette demande. Seule la requête de téléchargement du modèle quitte l’appareil — l’audio, les transcriptions et les échantillons vocaux ne sont pas transmis."
           }
         },
@@ -15786,8 +15786,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Die Audiositzung ist wieder verfügbar. Prüfe den Eingang, bevor du erneut startest."
+            "state": "translated",
+            "value": "Die Audiositzung ist wieder verfügbar. Prüfen Sie den Eingang, bevor Sie erneut starten."
           }
         },
         "en": {
@@ -15798,13 +15798,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "La sesión de audio vuelve a estar disponible. Comprueba la entrada antes de empezar de nuevo."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "La session audio est de nouveau disponible. Vérifiez l'entrée avant de recommencer."
           }
         },
@@ -15857,8 +15857,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Die Audiositzung ist wieder verfügbar. Starte die Aufnahme neu, nachdem du den Eingang geprüft hast."
+            "state": "translated",
+            "value": "Die Audiositzung ist wieder verfügbar. Starten Sie die Aufnahme neu, nachdem Sie den Eingang geprüft haben."
           }
         },
         "en": {
@@ -15869,13 +15869,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "La sesión de audio vuelve a estar disponible. Reinicia la captura tras comprobar la entrada."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "La session audio est de nouveau disponible. Relancez la capture après avoir vérifié l'entrée."
           }
         },
@@ -16069,8 +16069,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Der iOS-Audiodienst wurde neu gestartet. Aufnahme pausiert — prüfe den Eingang und starte erneut."
+            "state": "translated",
+            "value": "Der iOS-Audiodienst wurde neu gestartet. Aufnahme pausiert — prüfen Sie den Eingang und starten Sie erneut."
           }
         },
         "en": {
@@ -16081,13 +16081,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "El servicio de audio de iOS se reinició. Grabación en pausa: comprueba la entrada y empieza de nuevo."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Le service audio d'iOS a redémarré. Enregistrement en pause — vérifiez l'entrée et recommencez."
           }
         },
@@ -16140,7 +16140,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Das installierte Paket enthält keinen lokalen Modellpfad."
           }
         },
@@ -16152,13 +16152,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "El paquete instalado no contiene ninguna ruta de modelo local."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Le pack installé ne contient aucun chemin vers un modèle local."
           }
         },
@@ -16211,7 +16211,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Die Sprache „%@“ wurde noch nicht für die Erkennung auf dem Gerät heruntergeladen."
           }
         },
@@ -16223,13 +16223,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "El idioma «%@» aún no se ha descargado para el reconocimiento en el dispositivo."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "La langue « %@ » n’a pas encore été téléchargée pour la reconnaissance sur l’appareil."
           }
         },
@@ -16282,7 +16282,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Die lokalen FluidAudio-Modelldateien fehlen im installierten Paket."
           }
         },
@@ -16294,13 +16294,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Faltan los archivos del modelo local de FluidAudio en el paquete instalado."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Les fichiers du modèle FluidAudio local sont absents du pack installé."
           }
         },
@@ -16353,7 +16353,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Der lokale Erkenner meldete nach der Paketinstallation, dass er nicht verfügbar ist."
           }
         },
@@ -16365,13 +16365,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "El reconocedor local indicó que no estaba disponible tras instalar el paquete."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Le moteur de reconnaissance local s'est signalé indisponible après l'installation du pack."
           }
         },
@@ -16424,7 +16424,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Das Mikrofon ist nicht verfügbar."
           }
         },
@@ -16436,13 +16436,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "El micrófono no está disponible."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Le microphone est indisponible."
           }
         },
@@ -16495,7 +16495,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Das Modell ist installiert, aber der lokale Erkenner ist in diesem Build nicht verfügbar."
           }
         },
@@ -16507,13 +16507,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "El modelo está instalado, pero el reconocedor local no está disponible en esta versión."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Le modèle est installé, mais le moteur de reconnaissance local n'est pas disponible dans cette version."
           }
         },
@@ -16578,7 +16578,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "El paquete del modelo cambió en origen y ya no coincide con el manifiesto de integridad fijado de Dspeech. Continúe sin el filtro de voz hasta que la app actualice el manifiesto del modelo."
+            "value": "El paquete del modelo cambió en origen y ya no coincide con el manifiesto de integridad fijado de Dspeech. Continúa sin el filtro de voz hasta que la app actualice el manifiesto del modelo."
           }
         },
         "fr": {
@@ -16706,8 +16706,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Das Modellpaket hat seine Prüfsumme oder Integritätsprüfung nicht bestanden. Wiederhole den Download, um eine verifizierte Kopie zu erhalten."
+            "state": "translated",
+            "value": "Das Modellpaket hat seine Prüfsumme oder Integritätsprüfung nicht bestanden. Wiederholen Sie den Download, um eine verifizierte Kopie zu erhalten."
           }
         },
         "en": {
@@ -16718,13 +16718,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "El paquete del modelo no superó su comprobación de suma de verificación o integridad. Reintenta la descarga para obtener una copia verificada."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Le pack du modèle a échoué à sa vérification de somme de contrôle ou d'intégrité. Relancez le téléchargement pour obtenir une copie vérifiée."
           }
         },
@@ -16777,7 +16777,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Das Modell „%@“ bleibt auf dem Gerät. Aktivieren Sie den Filter oben oder löschen Sie das Paket, um Speicherplatz freizugeben."
           }
         },
@@ -16789,13 +16789,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "El modelo «%@» permanece en el dispositivo. Activa el filtro de arriba o elimina el paquete para liberar espacio."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Le modèle « %@ » reste sur l’appareil. Activez le filtre ci-dessus ou supprimez le pack pour libérer de l’espace."
           }
         },
@@ -16848,7 +16848,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Das On-Device-Stimmerkennungsmodell ist in diesem Build nicht installiert (siehe ADR 0007)."
           }
         },
@@ -16860,13 +16860,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "El modelo de reconocimiento de voz en el dispositivo no está instalado en esta versión (consulta ADR 0007)."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Le modèle de reconnaissance vocale sur l'appareil n'est pas installé dans cette version (voir ADR 0007)."
           }
         },
@@ -16919,7 +16919,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Das Paket ist installiert, aber der lokale Erkenner ist in diesem Build nicht verbunden, daher ist die Sprachaufnahme deaktiviert."
           }
         },
@@ -16931,13 +16931,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "El paquete está instalado, pero el reconocedor local no está conectado en esta versión, por lo que la grabación de voz está desactivada."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Le pack est installé, mais le moteur de reconnaissance local n'est pas connecté dans cette version ; l'enregistrement vocal est donc désactivé."
           }
         },
@@ -16990,8 +16990,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Der Piloten-Stimmfilter funktioniert erst, nachdem das lokale Modellpaket installiert ist. Der Download erfolgt einmalig, explizit und auf deine Anfrage; Audio verlässt nie dein Gerät."
+            "state": "translated",
+            "value": "Der Piloten-Sprachfilter funktioniert erst, nachdem das lokale Modellpaket installiert ist. Der Download erfolgt einmalig, explizit und auf Ihre Anfrage; Audio verlässt nie Ihr Gerät."
           }
         },
         "en": {
@@ -17002,14 +17002,14 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "El filtro de voz del piloto funciona solo después de instalar el paquete del modelo local. La descarga es única, explícita y a petición tuya; el audio nunca sale de tu dispositivo."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Le filtre de voix du pilote ne fonctionne qu'après l'installation du pack du modèle local. Le téléchargement est unique, explicite et à votre demande ; l'audio ne quitte jamais votre appareil."
+            "state": "translated",
+            "value": "Le filtre vocal du pilote ne fonctionne qu'après l'installation du pack du modèle local. Le téléchargement est unique, explicite et à votre demande ; l'audio ne quitte jamais votre appareil."
           }
         },
         "it": {
@@ -17061,7 +17061,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Der Pre-ASR-Filter kann nur Sprache ausblenden, die sicher als die des Piloten erkannt wurde."
           }
         },
@@ -17073,13 +17073,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "El filtro previo al ASR solo puede ocultar voz reconocida con seguridad como la del piloto."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Le filtre pré-ASR ne peut masquer que la parole reconnue avec certitude comme étant celle du pilote."
           }
         },
@@ -17132,8 +17132,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Das Erkennungs-Sprachpaket ist nicht geladen. Aktiviere die Diktierfunktion und lade die Sprache unter Einstellungen → Allgemein → Tastatur → Diktieren."
+            "state": "translated",
+            "value": "Das Erkennungs-Sprachpaket ist nicht geladen. Aktivieren Sie das Diktat und laden Sie die Sprache unter Einstellungen → Allgemein → Tastatur → Diktieren."
           }
         },
         "en": {
@@ -17144,13 +17144,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "El paquete de idioma de reconocimiento no está descargado. Activa el Dictado y descarga el idioma en Ajustes → General → Teclado → Dictado."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Le pack de langue de reconnaissance n'est pas téléchargé. Activez la Dictée et téléchargez la langue dans Réglages → Général → Clavier → Dictée."
           }
         },
@@ -17203,7 +17203,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Die Embedding-Dimension des Erkenners (%lld) stimmt nicht mit dem Paket (%lld) überein."
           }
         },
@@ -17215,13 +17215,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "La dimensión de incrustación del reconocedor (%lld) no coincide con la del paquete (%lld)."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "La dimension des embeddings du moteur de reconnaissance (%lld) ne correspond pas à celle du pack (%lld)."
           }
         },
@@ -17274,8 +17274,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Das gespeicherte Rufzeichen ist beschädigt. Setze es zurück und lege das Rufzeichen erneut fest."
+            "state": "translated",
+            "value": "Das gespeicherte Rufzeichen ist beschädigt. Setzen Sie es zurück und legen Sie das Rufzeichen erneut fest."
           }
         },
         "en": {
@@ -17286,13 +17286,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "El indicativo guardado está dañado. Restablécelo y vuelve a definir el indicativo."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "L'indicatif enregistré est corrompu. Réinitialisez-le et redéfinissez l'indicatif."
           }
         },
@@ -17345,8 +17345,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Der gespeicherte Zustand des Stimmmodell-Pakets ist beschädigt. Fahre ohne Stimmfilter fort und lade das Paket bei Bedarf erneut."
+            "state": "translated",
+            "value": "Der gespeicherte Zustand des Sprachfilter-Modellpakets ist beschädigt. Fahren Sie ohne Sprachfilter fort und laden Sie das Paket bei Bedarf erneut herunter."
           }
         },
         "en": {
@@ -17357,14 +17357,14 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "El estado guardado del paquete del modelo de voz está dañado. Continúa sin el filtro de voz y vuelve a descargar el paquete si es necesario."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "L'état enregistré du pack du modèle vocal est corrompu. Continuez sans le filtre de voix et retéléchargez le pack si nécessaire."
+            "state": "translated",
+            "value": "L'état enregistré du pack du modèle vocal est corrompu. Continuez sans le filtre vocal et retéléchargez le pack si nécessaire."
           }
         },
         "it": {
@@ -17416,8 +17416,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Die gespeicherten Stimmproben sind beschädigt. Setze die beschädigten Daten zurück und nimm die Proben erneut auf."
+            "state": "translated",
+            "value": "Die gespeicherten Stimmproben sind beschädigt. Setzen Sie die beschädigten Daten zurück und nehmen Sie die Proben erneut auf."
           }
         },
         "en": {
@@ -17428,13 +17428,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Las muestras de voz guardadas están dañadas. Restablece los datos dañados y vuelve a grabar las muestras."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Les échantillons vocaux enregistrés sont corrompus. Réinitialisez les données corrompues et réenregistrez les échantillons."
           }
         },
@@ -17487,8 +17487,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Die Zielsprache wird für die On-Device-Übersetzung nicht unterstützt. Wähle eine andere Übersetzungssprache."
+            "state": "translated",
+            "value": "Die Zielsprache wird für die On-Device-Übersetzung nicht unterstützt. Wählen Sie eine andere Übersetzungssprache."
           }
         },
         "en": {
@@ -17499,13 +17499,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "El idioma de destino no es compatible con la traducción en el dispositivo. Elige otro idioma de traducción."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "La langue cible n'est pas prise en charge pour la traduction sur l'appareil. Choisissez une autre langue de traduction."
           }
         },
@@ -17558,8 +17558,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Das Übersetzungs-Sprachpaket ist nicht installiert. Schalte die Übersetzung aus und wieder ein — iOS bietet dann den Download an."
+            "state": "translated",
+            "value": "Das Übersetzungs-Sprachpaket ist nicht installiert. Schalten Sie die Übersetzung aus und wieder ein — iOS bietet dann den Download an."
           }
         },
         "en": {
@@ -17570,13 +17570,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "El paquete de idioma de traducción no está instalado. Desactiva y vuelve a activar la traducción: iOS te ofrecerá la descarga."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Le pack de langue de traduction n'est pas installé. Désactivez puis réactivez la traduction — iOS proposera le téléchargement."
           }
         },
@@ -17629,8 +17629,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Das Stimmfilter-Modell ist nicht installiert. Lade das Paket, um die Pilotenerkennung zu aktivieren."
+            "state": "translated",
+            "value": "Das Sprachfilter-Modell ist nicht installiert. Laden Sie das Paket, um die Pilotenerkennung zu aktivieren."
           }
         },
         "en": {
@@ -17641,14 +17641,14 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "El modelo del filtro de voz no está instalado. Descarga el paquete para activar el reconocimiento del piloto."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Le modèle du filtre de voix n'est pas installé. Téléchargez le pack pour activer la reconnaissance du pilote."
+            "state": "translated",
+            "value": "Le modèle du filtre vocal n'est pas installé. Téléchargez le pack pour activer la reconnaissance du pilote."
           }
         },
         "it": {
@@ -17700,8 +17700,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Dann: Allgemein -> Tastatur -> Diktier-Sprachen -- aktiviere Diktat und füge diese Sprache hinzu. Das Modell wird geladen, danach funktioniert die Erkennung offline."
+            "state": "translated",
+            "value": "Dann: Allgemein -> Tastatur -> Diktiersprachen -- aktivieren Sie das Diktat und fügen Sie diese Sprache hinzu. Das Modell wird geladen, danach funktioniert die Erkennung offline."
           }
         },
         "en": {
@@ -17712,13 +17712,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Luego: General -> Teclado -> Idiomas de dictado -- active Dictado y añada este idioma. El modelo se descarga y el reconocimiento funciona sin conexión."
+            "state": "translated",
+            "value": "Luego: General -> Teclado -> Idiomas de dictado -- activa el Dictado y añade este idioma. El modelo se descarga y el reconocimiento funciona sin conexión."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Ensuite : Général -> Clavier -> Langues de dictée -- activez Dictée et ajoutez cette langue. Le modèle se télécharge et la reconnaissance fonctionne hors ligne."
           }
         },
@@ -17771,8 +17771,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Dann: Allgemein → Tastatur → Diktiersprachen — Diktierfunktion aktivieren und diese Sprache hinzufügen. Das Modell wird geladen und die Erkennung funktioniert offline."
+            "state": "translated",
+            "value": "Dann: Allgemein → Tastatur → Diktiersprachen — aktivieren Sie das Diktat und fügen Sie diese Sprache hinzu. Das Modell wird geladen und die Erkennung funktioniert offline."
           }
         },
         "en": {
@@ -17783,13 +17783,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Luego: General → Teclado → Idiomas de dictado: activa el Dictado y añade este idioma. El modelo se descarga y el reconocimiento funciona sin conexión."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Puis : Général → Clavier → Langues de dictée — activez la Dictée et ajoutez cette langue. Le modèle se télécharge et la reconnaissance fonctionne hors ligne."
           }
         },
@@ -17854,7 +17854,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "No hay suficiente almacenamiento en el dispositivo para instalar el paquete del modelo del filtro de voz. Libere espacio e inténtelo de nuevo."
+            "value": "No hay suficiente almacenamiento en el dispositivo para instalar el paquete del modelo del filtro de voz. Libera espacio e inténtalo de nuevo."
           }
         },
         "fr": {
@@ -17912,7 +17912,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Dies leert nur die Cockpit-Ansicht. Der gespeicherte Sitzungsverlauf bleibt auf diesem Gerät."
           }
         },
@@ -17924,13 +17924,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Esto solo limpia la vista de cabina. El historial de sesiones guardadas permanece en este dispositivo."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Cela efface uniquement la vue cockpit. L'historique des sessions enregistrées reste sur cet appareil."
           }
         },
@@ -17983,7 +17983,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Dies löscht das gespeicherte Transkript von diesem Gerät. Die aktuelle Ansicht bleibt unverändert."
           }
         },
@@ -17995,13 +17995,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Esto elimina la transcripción guardada de este dispositivo. La vista actual no cambia."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Cela supprime la transcription enregistrée de cet appareil. La vue actuelle ne change pas."
           }
         },
@@ -18054,8 +18054,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Diese Sprache ist nicht für die Erkennung verfügbar. Wähle eine andere Sprache in den Erkennungseinstellungen."
+            "state": "translated",
+            "value": "Diese Sprache ist nicht für die Erkennung verfügbar. Wählen Sie eine andere Sprache in den Erkennungseinstellungen."
           }
         },
         "en": {
@@ -18066,13 +18066,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Este idioma no está disponible para el reconocimiento. Elige otro idioma en los ajustes de reconocimiento."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Cette langue n'est pas disponible pour la reconnaissance. Choisissez une autre langue dans les réglages de reconnaissance."
           }
         },
@@ -18125,8 +18125,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Dieses Sprachpaar wird für die On-Device-Übersetzung nicht unterstützt. Wähle eine andere Zielsprache."
+            "state": "translated",
+            "value": "Dieses Sprachpaar wird für die On-Device-Übersetzung nicht unterstützt. Wählen Sie eine andere Zielsprache."
           }
         },
         "en": {
@@ -18137,13 +18137,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Este par de idiomas no es compatible con la traducción en el dispositivo. Elige otro idioma de destino."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Cette paire de langues n'est pas prise en charge pour la traduction sur l'appareil. Choisissez une autre langue cible."
           }
         },
@@ -18196,8 +18196,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Diese Erkennungssprache wird für die On-Device-Übersetzung nicht unterstützt. Wähle eine andere Erkennungssprache."
+            "state": "translated",
+            "value": "Diese Erkennungssprache wird für die On-Device-Übersetzung nicht unterstützt. Wählen Sie eine andere Erkennungssprache."
           }
         },
         "en": {
@@ -18208,13 +18208,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Este idioma de reconocimiento no es compatible con la traducción en el dispositivo. Elige otro idioma de reconocimiento."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Cette langue de reconnaissance n'est pas prise en charge pour la traduction sur l'appareil. Choisissez une autre langue de reconnaissance."
           }
         },
@@ -18267,8 +18267,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Zu leise oder zu kurz -- nimm eine klarere Probe auf."
+            "state": "translated",
+            "value": "Zu leise oder zu kurz -- nehmen Sie eine klarere Probe auf."
           }
         },
         "en": {
@@ -18279,13 +18279,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Demasiado bajo o corto -- grabe una muestra más clara."
+            "state": "translated",
+            "value": "Demasiado bajo o demasiado corto -- graba una muestra más clara."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Trop faible ou trop court -- enregistrez un échantillon plus clair."
           }
         },
@@ -18338,8 +18338,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Zu leise oder zu kurz — nimm eine deutlichere Probe auf."
+            "state": "translated",
+            "value": "Zu leise oder zu kurz — nehmen Sie eine deutlichere Probe auf."
           }
         },
         "en": {
@@ -18350,13 +18350,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Demasiado bajo o demasiado corto: graba una muestra más clara."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Trop faible ou trop court — enregistrez un échantillon plus clair."
           }
         },
@@ -18829,7 +18829,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Übersetzung"
           }
         },
@@ -18841,13 +18841,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Traducción"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Traduction"
           }
         },
@@ -18900,7 +18900,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Übersetzung läuft auf dem Gerät über Apples System-Sprachpakete. Beim ersten Aktivieren bietet iOS den Download eines Sprachpakets an. Audio und Text verlassen das Gerät nie."
           }
         },
@@ -18912,13 +18912,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "La traducción se ejecuta en el dispositivo mediante paquetes de idioma del sistema de Apple. La primera vez que la active, iOS ofrece descargar un paquete. El audio y el texto nunca salen del dispositivo."
+            "state": "translated",
+            "value": "La traducción se ejecuta en el dispositivo mediante paquetes de idioma del sistema de Apple. La primera vez que la actives, iOS ofrece descargar un paquete. El audio y el texto nunca salen del dispositivo."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "La traduction s'exécute sur l'appareil via les packs de langue système d'Apple. Lors de la première activation, iOS propose de télécharger un pack. L'audio et le texte ne quittent jamais l'appareil."
           }
         },
@@ -19041,7 +19041,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Unbekannter Eingang"
           }
         },
@@ -19053,13 +19053,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Entrada desconocida"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Entrée inconnue"
           }
         },
@@ -19112,8 +19112,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Nutze das integrierte Mikrofon zum Ausprobieren. Für das Cockpit schließe einen kabelgebundenen Eingang an (USB-C / TRRS)."
+            "state": "translated",
+            "value": "Nutzen Sie das integrierte Mikrofon zum Ausprobieren. Für das Cockpit schließen Sie einen kabelgebundenen Eingang an (USB-C / TRRS)."
           }
         },
         "en": {
@@ -19124,13 +19124,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Usa el micrófono integrado para probarlo. Para la cabina, conecta una entrada con cable (USB-C / TRRS)."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Utilisez le microphone intégré pour faire un essai. Pour le cockpit, branchez une entrée filaire (USB-C / TRRS)."
           }
         },
@@ -19183,7 +19183,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "PRÜFEN"
           }
         },
@@ -19195,13 +19195,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "VERIFICAR"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "VÉRIFIER"
           }
         },
@@ -19324,7 +19324,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Version"
           }
         },
@@ -19336,13 +19336,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Versión"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Version"
           }
         },
@@ -19395,8 +19395,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Stimmfilter aus. Das Modell ist installiert und bereit."
+            "state": "translated",
+            "value": "Sprachfilter aus. Das Modell ist installiert und bereit."
           }
         },
         "en": {
@@ -19407,14 +19407,14 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Filtro de voz desactivado. El modelo está instalado y listo."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Filtre de voix désactivé. Le modèle est installé et prêt."
+            "state": "translated",
+            "value": "Filtre vocal désactivé. Le modèle est installé et prêt."
           }
         },
         "it": {
@@ -19466,7 +19466,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Stimmprobe aufgenommen. Erneut aufnehmen, um sie zu aktualisieren."
           }
         },
@@ -19478,13 +19478,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Muestra de voz grabada. Vuelve a grabar para actualizarla."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Échantillon vocal enregistré. Enregistrez à nouveau pour le mettre à jour."
           }
         },
@@ -19537,8 +19537,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Stimme gespeichert für %@."
+            "state": "translated",
+            "value": "Stimme für %@ gespeichert."
           }
         },
         "en": {
@@ -19549,13 +19549,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Voz guardada para %@."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Voix enregistrée pour %@."
           }
         },
@@ -19608,8 +19608,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Ohne Rufzeichen lässt der Filter alle Nicht-Piloten-Segmente durch. Tippe auf das Mikrofon, um es per Stimme festzulegen."
+            "state": "translated",
+            "value": "Ohne Rufzeichen lässt der Filter alle Nicht-Piloten-Segmente durch. Tippen Sie auf das Mikrofon, um es per Stimme festzulegen."
           }
         },
         "en": {
@@ -19620,13 +19620,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Sin un indicativo, el filtro deja pasar todos los segmentos que no son del piloto. Pulsa el micrófono para definirlo por voz."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Sans indicatif, le filtre laisse passer tous les segments non-pilote. Appuyez sur le microphone pour le définir à la voix."
           }
         },
@@ -19821,8 +19821,8 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Deine Wahl wird für dieses Gerät gespeichert. Das integrierte Mikrofon dient zum Testen; für das Cockpit schließe einen kabelgebundenen Eingang an."
+            "state": "translated",
+            "value": "Ihre Wahl wird für dieses Gerät gespeichert. Das integrierte Mikrofon dient zum Testen; für das Cockpit schließen Sie einen kabelgebundenen Eingang an."
           }
         },
         "en": {
@@ -19833,13 +19833,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Tu elección se guarda para este dispositivo. El micrófono integrado es para pruebas; para la cabina, conecta una entrada con cable."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Votre choix est enregistré pour cet appareil. Le microphone intégré sert aux tests ; pour le cockpit, branchez une entrée filaire."
           }
         },
@@ -19892,7 +19892,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "integriertes Mikrofon"
           }
         },
@@ -19904,13 +19904,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "micrófono integrado"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "microphone intégré"
           }
         },
@@ -19963,7 +19963,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Konf. %@"
           }
         },
@@ -19975,13 +19975,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "conf. %@"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "conf. %@"
           }
         },
@@ -20034,7 +20034,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Integriertes Mikrofon"
           }
         },
@@ -20046,13 +20046,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Micrófono integrado"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Microphone intégré"
           }
         },
@@ -20105,7 +20105,7 @@
       "localizations": {
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "neuer Eingang"
           }
         },
@@ -20117,13 +20117,13 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "nueva entrada"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "nouvelle entrée"
           }
         },
@@ -20181,19 +20181,19 @@
         },
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Crew %lld"
           }
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Tripulación %lld"
+            "state": "translated",
+            "value": "Tripulante %lld"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Équipage %lld"
           }
         },
@@ -20223,7 +20223,7 @@
         },
         "ru": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Экипаж %lld"
           }
         },
@@ -20251,19 +20251,19 @@
         },
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Crewmitglied hinzufügen"
           }
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Añadir tripulante"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Ajouter un membre d’équipage"
           }
         },
@@ -20293,7 +20293,7 @@
         },
         "ru": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Добавить члена экипажа"
           }
         },
@@ -20321,19 +20321,19 @@
         },
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Neu aufnehmen"
           }
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Volver a grabar"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Réenregistrer"
           }
         },
@@ -20363,7 +20363,7 @@
         },
         "ru": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Перезаписать"
           }
         },
@@ -20391,19 +20391,19 @@
         },
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Sprachaufnahme nicht verfügbar"
           }
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Grabación de voz no disponible"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Enregistrement vocal indisponible"
           }
         },
@@ -20433,7 +20433,7 @@
         },
         "ru": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Запись голоса недоступна"
           }
         },
@@ -20461,19 +20461,19 @@
         },
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Aufnahme – sprich etwa 4 Sekunden weiter und tippe dann auf Stopp."
+            "state": "translated",
+            "value": "Aufnahme – sprechen Sie etwa 4 Sekunden weiter und tippen Sie dann auf Stopp."
           }
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Grabando: sigue hablando unos 4 segundos y luego toca Detener."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Enregistrement – continuez à parler environ 4 secondes, puis touchez Arrêter."
           }
         },
@@ -20503,7 +20503,7 @@
         },
         "ru": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Запись — говорите ещё около 4 секунд, затем нажмите «Стоп»."
           }
         },
@@ -20531,19 +20531,19 @@
         },
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Sprachprobe aufgenommen. Neu aufnehmen, um sie zu aktualisieren."
+            "state": "translated",
+            "value": "Stimmprobe aufgenommen. Neu aufnehmen, um sie zu aktualisieren."
           }
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Muestra de voz grabada. Vuelve a grabar para actualizarla."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Échantillon vocal enregistré. Réenregistrez pour le mettre à jour."
           }
         },
@@ -20573,7 +20573,7 @@
         },
         "ru": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Образец голоса записан. Перезапишите, чтобы обновить."
           }
         },
@@ -20601,19 +20601,19 @@
         },
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Noch keine Crew-Stimmen. Füge jede Person mit Headset hinzu, damit ihre Funksprüche von der Flugsicherung unterschieden werden können."
+            "state": "translated",
+            "value": "Noch keine Crew-Stimmen. Fügen Sie jede Person mit Headset hinzu, damit ihre Funksprüche von der Flugsicherung unterschieden werden können."
           }
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Aún no hay voces de la tripulación. Añade a cada persona con auriculares para distinguir sus transmisiones de las del ATC."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Aucune voix d’équipage pour l’instant. Ajoutez chaque personne au casque pour distinguer ses transmissions de celles du contrôle."
           }
         },
@@ -20643,7 +20643,7 @@
         },
         "ru": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Голосов экипажа пока нет. Добавьте каждого в гарнитуре, чтобы отличать их передачи от диспетчера."
           }
         },
@@ -20671,19 +20671,19 @@
         },
         "de": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "%@ entfernen"
           }
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Eliminar %@"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Supprimer %@"
           }
         },
@@ -20713,7 +20713,7 @@
         },
         "ru": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Удалить %@"
           }
         },
@@ -20741,19 +20741,19 @@
         },
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Kein Zugriff auf Mikrofon und Spracherkennung. Prüfe die Berechtigungen in den iPhone-Einstellungen und tippe dann erneut auf Start."
+            "state": "translated",
+            "value": "Kein Zugriff auf Mikrofon und Spracherkennung. Prüfen Sie die Berechtigungen in den iPhone-Einstellungen und tippen Sie dann erneut auf Start."
           }
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "No se pudo acceder al micrófono ni al reconocimiento de voz. Revisa los permisos en Ajustes del iPhone y vuelve a tocar Iniciar."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Impossible d’accéder au micro et à la reconnaissance vocale. Vérifiez les autorisations dans les Réglages de l’iPhone, puis touchez de nouveau Démarrer."
           }
         },
@@ -20783,7 +20783,7 @@
         },
         "ru": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Не удалось получить доступ к микрофону и распознаванию речи. Проверьте разрешения в Настройках iPhone и снова нажмите «Старт»."
           }
         },
@@ -20811,19 +20811,19 @@
         },
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Stimme nicht ausreichend erfasst. Sprich etwa 5 Sekunden an einem ruhigen Ort und tippe dann auf Stopp."
+            "state": "translated",
+            "value": "Stimme nicht ausreichend erfasst. Sprechen Sie etwa 5 Sekunden an einem ruhigen Ort und tippen Sie dann auf Stopp."
           }
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "No se captó suficiente tu voz. Habla unos 5 segundos en un lugar tranquilo y luego toca Detener."
+            "state": "translated",
+            "value": "No se captó suficiente de tu voz. Habla unos 5 segundos en un lugar tranquilo y luego toca Detener."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Voix pas assez captée. Parlez environ 5 secondes dans un endroit calme, puis touchez Arrêter."
           }
         },
@@ -20853,7 +20853,7 @@
         },
         "ru": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Не удалось записать достаточно голоса. Говорите около 5 секунд в тихом месте, затем нажмите «Стоп»."
           }
         },
