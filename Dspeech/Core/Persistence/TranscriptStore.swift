@@ -100,6 +100,10 @@ extension TranscriptStoring {
 // golden shape. Optional fields (end, engine, classification) are omitted when absent rather than
 // emitted as null, so a legacy segment and a rich transmission stay unambiguous. No I/O here.
 enum TranscriptJSONL {
+  // why: M2 — every JSONL row is self-describing with a schema version so a downstream consumer can
+  // branch on shape changes instead of guessing. Bump on any breaking row-shape change.
+  static let schemaVersion = 1
+
   struct Row: Encodable {
     let confidence: Double
     let end: TimeInterval?
@@ -110,9 +114,10 @@ enum TranscriptJSONL {
     let sourceLanguage: String
     let start: TimeInterval
     let text: String
+    let v: Int
 
     enum CodingKeys: String, CodingKey {
-      case confidence, end, engine, id, kind, reason, sourceLanguage, start, text
+      case confidence, end, engine, id, kind, reason, sourceLanguage, start, text, v
     }
 
     func encode(to encoder: Encoder) throws {
@@ -126,6 +131,7 @@ enum TranscriptJSONL {
       try container.encode(sourceLanguage, forKey: .sourceLanguage)
       try container.encode(start, forKey: .start)
       try container.encode(text, forKey: .text)
+      try container.encode(v, forKey: .v)
     }
   }
 
@@ -143,7 +149,8 @@ enum TranscriptJSONL {
           reason: reason,
           sourceLanguage: segment.sourceLanguageCode,
           start: transmission.startedAt.timeIntervalSince1970,
-          text: transmission.text
+          text: transmission.text,
+          v: schemaVersion
         ))
     }
     .joined(separator: "\n")
@@ -161,7 +168,8 @@ enum TranscriptJSONL {
           reason: nil,
           sourceLanguage: segment.sourceLanguageCode,
           start: segment.startedAt.timeIntervalSince1970,
-          text: segment.text
+          text: segment.text,
+          v: schemaVersion
         ))
     }
     .joined(separator: "\n")
