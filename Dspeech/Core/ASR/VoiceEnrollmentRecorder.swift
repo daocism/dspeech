@@ -311,7 +311,7 @@ enum VoiceEnrollmentCaptureError: Error {
 
 @MainActor
 private final class AVAudioEngineVoiceEnrollmentCapture: VoiceEnrollmentAudioCapturing {
-  private let audioEngine = AVAudioEngine()
+  private let tapSession = AVAudioEngineTapSession()
   private var sessionActivated = false
 
   func start(onBuffer: @escaping @Sendable (AVAudioPCMBuffer) -> Void) throws -> Double {
@@ -322,23 +322,18 @@ private final class AVAudioEngineVoiceEnrollmentCapture: VoiceEnrollmentAudioCap
       sessionActivated = true
       DspeechLog.voiceFilter.info("voice enrollment audio session activation succeeded")
 
-      let inputNode = audioEngine.inputNode
-      let format = inputNode.outputFormat(forBus: 0)
-      guard format.channelCount > 0, format.sampleRate > 0 else {
+      let format: AVAudioFormat
+      do {
+        format = try tapSession.startTap(bufferSize: 2048, handler: onBuffer)
+      } catch let error as AVAudioEngineTapSession.InvalidInputFormat {
         DspeechLog.voiceFilter.error(
-          "voice enrollment audio tap install failed reason=invalid-input-format sampleRate=\(format.sampleRate, privacy: .public) channels=\(format.channelCount, privacy: .public)"
+          "voice enrollment audio tap install failed reason=invalid-input-format sampleRate=\(error.sampleRate, privacy: .public) channels=\(error.channelCount, privacy: .public)"
         )
         throw VoiceEnrollmentCaptureError.invalidInputFormat
-      }
-      inputNode.removeTap(onBus: 0)
-      inputNode.installTap(onBus: 0, bufferSize: 2048, format: nil) { @Sendable buffer, _ in
-        onBuffer(buffer)
       }
       DspeechLog.voiceFilter.info(
         "voice enrollment audio tap installed sampleRate=\(format.sampleRate, privacy: .public) channels=\(format.channelCount, privacy: .public)"
       )
-      audioEngine.prepare()
-      try audioEngine.start()
       DspeechLog.voiceFilter.info("voice enrollment audio engine started")
       return format.sampleRate
     } catch {
@@ -351,10 +346,7 @@ private final class AVAudioEngineVoiceEnrollmentCapture: VoiceEnrollmentAudioCap
   }
 
   func stop(deactivateSession: Bool) {
-    if audioEngine.isRunning {
-      audioEngine.stop()
-    }
-    audioEngine.inputNode.removeTap(onBus: 0)
+    tapSession.stop()
     if deactivateSession, sessionActivated {
       DspeechLog.voiceFilter.info("voice enrollment audio session deactivation requested")
       do {
