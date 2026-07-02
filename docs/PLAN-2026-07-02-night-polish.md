@@ -124,9 +124,9 @@ verified per cluster. LOCAL/CLOUD badge legibility is a hard gate (rule 4).
 - [x] J3. `scripts/verify-primary-scenario.sh` — real ATC fixtures through the REAL engines (primary-scenario proof).
 - [x] J4. Simulator visual review: screenshot the full view-state matrix, full-frame review of every image.
 - [x] J5. `run-asr-eval.py` real-engine eval: classification/WER not regressed vs the 92%/0.18 baseline.
-- [ ] J6. CI green on all pushed branches/PRs (`gh run list` + root-cause fixes, no suppression).
+- [x] J6. CI green on all pushed branches/PRs (`gh run list` + root-cause fixes, no suppression).
 - [x] J7. Memory/pattern updates (project run-note + any global feedback patterns learned).
-- [ ] J8. Final report: per-phase % dashboard, artifacts, SHAs.
+- [x] J8. Final report: per-phase % dashboard, artifacts, SHAs.
 
 ## Execution notes
 - Wave-based: parallel subagents with strictly disjoint file ownership; `Localizable.xcstrings` is single-owner for the whole night (serialized l10n batches).
