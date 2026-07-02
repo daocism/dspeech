@@ -112,7 +112,113 @@ func isModelInstallDiskFullNSError(_ error: Error) -> Bool {
   return false
 }
 
+// MARK: - Offline vs. generic-network classification
+
+/// True for the URL-loading error codes that specifically mean "the device has no usable network
+/// path" (airplane mode, Wi-Fi/cell dropped mid-transfer, cellular-data disallowed) — as opposed to
+/// a server/HTTP-level failure. Each installer maps these to a distinct `.offline` failure kind with
+/// its own user-facing copy (C2), so the pilot is told to reconnect rather than shown a generic
+/// "network request failed".
+func isModelInstallOfflineError(_ error: Error) -> Bool {
+  if let urlError = error as? URLError {
+    switch urlError.code {
+    case .notConnectedToInternet, .networkConnectionLost, .dataNotAllowed:
+      return true
+    default:
+      return false
+    }
+  }
+  let nsError = error as NSError
+  if nsError.domain == NSURLErrorDomain {
+    return [
+      NSURLErrorNotConnectedToInternet,
+      NSURLErrorNetworkConnectionLost,
+      NSURLErrorDataNotAllowed,
+    ].contains(nsError.code)
+  }
+  return false
+}
+
+// MARK: - Resumable single-file staged download (C1)
+
+/// The bytes returned by a caller-supplied ranged fetch: the HTTP status code (so the resume logic
+/// can tell an honored `Range` request — 206 Partial Content — from a server that ignored it and
+/// re-sent the whole file — 200 OK) and a temporary file the caller owns containing the body bytes.
+struct ResumableDownloadResponse: Sendable {
+  let statusCode: Int
+  let bodyFileURL: URL
+}
+
+/// Byte count of a partial-download file, or 0 when it does not exist yet.
+func pinnedPartialByteCount(_ url: URL) -> Int64 {
+  let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
+  return (attributes?[.size] as? Int64) ?? 0
+}
+
+/// Downloads a single pinned file with HTTP range-resume. Bytes are staged into `<destination>.partial`
+/// so an interrupted transfer resumes from the partial's current byte count instead of restarting at
+/// zero, then the completed `.partial` is atomically moved to `destination`. The caller provides the
+/// actual network fetch as `fetch(fromByteOffset)`: it issues a `Range: bytes=<offset>-` request when
+/// the offset is non-zero and returns the response status + body temp file.
+///
+/// - Complete-file skip is handled by the ENGINE (it never calls this when `destination` already
+///   exists), but this guards it too so the helper is safe to call standalone.
+/// - A server that ignores the range (returns 200 with the whole body) discards the stale partial and
+///   restarts the file cleanly.
+/// - The final SHA-256 integrity gate always runs later over the COMPLETE assembled `destination`
+///   (in `downloadAndStagePinnedModel`); a corrupt/short partial can therefore never fail-open.
+func resumableStagedDownload(
+  to destination: URL,
+  fetch: (_ fromByteOffset: Int64) async throws -> ResumableDownloadResponse
+) async throws {
+  let fileManager = FileManager.default
+  if fileManager.fileExists(atPath: destination.path) { return }
+  try fileManager.createDirectory(
+    at: destination.deletingLastPathComponent(),
+    withIntermediateDirectories: true
+  )
+  let partial = destination.appendingPathExtension("partial")
+  let resumeOffset = pinnedPartialByteCount(partial)
+  let response = try await fetch(resumeOffset)
+  defer { try? ModelInstallFileSystem.removeIfPresent(response.bodyFileURL) }
+  guard response.statusCode == 200 || response.statusCode == 206 else {
+    throw URLError(.badServerResponse)
+  }
+  if resumeOffset > 0, response.statusCode == 206 {
+    try appendPinnedPartial(from: response.bodyFileURL, to: partial)
+  } else {
+    // why: a fresh download, or a server that ignored `Range` and re-sent the whole file (200) —
+    // either way the temp body IS the complete file, so replace any stale partial with it.
+    try ModelInstallFileSystem.removeIfPresent(partial)
+    try fileManager.moveItem(at: response.bodyFileURL, to: partial)
+  }
+  try ModelInstallFileSystem.removeIfPresent(destination)
+  try fileManager.moveItem(at: partial, to: destination)
+}
+
+/// Appends the bytes of `sourceURL` onto the end of `destinationPartial`, streaming in bounded chunks
+/// so resuming a multi-hundred-MB file never loads the whole body into memory.
+private func appendPinnedPartial(from sourceURL: URL, to destinationPartial: URL) throws {
+  let readHandle = try FileHandle(forReadingFrom: sourceURL)
+  defer { try? readHandle.close() }
+  let writeHandle = try FileHandle(forWritingTo: destinationPartial)
+  defer { try? writeHandle.close() }
+  try writeHandle.seekToEnd()
+  while true {
+    let chunk = try readHandle.read(upToCount: 4 * 1024 * 1024) ?? Data()
+    if chunk.isEmpty { break }
+    try writeHandle.write(contentsOf: chunk)
+  }
+}
+
 // MARK: - Pinned download-stage-verify engine
+
+/// Stable per-model staging root. Kept stable (no random UUID) so completed + partial files survive a
+/// cancelled/interrupted attempt and are resumed by the next `install()` (C1), never re-downloaded
+/// from zero. Cleaned up on successful install and on model deletion.
+func pinnedModelStagingRoot(modelsRoot: URL, modelFolderName: String) -> URL {
+  modelsRoot.appendingPathComponent(".\(modelFolderName).staging", isDirectory: true)
+}
 
 struct PinnedModelFileSpec: Equatable, Sendable {
   let relativePath: String
@@ -150,74 +256,71 @@ func downloadAndStagePinnedModel(
   checksumMismatch: (_ relativePath: String, _ expected: String, _ actual: String) -> Error,
   onProgress: (_ completedBytes: Int64) -> Void
 ) async throws -> StagedPinnedModel {
-  let stagingRoot = modelsRoot.appendingPathComponent(
-    ".\(modelFolderName).staging-\(UUID().uuidString)",
-    isDirectory: true
-  )
+  let stagingRoot = pinnedModelStagingRoot(modelsRoot: modelsRoot, modelFolderName: modelFolderName)
   let stagingModelFolder = stagingRoot.appendingPathComponent(modelFolderName, isDirectory: true)
   let finalModelFolder = modelsRoot.appendingPathComponent(modelFolderName, isDirectory: true)
-  try ModelInstallFileSystem.removeIfPresent(stagingRoot)
+  // why: do NOT wipe the staging folder on entry — completed + partial files from a prior
+  // cancelled/interrupted attempt are the resume cache (C1). createDirectory is idempotent.
   try FileManager.default.createDirectory(at: stagingModelFolder, withIntermediateDirectories: true)
   try ModelInstallFileSystem.excludeFromBackup(stagingRoot)
 
-  do {
-    var completedBytes: Int64 = 0
-    var installedFiles: [DownloadedModelFile] = []
-    onProgress(completedBytes)
+  var completedBytes: Int64 = 0
+  var installedFiles: [DownloadedModelFile] = []
+  onProgress(completedBytes)
 
-    for spec in specs {
-      try Task.checkCancellation()
-      let destination = stagingModelFolder.appendingPathComponent(
-        spec.relativePath,
-        isDirectory: false
-      )
+  for spec in specs {
+    try Task.checkCancellation()
+    let destination = stagingModelFolder.appendingPathComponent(
+      spec.relativePath,
+      isDirectory: false
+    )
+    // why: complete-file skip — a file fully staged + verified by a prior attempt is re-verified
+    // below (never trusted blind) but not re-downloaded, so a resumed install pays only for the
+    // files it still needs. The downloader itself resumes an in-progress `.partial` via a Range
+    // request; a checksum failure on any staged file deletes it so the retry re-fetches it fresh.
+    if !FileManager.default.fileExists(atPath: destination.path) {
       let source = try sourceURL(spec.relativePath)
       try await download(source, destination)
       guard FileManager.default.fileExists(atPath: destination.path) else {
         throw fileMissing(spec.relativePath)
       }
-      let (computedSHA256, actualSizeBytes) = try await ModelInstallFileSystem.fileDigest(
-        at: destination
-      )
-      // why: integrity gate — compare the just-downloaded bytes against the baked-in pinned hash
-      // before accepting the file. A mismatch throws (never fail-open); the staging folder is then
-      // torn down by the catch below, so a tampered/corrupt bundle never installs.
-      guard computedSHA256.lowercased() == spec.expectedSHA256.lowercased() else {
-        throw checksumMismatch(
-          spec.relativePath,
-          spec.expectedSHA256.lowercased(),
-          computedSHA256.lowercased()
-        )
-      }
-      installedFiles.append(
-        DownloadedModelFile(
-          relativePath: spec.relativePath,
-          sha256: computedSHA256,
-          sizeBytes: actualSizeBytes
-        ))
-      // why: advance by the actual received size (== manifest size for any file that passed the
-      // checksum gate above), so progress can never diverge or exceed 1.0 on a bad download.
-      completedBytes += actualSizeBytes
-      onProgress(completedBytes)
     }
-
-    let files = installedFiles.sorted { $0.relativePath < $1.relativePath }
-    let sizeBytes = files.reduce(Int64(0)) { $0 + $1.sizeBytes }
-    try ModelInstallFileSystem.removeIfPresent(finalModelFolder)
-    try FileManager.default.moveItem(at: stagingModelFolder, to: finalModelFolder)
-    try ModelInstallFileSystem.removeIfPresent(stagingRoot)
-    try ModelInstallFileSystem.excludeFromBackup(finalModelFolder)
-    return StagedPinnedModel(finalModelFolder: finalModelFolder, files: files, sizeBytes: sizeBytes)
-  } catch {
-    // why: best-effort staging teardown, but a removal failure is an OS-level signal — log it
-    // (never silently swallow per project error rules) rather than leak orphan staging folders.
-    do {
-      try ModelInstallFileSystem.removeIfPresent(stagingRoot)
-    } catch let teardownError {
-      DspeechLog.engine.error(
-        "pinned model staging teardown failed error=\(teardownError.localizedDescription, privacy: .public)"
+    let (computedSHA256, actualSizeBytes) = try await ModelInstallFileSystem.fileDigest(
+      at: destination
+    )
+    // why: integrity gate — compare the assembled file against the baked-in pinned hash before
+    // accepting it. A mismatch throws (never fail-open) AFTER deleting the corrupt staged file and
+    // any leftover `.partial`, so the next attempt re-downloads it fresh rather than resuming or
+    // installing tampered/corrupt bytes.
+    guard computedSHA256.lowercased() == spec.expectedSHA256.lowercased() else {
+      try? ModelInstallFileSystem.removeIfPresent(destination)
+      try? ModelInstallFileSystem.removeIfPresent(destination.appendingPathExtension("partial"))
+      throw checksumMismatch(
+        spec.relativePath,
+        spec.expectedSHA256.lowercased(),
+        computedSHA256.lowercased()
       )
     }
-    throw error
+    installedFiles.append(
+      DownloadedModelFile(
+        relativePath: spec.relativePath,
+        sha256: computedSHA256,
+        sizeBytes: actualSizeBytes
+      ))
+    // why: advance by the actual received size (== manifest size for any file that passed the
+    // checksum gate above), so progress can never diverge or exceed 1.0 on a bad download.
+    completedBytes += actualSizeBytes
+    onProgress(completedBytes)
   }
+
+  let files = installedFiles.sorted { $0.relativePath < $1.relativePath }
+  let sizeBytes = files.reduce(Int64(0)) { $0 + $1.sizeBytes }
+  try ModelInstallFileSystem.removeIfPresent(finalModelFolder)
+  try FileManager.default.moveItem(at: stagingModelFolder, to: finalModelFolder)
+  // why: teardown the staging root ONLY on success. On any thrown failure it is preserved as the
+  // resume cache; a partial staging folder never installs because the atomic move above happens
+  // only after every file verifies. Orphan staging is reclaimed on model deletion.
+  try ModelInstallFileSystem.removeIfPresent(stagingRoot)
+  try ModelInstallFileSystem.excludeFromBackup(finalModelFolder)
+  return StagedPinnedModel(finalModelFolder: finalModelFolder, files: files, sizeBytes: sizeBytes)
 }
