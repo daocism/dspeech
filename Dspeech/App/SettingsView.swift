@@ -360,6 +360,16 @@ struct SettingsView: View {
     }
     .accessibilityIdentifier("settings-sheet")
     .preferredColorScheme(.dark)
+    // why: success haptic keyed to the install STATE transition (absent/downloading -> installed),
+    // never a tap — a failed or cancelled download never reaches .installed, so it can't emit
+    // success. The closure form fires only on the false->true edge, so deleting the model
+    // (installed -> absent) stays silent (D13, ADR 0013 rule 7).
+    .sensoryFeedback(trigger: whisperKitInstaller.state.isInstalled) { wasInstalled, isInstalled in
+      isInstalled && !wasInstalled ? .success : nil
+    }
+    .sensoryFeedback(trigger: parakeetInstaller.state.isInstalled) { wasInstalled, isInstalled in
+      isInstalled && !wasInstalled ? .success : nil
+    }
   }
 
   static func pickerTag(forStored stored: String?) -> String {

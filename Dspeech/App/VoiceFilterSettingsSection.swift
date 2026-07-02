@@ -22,6 +22,9 @@ struct VoiceFilterSettingsSection: View {
   @State private var crewProfiles: [PilotVoiceProfile]
   @State private var recordingTarget: CrewEnrollmentTarget?
   @State private var enrollMessage: String?
+  // why: monotonic counter bumped ONLY on a successful enroll (never on failure or removal), so the
+  // success haptic keys to the enrollment-completed event and can't fire on a failed recording (D13).
+  @State private var enrollmentCompletions = 0
   private let installer: SpeakerModelPackInstaller
 
   init(pipeline: VoiceFilterPipeline, onDisabled: @escaping () -> Void = {}) {
@@ -126,6 +129,13 @@ struct VoiceFilterSettingsSection: View {
       )
     }
     .onDisappear { stopTransientCapture() }
+    // why: success haptic on the model-pack STATE transition into .installed (false->true edge only,
+    // so a re-download after delete fires but the delete itself stays silent) and on each successful
+    // crew enrollment (the monotonic counter never advances on a failed recording) — D13, ADR 0013.
+    .sensoryFeedback(trigger: modelPackAcquisition.state.isInstalled) { wasInstalled, isInstalled in
+      isInstalled && !wasInstalled ? .success : nil
+    }
+    .sensoryFeedback(.success, trigger: enrollmentCompletions)
   }
 
   private var dictationButton: some View {
@@ -285,6 +295,7 @@ struct VoiceFilterSettingsSection: View {
         sampleRate: result.sampleRate
       )
       crewProfiles = pipeline.profiles
+      enrollmentCompletions += 1
       let name =
         crewProfiles.firstIndex(where: { $0.id == profile.id }).map { crewDisplayName(index: $0) }
         ?? profile.label
