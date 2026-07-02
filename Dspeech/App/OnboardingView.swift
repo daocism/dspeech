@@ -112,8 +112,10 @@ struct OnboardingView: View {
   private func advance() {
     if isLastCard {
       onComplete()
-    } else {
+    } else if animatesGlassMorph {
       withAnimation { selection += 1 }
+    } else {
+      selection += 1
     }
   }
 

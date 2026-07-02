@@ -261,7 +261,7 @@ struct TransmissionTranscriptCard: View {
             : String(localized: "Shows the transmission's start and end time")
         )
         .accessibilityAction(named: Text(String(localized: "Show details"))) {
-          withAnimation(.easeInOut(duration: 0.15)) { expanded.toggle() }
+          withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.15)) { expanded.toggle() }
         }
       if expanded { detailRow }
     }
@@ -270,7 +270,9 @@ struct TransmissionTranscriptCard: View {
     .frame(maxWidth: .infinity, alignment: .leading)
     .transcriptCardChrome(stroke: .white.opacity(0.10))
     .contentShape(Rectangle())
-    .onTapGesture { withAnimation(.easeInOut(duration: 0.15)) { expanded.toggle() } }
+    .onTapGesture {
+      withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.15)) { expanded.toggle() }
+    }
     .overlay(alignment: .topLeading) {
       Color.clear
         .frame(width: 1, height: 1)
@@ -369,7 +371,9 @@ struct TranscriptSegmentCard: View {
     .frame(maxWidth: .infinity, alignment: .leading)
     .transcriptCardChrome(stroke: .white.opacity(0.10))
     .contentShape(Rectangle())
-    .onTapGesture { withAnimation(.easeInOut(duration: 0.15)) { expanded.toggle() } }
+    .onTapGesture {
+      withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.15)) { expanded.toggle() }
+    }
     .transition(cardEntranceTransition(reduceMotion: reduceMotion))
     .accessibilityIdentifier("transcript-segment")
   }
