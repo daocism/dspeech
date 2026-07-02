@@ -34,6 +34,9 @@
   bug on the glass banner, dark-lock, VoiceOver expand), ru a11y sweeps added.
 - **CI**: weekly full-a11y cron + monthly speaker-calibration, toolchain-version artifact,
   snapshot failure diffs uploaded; pre-push device-arch hook; scripts/local-gate.sh.
+- **Tools symlink rule**: ReplayKit/SpeakerEval vendor Core by SYMLINK — any NEW Core file
+  used by shared code must be symlinked into BOTH packages or the host CLIs break
+  (caught by the real-audio gate tonight; `--source-only` policy does not compile Tools).
 - **Store prep**: privacy-policy DRAFT (publishing = owner call), SDK manifest audit clean
   (Xcode 26 dropped `privacyreport` CLI — aggregation done directly), listing metadata
   linter green over 11 listings, release checklist refreshed, README rewritten.
