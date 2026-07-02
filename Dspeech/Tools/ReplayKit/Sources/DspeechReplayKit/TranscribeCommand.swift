@@ -4,7 +4,7 @@ import Foundation
 
 enum TranscribeCommand {
   static let usage = """
-    Usage: dspeech-replay transcribe --audio <wav> --locale <locale> [--engine apple|whisperkit|parakeet] [--callsign <raw>] [--gap <seconds>] [--simulate-restart <seconds>] [--replay-tail on|off] [--chunk-seconds <seconds>] [--emit-partials on|off] [--model-dir <dir>]
+    Usage: dspeech-replay transcribe --audio <wav> --locale <locale> [--engine apple|whisperkit] [--callsign <raw>] [--gap <seconds>] [--simulate-restart <seconds>] [--replay-tail on|off] [--chunk-seconds <seconds>] [--emit-partials on|off]
     """
 
   static func run(_ arguments: [String]) async throws -> Int32 {
@@ -16,16 +16,6 @@ enum TranscribeCommand {
         )
       }
       try await WhisperKitTranscribe.run(options: options)
-      return 0
-    }
-    if options.engine == "parakeet" {
-      guard options.restartSeconds.isEmpty, !options.silenceRestart else {
-        throw ReplayKitError.invalidArguments(
-          "--simulate-restart/--silence-restart mirror the Apple task-recycle path; Parakeet EOU "
-            + "self-finalizes on its own end-of-utterance detector, so neither applies"
-        )
-      }
-      try await ParakeetTranscribe.run(options: options)
       return 0
     }
     let authorizationStatus = SpeechAuthorization.request()
@@ -52,11 +42,6 @@ struct TranscribeArguments: Sendable {
   let transmissionGapSeconds: Double
   let engine: String
   let silenceRestart: Bool
-  // why: host-only override pointing at the leaf folder that directly contains the Parakeet
-  // CoreML bundle (streaming_encoder.mlmodelc/decoder.mlmodelc/joint_decision.mlmodelc/vocab.json).
-  // nil = resolve the pinned pack into the host cache and verify it. Only consulted by --engine
-  // parakeet.
-  let modelDir: URL?
 
   static func parse(_ arguments: [String]) throws -> TranscribeArguments {
     var audioURL: URL?
@@ -69,7 +54,6 @@ struct TranscribeArguments: Sendable {
     var transmissionGapSeconds = 3.5
     var engine = "apple"
     var silenceRestart = false
-    var modelDir: URL?
     var index = 0
 
     while index < arguments.count {
@@ -125,19 +109,13 @@ struct TranscribeArguments: Sendable {
       case "--engine":
         index += 1
         guard index < arguments.count,
-          ["apple", "whisperkit", "parakeet"].contains(arguments[index])
+          ["apple", "whisperkit"].contains(arguments[index])
         else {
           throw ReplayKitError.invalidArguments(
-            "Invalid value for --engine (supported: apple, whisperkit, parakeet)"
+            "Invalid value for --engine (supported: apple, whisperkit)"
           )
         }
         engine = arguments[index]
-      case "--model-dir":
-        index += 1
-        guard index < arguments.count else {
-          throw ReplayKitError.invalidArguments("Missing value for --model-dir")
-        }
-        modelDir = URL(fileURLWithPath: arguments[index], isDirectory: true)
       case "--silence-restart":
         index += 1
         guard index < arguments.count, let value = ToggleArgument(arguments[index]) else {
@@ -167,8 +145,7 @@ struct TranscribeArguments: Sendable {
       emitPartials: emitPartials,
       transmissionGapSeconds: transmissionGapSeconds,
       engine: engine,
-      silenceRestart: silenceRestart,
-      modelDir: modelDir
+      silenceRestart: silenceRestart
     )
   }
 }
@@ -291,7 +268,7 @@ private final class TranscribeRunner {
   private var closedTransmissions: [Transmission] = []
   // why: emulate the live engine's silence-driven recognition restart. SFSpeech .dictation never
   // self-finalizes on a pause, so the engine must DETECT the speech gap and recycle the request —
-  // exactly what a continuous live mic needs (the 2026-06-14 "one card forever" device report).
+  // exactly what a continuous live mic needs: without it one card grows forever.
   private let silenceSegmenter: EnergySilenceSegmenter?
   private let callSign: CallSign?
 

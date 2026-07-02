@@ -79,15 +79,13 @@ struct ContentView: View {
       let debugScriptedEngine: (any LiveTranscriptionEngine)? = nil
     #endif
     let whisperKitInstaller = WhisperKitModelInstaller()
-    let parakeetInstaller = ParakeetModelInstaller()
     let resolvedEngine =
       engine
       ?? debugScriptedEngine
       ?? Self.makeLiveTranscriptionEngine(
         recognition: recognitionSettings,
         voiceFilter: filter,
-        whisperKitInstaller: whisperKitInstaller,
-        parakeetInstaller: parakeetInstaller
+        whisperKitInstaller: whisperKitInstaller
       )
     let translationSettings = TranslationSettings()
     let live = LiveTranscriptionViewModel(
@@ -127,8 +125,7 @@ struct ContentView: View {
   private static func makeLiveTranscriptionEngine(
     recognition: RecognitionSettings,
     voiceFilter: VoiceFilterPipeline,
-    whisperKitInstaller: WhisperKitModelInstaller,
-    parakeetInstaller: ParakeetModelInstaller
+    whisperKitInstaller: WhisperKitModelInstaller
   ) -> any LiveTranscriptionEngine {
     switch recognition.engineChoice {
     case .apple:
@@ -152,25 +149,6 @@ struct ContentView: View {
       return WhisperKitLiveTranscriptionEngine(
         transcriber: WhisperKitTranscriberAdapter(),
         installedModelFolderURL: { whisperKitInstaller.installedModelFolderURL },
-        localeProvider: { recognition.localeIdentifier ?? recognition.activeLocaleIdentifier },
-        bufferGate: VoiceFilterSpeechAudioBufferGate(pipeline: voiceFilter)
-      )
-    case .parakeet:
-      guard parakeetInstaller.state.isInstalled,
-        parakeetInstaller.installedModelFolderURL != nil
-      else {
-        DspeechLog.engine.error(
-          "parakeet engine selected but local model is not installed; falling back to apple speech"
-        )
-        return makeAppleSpeechLiveTranscriptionEngine(
-          recognition: recognition,
-          voiceFilter: voiceFilter
-        )
-      }
-      DspeechLog.engine.info("parakeet engine selected with installed local model")
-      return ParakeetLiveTranscriptionEngine(
-        transcriber: SystemParakeetStreamingAdapter(),
-        installedModelFolderURL: { parakeetInstaller.installedModelFolderURL },
         localeProvider: { recognition.localeIdentifier ?? recognition.activeLocaleIdentifier },
         bufferGate: VoiceFilterSpeechAudioBufferGate(pipeline: voiceFilter)
       )
@@ -198,9 +176,8 @@ struct ContentView: View {
   }
 
   private var demoTranscriptSegmentsForDisplay: [TranscriptSegment] {
-    // why: the demo transcript is a first-run illustration ONLY — show it solely before the
-    // first Start, never over real content and never again after a real session (the
-    // "press Stop and my transcript turns back into demo" bug).
+    // why: the demo transcript is a first-run illustration only — shown solely before the
+    // first Start, never over real content and never again after a real session.
     guard liveViewModel.visibleSegments.isEmpty,
       liveViewModel.partialText.isEmpty,
       !liveViewModel.hasEverStarted
@@ -227,10 +204,10 @@ struct ContentView: View {
   private var emptyStateText: String {
     switch liveViewModel.status {
     case .idle, .stopped, .failed:
-      // why: the on-device-locale readiness check is Apple-Speech-specific. WhisperKit and
-      // Parakeet ship their own downloaded models and have no Apple per-language asset, so their
-      // idle screen must NOT claim "no recognition languages" — that gate only applies to Apple.
-      if recognition.engineChoice == .whisperKit || recognition.engineChoice == .parakeet {
+      // why: the on-device-locale readiness check is Apple-Speech-specific. WhisperKit ships its own
+      // downloaded model and has no Apple per-language asset, so its idle screen must NOT claim
+      // "no recognition languages" — that gate only applies to Apple.
+      if recognition.engineChoice == .whisperKit {
         return idleInviteText
       }
       // why: before the first Start, reflect whether on-device recognition is actually ready —
@@ -278,9 +255,9 @@ struct ContentView: View {
           filteredCountPill()
           // why: reserve real layout space (outside the auto-scrolling transcript) for the
           // first-run "Settings are here" coachmark that floats under the gear, so the first
-          // transcript card renders BELOW it. A scroll content inset did not work — the
+          // transcript card renders below it. A scroll content inset does not work — the
           // transcript auto-scrolls to the latest card, carrying any top inset off-screen,
-          // so the bubble kept obscuring the first card's text + ⋮ button (2026-06-13 review).
+          // so the bubble would obscure the first card's text and ⋮ button.
           if showHints {
             Color.clear.frame(height: isLandscape ? 40 : 56)
           }
@@ -290,9 +267,9 @@ struct ContentView: View {
         .padding(.horizontal, isLandscape ? 16 : 18)
         .padding(.top, isLandscape ? 6 : 10)
         .padding(.bottom, isLandscape ? 8 : 14)
-        // why: the first-run settings hint is a free-floating callout UNDER the gear —
-        // inline in the bar it fought title/chips/buttons for width on long locales and
-        // degraded into truncation (2026-06-11 visual review).
+        // why: the first-run settings hint is a free-floating callout under the gear —
+        // inline in the bar it fights title/chips/buttons for width on long locales and
+        // degrades into truncation.
         .overlay(alignment: .topTrailing) {
           if showHints {
             HintBubble(text: String(localized: "Settings are here"), pointer: .up)
@@ -301,8 +278,8 @@ struct ContentView: View {
           }
         }
         // why: bottom-anchored above the floating controls — the hint appears with the
-        // FIRST transmission card, which renders at the top; a top overlay sat on that
-        // card and obscured it (2026-06-12 visual review). Bottom space is empty at
+        // first transmission card, which renders at the top; a top overlay would sit on that
+        // card and obscure it. Bottom space is empty at
         // appearance time and sits next to the microphone the hint talks about.
         .overlay(alignment: .bottom) {
           if liveViewModel.oneTimeNoAnchorHintVisible {
@@ -332,8 +309,8 @@ struct ContentView: View {
           maxWidth: measure,
           showHints: showHints,
           isStopVisible: liveViewModel.canStopCurrentSession,
-          // why: NEVER disable the control while permission is being requested — that left the pilot
-          // stranded on a stuck "Requesting access" with no escape (2026-06-14). It shows Stop during
+          // why: never disable the control while permission is being requested — that would strand the
+          // pilot on a stuck "Requesting access" with no escape. It shows Stop during
           // .requestingPermission (canStopCurrentSession), and a tap routes to stop()/abort.
           disabled: false
         ) {
@@ -487,12 +464,10 @@ struct ContentView: View {
     }
   }
 
-  // why: E1/E2 — on regular width (iPad, iPad slide-over stays compact) the letterboxed phone
-  // layout is replaced by a real NavigationSplitView: the sidebar is the navigation (Live /
-  // History / Settings), the detail column hosts the cockpit or the re-housed History/Settings
-  // views (NOT sheets). The sidebar is system chrome, so it gets automatic glass — no custom
-  // glass is added (ADR 0013). The cockpit surface is the SAME `cockpitSurface` used on compact,
-  // so there is one live-transcript implementation, not a duplicate.
+  // why: E1/E2 — on regular width (iPad slide-over stays compact) the layout is a
+  // NavigationSplitView: sidebar navigation (Live / History / Settings), detail column hosts the
+  // cockpit or the History/Settings views (not sheets). The sidebar is system chrome (automatic
+  // glass, no custom glass — ADR 0013); the cockpit reuses the same `cockpitSurface` as compact.
   @ViewBuilder
   private var iPadSplitLayout: some View {
     NavigationSplitView {
@@ -550,7 +525,7 @@ struct ContentView: View {
 
   // why: on regular width the History/Settings surfaces are sidebar-driven detail columns, so
   // "open" means selecting the sidebar destination, not presenting a sheet. On compact the sheet
-  // path is unchanged (zero iPhone regression). Banners and the control-bar buttons both route
+  // path is used instead. Banners and the control-bar buttons both route
   // through here so every entry point adapts to the active layout.
   private func presentSettings() {
     if horizontalSizeClass == .regular {
@@ -821,10 +796,9 @@ struct ContentView: View {
     }
   }
 
-  // why: launch coachmark hints show ONLY in the pristine first-run idle state — never after the
-  // first Start, never with any prior/visible content (the bubbles cover real controls, e.g. the
-  // "Tap to start" bubble lands on Clear — an obscured-hit-region defect), and never at accessibility
-  // text sizes (they clip beside the floating controls). The guard below encodes all those conditions.
+  // why: launch coachmark hints show only in the pristine first-run idle state — never after the
+  // first Start, never with prior/visible content (bubbles would cover real controls and obscure
+  // hit regions), and never at accessibility text sizes (they clip beside the floating controls).
   private var showHints: Bool {
     liveViewModel.status == .idle && !dynamicTypeSize.isAccessibilitySize
       && !liveViewModel.hasEverStarted && liveViewModel.segments.isEmpty
@@ -855,11 +829,10 @@ enum SidebarDestination: Hashable {
   case settings
 }
 
-// why: E3 — the 720pt centered letterbox is gone. On compact the cockpit is full-bleed
-// (.infinity, centered is moot). In the split detail the column IS the width constraint, so the
-// content is capped to a comfortable reading measure and ANCHORED LEADING (topLeading ZStack)
-// instead of centered — the transcript, Clear control, and Start button all share the same
-// leading-anchored measure so they stay aligned.
+// why: E3 — on compact the cockpit is full-bleed (.infinity; centering is moot). In the split
+// detail the column is the width constraint, so content is capped to a comfortable reading
+// measure and anchored leading (topLeading ZStack), not centered — the transcript, Clear
+// control, and Start button share the same leading-anchored measure so they stay aligned.
 enum CockpitLayoutContext {
   case standalone
   case splitDetail
@@ -908,8 +881,8 @@ private struct TranscriptBottomOffsetPreferenceKey: PreferenceKey {
     func saveHasCompletedOnboarding(_ completed: Bool) {}
   }
 
-  // why: the Canvas preview's own tiny stand-in for AudioSessionRouting — the real fake now lives in
-  // the test target (never ships in the app). Static ready route, no mic hardware, empty event stream.
+  // why: the Canvas preview's own tiny stand-in for AudioSessionRouting (the shared test fake
+  // is not visible to the app target). Static ready route, no mic hardware, empty event stream.
   private struct PreviewAudioSessionRouting: AudioSessionRouting {
     let currentRouteSnapshot: RouteSnapshot
     let availableInputSnapshots: [PortSnapshot]

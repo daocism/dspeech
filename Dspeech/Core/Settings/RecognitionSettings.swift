@@ -28,11 +28,9 @@ enum RecognitionLocaleAvailabilityState: Equatable, Sendable {
 enum TranscriptionEngineChoice: String, Codable, Sendable, CaseIterable, Identifiable {
   case apple
   case whisperKit
-  // why: Parakeet EOU streaming (FluidAudio), English-only. Selectable only when the recognition
-  // locale is en-* (gated in the picker + defensively in the engine). Default stays .apple.
-  // Forward-only migration: older stored .apple/.whisperKit values still decode unchanged; an
-  // unknown raw value falls back to .apple via loadEngineChoice. (ADR-0012.)
-  case parakeet
+  // why: forward-only migration — older stored .apple/.whisperKit values still decode unchanged; an
+  // unknown or retired raw value falls back to .apple via loadEngineChoice. Retired raw values are
+  // migrated silently (not flagged corrupt) via retiredEngineRawValues.
 
   var id: String { rawValue }
 
@@ -42,8 +40,6 @@ enum TranscriptionEngineChoice: String, Codable, Sendable, CaseIterable, Identif
       return String(localized: "Apple Speech")
     case .whisperKit:
       return String(localized: "WhisperKit")
-    case .parakeet:
-      return String(localized: "Parakeet (EN)")
     }
   }
 }
@@ -66,6 +62,10 @@ struct UserDefaultsRecognitionSettingsStorage: RecognitionSettingsStorage, @unch
   static let localeKey = "dspeech.recognition.locale.v1"
   static let engineChoiceKey = "dspeech.recognition.engine.v1"
   static let transmissionGapSecondsDefaultsName = "dspeech.recognition.transmission-gap-seconds.v1"
+  // why: engine raw values retired from TranscriptionEngineChoice. A persisted value here is legacy
+  // data, not corruption — loadEngineChoice migrates it to .apple silently and loadIssue must NOT
+  // flag it corrupt. ("parakeet" retired 2026-07-02 after the first real EOU eval; ADR-0012 removed.)
+  static let retiredEngineRawValues: Set<String> = ["parakeet"]
 
   let defaults: UserDefaults
 
@@ -96,8 +96,8 @@ struct UserDefaultsRecognitionSettingsStorage: RecognitionSettingsStorage, @unch
 
   func loadTransmissionGapSeconds() -> TimeInterval {
     let stored = defaults.double(forKey: Self.transmissionGapSecondsDefaultsName)
-    // why: 2.0 matches the TransmissionAssembler tuning — 3.5 (the old value) merged close-together
-    // ATC exchanges into one card on a CLEAN install where the user never set this (2026-06-14 audit).
+    // why: 2.0 matches the TransmissionAssembler tuning — a larger gap merges close-together ATC
+    // exchanges into one card on a CLEAN install where the user never set this.
     guard stored > 0 else { return 2.0 }
     return clampTransmissionGapSeconds(stored)
   }
@@ -110,7 +110,8 @@ struct UserDefaultsRecognitionSettingsStorage: RecognitionSettingsStorage, @unch
 
   func loadIssue() -> SettingsStorageIssue? {
     if let raw = defaults.string(forKey: Self.engineChoiceKey),
-      TranscriptionEngineChoice(rawValue: raw) == nil
+      TranscriptionEngineChoice(rawValue: raw) == nil,
+      !Self.retiredEngineRawValues.contains(raw)
     {
       return .recognitionEngineCorrupted
     }

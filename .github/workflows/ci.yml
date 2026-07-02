@@ -98,8 +98,8 @@ jobs:
       # why: -test-iterations 2 with -retry-tests-on-failure costs 1x while green (extra
       # iterations run only for failing tests) and absorbs one hosted-runner transient.
       # why: run DspeechTests serially on the hosted runner. The @MainActor-heavy async
-      # engine/audio suites (AppleSpeech + AudioSource + the Parakeet EOU suites added in
-      # 3123265) all share the one MainActor executor; Swift Testing's default in-process
+      # engine/audio suites (AppleSpeech + AudioSource) all share the one MainActor
+      # executor; Swift Testing's default in-process
       # parallelism let them co-schedule and starve each other's drain/poll loops on the
       # CPU-starved runner (a ~1.3s local wait blew past the 30s budget → exit 65). Serial
       # execution removes the contention at the source — assertions and budgets stay strict,

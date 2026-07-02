@@ -7,9 +7,6 @@ enum DspeechLog {
   // why: ModelPackState.swift is symlinked into this tool and logs persist failures via
   // DspeechLog.modelPack; the stub must carry every category the symlinked sources reference.
   static let modelPack = Logger(subsystem: subsystem, category: "model-pack")
-  // why: ParakeetModelInstaller.swift (symlinked here to reuse the pinned supply-chain manifest
-  // for the host Parakeet arm) logs a persistence failure via DspeechLog.engine.
-  static let engine = Logger(subsystem: subsystem, category: "engine")
 }
 
 enum ReplayKitError: Error, CustomStringConvertible {
