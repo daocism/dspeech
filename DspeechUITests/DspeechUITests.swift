@@ -531,14 +531,16 @@ final class DspeechUITests: XCTestCase {
     ]
     app.launch()
 
+    // H4 — the safety advisory card leads the first-run sequence, before the receive-only card.
     XCTAssertTrue(
-      app.staticTexts["Только приём"].waitForExistence(timeout: 8),
-      "first run must show the onboarding receive-only card")
+      app.staticTexts["Только справочно"].waitForExistence(timeout: 8),
+      "first run must show the safety advisory card FIRST")
     XCTAssertFalse(
       app.buttons["onboarding-done-button"].exists,
       "done button must only appear on the last card")
 
-    for _ in 0..<2 {
+    // four cards now (advisory, receive-only, local, connect) — advance three times to the last.
+    for _ in 0..<3 {
       let next = app.buttons["onboarding-next-button"]
       XCTAssertTrue(next.waitForExistence(timeout: 4))
       next.tap()
@@ -554,7 +556,7 @@ final class DspeechUITests: XCTestCase {
       app.staticTexts["Dspeech"].waitForExistence(timeout: 6),
       "completing onboarding must reveal the transcript surface")
     XCTAssertFalse(
-      app.staticTexts["Только приём"].waitForExistence(timeout: 2),
+      app.staticTexts["Только справочно"].waitForExistence(timeout: 2),
       "onboarding must be dismissed after completion")
   }
 

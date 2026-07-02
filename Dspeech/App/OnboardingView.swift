@@ -6,6 +6,9 @@ struct OnboardingCard: Identifiable {
   let title: String
   let message: String
   let accessibilityIdentifier: String
+  // why: H4 — the safety advisory card leads with the theme warning tint so it reads as a caution,
+  // not brand chrome; the informational cards keep the accent. Defaulted so existing cards are terse.
+  var tint: Color = DspeechTheme.accent
 }
 
 struct OnboardingView: View {
@@ -30,9 +33,25 @@ struct OnboardingView: View {
     return animatesGlassMorph ? tinted.interactive() : tinted
   }
 
+  // why: H4 — the safety advisory is card 0 so it is the FIRST thing a first-run pilot reads, before
+  // any capability framing: the transcript is an advisory aid that can be wrong and never replaces
+  // listening to the radio/ATC. The informational cards follow. ids stay contiguous 0…3 so the paged
+  // `selection` tag and `isLastCard` (selection == count - 1) advance correctly.
   static let cards: [OnboardingCard] = [
     OnboardingCard(
       id: 0,
+      systemImage: "exclamationmark.triangle",
+      title: String(localized: "Advisory only"),
+      message:
+        String(
+          localized:
+            "Transcripts can be wrong or incomplete. Dspeech is an advisory aid and never replaces listening to the radio or ATC instructions."
+        ),
+      accessibilityIdentifier: "onboarding-card-advisory",
+      tint: DspeechTheme.warning
+    ),
+    OnboardingCard(
+      id: 1,
       systemImage: "antenna.radiowaves.left.and.right",
       title: String(localized: "Receive-only"),
       message:
@@ -43,7 +62,7 @@ struct OnboardingView: View {
       accessibilityIdentifier: "onboarding-card-receive-only"
     ),
     OnboardingCard(
-      id: 1,
+      id: 2,
       systemImage: "lock.shield",
       title: String(localized: "Local by default"),
       message:
@@ -51,7 +70,7 @@ struct OnboardingView: View {
       accessibilityIdentifier: "onboarding-card-local-first"
     ),
     OnboardingCard(
-      id: 2,
+      id: 3,
       systemImage: "cable.connector",
       title: String(localized: "Connect an input for accuracy"),
       message:
@@ -145,11 +164,16 @@ struct OnboardingView: View {
       if includeSpacers { Spacer() }
       Image(systemName: card.systemImage)
         .font(.system(size: iconSize, weight: .semibold))
-        .foregroundStyle(DspeechTheme.accent)
+        .foregroundStyle(card.tint)
       Text(card.title)
         .font(.system(.title, design: .rounded).weight(.bold))
         .foregroundStyle(.white)
         .multilineTextAlignment(.center)
+        // why: at AX-XL the longer localized titles (German "Nur zur Orientierung") wrap; without
+        // fixedSize the title is clipped instead of growing vertically. Horizontal margin lets it
+        // wrap inside the card rather than at the screen edge (matches the message row).
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(.horizontal, 24)
       Text(card.message)
         .font(.body.weight(.medium))
         .foregroundStyle(.white)
