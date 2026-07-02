@@ -123,6 +123,107 @@ struct LiveTranscriptionViewModelTests {
     }
   }
 
+  // why: C5 — a controllable `Clock` so throttle timing is deterministic in tests. Time only moves
+  // when `advance(by:)` is called; sleepers waiting on a passed deadline are resumed then.
+  final class ManualTestClock: Clock, @unchecked Sendable {
+    struct Instant: InstantProtocol {
+      var offset: Duration
+
+      func advanced(by duration: Duration) -> Instant { Instant(offset: offset + duration) }
+      func duration(to other: Instant) -> Duration { other.offset - offset }
+      static func < (lhs: Instant, rhs: Instant) -> Bool { lhs.offset < rhs.offset }
+    }
+
+    private struct Sleeper {
+      let id: UUID
+      let deadline: Instant
+      let continuation: CheckedContinuation<Void, any Error>
+    }
+
+    private let lock = NSLock()
+    private var current = Instant(offset: .zero)
+    private var sleepers: [Sleeper] = []
+
+    var now: Instant {
+      lock.lock()
+      defer { lock.unlock() }
+      return current
+    }
+
+    var minimumResolution: Duration { .zero }
+
+    func sleep(until deadline: Instant, tolerance: Duration?) async throws {
+      let id = UUID()
+      try await withTaskCancellationHandler {
+        try await withCheckedThrowingContinuation {
+          (continuation: CheckedContinuation<Void, any Error>) in
+          lock.lock()
+          if current.offset >= deadline.offset {
+            lock.unlock()
+            continuation.resume()
+            return
+          }
+          sleepers.append(Sleeper(id: id, deadline: deadline, continuation: continuation))
+          lock.unlock()
+        }
+      } onCancel: {
+        lock.lock()
+        let index = sleepers.firstIndex { $0.id == id }
+        let sleeper = index.map { sleepers.remove(at: $0) }
+        lock.unlock()
+        sleeper?.continuation.resume(throwing: CancellationError())
+      }
+    }
+
+    func advance(by duration: Duration) {
+      lock.lock()
+      current = current.advanced(by: duration)
+      let due = sleepers.filter { $0.deadline.offset <= current.offset }
+      sleepers.removeAll { $0.deadline.offset <= current.offset }
+      lock.unlock()
+      for sleeper in due { sleeper.continuation.resume() }
+    }
+  }
+
+  final class PublishSink: @unchecked Sendable {
+    var values: [String] = []
+  }
+
+  // why: C5 — models a throttle holding a buffered (unpublished) partial: `send` records but never
+  // publishes, `flush` publishes the latest held value, `reset` drops it. Lets the VM wiring be
+  // tested deterministically without any real throttle timing.
+  @MainActor
+  final class SpyPartialTextThrottle: PartialTextThrottling {
+    private(set) var sent: [String] = []
+    private(set) var published: [String] = []
+    private(set) var flushCount = 0
+    private(set) var resetCount = 0
+    private var publish: (@MainActor (String) -> Void)?
+
+    func begin(publish: @escaping @MainActor (String) -> Void) {
+      self.publish = publish
+    }
+
+    func send(_ text: String) {
+      sent.append(text)
+    }
+
+    func flush() {
+      flushCount += 1
+      if let last = sent.last {
+        published.append(last)
+        publish?(last)
+      }
+    }
+
+    func reset() {
+      resetCount += 1
+      sent.removeAll()
+    }
+
+    func end() {}
+  }
+
   struct StoreFailure: Error, Equatable {}
 
   final class FakeTranscriptStore: TranscriptStoring {
@@ -732,6 +833,71 @@ struct LiveTranscriptionViewModelTests {
     vm.reset()
     #expect(vm.segments.isEmpty)
     #expect(vm.partialText.isEmpty)
+  }
+
+  // why: C5 — throttling publishes the first partial immediately (low latency), holds a subsequent
+  // burst without publishing every value (a frozen clock never crosses the interval), and coalesces
+  // to the LATEST value, which `flush()` publishes.
+  @Test func throttlePublishesFirstImmediatelyHoldsBurstThenFlushesLatest() async {
+    let clock = ManualTestClock()
+    let throttle = ThrottledPartialText(interval: .milliseconds(100), clock: clock)
+    let sink = PublishSink()
+    throttle.begin { sink.values.append($0) }
+
+    throttle.send("a")
+    await wait(for: { sink.values == ["a"] })
+    throttle.send("b")
+    throttle.send("c")
+    for _ in 0..<10 { await Task.yield() }
+    // the burst is held — only the first value published while inside the interval
+    #expect(sink.values == ["a"])
+
+    throttle.flush()
+    await wait(for: { sink.values == ["a", "c"] })
+    #expect(sink.values == ["a", "c"])
+    throttle.end()
+  }
+
+  // why: C5 / D-1 regression — a partial still held in the throttle at Stop must be flushed into the
+  // transcript, never lost. The spy throttle models a buffered (unpublished) partial; Stop must call
+  // flush() so the held text reaches `partialText` and is committed as a segment.
+  @Test func stopFlushesHeldPartialSoSessionEndNeverLosesText() async {
+    let engine = FakeEngine()
+    let throttle = SpyPartialTextThrottle()
+    let vm = LiveTranscriptionViewModel(engine: engine, partialTextThrottle: throttle)
+    await vm.start()
+    await wait(for: { vm.status == .listening })
+
+    engine.push(.partial("cleared to land runway two seven"))
+    await wait(for: { throttle.sent == ["cleared to land runway two seven"] })
+    // the partial went through the throttle, NOT straight to partialText
+    #expect(vm.partialText.isEmpty)
+
+    vm.stop()
+
+    await wait(for: { vm.segments.contains { $0.text == "cleared to land runway two seven" } })
+    #expect(throttle.flushCount >= 1)
+    #expect(vm.segments.contains { $0.text == "cleared to land runway two seven" })
+  }
+
+  // why: C5 — a final segment must reset the throttle (dropping any held partial so it can never
+  // resurface over committed text) and clear `partialText` immediately, not on the throttle interval.
+  @Test func finalSegmentResetsThrottleAndClearsPartialImmediately() async {
+    let engine = FakeEngine()
+    let throttle = SpyPartialTextThrottle()
+    let vm = LiveTranscriptionViewModel(engine: engine, partialTextThrottle: throttle)
+    await vm.start()
+    await wait(for: { vm.status == .listening })
+
+    engine.push(.partial("held hypothesis"))
+    await wait(for: { throttle.sent == ["held hypothesis"] })
+
+    engine.push(.segment(makeSegment("Real final call"), speaker: nil))
+    await wait(for: { vm.segments.contains { $0.text == "Real final call" } })
+
+    #expect(throttle.resetCount >= 1)
+    #expect(vm.partialText.isEmpty)
+    #expect(throttle.published.isEmpty)
   }
 
   @Test func visibleSegmentsCapsLastFiveHundredAndCountsOlderHistory() async {

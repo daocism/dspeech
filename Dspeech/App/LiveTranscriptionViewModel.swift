@@ -1,5 +1,95 @@
+import AsyncAlgorithms
 import Foundation
 import Observation
+
+// why: C5 — the recognizer can emit a partial hypothesis many times per second. Publishing every one
+// straight to the `@Observable partialText` churns SwiftUI on long sessions. This throttles partial
+// UI publication (latest-value-wins) while keeping FINAL segments and Stop/finish immediate: `reset()`
+// drops a pending partial the instant a final arrives (so a stale hypothesis can never re-appear over
+// committed text), and `flush()` publishes the latest pending partial synchronously on Stop so the
+// session-end commit never loses in-flight text (the D-1 bug class).
+@MainActor
+protocol PartialTextThrottling: AnyObject {
+  func begin(publish: @escaping @MainActor (String) -> Void)
+  func send(_ text: String)
+  func flush()
+  func reset()
+  func end()
+}
+
+@MainActor
+final class ThrottledPartialText<C: Clock>: PartialTextThrottling
+where C.Instant.Duration == Duration {
+  private struct Update: Sendable {
+    let epoch: Int
+    let text: String
+  }
+
+  private let interval: Duration
+  private let clock: C
+  private var epoch = 0
+  private var latest = ""
+  private var hasPending = false
+  private var publish: (@MainActor (String) -> Void)?
+  private var continuation: AsyncStream<Update>.Continuation?
+  private var task: Task<Void, Never>?
+
+  init(interval: Duration = .milliseconds(100), clock: C) {
+    self.interval = interval
+    self.clock = clock
+  }
+
+  deinit {
+    task?.cancel()
+  }
+
+  func begin(publish: @escaping @MainActor (String) -> Void) {
+    self.publish = publish
+    guard task == nil else { return }
+    let (stream, continuation) = AsyncStream.makeStream(
+      of: Update.self, bufferingPolicy: .bufferingNewest(1))
+    self.continuation = continuation
+    // why: `_throttle` is the (currently underscore-prefixed) rate-limiter in swift-async-algorithms
+    // 1.1.5; `latest: true` keeps the most recent partial per interval.
+    let throttled = stream._throttle(for: interval, clock: clock, latest: true)
+    task = Task { @MainActor [weak self] in
+      for await update in throttled {
+        guard let self else { return }
+        // why: drop any value stamped with a superseded epoch — a `reset()`/`flush()` between the
+        // yield and this emission means a final segment already cleared/committed the partial.
+        guard update.epoch == self.epoch else { continue }
+        self.publish?(update.text)
+        self.hasPending = false
+      }
+    }
+  }
+
+  func send(_ text: String) {
+    latest = text
+    hasPending = true
+    continuation?.yield(Update(epoch: epoch, text: text))
+  }
+
+  func flush() {
+    guard hasPending else { return }
+    hasPending = false
+    epoch += 1
+    publish?(latest)
+  }
+
+  func reset() {
+    hasPending = false
+    latest = ""
+    epoch += 1
+  }
+
+  func end() {
+    task?.cancel()
+    task = nil
+    continuation?.finish()
+    continuation = nil
+  }
+}
 
 protocol NoAnchorHintStateStorage: Sendable {
   func loadHasShownNoAnchorHint() -> Bool
@@ -52,6 +142,9 @@ final class LiveTranscriptionViewModel {
   private let translator: (any TranslationService)?
   private let translationTarget: @MainActor () -> Locale.Language?
   private let now: @MainActor () -> Date
+  // why: C5 — throttles partial-hypothesis publication to `partialText` (latest-value-wins). Finals
+  // and Stop bypass it (reset/flush) so no in-flight text is ever lost.
+  private let partialTextThrottle: any PartialTextThrottling
   private let transmissionTickNanoseconds: UInt64
   // why: cap on the RAM-resident transmission cards (the disk store keeps the full record). Far
   // above the 500 visible-segment cap so live scrollback never hits the eviction boundary; older
@@ -94,7 +187,8 @@ final class LiveTranscriptionViewModel {
     now: @escaping @MainActor () -> Date = { Date() },
     transmissionTickNanoseconds: UInt64 = 500_000_000,
     transmissionWindowLimit: Int = 2_000,
-    visibleSegmentLimit: Int = 500
+    visibleSegmentLimit: Int = 500,
+    partialTextThrottle: (any PartialTextThrottling)? = nil
   ) {
     self.engine = engine
     self.transcriptStore = transcriptStore
@@ -109,8 +203,13 @@ final class LiveTranscriptionViewModel {
     self.transmissionTickNanoseconds = transmissionTickNanoseconds
     self.transmissionWindowLimit = transmissionWindowLimit
     self.visibleSegmentLimit = visibleSegmentLimit
+    self.partialTextThrottle =
+      partialTextThrottle ?? ThrottledPartialText(clock: ContinuousClock())
     self.hasEverStarted = firstSessionStorage.loadHasEverStarted()
     self.hasShownNoAnchorHint = noAnchorHintStorage.loadHasShownNoAnchorHint()
+    self.partialTextThrottle.begin { [weak self] text in
+      self?.partialText = text
+    }
   }
 
   var visibleSegments: [TranscriptSegment] {
@@ -163,9 +262,11 @@ final class LiveTranscriptionViewModel {
 
   func stop() {
     startInFlight = false
-    // why: pressing Stop must NOT discard what the user was watching. If a partial line is
-    // still on screen (the recognizer hasn't finalized it), commit it as a segment so the
-    // transcript persists instead of vanishing on teardown.
+    // why: pressing Stop must NOT discard what the user was watching. Flush any partial still held
+    // in the throttle into `partialText` synchronously (C5) BEFORE committing, so a not-yet-published
+    // hypothesis is never lost at session end. If a partial line is still on screen (the recognizer
+    // hasn't finalized it), commit it as a segment so the transcript persists instead of vanishing.
+    partialTextThrottle.flush()
     commitPartialAsSegment()
     engine.stop()
   }
@@ -194,6 +295,7 @@ final class LiveTranscriptionViewModel {
     displayedTransmissions.removeAll()
     filteredTransmissions.removeAll()
     transmissionAssembler = nil
+    partialTextThrottle.reset()
     partialText = ""
     oneTimeNoAnchorHintVisible = false
     suppressedSegmentIDs.removeAll()
@@ -526,16 +628,22 @@ final class LiveTranscriptionViewModel {
         guard let self else { return }
         switch event {
         case .partial(let text):
-          self.partialText = text
+          // why: C5 — throttle only the UI publication of the partial; the assembler still consumes
+          // every partial immediately so transmission assembly/classification is unaffected.
+          self.partialTextThrottle.send(text)
           self.processTransmissionInput(.partial(text: text, at: self.now()))
         case .segment(let segment, let speaker):
           self.handleFinalSegment(segment, speaker: speaker)
+          // why: a final arrived — drop any pending throttled partial (C5) so a stale hypothesis
+          // can never publish over the committed segment, then clear the on-screen partial.
+          self.partialTextThrottle.reset()
           self.partialText = ""
         case .taskRestart:
           // why: the engine has already committed the live partial as an interim
           // segment; clearing here prevents the stale partial from lingering until
           // the next task's first partial arrives.
           self.processTransmissionInput(.taskRestart(at: self.now()))
+          self.partialTextThrottle.reset()
           self.partialText = ""
         case .status(let newStatus):
           let oldStatus = self.status
@@ -548,12 +656,15 @@ final class LiveTranscriptionViewModel {
           if newStatus == .stopped {
             self.finishTransmissionAssembly(at: self.now())
             self.stopTransmissionTickLoop()
+            self.partialTextThrottle.reset()
             self.partialText = ""
             self.endPersistenceSessionIfNeeded()
           }
           if case .failed = newStatus {
             self.finishTransmissionAssembly(at: self.now())
             self.stopTransmissionTickLoop()
+            self.partialTextThrottle.reset()
+            self.partialText = ""
             self.endPersistenceSessionIfNeeded()
           }
         }
