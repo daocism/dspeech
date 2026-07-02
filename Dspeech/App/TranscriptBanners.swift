@@ -18,13 +18,19 @@ struct RouteBanner: View {
     .padding(.horizontal, 12)
     .padding(.vertical, 8)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background(
-      (canStart ? DspeechTheme.warning : DspeechTheme.danger).opacity(0.14),
-      in: RoundedRectangle(cornerRadius: DspeechTheme.bannerCornerRadius, style: .continuous)
+    // why: D7 — floating status chrome over the live transcript → .regular glass (ADR 0013
+    // rule 1/3), replacing the flat color.opacity(0.14) fill. Per-severity tint lives on the
+    // stroke + the coloured text, NOT the glass fill (a tinted glass would wash the same-hue
+    // text into it). Under Reduce Transparency .regular degrades to a solid dark material and
+    // the warning/danger text + stroke stay high-contrast.
+    .glassEffect(
+      .regular, in: .rect(cornerRadius: DspeechTheme.bannerCornerRadius, style: .continuous)
     )
     .overlay {
       RoundedRectangle(cornerRadius: DspeechTheme.bannerCornerRadius, style: .continuous)
-        .stroke((canStart ? DspeechTheme.warning : DspeechTheme.danger).opacity(0.4), lineWidth: 1)
+        .stroke(
+          (canStart ? DspeechTheme.warning : DspeechTheme.danger)
+            .opacity(DspeechTheme.chipStrokeOpacity), lineWidth: 1)
     }
     .accessibilityIdentifier("route-banner")
   }
@@ -56,9 +62,10 @@ struct BackgroundStopNoticeBanner: View {
     .padding(.horizontal, 12)
     .padding(.vertical, 8)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background(
-      Color.white.opacity(0.10), in: RoundedRectangle(cornerRadius: DspeechTheme.bannerCornerRadius)
-    )
+    // why: D7 — neutral informational banner → neutral .regular glass with a plain white
+    // hairline (no severity tint; this notice is not an error). Matches the glass idiom of
+    // the other floating banners.
+    .glassEffect(.regular, in: .rect(cornerRadius: DspeechTheme.bannerCornerRadius))
     .overlay {
       RoundedRectangle(cornerRadius: DspeechTheme.bannerCornerRadius)
         .stroke(Color.white.opacity(0.26), lineWidth: 1)
@@ -94,13 +101,11 @@ struct PersistenceFailureBanner: View {
     .padding(.horizontal, 12)
     .padding(.vertical, 8)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background(
-      DspeechTheme.warning.opacity(0.14),
-      in: RoundedRectangle(cornerRadius: DspeechTheme.bannerCornerRadius)
-    )
+    // why: D7 — warning-severity glass banner; tint on stroke + text only (see RouteBanner).
+    .glassEffect(.regular, in: .rect(cornerRadius: DspeechTheme.bannerCornerRadius))
     .overlay {
       RoundedRectangle(cornerRadius: DspeechTheme.bannerCornerRadius)
-        .stroke(DspeechTheme.warning.opacity(0.4), lineWidth: 1)
+        .stroke(DspeechTheme.warning.opacity(DspeechTheme.chipStrokeOpacity), lineWidth: 1)
     }
     .accessibilityIdentifier("persistence-failure-banner")
   }
@@ -130,7 +135,10 @@ struct TranslationFailureBanner: View {
           .minimumScaleFactor(0.65)
           .padding(.horizontal, 12)
           .frame(minHeight: 44)
-          .background(.black.opacity(0.32), in: Capsule())
+          // why: D7 — inner action reads as a control ON the glass banner, so it gets its own
+          // .regular glass capsule (mirrors LiveFailureBanner's Open-Settings button) instead
+          // of a flat black rect floating on the glass.
+          .glassEffect(.regular, in: Capsule())
       }
       .buttonStyle(.plain)
       .accessibilityIdentifier("translation-settings-action")
@@ -139,13 +147,11 @@ struct TranslationFailureBanner: View {
     .padding(.horizontal, 12)
     .padding(.vertical, 8)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background(
-      DspeechTheme.accent.opacity(0.12),
-      in: RoundedRectangle(cornerRadius: DspeechTheme.bannerCornerRadius)
-    )
+    // why: D7 — accent-tinted glass banner; tint on stroke + text only (see RouteBanner).
+    .glassEffect(.regular, in: .rect(cornerRadius: DspeechTheme.bannerCornerRadius))
     .overlay {
       RoundedRectangle(cornerRadius: DspeechTheme.bannerCornerRadius)
-        .stroke(DspeechTheme.accent.opacity(0.38), lineWidth: 1)
+        .stroke(DspeechTheme.accent.opacity(DspeechTheme.chipStrokeOpacity), lineWidth: 1)
     }
     .accessibilityIdentifier("translation-failure-banner")
   }
@@ -168,9 +174,13 @@ struct FilteredCountPill: View {
       .foregroundStyle(DspeechTheme.filtered)
       .padding(.horizontal, 12)
       .frame(minHeight: 44)
-      .background(DspeechTheme.filtered.opacity(0.14), in: Capsule())
+      // why: D8 — the filtered-count pill floats over the transcript → .regular glass capsule
+      // with a filtered-yellow tinted stroke, replacing the flat yellow.opacity(0.14) fill.
+      // Tint stays on the stroke + text so the yellow label reads against the glass.
+      .glassEffect(.regular, in: Capsule())
       .overlay {
-        Capsule().stroke(DspeechTheme.filtered.opacity(0.42), lineWidth: 1)
+        Capsule()
+          .stroke(DspeechTheme.filtered.opacity(DspeechTheme.chipStrokeOpacity), lineWidth: 1)
       }
     }
     .buttonStyle(.plain)
