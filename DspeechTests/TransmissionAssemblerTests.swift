@@ -48,10 +48,10 @@ struct TransmissionAssemblerTests {
   }
 
   @Test func reEmittedUnchangedPartialsDoNotKeepOneCardAliveAcrossASilenceGap() {
-    // why: THE 2026-06-14 device report ("one line, doesn't segment"). Apple SFSpeech re-emits the
-    // same growing transcription continuously, INCLUDING during a pause. The assembler refreshed
-    // the gap timer on every partial, so the silence gap never elapsed and the whole flight stayed
-    // ONE card. Two spoken transmissions separated by a real pause MUST become TWO cards.
+    // why: Apple SFSpeech re-emits the same growing transcription continuously, INCLUDING during a
+    // pause. Re-emitted unchanged partials must NOT refresh the gap timer, else the silence gap
+    // never elapses and the whole flight stays ONE card. Two spoken transmissions separated by a
+    // real pause MUST become TWO cards.
     var assembler = Self.makeAssembler()
     var opened = 0
     func apply(_ updates: [TransmissionUpdate]) {
@@ -307,10 +307,10 @@ struct TransmissionAssemblerTests {
 
   @Test func clampsOutOfRangeGapConfig() {
     #expect(
-      TransmissionAssemblerConfig(transmissionGapSeconds: 0.25, overlapMergeMinWords: 2)
+      TransmissionAssemblerConfig(transmissionGapSeconds: 0.25)
         .transmissionGapSeconds == 2)
     #expect(
-      TransmissionAssemblerConfig(transmissionGapSeconds: 12, overlapMergeMinWords: 2)
+      TransmissionAssemblerConfig(transmissionGapSeconds: 12)
         .transmissionGapSeconds == 6)
     #expect(TransmissionAssemblerConfig.default.transmissionGapSeconds == 2.0)
     #expect(TransmissionAssemblerConfig.default.overlapMergeMinWords == 2)

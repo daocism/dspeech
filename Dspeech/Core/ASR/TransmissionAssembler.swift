@@ -2,20 +2,16 @@ import Foundation
 
 struct TransmissionAssemblerConfig: Equatable, Sendable {
   var transmissionGapSeconds: TimeInterval
-  var overlapMergeMinWords: Int
+  // why: fixed, not an init knob — no caller varies it; an overlap of at
+  // least two words distinguishes a genuinely restated clearance from a stray shared token.
+  let overlapMergeMinWords: Int = 2
 
-  // why: 2.0s matches the cadence of real ATC — transmissions are separated by ~1-2s, and the
-  // gap timer only advances on NEW speech content (not re-emitted partials), so an in-transmission
-  // pause of a beat does not split. 3.5s was long enough that close-together exchanges merged into
-  // one card (2026-06-14 device report). Clamped to [2,6]; user-configurable.
-  static let `default` = TransmissionAssemblerConfig(
-    transmissionGapSeconds: 2.0,
-    overlapMergeMinWords: 2
-  )
+  // why: 2.0s matches real ATC cadence; the gap timer only advances on NEW speech content,
+  // so an in-transmission beat does not split a card. Clamped to [2,6]; user-configurable.
+  static let `default` = TransmissionAssemblerConfig(transmissionGapSeconds: 2.0)
 
-  init(transmissionGapSeconds: TimeInterval = 2.0, overlapMergeMinWords: Int = 2) {
+  init(transmissionGapSeconds: TimeInterval = 2.0) {
     self.transmissionGapSeconds = min(6, max(2, transmissionGapSeconds))
-    self.overlapMergeMinWords = max(1, overlapMergeMinWords)
   }
 }
 
@@ -42,7 +38,7 @@ struct TransmissionAssembler {
         id: id,
         startedAt: startedAt,
         // why: never let an interim restart commit / out-of-order evidence produce endedAt < startedAt
-        // (a crossed-timestamp card, 2026-06-14 audit). A transmission can't end before it began.
+        // (a crossed-timestamp card). A transmission can't end before it began.
         endedAt: max(startedAt, overrideEndedAt ?? endedAt),
         text: text,
         segments: segments,
@@ -92,8 +88,8 @@ struct TransmissionAssembler {
         }
       } else if trimmed != lastPartialText {
         // why: only NEW speech content keeps the transmission alive. A re-emitted unchanged partial
-        // during a pause is silence, not speech — refreshing the gap timer on it kept the whole
-        // flight as ONE card ("one line, doesn't segment", 2026-06-14 device report).
+        // during a pause is silence, not speech — refreshing the gap timer on it would keep the whole
+        // flight as ONE card that never segments.
         lastPartialText = trimmed
         openTransmission?.lastSpeechEvidenceAt = at
         openTransmission?.endedAt = at

@@ -221,7 +221,7 @@ struct CallSignTests {
   @Test("should preserve callsign matching across 1000 generated spoken registrations")
   func shouldPreserveCallSignMatchingAcross1000GeneratedSpokenRegistrations() throws {
     let generatedCaseCount = 1_000
-    var random = DeterministicCallSignRandom(seed: 0xD5_06_11_03)
+    var random = SeededGenerator(seed: 0xD5_06_11_03)
 
     for _ in 0..<generatedCaseCount {
       let registration = Self.registration(random: &random)
@@ -242,17 +242,17 @@ struct CallSignTests {
   @Test("should keep generated abbreviated callsigns out of the full-match tier")
   func shouldKeepGeneratedAbbreviatedCallSignsOutOfFullMatchTier() throws {
     let generatedCaseCount = 500
-    var random = DeterministicCallSignRandom(seed: 0xD5_06_11_04)
+    var random = SeededGenerator(seed: 0xD5_06_11_04)
 
     for _ in 0..<generatedCaseCount {
-      let registration = Self.registration(random: &random)
+      // why: the abbreviation tier needs a >=2-char tail, so the generator domain for THIS
+      // property starts at two tail characters — a 1-char registration is a valid callsign
+      // but not a member of this property's input class.
+      let registration = Self.registration(random: &random, minimumTailCount: 2)
       let callSign = try #require(CallSign(raw: registration))
       let suffix = Array(callSign.normalized.dropFirst())
-      guard suffix.count >= 2 else {
-        Issue.record("generated registration must include an abbreviated suffix")
-        return
-      }
-      let tailLength = random.int(in: 2...suffix.count)
+      try #require(suffix.count >= 2)
+      let tailLength = Int.random(in: 2...suffix.count, using: &random)
       let tail = String(suffix.suffix(tailLength))
       let spokenTail = tail.map {
         Self.spokenToken(for: $0, random: &random)
@@ -269,7 +269,7 @@ struct CallSignTests {
   @Test("should preserve French callsign matching across 500 generated spoken registrations")
   func shouldPreserveFrenchCallSignMatchingAcross500GeneratedSpokenRegistrations() throws {
     let generatedCaseCount = 500
-    var random = DeterministicCallSignRandom(seed: 0xD5_06_12_05)
+    var random = SeededGenerator(seed: 0xD5_06_12_05)
 
     for _ in 0..<generatedCaseCount {
       let registration = Self.registration(random: &random)
@@ -287,38 +287,19 @@ struct CallSignTests {
     #expect(generatedCaseCount == 500)
   }
 
-  private struct DeterministicCallSignRandom {
-    private var state: UInt64
-
-    init(seed: UInt64) {
-      self.state = seed
-    }
-
-    mutating func next() -> UInt64 {
-      state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
-      return state
-    }
-
-    mutating func int(in range: ClosedRange<Int>) -> Int {
-      let span = UInt64(range.upperBound - range.lowerBound + 1)
-      return range.lowerBound + Int(next() % span)
-    }
-
-    mutating func bool() -> Bool {
-      next().isMultiple(of: 2)
-    }
-  }
-
   private static let registrationPrefixes = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
   private static let registrationTailCharacters = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 
-  private static func registration(random: inout DeterministicCallSignRandom) -> String {
-    let prefix = registrationPrefixes[random.int(in: 0...(registrationPrefixes.count - 1))]
-    let tailCount = random.int(in: 1...4)
+  private static func registration(
+    random: inout SeededGenerator, minimumTailCount: Int = 1
+  ) -> String {
+    let prefix = registrationPrefixes[
+      Int.random(in: 0...(registrationPrefixes.count - 1), using: &random)]
+    let tailCount = Int.random(in: minimumTailCount...4, using: &random)
     var result = String(prefix)
     for _ in 0..<tailCount {
       let next = registrationTailCharacters[
-        random.int(in: 0...(registrationTailCharacters.count - 1))]
+        Int.random(in: 0...(registrationTailCharacters.count - 1), using: &random)]
       result.append(next)
     }
     return result
@@ -326,7 +307,7 @@ struct CallSignTests {
 
   private static func nonCollidingRegistration(
     with registration: String,
-    random: inout DeterministicCallSignRandom
+    random: inout SeededGenerator
   ) -> String {
     let ownKeys = matchKeys(for: registration)
     while true {
@@ -339,21 +320,21 @@ struct CallSignTests {
 
   private static func render(
     registration: String,
-    random: inout DeterministicCallSignRandom
+    random: inout SeededGenerator
   ) -> String {
     let characters = Array(registration)
     let suffix = Array(characters.dropFirst())
-    let useAbbreviation = suffix.count >= 2 && random.int(in: 0...2) != 0
+    let useAbbreviation = suffix.count >= 2 && Int.random(in: 0...2, using: &random) != 0
     let selected: [Character]
     if useAbbreviation {
-      let tailLength = random.int(in: 2...suffix.count)
+      let tailLength = Int.random(in: 2...suffix.count, using: &random)
       let tail = Array(suffix.suffix(tailLength))
-      selected = random.bool() ? [characters[0]] + tail : tail
+      selected = Bool.random(using: &random) ? [characters[0]] + tail : tail
     } else {
       selected = characters
     }
 
-    if random.int(in: 0...3) == 0 {
+    if Int.random(in: 0...3, using: &random) == 0 {
       return String(selected)
     }
     return selected.map { spokenToken(for: $0, random: &random) }.joined(separator: " ")
@@ -361,14 +342,14 @@ struct CallSignTests {
 
   private static func renderFrench(
     registration: String,
-    random: inout DeterministicCallSignRandom
+    random: inout SeededGenerator
   ) -> String {
     Array(registration).map { frenchSpokenToken(for: $0, random: &random) }.joined(separator: " ")
   }
 
   private static func spokenToken(
     for character: Character,
-    random: inout DeterministicCallSignRandom
+    random: inout SeededGenerator
   ) -> String {
     let variants: [String]
     switch character {
@@ -410,12 +391,12 @@ struct CallSignTests {
     case "9": variants = ["Nine", "Niner"]
     default: variants = [String(character)]
     }
-    return variants[random.int(in: 0...(variants.count - 1))]
+    return variants[Int.random(in: 0...(variants.count - 1), using: &random)]
   }
 
   private static func frenchSpokenToken(
     for character: Character,
-    random: inout DeterministicCallSignRandom
+    random: inout SeededGenerator
   ) -> String {
     let variants: [String]
     switch character {
@@ -457,7 +438,7 @@ struct CallSignTests {
     case "9": variants = ["Neuf"]
     default: variants = [String(character)]
     }
-    return variants[random.int(in: 0...(variants.count - 1))]
+    return variants[Int.random(in: 0...(variants.count - 1), using: &random)]
   }
 
   private static func matchKeys(for registration: String) -> Set<String> {
@@ -477,7 +458,6 @@ struct CallSignTests {
   // why: regression — the full call-sign must match a run that EQUALS it or is it followed by a
   // DIGIT (own read-back number). It must NOT match traffic addressed to ANOTHER aircraft whose
   // decoded run merely contains ours embedded (mid/suffix) or extended by more phonetic letters.
-  // Found by adversarial review 2026-06-13.
   @Test func ownCallSignFollowedByReadbackDigitsMatches() throws {
     let cs = try #require(CallSign(raw: "N123AB"))
     #expect(cs.matches(in: "November one two three alpha bravo two seven"))
