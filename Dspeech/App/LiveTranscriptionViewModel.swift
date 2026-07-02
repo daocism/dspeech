@@ -704,9 +704,34 @@ final class LiveTranscriptionViewModel {
       let session = try transcriptStore.beginSession(localeIdentifier: localeIdentifier)
       activeTranscriptSessionID = session.id
       mostRecentTranscriptSessionID = session.id
+      if let engineName = Self.engineDisplayName(for: engine) {
+        do {
+          try transcriptStore.setEngine(engineName, for: session.id)
+        } catch {
+          // why: engine metadata is history garnish, not flight data — losing it must not
+          // surface the persistence-failure banner that real transcript loss earns.
+          DspeechLog.persistence.error(
+            "failed to record engine name on session summary: \(String(describing: error))")
+        }
+      }
     } catch {
       persistenceUnavailableForCurrentSession = true
       recordPersistenceFailure()
+    }
+  }
+
+  // why: history metadata records the RESOLVED engine (post-fallback), not the settings
+  // choice — a Parakeet selection that fell back to Apple must read "Apple Speech".
+  private static func engineDisplayName(for engine: any LiveTranscriptionEngine) -> String? {
+    switch engine {
+    case is AppleSpeechLiveTranscriptionEngine:
+      return TranscriptionEngineChoice.apple.displayName
+    case is WhisperKitLiveTranscriptionEngine:
+      return TranscriptionEngineChoice.whisperKit.displayName
+    case is ParakeetLiveTranscriptionEngine:
+      return TranscriptionEngineChoice.parakeet.displayName
+    default:
+      return nil
     }
   }
 

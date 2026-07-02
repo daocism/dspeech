@@ -1,4 +1,41 @@
 import SwiftUI
+import UniformTypeIdentifiers
+
+// why: C6 — a Transferable document so the JSONL/text share produces a real file with the right
+// extension in the share sheet (Files, Mail, AirDrop) rather than an untyped text blob. Local-only:
+// the bytes are the already-persisted transcript, nothing new leaves the device that the user
+// didn't explicitly share.
+private struct TranscriptExportFile: Transferable {
+  let text: String
+  let filename: String
+
+  static var transferRepresentation: some TransferRepresentation {
+    DataRepresentation(exportedContentType: .plainText) { file in
+      Data(file.text.utf8)
+    }
+    .suggestedFileName { $0.filename }
+  }
+}
+
+// why: session-metadata formatting (C7) kept pure and off the views — duration is honest "—" for a
+// recovered session (no clean end), engine is "—" when a pre-C7 summary never recorded it.
+enum SessionMetadataFormat {
+  static func duration(_ seconds: TimeInterval?) -> String {
+    guard let seconds else { return "—" }
+    let total = Int(seconds.rounded())
+    let hours = total / 3600
+    let minutes = (total % 3600) / 60
+    let secs = total % 60
+    return hours > 0
+      ? String(format: "%d:%02d:%02d", hours, minutes, secs)
+      : String(format: "%d:%02d", minutes, secs)
+  }
+
+  static func engine(_ engineDisplayName: String?) -> String {
+    guard let engineDisplayName, !engineDisplayName.isEmpty else { return "—" }
+    return engineDisplayName
+  }
+}
 
 @MainActor
 struct SessionHistoryView: View {
@@ -109,6 +146,19 @@ private struct SessionSummaryRow: View {
         )
         .font(.footnote.monospacedDigit())
         .foregroundStyle(.secondary)
+        // why: C7 — duration + engine surfaced as a compact second metadata line; honest "—" when a
+        // recovered session has no clean duration or a pre-C7 summary recorded no engine.
+        Text(
+          String(
+            localized:
+              "\(SessionMetadataFormat.duration(session.durationSeconds)) · \(SessionMetadataFormat.engine(session.engineDisplayName))"
+          )
+        )
+        .font(.caption.monospacedDigit())
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+        .minimumScaleFactor(0.7)
+        .accessibilityIdentifier("session-history-row-metadata")
       }
       Spacer(minLength: 0)
       SessionStatusBadge(recovered: session.endedAt == nil)
@@ -158,6 +208,7 @@ private struct SessionHistoryDetailView: View {
 
   @State private var segments: [TranscriptSegment] = []
   @State private var exportText: String?
+  @State private var exportJSONL: String?
   @State private var failureMessage: String?
 
   var body: some View {
@@ -166,6 +217,22 @@ private struct SessionHistoryDetailView: View {
         Text(failureMessage)
           .font(.footnote)
           .foregroundStyle(DspeechTheme.warning)
+      }
+      Section {
+        LabeledContent(
+          String(localized: "Duration"),
+          value: SessionMetadataFormat.duration(session.durationSeconds)
+        )
+        .accessibilityIdentifier("session-detail-duration")
+        LabeledContent(
+          String(localized: "Engine"),
+          value: SessionMetadataFormat.engine(session.engineDisplayName)
+        )
+        .accessibilityIdentifier("session-detail-engine")
+        LabeledContent(String(localized: "Recognition language"), value: session.localeIdentifier)
+          .accessibilityIdentifier("session-detail-locale")
+      } header: {
+        Text(String(localized: "Session"))
       }
       Section {
         ForEach(segments) { segment in
@@ -197,8 +264,23 @@ private struct SessionHistoryDetailView: View {
     .navigationBarTitleDisplayMode(.inline)
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
-        if let exportText {
-          ShareLink(item: exportText) {
+        if let exportText, let exportJSONL {
+          Menu {
+            ShareLink(
+              item: TranscriptExportFile(text: exportText, filename: exportFilename(ext: "txt")),
+              preview: SharePreview(String(localized: "Transcript (text)"))
+            ) {
+              Label(String(localized: "Share as text"), systemImage: "doc.plaintext")
+            }
+            .accessibilityIdentifier("session-history-share-text")
+            ShareLink(
+              item: TranscriptExportFile(text: exportJSONL, filename: exportFilename(ext: "jsonl")),
+              preview: SharePreview(String(localized: "Transcript (JSONL)"))
+            ) {
+              Label(String(localized: "Share as JSONL"), systemImage: "curlybraces")
+            }
+            .accessibilityIdentifier("session-history-share-jsonl")
+          } label: {
             Label(String(localized: "Share"), systemImage: "square.and.arrow.up")
           }
           .accessibilityIdentifier("session-history-share")
@@ -208,10 +290,15 @@ private struct SessionHistoryDetailView: View {
     .onAppear { load() }
   }
 
+  private func exportFilename(ext: String) -> String {
+    "Dspeech-transcript-\(session.id.uuidString.prefix(8)).\(ext)"
+  }
+
   private func load() {
     do {
       segments = try store.segments(in: session.id)
       exportText = try store.exportText(for: session.id)
+      exportJSONL = try store.exportJSONL(for: session.id)
       failureMessage = nil
     } catch {
       failureMessage = String(localized: "Couldn't load this transcript.")

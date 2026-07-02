@@ -5,6 +5,7 @@ struct SettingsView: View {
   @Bindable var privacy: PrivacySettings
   @Bindable var recognition: RecognitionSettings
   @Bindable var translation: TranslationSettings
+  @Bindable var retention: TranscriptRetentionSettings
   var audioSource: AudioSourceController
   var translationFailure: TranslationFailure?
   var captureActive: Bool
@@ -19,11 +20,13 @@ struct SettingsView: View {
     translationFailure: TranslationFailure? = nil,
     captureActive: Bool = false,
     voiceFilter: VoiceFilterPipeline? = nil,
+    retention: TranscriptRetentionSettings = TranscriptRetentionSettings(),
     onVoiceFilterDisabled: @escaping () -> Void = {}
   ) {
     self.privacy = privacy
     self.recognition = recognition
     self.translation = translation
+    self.retention = retention
     self.audioSource = audioSource
     self.translationFailure = translationFailure
     self.captureActive = captureActive
@@ -37,6 +40,15 @@ struct SettingsView: View {
   @State private var appLanguage: String = Self.currentAppLanguagePickerTag()
   @State private var whisperKitInstaller = WhisperKitModelInstaller()
   @State private var parakeetInstaller = ParakeetModelInstaller()
+  // why: C3 — the SwiftUI download tasks are held so Pause can cancel them. Cancellation propagates
+  // into the shared installer engine (Task.checkCancellation between files), which preserves the C1
+  // staging cache, so Resume continues from the kept bytes instead of restarting at zero. This holds
+  // no download logic — it only owns the task handle.
+  @State private var whisperKitDownloadTask: Task<Void, Never>?
+  @State private var parakeetDownloadTask: Task<Void, Never>?
+  // why: C8 — transcript-store footprint computed OFF the main actor in a detached task and cached
+  // here; a nil value renders as "Calculating…". Recomputed on appear and after a cleanup toggle.
+  @State private var transcriptStorageBytes: Int64?
 
   private static let appLanguages: [(code: String, name: String)] = [
     ("", String(localized: "System")),
@@ -330,12 +342,14 @@ struct SettingsView: View {
         } footer: {
           Text(String(localized: "Restart the app to change the language."))
         }
+        storageSection
         Section(String(localized: "About")) {
           LabeledContent(String(localized: "Version"), value: Bundle.main.shortVersion)
         }
       }
       .onAppear { audioSource.refresh() }
       .task { await recognition.refreshCapableLocales() }
+      .task(id: retention.autoCleanupEnabled) { await refreshTranscriptStorageUsage() }
       .onChange(of: recognition.localeIdentifier) {
         Task { await recognition.refreshSelectedDownloadState() }
         // why: if the user switches to a non-English recognition locale while Parakeet is the
@@ -435,38 +449,60 @@ struct SettingsView: View {
     }
   }
 
+  @ViewBuilder
   private var parakeetAbsentContent: some View {
+    if parakeetInstaller.hasPartialStaging {
+      parakeetPausedResumeContent
+    } else {
+      VStack(alignment: .leading, spacing: 8) {
+        parakeetStatusRow(
+          title: String(localized: "Model not installed"),
+          detail: String(localized: "Required download") + ": "
+            + byteString(ParakeetModelInstaller.expectedModelSizeBytes)
+        )
+        if recognition.engineChoice == .parakeet {
+          Text(
+            String(
+              localized:
+                "Download the Parakeet model before using it. Until then, Dspeech falls back to Apple Speech."
+            )
+          )
+          .font(.footnote)
+          .foregroundStyle(DspeechTheme.warning)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .fixedSize(horizontal: false, vertical: true)
+        }
+        Button {
+          startParakeetDownload()
+        } label: {
+          Label(
+            String(
+              localized:
+                "Install Parakeet (English, \(byteString(ParakeetModelInstaller.expectedModelSizeBytes)))"
+            ),
+            systemImage: "arrow.down.circle.fill"
+          )
+        }
+        .buttonStyle(.borderedProminent)
+        .accessibilityIdentifier("parakeet-model-download")
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+    }
+  }
+
+  private var parakeetPausedResumeContent: some View {
     VStack(alignment: .leading, spacing: 8) {
       parakeetStatusRow(
-        title: String(localized: "Model not installed"),
-        detail: String(localized: "Required download") + ": "
-          + byteString(ParakeetModelInstaller.expectedModelSizeBytes)
+        title: String(localized: "Download paused"),
+        detail: pausedKeptDetail(fraction: parakeetInstaller.stagedFractionKept)
       )
-      if recognition.engineChoice == .parakeet {
-        Text(
-          String(
-            localized:
-              "Download the Parakeet model before using it. Until then, Dspeech falls back to Apple Speech."
-          )
-        )
-        .font(.footnote)
-        .foregroundStyle(DspeechTheme.warning)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .fixedSize(horizontal: false, vertical: true)
-      }
       Button {
-        Task { await parakeetInstaller.install() }
+        startParakeetDownload()
       } label: {
-        Label(
-          String(
-            localized:
-              "Install Parakeet (English, \(byteString(ParakeetModelInstaller.expectedModelSizeBytes)))"
-          ),
-          systemImage: "arrow.down.circle.fill"
-        )
+        Label(String(localized: "Resume download"), systemImage: "arrow.down.circle.fill")
       }
       .buttonStyle(.borderedProminent)
-      .accessibilityIdentifier("parakeet-model-download")
+      .accessibilityIdentifier("parakeet-model-resume")
     }
     .frame(maxWidth: .infinity, alignment: .leading)
   }
@@ -487,6 +523,13 @@ struct SettingsView: View {
       .font(.footnote.weight(.medium))
       .foregroundStyle(.secondary)
       .accessibilityIdentifier("parakeet-model-downloading")
+      Button {
+        pauseParakeetDownload()
+      } label: {
+        Label(String(localized: "Pause"), systemImage: "pause.circle")
+      }
+      .buttonStyle(.bordered)
+      .accessibilityIdentifier("parakeet-model-pause")
     }
     .frame(maxWidth: .infinity, alignment: .leading)
   }
@@ -507,21 +550,28 @@ struct SettingsView: View {
     .frame(maxWidth: .infinity, alignment: .leading)
   }
 
+  @ViewBuilder
   private func parakeetFailedContent(_ failure: ParakeetModelInstallFailure) -> some View {
-    VStack(alignment: .leading, spacing: 8) {
-      parakeetStatusRow(
-        title: String(localized: "Model install failed"),
-        detail: failure.userSafeReason
-      )
-      if failure.isRetryable {
-        Button(String(localized: "Retry Parakeet download")) {
-          Task { await parakeetInstaller.install() }
+    // why: a paused (cancelled) download is not an error — surface it as a resumable pause with the
+    // kept-bytes copy, not a red "install failed" retry.
+    if failure.kind == .cancelled {
+      parakeetPausedResumeContent
+    } else {
+      VStack(alignment: .leading, spacing: 8) {
+        parakeetStatusRow(
+          title: String(localized: "Model install failed"),
+          detail: failure.userSafeReason
+        )
+        if failure.isRetryable {
+          Button(String(localized: "Retry Parakeet download")) {
+            startParakeetDownload()
+          }
+          .buttonStyle(.bordered)
+          .accessibilityIdentifier("parakeet-model-retry")
         }
-        .buttonStyle(.bordered)
-        .accessibilityIdentifier("parakeet-model-retry")
       }
+      .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .frame(maxWidth: .infinity, alignment: .leading)
   }
 
   private func parakeetStatusRow(title: String, detail: String) -> some View {
@@ -553,36 +603,58 @@ struct SettingsView: View {
     }
   }
 
+  @ViewBuilder
   private var whisperKitAbsentContent: some View {
+    if whisperKitInstaller.hasPartialStaging {
+      whisperKitPausedResumeContent
+    } else {
+      VStack(alignment: .leading, spacing: 8) {
+        whisperKitStatusRow(
+          title: String(localized: "Model not installed"),
+          detail: String(localized: "Required download") + ": "
+            + byteString(WhisperKitModelInstaller.expectedModelSizeBytes)
+        )
+        if recognition.engineChoice == .whisperKit {
+          Text(
+            String(
+              localized:
+                "Download the model before using WhisperKit. Until then, Dspeech falls back to Apple Speech."
+            )
+          )
+          .font(.footnote)
+          .foregroundStyle(DspeechTheme.warning)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .fixedSize(horizontal: false, vertical: true)
+        }
+        Button {
+          startWhisperKitDownload()
+        } label: {
+          Label(
+            String(localized: "Download WhisperKit model") + " ("
+              + byteString(WhisperKitModelInstaller.expectedModelSizeBytes) + ")",
+            systemImage: "arrow.down.circle.fill"
+          )
+        }
+        .buttonStyle(.borderedProminent)
+        .accessibilityIdentifier("whisperkit-model-download")
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+    }
+  }
+
+  private var whisperKitPausedResumeContent: some View {
     VStack(alignment: .leading, spacing: 8) {
       whisperKitStatusRow(
-        title: String(localized: "Model not installed"),
-        detail: String(localized: "Required download") + ": "
-          + byteString(WhisperKitModelInstaller.expectedModelSizeBytes)
+        title: String(localized: "Download paused"),
+        detail: pausedKeptDetail(fraction: whisperKitInstaller.stagedFractionKept)
       )
-      if recognition.engineChoice == .whisperKit {
-        Text(
-          String(
-            localized:
-              "Download the model before using WhisperKit. Until then, Dspeech falls back to Apple Speech."
-          )
-        )
-        .font(.footnote)
-        .foregroundStyle(DspeechTheme.warning)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .fixedSize(horizontal: false, vertical: true)
-      }
       Button {
-        Task { await whisperKitInstaller.install() }
+        startWhisperKitDownload()
       } label: {
-        Label(
-          String(localized: "Download WhisperKit model") + " ("
-            + byteString(WhisperKitModelInstaller.expectedModelSizeBytes) + ")",
-          systemImage: "arrow.down.circle.fill"
-        )
+        Label(String(localized: "Resume download"), systemImage: "arrow.down.circle.fill")
       }
       .buttonStyle(.borderedProminent)
-      .accessibilityIdentifier("whisperkit-model-download")
+      .accessibilityIdentifier("whisperkit-model-resume")
     }
     .frame(maxWidth: .infinity, alignment: .leading)
   }
@@ -603,6 +675,13 @@ struct SettingsView: View {
       .font(.footnote.weight(.medium))
       .foregroundStyle(.secondary)
       .accessibilityIdentifier("whisperkit-model-downloading")
+      Button {
+        pauseWhisperKitDownload()
+      } label: {
+        Label(String(localized: "Pause"), systemImage: "pause.circle")
+      }
+      .buttonStyle(.bordered)
+      .accessibilityIdentifier("whisperkit-model-pause")
     }
     .frame(maxWidth: .infinity, alignment: .leading)
   }
@@ -623,21 +702,28 @@ struct SettingsView: View {
     .frame(maxWidth: .infinity, alignment: .leading)
   }
 
+  @ViewBuilder
   private func whisperKitFailedContent(_ failure: WhisperKitModelInstallFailure) -> some View {
-    VStack(alignment: .leading, spacing: 8) {
-      whisperKitStatusRow(
-        title: String(localized: "Model install failed"),
-        detail: failure.userSafeReason
-      )
-      if failure.isRetryable {
-        Button(String(localized: "Retry WhisperKit download")) {
-          Task { await whisperKitInstaller.install() }
+    // why: a paused (cancelled) download is not an error — surface it as a resumable pause with the
+    // kept-bytes copy, not a red "install failed" retry.
+    if failure.kind == .cancelled {
+      whisperKitPausedResumeContent
+    } else {
+      VStack(alignment: .leading, spacing: 8) {
+        whisperKitStatusRow(
+          title: String(localized: "Model install failed"),
+          detail: failure.userSafeReason
+        )
+        if failure.isRetryable {
+          Button(String(localized: "Retry WhisperKit download")) {
+            startWhisperKitDownload()
+          }
+          .buttonStyle(.bordered)
+          .accessibilityIdentifier("whisperkit-model-retry")
         }
-        .buttonStyle(.bordered)
-        .accessibilityIdentifier("whisperkit-model-retry")
       }
+      .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .frame(maxWidth: .infinity, alignment: .leading)
   }
 
   private func whisperKitStatusRow(title: String, detail: String) -> some View {
@@ -657,6 +743,104 @@ struct SettingsView: View {
 
   private func byteString(_ bytes: Int64) -> String {
     ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+  }
+
+  // MARK: - C3 pause / resume
+
+  private func startWhisperKitDownload() {
+    whisperKitDownloadTask?.cancel()
+    whisperKitDownloadTask = Task { await whisperKitInstaller.install() }
+  }
+
+  private func pauseWhisperKitDownload() {
+    whisperKitDownloadTask?.cancel()
+    whisperKitDownloadTask = nil
+  }
+
+  private func startParakeetDownload() {
+    parakeetDownloadTask?.cancel()
+    parakeetDownloadTask = Task { await parakeetInstaller.install() }
+  }
+
+  private func pauseParakeetDownload() {
+    parakeetDownloadTask?.cancel()
+    parakeetDownloadTask = nil
+  }
+
+  private func pausedKeptDetail(fraction: Double) -> String {
+    guard fraction > 0 else { return String(localized: "Paused") }
+    let percent = Int((fraction * 100).rounded())
+    return String(localized: "Paused — \(percent)% kept")
+  }
+
+  // MARK: - C8 storage footprint + retention cleanup
+
+  private func refreshTranscriptStorageUsage() async {
+    let bytes = await Task.detached(priority: .utility) {
+      FileTranscriptStore.totalDiskUsageBytes()
+    }.value
+    transcriptStorageBytes = bytes
+  }
+
+  private var storageSection: some View {
+    Section {
+      LabeledContent(String(localized: "Transcripts on device")) {
+        if let transcriptStorageBytes {
+          Text(byteString(transcriptStorageBytes))
+            .foregroundStyle(.secondary)
+            .accessibilityIdentifier("storage-usage-value")
+        } else {
+          Text(String(localized: "Calculating…"))
+            .foregroundStyle(.secondary)
+            .accessibilityIdentifier("storage-usage-calculating")
+        }
+      }
+      Toggle(isOn: $retention.autoCleanupEnabled) {
+        VStack(alignment: .leading, spacing: 2) {
+          Text(String(localized: "Auto-delete old flights"))
+            .font(.body.weight(.medium))
+          Text(
+            retention.autoCleanupEnabled
+              ? String(
+                localized:
+                  "On the next launch, saved flights older than the window below are deleted from this device. The active flight is never deleted."
+              )
+              : String(
+                localized:
+                  "Off. Saved flights are kept until you delete them. Turn on to remove flights older than a chosen age at launch."
+              )
+          )
+          .font(.footnote)
+          .foregroundStyle(.secondary)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .fixedSize(horizontal: false, vertical: true)
+        }
+      }
+      .accessibilityIdentifier("storage-autocleanup-toggle")
+      if retention.autoCleanupEnabled {
+        Picker(String(localized: "Delete flights older than"), selection: $retention.window) {
+          ForEach(TranscriptRetentionWindow.allCases) { window in
+            Text(retentionWindowLabel(window)).tag(window)
+          }
+        }
+        .accessibilityIdentifier("storage-retention-picker")
+      }
+    } header: {
+      Text(String(localized: "Storage"))
+    } footer: {
+      Text(
+        String(
+          localized:
+            "Deletion runs only at app launch and removes whole saved flights. Transcripts never leave your device."
+        )
+      )
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .fixedSize(horizontal: false, vertical: true)
+    }
+  }
+
+  private func retentionWindowLabel(_ window: TranscriptRetentionWindow) -> String {
+    String(localized: "\(window.days) days")
   }
 }
 

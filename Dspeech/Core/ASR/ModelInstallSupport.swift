@@ -155,6 +155,33 @@ func pinnedPartialByteCount(_ url: URL) -> Int64 {
   return (attributes?[.size] as? Int64) ?? 0
 }
 
+/// Total bytes already staged for a model (completed files + in-flight `.partial` chunks) under its
+/// stable staging root — the resume cache C1 preserves across a cancelled/paused attempt. 0 when no
+/// staging exists yet. Read-only: it stats regular files, never mutates the cache. Used by the C3
+/// pause/resume UI to show how much of an interrupted download is kept.
+func pinnedModelStagedByteCount(modelsRoot: URL, modelFolderName: String) -> Int64 {
+  let stagingRoot = pinnedModelStagingRoot(modelsRoot: modelsRoot, modelFolderName: modelFolderName)
+  guard
+    let enumerator = FileManager.default.enumerator(
+      at: stagingRoot,
+      includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey],
+      options: []
+    )
+  else {
+    return 0
+  }
+  var total: Int64 = 0
+  for case let fileURL as URL in enumerator {
+    guard let values = try? fileURL.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey]),
+      values.isRegularFile == true
+    else {
+      continue
+    }
+    total += Int64(values.fileSize ?? 0)
+  }
+  return total
+}
+
 /// Downloads a single pinned file with HTTP range-resume. Bytes are staged into `<destination>.partial`
 /// so an interrupted transfer resumes from the partial's current byte count instead of restarting at
 /// zero, then the completed `.partial` is atomically moved to `destination`. The caller provides the

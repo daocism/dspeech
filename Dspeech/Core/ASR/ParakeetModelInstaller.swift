@@ -384,6 +384,20 @@ final class ParakeetModelInstaller {
     applicationSupportDirectory.appendingPathComponent(Self.modelsRootComponent, isDirectory: true)
   }
 
+  // why: C3 read-only accessors over the C1 resume cache — the UI shows a "Resume download" CTA and
+  // "N% kept" copy when a paused/cancelled attempt left staged bytes behind. No download logic here;
+  // these only stat the staging folder.
+  var partialStagingByteCount: Int64 {
+    pinnedModelStagedByteCount(modelsRoot: modelsRootURL, modelFolderName: Self.modelFolderName)
+  }
+
+  var hasPartialStaging: Bool { partialStagingByteCount > 0 }
+
+  var stagedFractionKept: Double {
+    guard expectedFilesSizeBytes > 0 else { return 0 }
+    return min(1, Double(partialStagingByteCount) / Double(expectedFilesSizeBytes))
+  }
+
   func install() async {
     do {
       let model = try await downloadAndInstallModel()

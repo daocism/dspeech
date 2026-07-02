@@ -406,6 +406,7 @@ struct ContentView: View {
     .task {
       await recognition.refreshCapableLocales()
       if translation.enabled { updateTranslationConfig() }
+      runTranscriptAutoCleanupIfEnabled()
       #if DEBUG
         // why: headless E2E seam — lets an automated real-audio run (fixture piped
         // into the simulator mic) start the live engine without a GUI tap. DEBUG-only;
@@ -528,6 +529,24 @@ struct ContentView: View {
     // and would render instantly offline with no language-pack download.
     guard translation.enabled, segment.source != .demo else { return nil }
     return liveViewModel.translations[segment.id]
+  }
+
+  // why: C8 — retention cleanup runs once per launch, only when the pilot opted in, and
+  // before any session can start (the .task ordering), so the active flight is never in
+  // range; a session started milliseconds ago can't be older than a 30-day cutoff anyway.
+  private func runTranscriptAutoCleanupIfEnabled() {
+    let retention = TranscriptRetentionSettings()
+    guard retention.autoCleanupEnabled, let transcriptStore else { return }
+    let cutoff = Date().addingTimeInterval(-TimeInterval(retention.window.days) * 86_400)
+    do {
+      let deleted = try transcriptStore.deleteSessions(olderThan: cutoff, excluding: nil as UUID?)
+      if deleted > 0 {
+        DspeechLog.persistence.info("auto-cleanup removed \(deleted) flight(s) past retention")
+      }
+    } catch {
+      DspeechLog.persistence.error(
+        "auto-cleanup failed: \(String(describing: error))")
+    }
   }
 
   @ViewBuilder

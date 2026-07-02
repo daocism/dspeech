@@ -10,6 +10,36 @@ struct TranscriptSessionSummary: Identifiable, Equatable, Sendable, Codable {
   // Legacy sessions with no stored transmissions fall back to the segment count (see endSession).
   var segmentCount: Int
   let localeIdentifier: String
+  // why: C7 — the recognition engine used for this session, surfaced in history. Optional +
+  // additive so summaries persisted before this field keep decoding (synthesized decodeIfPresent
+  // yields nil); a nil engine renders as a neutral "—" placeholder rather than a fabricated value.
+  var engineDisplayName: String?
+
+  // why: an explicit initializer (with an engineDisplayName default) keeps every existing
+  // call site — which never passed an engine — compiling unchanged, while the synthesized
+  // Codable conformance stays in place because no custom init(from:)/encode(to:) is provided.
+  init(
+    id: UUID,
+    startedAt: Date,
+    endedAt: Date?,
+    segmentCount: Int,
+    localeIdentifier: String,
+    engineDisplayName: String? = nil
+  ) {
+    self.id = id
+    self.startedAt = startedAt
+    self.endedAt = endedAt
+    self.segmentCount = segmentCount
+    self.localeIdentifier = localeIdentifier
+    self.engineDisplayName = engineDisplayName
+  }
+
+  // why: honest duration — nil for a recovered session (no clean endedAt), so the UI shows "—"
+  // instead of inventing an end time. Never negative if clocks disagree.
+  var durationSeconds: TimeInterval? {
+    guard let endedAt else { return nil }
+    return max(0, endedAt.timeIntervalSince(startedAt))
+  }
 }
 
 // why: the transcript is flight data (D4 in the 2026-06-11 spec). Losing it on app kill,
@@ -33,6 +63,134 @@ protocol TranscriptStoring {
   func transmissions(in sessionID: UUID) throws -> [Transmission]
   func deleteSession(_ sessionID: UUID) throws
   func exportText(for sessionID: UUID) throws -> String
+  // why: C6 — structured, one-object-per-line export alongside the plain-text share, built from
+  // the same torn-tail-tolerant row readers. C7 — records the engine used onto the open session.
+  // Both ship a default (below) so existing test doubles conform without change.
+  func exportJSONL(for sessionID: UUID) throws -> String
+  func setEngine(_ engineDisplayName: String, for sessionID: UUID) throws
+  @discardableResult
+  func deleteSessions(olderThan cutoff: Date, excluding activeSessionID: UUID?) throws -> Int
+}
+
+extension TranscriptStoring {
+  // why: default over the PUBLIC row readers so any conformer (incl. test doubles) gets a valid
+  // JSONL export without reimplementing it. FileTranscriptStore overrides to also stamp the
+  // session's persisted engine, which the public surface doesn't expose.
+  func exportJSONL(for sessionID: UUID) throws -> String {
+    let transmissionRows = try transmissions(in: sessionID)
+    if !transmissionRows.isEmpty {
+      return try TranscriptJSONL.encode(
+        transmissions: transmissionRows, engineDisplayName: nil)
+    }
+    return try TranscriptJSONL.encode(
+      segments: try segments(in: sessionID), engineDisplayName: nil)
+  }
+
+  // why: recording the engine is a persistence concern; a test double that doesn't persist
+  // summaries has nothing to record, so the default is intentionally a no-op.
+  func setEngine(_ engineDisplayName: String, for sessionID: UUID) throws {}
+
+  // why: retention cleanup only means something for a store with durable sessions; doubles
+  // report zero deletions.
+  @discardableResult
+  func deleteSessions(olderThan cutoff: Date, excluding activeSessionID: UUID?) throws -> Int { 0 }
+}
+
+// why: pure JSONL encoder — one self-describing JSON object per line, sorted keys for a stable
+// golden shape. Optional fields (end, engine, classification) are omitted when absent rather than
+// emitted as null, so a legacy segment and a rich transmission stay unambiguous. No I/O here.
+enum TranscriptJSONL {
+  struct Row: Encodable {
+    let confidence: Double
+    let end: TimeInterval?
+    let engine: String?
+    let id: String
+    let kind: String?
+    let reason: String?
+    let sourceLanguage: String
+    let start: TimeInterval
+    let text: String
+
+    enum CodingKeys: String, CodingKey {
+      case confidence, end, engine, id, kind, reason, sourceLanguage, start, text
+    }
+
+    func encode(to encoder: Encoder) throws {
+      var container = encoder.container(keyedBy: CodingKeys.self)
+      try container.encode(confidence, forKey: .confidence)
+      try container.encodeIfPresent(end, forKey: .end)
+      try container.encodeIfPresent(engine, forKey: .engine)
+      try container.encode(id, forKey: .id)
+      try container.encodeIfPresent(kind, forKey: .kind)
+      try container.encodeIfPresent(reason, forKey: .reason)
+      try container.encode(sourceLanguage, forKey: .sourceLanguage)
+      try container.encode(start, forKey: .start)
+      try container.encode(text, forKey: .text)
+    }
+  }
+
+  static func encode(transmissions: [Transmission], engineDisplayName: String?) throws -> String {
+    try transmissions.map { transmission in
+      let segment = FileTranscriptStore.segment(from: transmission)
+      let (kind, reason) = classificationParts(transmission.classification)
+      return try line(
+        Row(
+          confidence: segment.confidence,
+          end: transmission.endedAt.timeIntervalSince1970,
+          engine: engineDisplayName,
+          id: transmission.id.uuidString,
+          kind: kind,
+          reason: reason,
+          sourceLanguage: segment.sourceLanguageCode,
+          start: transmission.startedAt.timeIntervalSince1970,
+          text: transmission.text
+        ))
+    }
+    .joined(separator: "\n")
+  }
+
+  static func encode(segments: [TranscriptSegment], engineDisplayName: String?) throws -> String {
+    try segments.map { segment in
+      try line(
+        Row(
+          confidence: segment.confidence,
+          end: nil,
+          engine: engineDisplayName,
+          id: segment.id.uuidString,
+          kind: nil,
+          reason: nil,
+          sourceLanguage: segment.sourceLanguageCode,
+          start: segment.startedAt.timeIntervalSince1970,
+          text: segment.text
+        ))
+    }
+    .joined(separator: "\n")
+  }
+
+  private static func classificationParts(
+    _ classification: TransmissionClassification
+  ) -> (kind: String, reason: String) {
+    switch classification {
+    case .displayed(let reason):
+      return ("displayed", reason.rawValue)
+    case .filtered(let reason):
+      return ("filtered", reason.rawValue)
+    }
+  }
+
+  private static let encoder: JSONEncoder = {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys]
+    return encoder
+  }()
+
+  private static func line(_ row: Row) throws -> String {
+    let data = try encoder.encode(row)
+    guard let string = String(data: data, encoding: .utf8) else {
+      throw TranscriptStoreError.encodingFailure("JSONL row was not valid UTF-8")
+    }
+    return string
+  }
 }
 
 enum TranscriptStoreError: LocalizedError, Equatable {
@@ -57,8 +215,8 @@ enum TranscriptStoreError: LocalizedError, Equatable {
 
 @MainActor
 final class FileTranscriptStore: TranscriptStoring {
-  private static let appDirectoryName = "Dspeech"
-  private static let transcriptDirectoryName = "Transcripts"
+  nonisolated private static let appDirectoryName = "Dspeech"
+  nonisolated private static let transcriptDirectoryName = "Transcripts"
   private static let summaryFileName = "summary.json"
   private static let segmentsFileName = "segments.jsonl"
   private static let transmissionsFileName = "transmissions.jsonl"
@@ -340,11 +498,97 @@ final class FileTranscriptStore: TranscriptStoring {
       .joined(separator: "\n")
   }
 
+  // why: C6 — the structured export mirrors exportText's row selection (transmissions first,
+  // legacy segments as fallback) but stamps the persisted engine onto each line, which the public
+  // protocol surface can't reach. Same torn-tail tolerance because it reuses transmissions()/legacy.
+  func exportJSONL(for sessionID: UUID) throws -> String {
+    let summary = try readSummary(for: sessionID)
+    let transmissionRows = try transmissions(in: sessionID)
+    if !transmissionRows.isEmpty {
+      return try TranscriptJSONL.encode(
+        transmissions: transmissionRows, engineDisplayName: summary.engineDisplayName)
+    }
+    return try TranscriptJSONL.encode(
+      segments: try legacySegments(in: sessionID), engineDisplayName: summary.engineDisplayName)
+  }
+
+  // why: C7 — the coordinator stamps the engine onto the OPEN session once at start; it is not a
+  // beginSession parameter so the persisted-summary shape stays additive. Rewrites the summary
+  // atomically (writeSummary uses .atomic) alongside the same protection level.
+  func setEngine(_ engineDisplayName: String, for sessionID: UUID) throws {
+    var summary = try readSummary(for: sessionID)
+    summary.engineDisplayName = engineDisplayName
+    try writeSummary(summary)
+  }
+
+  // why: C8 — total on-disk footprint of the transcript store, summed over regular files only
+  // (directory entries carry their own allocation the app doesn't own). Instance form is used by
+  // tests with a custom root; Settings uses the static self-resolving form off the main actor.
+  func totalDiskUsageBytes() -> Int64 {
+    Self.directoryByteCount(at: rootDirectory, fileManager: fileManager)
+  }
+
+  // why: C8 — a static entry point for surfaces (Settings) that don't hold a store instance; it
+  // self-resolves the same default root the store uses. Returns 0 when the directory is absent.
+  nonisolated static func totalDiskUsageBytes(fileManager: FileManager = .default) -> Int64 {
+    guard let root = try? defaultRootDirectory(fileManager: fileManager),
+      fileManager.fileExists(atPath: root.path)
+    else {
+      return 0
+    }
+    return directoryByteCount(at: root, fileManager: fileManager)
+  }
+
+  nonisolated private static func directoryByteCount(at url: URL, fileManager: FileManager) -> Int64
+  {
+    guard
+      let enumerator = fileManager.enumerator(
+        at: url,
+        includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey],
+        options: []
+      )
+    else {
+      return 0
+    }
+    var total: Int64 = 0
+    for case let fileURL as URL in enumerator {
+      guard let values = try? fileURL.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey]),
+        values.isRegularFile == true
+      else {
+        continue
+      }
+      total += Int64(values.fileSize ?? 0)
+    }
+    return total
+  }
+
+  // why: C8 — opt-in retention cleanup. Deletes WHOLE sessions whose age anchor precedes the
+  // cutoff, never the active session, and never a session exactly at the window (strict <, so a
+  // session aged exactly the retention window survives one more launch). Returns the count deleted
+  // for an honest log. Age anchor = endedAt when the flight closed cleanly, else startedAt.
+  @discardableResult
+  func deleteSessions(olderThan cutoff: Date, excluding activeSessionID: UUID? = nil) throws -> Int
+  {
+    let summaries = try sessions()
+    var deletedCount = 0
+    for summary in summaries {
+      if summary.id == activeSessionID { continue }
+      let ageAnchor = summary.endedAt ?? summary.startedAt
+      guard ageAnchor < cutoff else { continue }
+      try deleteSession(summary.id)
+      deletedCount += 1
+    }
+    DspeechLog.persistence.info(
+      "retention cleanup deleted count=\(deletedCount, privacy: .public) cutoff=\(cutoff.timeIntervalSince1970, privacy: .public)"
+    )
+    return deletedCount
+  }
+
   func corruptSessionIDs() -> [UUID] {
     corruptIDs
   }
 
-  private static func defaultRootDirectory(fileManager: FileManager) throws -> URL {
+  nonisolated private static func defaultRootDirectory(fileManager: FileManager) throws -> URL {
     try ApplicationSupport.directory(fileManager: fileManager)
       .appendingPathComponent(appDirectoryName, isDirectory: true)
       .appendingPathComponent(transcriptDirectoryName, isDirectory: true)
@@ -400,7 +644,7 @@ final class FileTranscriptStore: TranscriptStoring {
     return deduped
   }
 
-  private static func segment(from transmission: Transmission) -> TranscriptSegment {
+  nonisolated static func segment(from transmission: Transmission) -> TranscriptSegment {
     let sourceLanguageCode =
       transmission.segments.first?.sourceLanguageCode
       ?? Locale(identifier: transmission.localeIdentifier).language.languageCode?.identifier
@@ -669,5 +913,116 @@ final class FileTranscriptStore: TranscriptStoring {
     DspeechLog.persistence.error(
       "transcript append failed id=\(sessionID.uuidString, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
     )
+  }
+}
+
+// MARK: - C8 retention settings (opt-in auto-cleanup of old sessions)
+
+// why: the retention window is a closed set of honest choices, not a free integer — modelling it as
+// an enum makes an out-of-range persisted value detectable (corruption) instead of silently applied.
+enum TranscriptRetentionWindow: Int, CaseIterable, Sendable, Codable, Identifiable {
+  case days30 = 30
+  case days90 = 90
+  case days180 = 180
+
+  var id: Int { rawValue }
+  var days: Int { rawValue }
+}
+
+enum TranscriptRetentionStorageIssue: Equatable, Sendable {
+  case retentionWindowCorrupted
+  case autoCleanupSaveFailed
+  case retentionWindowSaveFailed
+}
+
+// why: mirrors the PrivacySettings storage-protocol template — a Sendable storage seam so the
+// @Observable model stays a pure value holder and persistence is injectable for round-trip +
+// corruption tests.
+protocol TranscriptRetentionStorage: Sendable {
+  func loadAutoCleanupEnabled() -> Bool
+  func saveAutoCleanupEnabled(_ enabled: Bool) throws
+  func loadRetentionWindow() -> TranscriptRetentionWindow
+  func saveRetentionWindow(_ window: TranscriptRetentionWindow) throws
+  func loadIssue() -> TranscriptRetentionStorageIssue?
+}
+
+extension TranscriptRetentionStorage {
+  func loadIssue() -> TranscriptRetentionStorageIssue? { nil }
+}
+
+struct UserDefaultsTranscriptRetentionStorage: TranscriptRetentionStorage, @unchecked Sendable {
+  static let autoCleanupKey = "dspeech.retention.autocleanup.v1"
+  static let windowKey = "dspeech.retention.window.days.v1"
+  // why: default window when none was ever chosen. Only takes effect once auto-cleanup is enabled
+  // (which defaults OFF), so no flight is ever deleted without an explicit opt-in.
+  static let defaultWindow: TranscriptRetentionWindow = .days90
+
+  let defaults: UserDefaults
+
+  init(defaults: UserDefaults = .standard) {
+    self.defaults = defaults
+  }
+
+  func loadAutoCleanupEnabled() -> Bool {
+    (defaults.object(forKey: Self.autoCleanupKey) as? Bool) ?? false
+  }
+
+  func saveAutoCleanupEnabled(_ enabled: Bool) throws {
+    defaults.set(enabled, forKey: Self.autoCleanupKey)
+  }
+
+  func loadRetentionWindow() -> TranscriptRetentionWindow {
+    guard defaults.object(forKey: Self.windowKey) != nil else { return Self.defaultWindow }
+    return TranscriptRetentionWindow(rawValue: defaults.integer(forKey: Self.windowKey))
+      ?? Self.defaultWindow
+  }
+
+  func saveRetentionWindow(_ window: TranscriptRetentionWindow) throws {
+    defaults.set(window.rawValue, forKey: Self.windowKey)
+  }
+
+  func loadIssue() -> TranscriptRetentionStorageIssue? {
+    guard defaults.object(forKey: Self.windowKey) != nil else { return nil }
+    return TranscriptRetentionWindow(rawValue: defaults.integer(forKey: Self.windowKey)) == nil
+      ? .retentionWindowCorrupted : nil
+  }
+}
+
+@MainActor
+@Observable
+final class TranscriptRetentionSettings {
+  private let storage: TranscriptRetentionStorage
+  private(set) var storageIssue: TranscriptRetentionStorageIssue?
+  var hasStaleSettings: Bool { storageIssue != nil }
+
+  var autoCleanupEnabled: Bool {
+    didSet {
+      guard autoCleanupEnabled != oldValue else { return }
+      do {
+        try storage.saveAutoCleanupEnabled(autoCleanupEnabled)
+        storageIssue = nil
+      } catch {
+        storageIssue = .autoCleanupSaveFailed
+      }
+    }
+  }
+
+  var window: TranscriptRetentionWindow {
+    didSet {
+      guard window != oldValue else { return }
+      do {
+        try storage.saveRetentionWindow(window)
+        storageIssue = nil
+      } catch {
+        storageIssue = .retentionWindowSaveFailed
+      }
+    }
+  }
+
+  init(storage: TranscriptRetentionStorage = UserDefaultsTranscriptRetentionStorage()) {
+    self.storage = storage
+    self.autoCleanupEnabled = storage.loadAutoCleanupEnabled()
+    self.window = storage.loadRetentionWindow()
+    self.storageIssue = storage.loadIssue()
   }
 }
