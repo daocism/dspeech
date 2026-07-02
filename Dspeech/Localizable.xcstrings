@@ -20870,6 +20870,356 @@
           }
         }
       }
+    },
+    "You appear to be offline. Reconnect to the internet and try again to download the Parakeet model.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You appear to be offline. Reconnect to the internet and try again to download the Parakeet model."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sie scheinen offline zu sein. Stellen Sie die Internetverbindung wieder her und versuchen Sie erneut, das Parakeet-Modell herunterzuladen."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parece que no tienes conexión. Vuelve a conectarte a Internet e inténtalo de nuevo para descargar el modelo Parakeet."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vous semblez hors ligne. Reconnectez-vous à Internet et réessayez de télécharger le modèle Parakeet."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sembra che tu sia offline. Riconnettiti a Internet e riprova a scaricare il modello Parakeet."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "オフラインのようです。インターネットに再接続して、Parakeet モデルをもう一度ダウンロードしてください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "오프라인 상태인 것 같습니다. 인터넷에 다시 연결한 후 Parakeet 모델을 다시 다운로드해 보세요."
+          }
+        },
+        "pt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Você parece estar offline. Reconecte-se à Internet e tente novamente baixar o modelo Parakeet."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Похоже, вы не в сети. Восстановите подключение к интернету и повторите загрузку модели Parakeet."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Схоже, ви не в мережі. Відновіть підключення до інтернету та повторіть завантаження моделі Parakeet."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "你似乎已离线。请重新连接互联网，然后重试下载 Parakeet 模型。"
+          }
+        }
+      }
+    },
+    "You appear to be offline. Reconnect to the internet and try again to download the WhisperKit model.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You appear to be offline. Reconnect to the internet and try again to download the WhisperKit model."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sie scheinen offline zu sein. Stellen Sie die Internetverbindung wieder her und versuchen Sie erneut, das WhisperKit-Modell herunterzuladen."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parece que no tienes conexión. Vuelve a conectarte a Internet e inténtalo de nuevo para descargar el modelo WhisperKit."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vous semblez hors ligne. Reconnectez-vous à Internet et réessayez de télécharger le modèle WhisperKit."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sembra che tu sia offline. Riconnettiti a Internet e riprova a scaricare il modello WhisperKit."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "オフラインのようです。インターネットに再接続して、WhisperKit モデルをもう一度ダウンロードしてください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "오프라인 상태인 것 같습니다. 인터넷에 다시 연결한 후 WhisperKit 모델을 다시 다운로드해 보세요."
+          }
+        },
+        "pt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Você parece estar offline. Reconecte-se à Internet e tente novamente baixar o modelo WhisperKit."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Похоже, вы не в сети. Восстановите подключение к интернету и повторите загрузку модели WhisperKit."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Схоже, ви не в мережі. Відновіть підключення до інтернету та повторіть завантаження моделі WhisperKit."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "你似乎已离线。请重新连接互联网，然后重试下载 WhisperKit 模型。"
+          }
+        }
+      }
+    },
+    "Audio capture was interrupted by a phone call or another app. Recording paused.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio capture was interrupted by a phone call or another app. Recording paused."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Audioaufnahme wurde durch einen Anruf oder eine andere App unterbrochen. Aufnahme pausiert."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La captura de audio se interrumpió por una llamada telefónica u otra app. Grabación en pausa."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La capture audio a été interrompue par un appel téléphonique ou une autre app. Enregistrement en pause."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L'acquisizione audio è stata interrotta da una telefonata o da un'altra app. Registrazione in pausa."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通話または別のアプリによって音声のキャプチャが中断されました。録音を一時停止しました。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "전화 통화 또는 다른 앱으로 인해 오디오 캡처가 중단되었습니다. 녹음이 일시 중지되었습니다."
+          }
+        },
+        "pt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A captura de áudio foi interrompida por uma chamada telefônica ou outro app. Gravação pausada."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Захват звука прерван телефонным звонком или другим приложением. Запись приостановлена."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Захоплення звуку перервано телефонним дзвінком або іншим застосунком. Запис призупинено."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音频采集被来电或其他 App 中断。录音已暂停。"
+          }
+        }
+      }
+    },
+    "The microphone was muted. Recording paused.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The microphone was muted. Recording paused."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Mikrofon wurde stummgeschaltet. Aufnahme pausiert."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se silenció el micrófono. Grabación en pausa."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le microphone a été coupé. Enregistrement en pause."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il microfono è stato disattivato. Registrazione in pausa."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "マイクがミュートされました。録音を一時停止しました。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "마이크가 음소거되었습니다. 녹음이 일시 중지되었습니다."
+          }
+        },
+        "pt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O microfone foi silenciado. Gravação pausada."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Микрофон отключён. Запись приостановлена."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Мікрофон вимкнено. Запис призупинено."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "麦克风已静音。录音已暂停。"
+          }
+        }
+      }
+    },
+    "The audio input was disconnected. Recording paused.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The audio input was disconnected. Recording paused."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Audioeingang wurde getrennt. Aufnahme pausiert."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se desconectó la entrada de audio. Grabación en pausa."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L'entrée audio a été déconnectée. Enregistrement en pause."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L'ingresso audio è stato scollegato. Registrazione in pausa."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "オーディオ入力が切断されました。録音を一時停止しました。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "오디오 입력이 연결 해제되었습니다. 녹음이 일시 중지되었습니다."
+          }
+        },
+        "pt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A entrada de áudio foi desconectada. Gravação pausada."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Аудиовход отключён. Запись приостановлена."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Аудіовхід від'єднано. Запис призупинено."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音频输入已断开。录音已暂停。"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

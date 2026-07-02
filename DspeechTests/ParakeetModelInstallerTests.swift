@@ -158,6 +158,22 @@ struct ParakeetModelInstallerTests {
     #expect(failure.isRetryable)
   }
 
+  // why: C2 — a specifically-offline device maps to `.offline` (distinct copy), NOT the generic
+  // `.network` failure, so the pilot is told to reconnect rather than "check the connection".
+  @Test func offlineErrorsMapToOfflineFailureTaxonomyDistinctFromNetwork() {
+    for code in [
+      URLError.Code.notConnectedToInternet, .networkConnectionLost, .dataNotAllowed,
+    ] {
+      let failure = parakeetModelDownloadFailure(for: URLError(code))
+      #expect(failure.kind == .offline)
+      #expect(failure.isRetryable)
+    }
+    let generic = parakeetModelDownloadFailure(for: URLError(.badServerResponse))
+    #expect(generic.kind == .network)
+    let offline = parakeetModelDownloadFailure(for: URLError(.notConnectedToInternet))
+    #expect(offline.userSafeReason != generic.userSafeReason)
+  }
+
   @Test func diskFullErrorsMapToDiskFailureTaxonomy() {
     let failures = [
       parakeetModelDownloadFailure(

@@ -210,6 +210,98 @@ struct WhisperKitModelInstallerTests {
     }
   }
 
+  // why: C2 — a specifically-offline device maps to `.offline` (distinct copy), NOT the generic
+  // `.network` failure, so the pilot is told to reconnect rather than "check the connection".
+  @Test func offlineErrorsMapToOfflineFailureTaxonomyDistinctFromNetwork() {
+    for code in [
+      URLError.Code.notConnectedToInternet, .networkConnectionLost, .dataNotAllowed,
+    ] {
+      let failure = whisperKitModelDownloadFailure(for: URLError(code))
+      #expect(failure.kind == .offline)
+      #expect(failure.isRetryable)
+    }
+    let generic = whisperKitModelDownloadFailure(for: URLError(.badServerResponse))
+    #expect(generic.kind == .network)
+    let offline = whisperKitModelDownloadFailure(for: URLError(.notConnectedToInternet))
+    #expect(offline.userSafeReason != generic.userSafeReason)
+  }
+
+  // why: C1 — an interrupted install must not restart completed files from zero. A network drop
+  // partway leaves the finished files staged; the retry re-downloads only what it still needs.
+  @Test func interruptedInstallResumesCompletedFilesOnRetry() async throws {
+    let appSupport = Self.makeApplicationSupportDirectory()
+    defer { Self.remove(appSupport) }
+    let (files, contents) = Self.fixtureManifest()
+    let storage = InMemoryWhisperKitModelStateStorage()
+    let failPath = files[2].relativePath
+    let downloader = ScriptedWhisperKitDownloader(
+      contents: contents, failOnceAt: failPath, error: URLError(.networkConnectionLost))
+
+    await Self.makeInstaller(storage, downloader, appSupport, files).install()
+    guard case .failed(let firstFailure) = storage.state else {
+      Issue.record("expected failed state, got \(storage.state)")
+      return
+    }
+    #expect(firstFailure.kind == .offline)
+    #expect(downloader.downloadedRelativePaths.contains(files[0].relativePath))
+    #expect(downloader.downloadedRelativePaths.contains(files[1].relativePath))
+    #expect(!downloader.downloadedRelativePaths.contains(failPath))
+
+    downloader.reset()
+    await Self.makeInstaller(storage, downloader, appSupport, files).install()
+    guard case .installed = storage.state else {
+      Issue.record("expected installed state, got \(storage.state)")
+      return
+    }
+    #expect(!downloader.downloadedRelativePaths.contains(files[0].relativePath))
+    #expect(!downloader.downloadedRelativePaths.contains(files[1].relativePath))
+    #expect(downloader.downloadedRelativePaths.contains(failPath))
+  }
+
+  // why: C1 — a staged file that fails the pinned SHA-256 is deleted (never fail-open, never a stale
+  // skip): the retry re-downloads exactly that file while still skipping the good ones.
+  @Test func checksumFailureCleansStagedFileSoRetryReDownloadsIt() async throws {
+    let appSupport = Self.makeApplicationSupportDirectory()
+    defer { Self.remove(appSupport) }
+    let (files, contents) = Self.fixtureManifest()
+    let storage = InMemoryWhisperKitModelStateStorage()
+    let corruptPath = files[1].relativePath
+    let downloader = ScriptedWhisperKitDownloader(
+      contents: contents, corruptOnceAt: corruptPath)
+
+    await Self.makeInstaller(storage, downloader, appSupport, files).install()
+    guard case .failed(let failure) = storage.state else {
+      Issue.record("expected failed state, got \(storage.state)")
+      return
+    }
+    #expect(failure.kind == .checksum)
+
+    downloader.reset()
+    await Self.makeInstaller(storage, downloader, appSupport, files).install()
+    guard case .installed = storage.state else {
+      Issue.record("expected installed state, got \(storage.state)")
+      return
+    }
+    #expect(downloader.downloadedRelativePaths.contains(corruptPath))
+    #expect(!downloader.downloadedRelativePaths.contains(files[0].relativePath))
+  }
+
+  private static func makeInstaller(
+    _ storage: InMemoryWhisperKitModelStateStorage,
+    _ downloader: any WhisperKitModelFileDownloading,
+    _ appSupport: URL,
+    _ files: [WhisperKitModelInstaller.ExpectedModelFile]
+  ) -> WhisperKitModelInstaller {
+    WhisperKitModelInstaller(
+      stateStorage: storage,
+      fileDownloader: downloader,
+      applicationSupportDirectory: appSupport,
+      availableCapacityProvider: { _ in 1_000_000_000 },
+      now: { Date(timeIntervalSince1970: 1_718_000_000) },
+      expectedFiles: files
+    )
+  }
+
   // why: B4 — the installer now verifies each downloaded file against its manifest SHA-256, so the
   // fake install path needs a manifest whose hashes match the fixture bytes (real model bytes can't
   // be reproduced from preimages). Covers all 17 pinned relative paths; config.json keeps its short
@@ -316,5 +408,159 @@ private final class FakeWhisperKitModelFileDownloader: WhisperKitModelFileDownlo
       return url.lastPathComponent
     }
     return components[(index + 1)...].joined(separator: "/")
+  }
+}
+
+// why: C1 — a downloader that fails (network) or corrupts a chosen file exactly ONCE, then behaves
+// on the retry, so a test can prove staged-file resume and corrupt-file cleanup across two attempts.
+private final class ScriptedWhisperKitDownloader: WhisperKitModelFileDownloading,
+  @unchecked Sendable
+{
+  // why: the installer downloads files sequentially (awaits each), so this fake's mutable state is
+  // only ever touched from one task at a time — no lock needed (and NSLock is unusable in async).
+  private let contents: [String: Data]
+  private let failOncePath: String?
+  private let failError: Error?
+  private let corruptOncePath: String?
+  private var didFail = false
+  private var didCorrupt = false
+  private(set) var downloadedRelativePaths: [String] = []
+
+  init(
+    contents: [String: Data],
+    failOnceAt failOncePath: String? = nil,
+    error failError: Error? = nil,
+    corruptOnceAt corruptOncePath: String? = nil
+  ) {
+    self.contents = contents
+    self.failOncePath = failOncePath
+    self.failError = failError
+    self.corruptOncePath = corruptOncePath
+  }
+
+  func reset() {
+    downloadedRelativePaths.removeAll()
+  }
+
+  func download(from sourceURL: URL, to destinationURL: URL) async throws {
+    let relativePath = Self.modelRelativePath(from: destinationURL)
+    let shouldFail = relativePath == failOncePath && !didFail
+    if shouldFail { didFail = true }
+    let shouldCorrupt = relativePath == corruptOncePath && !didCorrupt
+    if shouldCorrupt { didCorrupt = true }
+    if shouldFail {
+      throw failError ?? URLError(.networkConnectionLost)
+    }
+    let data =
+      shouldCorrupt
+      ? Data("corrupted-\(relativePath)".utf8)
+      : try #require(contents[relativePath], "missing fixture for \(relativePath)")
+    try FileManager.default.createDirectory(
+      at: destinationURL.deletingLastPathComponent(),
+      withIntermediateDirectories: true
+    )
+    try data.write(to: destinationURL, options: .atomic)
+    downloadedRelativePaths.append(relativePath)
+  }
+
+  private static func modelRelativePath(from url: URL) -> String {
+    let components = url.pathComponents
+    guard
+      let index = components.lastIndex(of: WhisperKitModelInstaller.modelFolderName),
+      index + 1 < components.endIndex
+    else {
+      return url.lastPathComponent
+    }
+    return components[(index + 1)...].joined(separator: "/")
+  }
+}
+
+// why: C1 — the resumable single-file staged download primitive, tested independently of the network
+// via an injected `fetch` seam. Covers: complete-file skip, fresh download (200), range-resume (206
+// appends onto the partial), and a server that ignores Range (200 replaces the stale partial).
+struct ResumableStagedDownloadTests {
+  private func makeDirectory() -> URL {
+    let url = FileManager.default.temporaryDirectory
+      .appendingPathComponent("dspeech-resume-\(UUID().uuidString)", isDirectory: true)
+    try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+    return url
+  }
+
+  @Test func completeFileIsSkippedWithoutFetching() async throws {
+    let dir = makeDirectory()
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let destination = dir.appendingPathComponent("model.bin")
+    let full = Data("already-complete".utf8)
+    try full.write(to: destination)
+    var fetchCalls = 0
+
+    try await resumableStagedDownload(to: destination) { _ in
+      fetchCalls += 1
+      let body = dir.appendingPathComponent("body-\(UUID().uuidString)")
+      try Data("should-not-be-used".utf8).write(to: body)
+      return ResumableDownloadResponse(statusCode: 200, bodyFileURL: body)
+    }
+
+    #expect(fetchCalls == 0)
+    #expect(try Data(contentsOf: destination) == full)
+  }
+
+  @Test func freshDownloadStagesFullBodyFromOffsetZero() async throws {
+    let dir = makeDirectory()
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let destination = dir.appendingPathComponent("model.bin")
+    let full = Data("hello world".utf8)
+    var capturedOffset: Int64 = -1
+
+    try await resumableStagedDownload(to: destination) { offset in
+      capturedOffset = offset
+      let body = dir.appendingPathComponent("body-\(UUID().uuidString)")
+      try full.write(to: body)
+      return ResumableDownloadResponse(statusCode: 200, bodyFileURL: body)
+    }
+
+    #expect(capturedOffset == 0)
+    #expect(try Data(contentsOf: destination) == full)
+    #expect(
+      !FileManager.default.fileExists(atPath: destination.appendingPathExtension("partial").path))
+  }
+
+  @Test func partialFileResumesViaRangeAndAppends() async throws {
+    let dir = makeDirectory()
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let destination = dir.appendingPathComponent("model.bin")
+    let head = Data("hello ".utf8)
+    let tail = Data("world".utf8)
+    try head.write(to: destination.appendingPathExtension("partial"))
+    var capturedOffset: Int64 = -1
+
+    try await resumableStagedDownload(to: destination) { offset in
+      capturedOffset = offset
+      let body = dir.appendingPathComponent("body-\(UUID().uuidString)")
+      try tail.write(to: body)
+      return ResumableDownloadResponse(statusCode: 206, bodyFileURL: body)
+    }
+
+    #expect(capturedOffset == Int64(head.count))
+    #expect(try Data(contentsOf: destination) == head + tail)
+  }
+
+  @Test func serverIgnoringRangeDiscardsStalePartialAndUsesFullBody() async throws {
+    let dir = makeDirectory()
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let destination = dir.appendingPathComponent("model.bin")
+    let full = Data("complete-fresh-body".utf8)
+    try Data("stale".utf8).write(to: destination.appendingPathExtension("partial"))
+    var capturedOffset: Int64 = -1
+
+    try await resumableStagedDownload(to: destination) { offset in
+      capturedOffset = offset
+      let body = dir.appendingPathComponent("body-\(UUID().uuidString)")
+      try full.write(to: body)
+      return ResumableDownloadResponse(statusCode: 200, bodyFileURL: body)
+    }
+
+    #expect(capturedOffset == 5)
+    #expect(try Data(contentsOf: destination) == full)
   }
 }

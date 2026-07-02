@@ -59,6 +59,10 @@ struct ParakeetInstalledModel: Equatable, Sendable, Codable {
 struct ParakeetModelInstallFailure: Equatable, Sendable, Codable {
   enum Kind: String, Equatable, Sendable, Codable {
     case network
+    // why: C2 — a specifically offline device (airplane mode / dropped Wi-Fi or cellular /
+    // cellular-data disallowed) gets its own kind + copy, distinct from a generic server-side
+    // network failure, so the pilot is told to reconnect rather than to "check the connection".
+    case offline
     case checksum
     case disk
     case cancelled
@@ -200,21 +204,33 @@ protocol ParakeetModelFileDownloading: Sendable {
 
 struct URLSessionParakeetModelFileDownloader: ParakeetModelFileDownloading {
   func download(from sourceURL: URL, to destinationURL: URL) async throws {
-    try FileManager.default.createDirectory(
-      at: destinationURL.deletingLastPathComponent(),
-      withIntermediateDirectories: true
-    )
-    let request = URLRequest(url: sourceURL)
-    let (temporaryURL, response) = try await URLSession.shared.download(for: request)
-    guard let httpResponse = response as? HTTPURLResponse,
-      (200..<300).contains(httpResponse.statusCode)
-    else {
-      throw URLError(.badServerResponse)
+    // why: C1 — stage into `<destination>.partial` and resume from its byte count via an HTTP
+    // `Range` request, so an interrupted multi-hundred-MB CoreML download continues instead of
+    // restarting at zero. The pinned per-file SHA-256 is still verified over the complete assembled
+    // file by the shared engine, so a corrupt/short partial can never fail-open.
+    try await resumableStagedDownload(to: destinationURL) { fromByteOffset in
+      var request = URLRequest(url: sourceURL)
+      if fromByteOffset > 0 {
+        request.setValue("bytes=\(fromByteOffset)-", forHTTPHeaderField: "Range")
+      }
+      let (temporaryURL, response) = try await URLSession.shared.download(for: request)
+      guard let httpResponse = response as? HTTPURLResponse else {
+        throw URLError(.badServerResponse)
+      }
+      // why: move the URLSession temp file into a stable sibling before returning — the system can
+      // reclaim the download's temp file once this async call unwinds, so the engine must not read
+      // it later.
+      let incoming = destinationURL.appendingPathExtension("incoming")
+      if FileManager.default.fileExists(atPath: incoming.path) {
+        try FileManager.default.removeItem(at: incoming)
+      }
+      try FileManager.default.createDirectory(
+        at: incoming.deletingLastPathComponent(),
+        withIntermediateDirectories: true
+      )
+      try FileManager.default.moveItem(at: temporaryURL, to: incoming)
+      return ResumableDownloadResponse(statusCode: httpResponse.statusCode, bodyFileURL: incoming)
     }
-    if FileManager.default.fileExists(atPath: destinationURL.path) {
-      try FileManager.default.removeItem(at: destinationURL)
-    }
-    try FileManager.default.moveItem(at: temporaryURL, to: destinationURL)
   }
 }
 
@@ -364,6 +380,10 @@ final class ParakeetModelInstaller {
     return URL(fileURLWithPath: path, isDirectory: true)
   }
 
+  private var modelsRootURL: URL {
+    applicationSupportDirectory.appendingPathComponent(Self.modelsRootComponent, isDirectory: true)
+  }
+
   func install() async {
     do {
       let model = try await downloadAndInstallModel()
@@ -378,6 +398,9 @@ final class ParakeetModelInstaller {
       if let installedModelFolderURL {
         try ModelInstallFileSystem.removeIfPresent(installedModelFolderURL)
       }
+      // why: reclaim any orphan resume-cache staging from an abandoned interrupted download (C1).
+      try? ModelInstallFileSystem.removeIfPresent(
+        pinnedModelStagingRoot(modelsRoot: modelsRootURL, modelFolderName: Self.modelFolderName))
       transition(to: .absent)
     } catch {
       transition(to: .failed(parakeetModelDeleteFailure(for: error)))
@@ -409,9 +432,7 @@ final class ParakeetModelInstaller {
   }
 
   private func downloadAndInstallModel() async throws -> ParakeetInstalledModel {
-    let modelsRoot =
-      applicationSupportDirectory
-      .appendingPathComponent(Self.modelsRootComponent, isDirectory: true)
+    let modelsRoot = modelsRootURL
     try FileManager.default.createDirectory(at: modelsRoot, withIntermediateDirectories: true)
     try ModelInstallFileSystem.excludeFromBackup(modelsRoot)
     try Self.preflightSufficientFreeSpace(
@@ -499,6 +520,18 @@ func parakeetModelDownloadFailure(for error: Error) -> ParakeetModelInstallFailu
     return ParakeetModelInstallFailure(
       kind: .cancelled,
       userSafeReason: String(localized: "The Parakeet model download was cancelled."),
+      isRetryable: true
+    )
+  }
+
+  if isModelInstallOfflineError(error) {
+    return ParakeetModelInstallFailure(
+      kind: .offline,
+      userSafeReason:
+        String(
+          localized:
+            "You appear to be offline. Reconnect to the internet and try again to download the Parakeet model."
+        ),
       isRetryable: true
     )
   }
