@@ -174,7 +174,13 @@ final class AccessibilityAuditUITests: XCTestCase {
         // wraps to several lines but is fully readable (verified by the de·AX-XL screenshot). Only
         // textClipped is acknowledged here — elementDetection (banner obscured by the mic) stays
         // HARD-gated, since that is the real risk for this critical element.
-        let isErrorBanner = id == "error-banner"
+        // (2026-07-02: the Open Settings button inside the same banner used to inherit the
+        // container's "error-banner" identifier and rode this acknowledgement; the identifier
+        // propagation bug was fixed, so the button's own id joins the SAME acknowledged class —
+        // its caption label scales at compact sizes / wraps freely at AX inside the narrow
+        // banner column and is screenshot-verified readable. elementDetection + hitRegion for
+        // the button stay HARD-gated.)
+        let isErrorBanner = id == "error-banner" || id == "open-settings-button"
         if isClippedText
           && (screen.hasPrefix("settings") || screen.contains("review sheet")
             || isEmptyStateMessage || isErrorBanner)

@@ -375,6 +375,7 @@ private struct StartButton: View {
 
 private struct LiveFailureBanner: View {
   let error: String
+  @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
   private var canOpenSettings: Bool {
     error == "speech-permission-denied" || error == "microphone-permission-denied"
@@ -397,9 +398,16 @@ private struct LiveFailureBanner: View {
         } label: {
           Text(String(localized: "Open Settings"))
             .font(.caption.weight(.semibold))
-            .lineLimit(1)
-            .minimumScaleFactor(0.65)
+            // why: the glass capsule is a real clipping boundary, so any line cap or
+            // scale-down trips the textClipped audit at accessibility sizes — at AX the
+            // label wraps freely and grows vertically (ui-quality: no lineLimit hiding
+            // text at the largest Dynamic Type); compact sizes keep the single-line pill.
+            .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+            .minimumScaleFactor(dynamicTypeSize.isAccessibilitySize ? 1 : 0.65)
+            .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 12)
+            .padding(.vertical, 6)
             .frame(minHeight: 44)
             // why: glass capsule instead of flat black so the inner action reads as a control
             // on the glass banner, not a black rectangle floating on it.
