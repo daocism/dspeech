@@ -57,7 +57,7 @@ struct SpeakerModelPackInstaller: Sendable {
   init(
     voiceFilterStorage: any VoiceFilterStorage = UserDefaultsVoiceFilterStorage(),
     availableCapacityProvider: @escaping @Sendable (URL) throws -> Int64 =
-      { try Self.availableCapacity(at: $0) }
+      { try ModelInstallFileSystem.availableCapacity(at: $0) }
   ) {
     self.voiceFilterStorage = voiceFilterStorage
     self.availableCapacityProvider = availableCapacityProvider
@@ -487,7 +487,7 @@ struct SpeakerModelPackInstaller: Sendable {
       }
 
       let digest = SHA256.hash(data: data)
-      let actualSHA256 = hexDigest(digest)
+      let actualSHA256 = ModelInstallFileSystem.hexDigest(digest)
       guard actualSHA256 == entry.sha256 else {
         DspeechLog.modelPack.error(
           "model pack integrity verification failed reason=checksum-mismatch"
@@ -507,7 +507,7 @@ struct SpeakerModelPackInstaller: Sendable {
       "model pack integrity verification succeeded files=\(normalizedManifest.count, privacy: .public) bytes=\(sizeBytes, privacy: .public)"
     )
     return VerifiedModelPack(
-      checksumSHA256: hexDigest(packHasher.finalize()),
+      checksumSHA256: ModelInstallFileSystem.hexDigest(packHasher.finalize()),
       sizeBytes: sizeBytes
     )
   }
@@ -548,21 +548,12 @@ struct SpeakerModelPackInstaller: Sendable {
     availableBytes: Int64,
     expectedPackSizeBytes: Int64 = Self.expectedPackSizeBytes
   ) throws {
-    let requiredBytes = expectedPackSizeBytes * 2
-    guard availableBytes >= requiredBytes else {
-      throw ModelPackInstallError.insufficientDiskSpace(
-        requiredBytes: requiredBytes,
-        availableBytes: availableBytes
-      )
+    try preflightPinnedModelFreeSpace(
+      availableBytes: availableBytes,
+      expectedModelSizeBytes: expectedPackSizeBytes
+    ) {
+      ModelPackInstallError.insufficientDiskSpace(requiredBytes: $0, availableBytes: $1)
     }
-  }
-
-  private static func availableCapacity(at url: URL) throws -> Int64 {
-    let attributes = try FileManager.default.attributesOfFileSystem(forPath: url.path)
-    guard let freeSize = attributes[.systemFreeSize] as? NSNumber else {
-      return 0
-    }
-    return freeSize.int64Value
   }
 
   private static func downloadPinnedModelFiles(
@@ -692,9 +683,5 @@ struct SpeakerModelPackInstaller: Sendable {
 
   private static func digestData(_ digest: SHA256.Digest) -> Data {
     digest.withUnsafeBytes { Data($0) }
-  }
-
-  private static func hexDigest(_ digest: SHA256.Digest) -> String {
-    digest.map { String(format: "%02x", $0) }.joined()
   }
 }

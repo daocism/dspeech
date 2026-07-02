@@ -97,6 +97,17 @@ enum WhisperKitModelInstallState: Equatable, Sendable, Codable {
   }
 }
 
+extension WhisperKitModelInstallState: PinnedModelPersistentState {
+  static var absentState: WhisperKitModelInstallState { .absent }
+
+  var installedLocalModelPath: String? { installedModel?.localModelPath }
+
+  func replacingInstalledLocalModelPath(_ path: String?) -> WhisperKitModelInstallState {
+    guard case .installed(let model) = self else { return self }
+    return .installed(model.replacingLocalModelPath(path))
+  }
+}
+
 protocol WhisperKitModelStateStorage: Sendable {
   func loadState() -> WhisperKitModelInstallState
   func saveState(_ state: WhisperKitModelInstallState)
@@ -115,43 +126,28 @@ struct UserDefaultsWhisperKitModelStateStorage: WhisperKitModelStateStorage, @un
   }
 
   func loadState() -> WhisperKitModelInstallState {
-    guard let data = defaults.data(forKey: Self.stateKey) else {
-      return .absent
-    }
-    do {
-      let decoded = try JSONDecoder().decode(WhisperKitModelInstallState.self, from: data)
-      let recovered = decoded.recoveredAfterColdStart()
-      let resolved = Self.resolvedModelPaths(
-        in: recovered,
-        applicationSupportDirectory: applicationSupportDirectory
-      )
-      let persisted = Self.persistedModelPaths(
-        in: resolved,
-        applicationSupportDirectory: applicationSupportDirectory
-      )
-      if persisted != decoded {
-        saveState(resolved)
-      }
-      return resolved
-    } catch {
-      return .failed(Self.corruptPersistedStateFailure)
-    }
+    loadPinnedModelState(
+      defaults: defaults,
+      key: Self.stateKey,
+      applicationSupportDirectory: applicationSupportDirectory,
+      corruptStateFallback: { .failed(Self.corruptPersistedStateFailure) },
+      saveResolved: { saveState($0) }
+    )
   }
 
   func saveState(_ state: WhisperKitModelInstallState) {
-    do {
-      let persisted = Self.persistedModelPaths(
-        in: state,
-        applicationSupportDirectory: applicationSupportDirectory
-      )
-      let data = try JSONEncoder().encode(persisted)
-      defaults.set(data, forKey: Self.stateKey)
-    } catch {
+    savePinnedModelState(
+      state,
+      defaults: defaults,
+      key: Self.stateKey,
+      applicationSupportDirectory: applicationSupportDirectory,
       // why: the protocol is non-throwing, but a persistence failure must not vanish silently — at
       // least leave a diagnostic trail (the installed state may then fail to survive relaunch).
-      DspeechLog.engine.error(
-        "whisperkit model state save failed error=\(error.localizedDescription, privacy: .public)")
-    }
+      onEncodeError: {
+        DspeechLog.engine.error(
+          "whisperkit model state save failed error=\($0.localizedDescription, privacy: .public)")
+      }
+    )
   }
 
   private static let corruptPersistedStateFailure = WhisperKitModelInstallFailure(
@@ -163,40 +159,6 @@ struct UserDefaultsWhisperKitModelStateStorage: WhisperKitModelStateStorage, @un
       ),
     isRetryable: false
   )
-
-  private static func resolvedModelPaths(
-    in state: WhisperKitModelInstallState,
-    applicationSupportDirectory: URL
-  ) -> WhisperKitModelInstallState {
-    switch state {
-    case .installed(let model):
-      return .installed(
-        model.replacingLocalModelPath(
-          ApplicationSupportRelativePath.resolved(
-            model.localModelPath,
-            applicationSupportDirectory: applicationSupportDirectory
-          )))
-    case .absent, .downloading, .failed:
-      return state
-    }
-  }
-
-  private static func persistedModelPaths(
-    in state: WhisperKitModelInstallState,
-    applicationSupportDirectory: URL
-  ) -> WhisperKitModelInstallState {
-    switch state {
-    case .installed(let model):
-      return .installed(
-        model.replacingLocalModelPath(
-          ApplicationSupportRelativePath.persisted(
-            model.localModelPath,
-            applicationSupportDirectory: applicationSupportDirectory
-          )))
-    case .absent, .downloading, .failed:
-      return state
-    }
-  }
 }
 
 protocol WhisperKitModelFileDownloading: Sendable {
@@ -215,22 +177,8 @@ struct URLSessionWhisperKitModelFileDownloader: WhisperKitModelFileDownloading {
         request.setValue("bytes=\(fromByteOffset)-", forHTTPHeaderField: "Range")
       }
       let (temporaryURL, response) = try await URLSession.shared.download(for: request)
-      guard let httpResponse = response as? HTTPURLResponse else {
-        throw URLError(.badServerResponse)
-      }
-      // why: move the URLSession temp file into a stable sibling before returning — the system can
-      // reclaim the download's temp file once this async call unwinds, so the engine must not read
-      // it later.
-      let incoming = destinationURL.appendingPathExtension("incoming")
-      if FileManager.default.fileExists(atPath: incoming.path) {
-        try FileManager.default.removeItem(at: incoming)
-      }
-      try FileManager.default.createDirectory(
-        at: incoming.deletingLastPathComponent(),
-        withIntermediateDirectories: true
-      )
-      try FileManager.default.moveItem(at: temporaryURL, to: incoming)
-      return ResumableDownloadResponse(statusCode: httpResponse.statusCode, bodyFileURL: incoming)
+      return try stagePinnedDownloadResponse(
+        temporaryURL: temporaryURL, response: response, destination: destinationURL)
     }
   }
 }
@@ -439,12 +387,11 @@ final class WhisperKitModelInstaller {
     availableBytes: Int64,
     expectedModelSizeBytes: Int64 = WhisperKitModelInstaller.expectedModelSizeBytes
   ) throws {
-    let requiredBytes = expectedModelSizeBytes * 2
-    guard availableBytes >= requiredBytes else {
-      throw WhisperKitModelInstallError.insufficientDiskSpace(
-        requiredBytes: requiredBytes,
-        availableBytes: availableBytes
-      )
+    try preflightPinnedModelFreeSpace(
+      availableBytes: availableBytes,
+      expectedModelSizeBytes: expectedModelSizeBytes
+    ) {
+      WhisperKitModelInstallError.insufficientDiskSpace(requiredBytes: $0, availableBytes: $1)
     }
   }
 
@@ -509,7 +456,16 @@ final class WhisperKitModelInstaller {
 }
 
 func whisperKitModelDownloadFailure(for error: Error) -> WhisperKitModelInstallFailure {
-  if case .checksumMismatch = error as? WhisperKitModelInstallError {
+  switch classifyPinnedModelDownloadFailure(
+    error,
+    isChecksumMismatch: {
+      if case .checksumMismatch = $0 as? WhisperKitModelInstallError { return true }
+      return false
+    },
+    isDiskFull: isWhisperKitDiskFull,
+    isCancelled: { $0 as? WhisperKitModelInstallError == .cancelled }
+  ) {
+  case .checksum:
     return WhisperKitModelInstallFailure(
       kind: .checksum,
       userSafeReason:
@@ -519,9 +475,7 @@ func whisperKitModelDownloadFailure(for error: Error) -> WhisperKitModelInstallF
         ),
       isRetryable: true
     )
-  }
-
-  if isWhisperKitDiskFull(error) {
+  case .disk:
     return WhisperKitModelInstallFailure(
       kind: .disk,
       userSafeReason:
@@ -531,17 +485,13 @@ func whisperKitModelDownloadFailure(for error: Error) -> WhisperKitModelInstallF
         ),
       isRetryable: true
     )
-  }
-
-  if error is CancellationError || error as? WhisperKitModelInstallError == .cancelled {
+  case .cancelled:
     return WhisperKitModelInstallFailure(
       kind: .cancelled,
       userSafeReason: String(localized: "The WhisperKit model download was cancelled."),
       isRetryable: true
     )
-  }
-
-  if isModelInstallOfflineError(error) {
+  case .offline:
     return WhisperKitModelInstallFailure(
       kind: .offline,
       userSafeReason:
@@ -551,9 +501,7 @@ func whisperKitModelDownloadFailure(for error: Error) -> WhisperKitModelInstallF
         ),
       isRetryable: true
     )
-  }
-
-  if error is URLError {
+  case .network:
     return WhisperKitModelInstallFailure(
       kind: .network,
       userSafeReason:
@@ -563,27 +511,14 @@ func whisperKitModelDownloadFailure(for error: Error) -> WhisperKitModelInstallF
         ),
       isRetryable: true
     )
-  }
-
-  let nsError = error as NSError
-  if nsError.domain == NSURLErrorDomain {
+  case .unknown:
     return WhisperKitModelInstallFailure(
-      kind: .network,
+      kind: .unknown,
       userSafeReason:
-        String(
-          localized:
-            "Couldn't download the WhisperKit model because the network request failed. Check your connection and try again."
-        ),
-      isRetryable: true
+        String(localized: "Couldn't install the WhisperKit model on this device."),
+      isRetryable: false
     )
   }
-
-  return WhisperKitModelInstallFailure(
-    kind: .unknown,
-    userSafeReason:
-      String(localized: "Couldn't install the WhisperKit model on this device."),
-    isRetryable: false
-  )
 }
 
 func whisperKitModelDeleteFailure(for error: Error) -> WhisperKitModelInstallFailure {

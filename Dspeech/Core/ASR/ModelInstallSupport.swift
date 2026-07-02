@@ -351,3 +351,164 @@ func downloadAndStagePinnedModel(
   try ModelInstallFileSystem.excludeFromBackup(finalModelFolder)
   return StagedPinnedModel(finalModelFolder: finalModelFolder, files: files, sizeBytes: sizeBytes)
 }
+
+// MARK: - Free-space preflight
+
+/// Shared free-space preflight for the pinned per-file installers. Requires 2× the model size —
+/// headroom for the staged copy plus the final folder landing beside it during the atomic move. Each
+/// installer supplies its own typed insufficient-space error so its public error taxonomy is unchanged.
+func preflightPinnedModelFreeSpace(
+  availableBytes: Int64,
+  expectedModelSizeBytes: Int64,
+  insufficientSpaceError: (_ requiredBytes: Int64, _ availableBytes: Int64) -> Error
+) throws {
+  let requiredBytes = expectedModelSizeBytes * 2
+  guard availableBytes >= requiredBytes else {
+    throw insufficientSpaceError(requiredBytes, availableBytes)
+  }
+}
+
+// MARK: - Shared HTTP-download staging tail (non-network)
+
+/// The non-network tail every pinned downloader shares: move the system-provided temp file into a
+/// stable `<destination>.incoming` sibling the engine can still read after the async call unwinds, and
+/// package it with the HTTP status for the resume logic. Holds no networking itself — the network
+/// fetch stays inside each installer's network-boundary file (release-policy allowlist), which calls
+/// this to hand the body off to `resumableStagedDownload`.
+func stagePinnedDownloadResponse(
+  temporaryURL: URL,
+  response: URLResponse,
+  destination: URL
+) throws -> ResumableDownloadResponse {
+  guard let httpResponse = response as? HTTPURLResponse else {
+    throw URLError(.badServerResponse)
+  }
+  let incoming = destination.appendingPathExtension("incoming")
+  if FileManager.default.fileExists(atPath: incoming.path) {
+    try FileManager.default.removeItem(at: incoming)
+  }
+  try FileManager.default.createDirectory(
+    at: incoming.deletingLastPathComponent(),
+    withIntermediateDirectories: true
+  )
+  try FileManager.default.moveItem(at: temporaryURL, to: incoming)
+  return ResumableDownloadResponse(statusCode: httpResponse.statusCode, bodyFileURL: incoming)
+}
+
+// MARK: - Download-failure classification
+
+/// Coarse failure kind a pinned-model download error maps to. Deliberately excludes `.corruptState`
+/// (a persisted-decode failure, not a download failure) — each installer keeps that in its own state
+/// storage. Each installer maps this to its own public Failure struct with localized copy.
+enum PinnedModelDownloadFailureKind: Equatable, Sendable {
+  case checksum
+  case disk
+  case cancelled
+  case offline
+  case network
+  case unknown
+}
+
+/// Single source of truth for the download-failure branch ORDER shared by the pinned installers
+/// (checksum → disk → cancelled → offline → network → unknown), so the two can't drift. The typed
+/// predicates (`isChecksumMismatch` / `isDiskFull` / `isCancelled`) are supplied per installer because
+/// they inspect that installer's own error enum; offline/network classification is shared here.
+func classifyPinnedModelDownloadFailure(
+  _ error: Error,
+  isChecksumMismatch: (Error) -> Bool,
+  isDiskFull: (Error) -> Bool,
+  isCancelled: (Error) -> Bool
+) -> PinnedModelDownloadFailureKind {
+  if isChecksumMismatch(error) { return .checksum }
+  if isDiskFull(error) { return .disk }
+  if error is CancellationError || isCancelled(error) { return .cancelled }
+  if isModelInstallOfflineError(error) { return .offline }
+  if error is URLError { return .network }
+  if (error as NSError).domain == NSURLErrorDomain { return .network }
+  return .unknown
+}
+
+// MARK: - UserDefaults-backed pinned-model state persistence engine
+
+/// A pinned-model install state that a `UserDefaults`-backed storage can persist. The generic engine
+/// (`loadPinnedModelState` / `savePinnedModelState`) owns the decode / cold-start-recovery /
+/// Application-Support-relative path rewrite / conditional re-save machinery; each concrete state enum
+/// only supplies its `.absent` case, its cold-start recovery, and access to the installed model's
+/// portable path.
+protocol PinnedModelPersistentState: Codable, Equatable {
+  static var absentState: Self { get }
+  /// A `.downloading` snapshot never survives a relaunch — recover it to `.absent` so a killed
+  /// install doesn't reload as a frozen progress bar.
+  func recoveredAfterColdStart() -> Self
+  /// The installed model's on-disk path, or nil for every non-installed case.
+  var installedLocalModelPath: String? { get }
+  /// Returns `self` with the installed model's path replaced; a no-op for non-installed cases.
+  func replacingInstalledLocalModelPath(_ path: String?) -> Self
+}
+
+extension PinnedModelPersistentState {
+  /// Rewrites the persisted (Application-Support-relative) path back to an absolute path on load.
+  func resolvingModelPaths(applicationSupportDirectory: URL) -> Self {
+    guard let path = installedLocalModelPath else { return self }
+    return replacingInstalledLocalModelPath(
+      ApplicationSupportRelativePath.resolved(
+        path, applicationSupportDirectory: applicationSupportDirectory))
+  }
+
+  /// Rewrites the absolute path to an Application-Support-relative path for persistence.
+  func persistingModelPaths(applicationSupportDirectory: URL) -> Self {
+    guard let path = installedLocalModelPath else { return self }
+    return replacingInstalledLocalModelPath(
+      ApplicationSupportRelativePath.persisted(
+        path, applicationSupportDirectory: applicationSupportDirectory))
+  }
+}
+
+/// Loads persisted pinned-model state: decode → recover a cold-started download → resolve the relative
+/// path to absolute → and, if the on-disk form is stale (path not yet stored relative), re-persist it.
+/// A decode failure returns the caller's corrupt-state fallback (never fail-open into `.installed`).
+func loadPinnedModelState<State: PinnedModelPersistentState>(
+  defaults: UserDefaults,
+  key: String,
+  applicationSupportDirectory: URL,
+  corruptStateFallback: () -> State,
+  saveResolved: (State) -> Void
+) -> State {
+  guard let data = defaults.data(forKey: key) else {
+    return State.absentState
+  }
+  do {
+    let decoded = try JSONDecoder().decode(State.self, from: data)
+    let recovered = decoded.recoveredAfterColdStart()
+    let resolved = recovered.resolvingModelPaths(
+      applicationSupportDirectory: applicationSupportDirectory)
+    let persisted = resolved.persistingModelPaths(
+      applicationSupportDirectory: applicationSupportDirectory)
+    if persisted != decoded {
+      saveResolved(resolved)
+    }
+    return resolved
+  } catch {
+    return corruptStateFallback()
+  }
+}
+
+/// Persists pinned-model state with the installed path stored Application-Support-relative (portable
+/// across the container UUID changing). The protocol is non-throwing, so an encode failure is routed
+/// to `onEncodeError` for a diagnostic trail rather than vanishing silently.
+func savePinnedModelState<State: PinnedModelPersistentState>(
+  _ state: State,
+  defaults: UserDefaults,
+  key: String,
+  applicationSupportDirectory: URL,
+  onEncodeError: (Error) -> Void
+) {
+  do {
+    let persisted = state.persistingModelPaths(
+      applicationSupportDirectory: applicationSupportDirectory)
+    let data = try JSONEncoder().encode(persisted)
+    defaults.set(data, forKey: key)
+  } catch {
+    onEncodeError(error)
+  }
+}

@@ -96,6 +96,17 @@ enum ParakeetModelInstallState: Equatable, Sendable, Codable {
   }
 }
 
+extension ParakeetModelInstallState: PinnedModelPersistentState {
+  static var absentState: ParakeetModelInstallState { .absent }
+
+  var installedLocalModelPath: String? { installedModel?.localModelPath }
+
+  func replacingInstalledLocalModelPath(_ path: String?) -> ParakeetModelInstallState {
+    guard case .installed(let model) = self else { return self }
+    return .installed(model.replacingLocalModelPath(path))
+  }
+}
+
 protocol ParakeetModelStateStorage: Sendable {
   func loadState() -> ParakeetModelInstallState
   func saveState(_ state: ParakeetModelInstallState)
@@ -114,43 +125,28 @@ struct UserDefaultsParakeetModelStateStorage: ParakeetModelStateStorage, @unchec
   }
 
   func loadState() -> ParakeetModelInstallState {
-    guard let data = defaults.data(forKey: Self.stateKey) else {
-      return .absent
-    }
-    do {
-      let decoded = try JSONDecoder().decode(ParakeetModelInstallState.self, from: data)
-      let recovered = decoded.recoveredAfterColdStart()
-      let resolved = Self.resolvedModelPaths(
-        in: recovered,
-        applicationSupportDirectory: applicationSupportDirectory
-      )
-      let persisted = Self.persistedModelPaths(
-        in: resolved,
-        applicationSupportDirectory: applicationSupportDirectory
-      )
-      if persisted != decoded {
-        saveState(resolved)
-      }
-      return resolved
-    } catch {
-      return .failed(Self.corruptPersistedStateFailure)
-    }
+    loadPinnedModelState(
+      defaults: defaults,
+      key: Self.stateKey,
+      applicationSupportDirectory: applicationSupportDirectory,
+      corruptStateFallback: { .failed(Self.corruptPersistedStateFailure) },
+      saveResolved: { saveState($0) }
+    )
   }
 
   func saveState(_ state: ParakeetModelInstallState) {
-    do {
-      let persisted = Self.persistedModelPaths(
-        in: state,
-        applicationSupportDirectory: applicationSupportDirectory
-      )
-      let data = try JSONEncoder().encode(persisted)
-      defaults.set(data, forKey: Self.stateKey)
-    } catch {
+    savePinnedModelState(
+      state,
+      defaults: defaults,
+      key: Self.stateKey,
+      applicationSupportDirectory: applicationSupportDirectory,
       // why: the protocol is non-throwing, but a persistence failure must not vanish silently — at
       // least leave a diagnostic trail (the installed state may then fail to survive relaunch).
-      DspeechLog.engine.error(
-        "parakeet model state save failed error=\(error.localizedDescription, privacy: .public)")
-    }
+      onEncodeError: {
+        DspeechLog.engine.error(
+          "parakeet model state save failed error=\($0.localizedDescription, privacy: .public)")
+      }
+    )
   }
 
   private static let corruptPersistedStateFailure = ParakeetModelInstallFailure(
@@ -162,40 +158,6 @@ struct UserDefaultsParakeetModelStateStorage: ParakeetModelStateStorage, @unchec
       ),
     isRetryable: false
   )
-
-  private static func resolvedModelPaths(
-    in state: ParakeetModelInstallState,
-    applicationSupportDirectory: URL
-  ) -> ParakeetModelInstallState {
-    switch state {
-    case .installed(let model):
-      return .installed(
-        model.replacingLocalModelPath(
-          ApplicationSupportRelativePath.resolved(
-            model.localModelPath,
-            applicationSupportDirectory: applicationSupportDirectory
-          )))
-    case .absent, .downloading, .failed:
-      return state
-    }
-  }
-
-  private static func persistedModelPaths(
-    in state: ParakeetModelInstallState,
-    applicationSupportDirectory: URL
-  ) -> ParakeetModelInstallState {
-    switch state {
-    case .installed(let model):
-      return .installed(
-        model.replacingLocalModelPath(
-          ApplicationSupportRelativePath.persisted(
-            model.localModelPath,
-            applicationSupportDirectory: applicationSupportDirectory
-          )))
-    case .absent, .downloading, .failed:
-      return state
-    }
-  }
 }
 
 protocol ParakeetModelFileDownloading: Sendable {
@@ -214,22 +176,8 @@ struct URLSessionParakeetModelFileDownloader: ParakeetModelFileDownloading {
         request.setValue("bytes=\(fromByteOffset)-", forHTTPHeaderField: "Range")
       }
       let (temporaryURL, response) = try await URLSession.shared.download(for: request)
-      guard let httpResponse = response as? HTTPURLResponse else {
-        throw URLError(.badServerResponse)
-      }
-      // why: move the URLSession temp file into a stable sibling before returning — the system can
-      // reclaim the download's temp file once this async call unwinds, so the engine must not read
-      // it later.
-      let incoming = destinationURL.appendingPathExtension("incoming")
-      if FileManager.default.fileExists(atPath: incoming.path) {
-        try FileManager.default.removeItem(at: incoming)
-      }
-      try FileManager.default.createDirectory(
-        at: incoming.deletingLastPathComponent(),
-        withIntermediateDirectories: true
-      )
-      try FileManager.default.moveItem(at: temporaryURL, to: incoming)
-      return ResumableDownloadResponse(statusCode: httpResponse.statusCode, bodyFileURL: incoming)
+      return try stagePinnedDownloadResponse(
+        temporaryURL: temporaryURL, response: response, destination: destinationURL)
     }
   }
 }
@@ -436,12 +384,11 @@ final class ParakeetModelInstaller {
     availableBytes: Int64,
     expectedModelSizeBytes: Int64 = ParakeetModelInstaller.expectedModelSizeBytes
   ) throws {
-    let requiredBytes = expectedModelSizeBytes * 2
-    guard availableBytes >= requiredBytes else {
-      throw ParakeetModelInstallError.insufficientDiskSpace(
-        requiredBytes: requiredBytes,
-        availableBytes: availableBytes
-      )
+    try preflightPinnedModelFreeSpace(
+      availableBytes: availableBytes,
+      expectedModelSizeBytes: expectedModelSizeBytes
+    ) {
+      ParakeetModelInstallError.insufficientDiskSpace(requiredBytes: $0, availableBytes: $1)
     }
   }
 
@@ -506,7 +453,16 @@ final class ParakeetModelInstaller {
 }
 
 func parakeetModelDownloadFailure(for error: Error) -> ParakeetModelInstallFailure {
-  if case .checksumMismatch = error as? ParakeetModelInstallError {
+  switch classifyPinnedModelDownloadFailure(
+    error,
+    isChecksumMismatch: {
+      if case .checksumMismatch = $0 as? ParakeetModelInstallError { return true }
+      return false
+    },
+    isDiskFull: isParakeetDiskFull,
+    isCancelled: { $0 as? ParakeetModelInstallError == .cancelled }
+  ) {
+  case .checksum:
     return ParakeetModelInstallFailure(
       kind: .checksum,
       userSafeReason:
@@ -516,9 +472,7 @@ func parakeetModelDownloadFailure(for error: Error) -> ParakeetModelInstallFailu
         ),
       isRetryable: true
     )
-  }
-
-  if isParakeetDiskFull(error) {
+  case .disk:
     return ParakeetModelInstallFailure(
       kind: .disk,
       userSafeReason:
@@ -528,17 +482,13 @@ func parakeetModelDownloadFailure(for error: Error) -> ParakeetModelInstallFailu
         ),
       isRetryable: true
     )
-  }
-
-  if error is CancellationError || error as? ParakeetModelInstallError == .cancelled {
+  case .cancelled:
     return ParakeetModelInstallFailure(
       kind: .cancelled,
       userSafeReason: String(localized: "The Parakeet model download was cancelled."),
       isRetryable: true
     )
-  }
-
-  if isModelInstallOfflineError(error) {
+  case .offline:
     return ParakeetModelInstallFailure(
       kind: .offline,
       userSafeReason:
@@ -548,9 +498,7 @@ func parakeetModelDownloadFailure(for error: Error) -> ParakeetModelInstallFailu
         ),
       isRetryable: true
     )
-  }
-
-  if error is URLError {
+  case .network:
     return ParakeetModelInstallFailure(
       kind: .network,
       userSafeReason:
@@ -560,27 +508,14 @@ func parakeetModelDownloadFailure(for error: Error) -> ParakeetModelInstallFailu
         ),
       isRetryable: true
     )
-  }
-
-  let nsError = error as NSError
-  if nsError.domain == NSURLErrorDomain {
+  case .unknown:
     return ParakeetModelInstallFailure(
-      kind: .network,
+      kind: .unknown,
       userSafeReason:
-        String(
-          localized:
-            "Couldn't download the Parakeet model because the network request failed. Check your connection and try again."
-        ),
-      isRetryable: true
+        String(localized: "Couldn't install the Parakeet model on this device."),
+      isRetryable: false
     )
   }
-
-  return ParakeetModelInstallFailure(
-    kind: .unknown,
-    userSafeReason:
-      String(localized: "Couldn't install the Parakeet model on this device."),
-    isRetryable: false
-  )
 }
 
 func parakeetModelDeleteFailure(for error: Error) -> ParakeetModelInstallFailure {
