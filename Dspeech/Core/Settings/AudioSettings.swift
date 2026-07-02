@@ -64,6 +64,81 @@ struct UserDefaultsAudioSettingsStorage: AudioSettingsStorage, @unchecked Sendab
   }
 }
 
+// MARK: - Download settings (M1: model downloads default to Wi-Fi only)
+
+// why: M1 — model/pack downloads (hundreds of MB) must not silently burn a pilot's cellular data.
+// A dedicated persisted setting (default OFF = Wi-Fi only) governs BOTH pinned downloaders
+// (WhisperKit + speaker model pack), following the PrivacySettings storage-protocol template so the
+// @Observable model stays a pure value holder and persistence is injectable for round-trip +
+// corruption tests. Lives here (not a new file) per the pbxproj no-new-file constraint.
+protocol DownloadSettingsStorage: Sendable {
+  func loadAllowCellular() -> Bool
+  func saveAllowCellular(_ allow: Bool) throws
+  func loadIssue() -> SettingsStorageIssue?
+}
+
+extension DownloadSettingsStorage {
+  func loadIssue() -> SettingsStorageIssue? { nil }
+}
+
+struct UserDefaultsDownloadSettingsStorage: DownloadSettingsStorage, @unchecked Sendable {
+  static let allowCellularKey = "dspeech.downloads.allow-cellular.v1"
+
+  let defaults: UserDefaults
+
+  init(defaults: UserDefaults = .standard) {
+    self.defaults = defaults
+  }
+
+  func loadAllowCellular() -> Bool {
+    if let value = defaults.object(forKey: Self.allowCellularKey) as? Bool {
+      return value
+    }
+    if let raw = defaults.string(forKey: Self.allowCellularKey) {
+      return SettingsBoolParsing.parse(raw) ?? false
+    }
+    // why: default OFF — a fresh install waits for Wi-Fi before any multi-hundred-MB model download.
+    return false
+  }
+
+  func saveAllowCellular(_ allow: Bool) throws {
+    defaults.set(allow, forKey: Self.allowCellularKey)
+  }
+
+  func loadIssue() -> SettingsStorageIssue? {
+    let raw = defaults.object(forKey: Self.allowCellularKey)
+    if raw == nil || raw is Bool { return nil }
+    if let string = raw as? String, SettingsBoolParsing.parse(string) != nil { return nil }
+    return .downloadAllowCellularCorrupted
+  }
+}
+
+@MainActor
+@Observable
+final class DownloadSettings {
+  private let storage: DownloadSettingsStorage
+  private(set) var storageIssue: SettingsStorageIssue?
+  var hasStaleSettings: Bool { storageIssue != nil }
+
+  var allowCellular: Bool {
+    didSet {
+      guard allowCellular != oldValue else { return }
+      do {
+        try storage.saveAllowCellular(allowCellular)
+        storageIssue = nil
+      } catch {
+        storageIssue = .downloadAllowCellularSaveFailed
+      }
+    }
+  }
+
+  init(storage: DownloadSettingsStorage = UserDefaultsDownloadSettingsStorage()) {
+    self.storage = storage
+    self.allowCellular = storage.loadAllowCellular()
+    self.storageIssue = storage.loadIssue()
+  }
+}
+
 enum PreferredInputResolver {
   // why: prefer an exact uid match (same physical device), else fall back to the
   // saved port type (a reconnected device of the same kind), else nil.

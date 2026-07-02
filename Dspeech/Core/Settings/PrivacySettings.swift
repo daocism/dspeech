@@ -50,6 +50,8 @@ enum SettingsStorageIssue: Equatable, Sendable {
   case translationTargetSaveFailed
   case audioPreferredInputCorrupted
   case audioPreferredInputSaveFailed
+  case downloadAllowCellularCorrupted
+  case downloadAllowCellularSaveFailed
 }
 
 protocol PrivacySettingsStorage: Sendable {

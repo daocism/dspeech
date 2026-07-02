@@ -165,13 +165,29 @@ protocol WhisperKitModelFileDownloading: Sendable {
 }
 
 struct URLSessionWhisperKitModelFileDownloader: WhisperKitModelFileDownloading {
+  // why: M1 — model downloads default to Wi-Fi only. Evaluated per request (not captured once) so a
+  // toggle in Settings takes effect on the next request without reconstructing the installer. When
+  // disallowed and only cellular is reachable, URLSession throws URLError.dataNotAllowed, which the
+  // shared taxonomy already maps to `.offline` (see isModelInstallOfflineError).
+  let allowsCellularAccess: @Sendable () -> Bool
+
+  init(
+    allowsCellularAccess: @escaping @Sendable () -> Bool = {
+      UserDefaultsDownloadSettingsStorage().loadAllowCellular()
+    }
+  ) {
+    self.allowsCellularAccess = allowsCellularAccess
+  }
+
   func download(from sourceURL: URL, to destinationURL: URL) async throws {
     // why: C1 — stage into `<destination>.partial` and resume from its byte count via an HTTP
     // `Range` request, so an interrupted multi-hundred-MB CoreML download continues instead of
     // restarting at zero. The pinned per-file SHA-256 is still verified over the complete assembled
     // file by the shared engine, so a corrupt/short partial can never fail-open.
+    let allowsCellular = allowsCellularAccess()
     try await resumableStagedDownload(to: destinationURL) { fromByteOffset in
       var request = URLRequest(url: sourceURL)
+      request.allowsCellularAccess = allowsCellular
       if fromByteOffset > 0 {
         request.setValue("bytes=\(fromByteOffset)-", forHTTPHeaderField: "Range")
       }
