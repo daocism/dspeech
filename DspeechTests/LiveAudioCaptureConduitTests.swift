@@ -111,6 +111,25 @@ struct LiveAudioCaptureConduitTests {
   }
 }
 
+// why: the tap-session primitive's I/O-bearing paths (format guard, installTap, engine start)
+// need real audio hardware, so they are exercised on device, not here. Its one hardware-free
+// contract — idempotent teardown — is pinned below so a refactor can't reintroduce the
+// "stop() must be safe when never started / called twice" hazard the four wrappers rely on.
+@MainActor
+struct AVAudioEngineTapSessionTests {
+  @Test func freshSessionIsNotRunning() {
+    let session = AVAudioEngineTapSession()
+    #expect(!session.isRunning)
+  }
+
+  @Test func stopIsIdempotentWhenNeverStarted() {
+    let session = AVAudioEngineTapSession()
+    session.stop()
+    session.stop()
+    #expect(!session.isRunning)
+  }
+}
+
 private enum SpyConduitAudioSessionError: Error, LocalizedError {
   case denied
 

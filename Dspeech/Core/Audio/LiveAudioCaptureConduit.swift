@@ -131,10 +131,7 @@ final class LiveAudioCaptureConduit {
 
   func stop() -> LiveEngineCleanupResult {
     removeEngineConfigurationObserver()
-    if audioEngine.isRunning {
-      audioEngine.stop()
-    }
-    audioEngine.inputNode.removeTap(onBus: 0)
+    AVAudioEngineTapSession(engine: audioEngine).stop()
     captureContinuation?.finish()
     captureContinuation = nil
     var deactivationFailure: String?
@@ -192,64 +189,48 @@ final class LiveAudioCaptureConduit {
   }
 
   private func startCurrentAudioEngine() throws {
-    let inputNode = audioEngine.inputNode
-    let recordingFormat = inputNode.outputFormat(forBus: 0)
-    // why: on some device routes (mic not yet granted, mid route-change, certain
-    // external interfaces) the input format reports 0 Hz / 0 channels; installing a
-    // tap with it throws deep inside CoreAudio. Surface it as an explicit failure.
-    guard recordingFormat.channelCount > 0, recordingFormat.sampleRate > 0 else {
-      DspeechLog.engine.error(
-        "live audio tap install failed slug=invalid-input-format sampleRate=\(recordingFormat.sampleRate, privacy: .public) channels=\(recordingFormat.channelCount, privacy: .public)"
-      )
-      throw LiveEngineError.invalidInputFormat
-    }
-
+    // why: the closure captures the continuation, so resolve it BEFORE building the tap —
+    // absence is an internal invariant violation, not a route failure.
     guard let audioContinuation = captureContinuation else {
       DspeechLog.engine.error("live audio tap install failed slug=capture-pipeline-unavailable")
       throw LiveEngineError.capturePipelineUnavailable
     }
 
-    inputNode.removeTap(onBus: 0)
-    // why: format:nil — the tap uses the input bus's OWN current format. Passing a
-    // separately-read AVAudioFormat (recordingFormat) trips an NSException abort inside
-    // AUGraphNodeBaseV3::CreateRecordingTap ("required condition is false:
-    // format.sampleRate == hwFormat.sampleRate") when it doesn't match the live hardware
-    // rate — which .measurement mode reconfigures, so the cached value is stale at
-    // tap-build time. nil removes the mismatch; the guard above still fails-fast on a dead
-    // (0 Hz / 0-channel) input. recordingFormat is kept only for that guard.
-    //
-    // why: the `@Sendable` on this block is LOAD-BEARING, not cosmetic. This type is
-    // @MainActor, so a bare closure literal here inherits @MainActor isolation; when
-    // AVFAudio invokes it on its realtime RealtimeMessenger thread, Swift asserts
-    // swift_task_isCurrentExecutor(MainActor) → false → dispatch_assert_queue_fail
-    // (EXC_BREAKPOINT) and the app crashes on the first captured buffer. `@Sendable`
-    // forces the block nonisolated so it legally runs off-MainActor. It captures only
-    // the Sendable continuation (never self / @MainActor state), deep-copies the
-    // recycled buffer, and yields it in capture order for the @MainActor consumer.
+    // why: the tap's `@Sendable` handler captures only the Sendable continuation + drop counter
+    // (never self / @MainActor state), deep-copies the recycled buffer, and yields it in capture
+    // order for the @MainActor consumer. The realtime-thread + format:nil hazards it rides on top
+    // of live in AVAudioEngineTapSession.
     let dropCounter = captureDropCounter
-    inputNode.installTap(onBus: 0, bufferSize: 1024, format: nil) { @Sendable buffer, _ in
-      guard let copy = buffer.dspeechDeepCopy() else { return }
-      let samples = LiveAudioCaptureConduit.monoFloatSamples(from: copy) ?? []
-      let result = audioContinuation.yield(
-        LiveCapturedAudioBuffer(buffer: copy, samples: samples, sampleRate: copy.format.sampleRate)
-      )
-      // why: bounded FIFO — a dropped buffer means the MainActor consumer stalled. Count + log
-      // (rate-limited) so the loss is visible in the field; never a silent truncation.
-      if case .dropped = result {
-        let total = dropCounter.recordDrop()
-        if total == 1 || total.isMultiple(of: LiveAudioCaptureConduit.dropLogInterval) {
-          DspeechLog.engine.error(
-            "live capture buffer dropped slug=capture-queue-overflow totalDropped=\(total, privacy: .public)"
+    let recordingFormat: AVAudioFormat
+    do {
+      recordingFormat = try AVAudioEngineTapSession(engine: audioEngine)
+        .startTap(bufferSize: 1024) { @Sendable buffer in
+          guard let copy = buffer.dspeechDeepCopy() else { return }
+          let samples = LiveAudioCaptureConduit.monoFloatSamples(from: copy) ?? []
+          let result = audioContinuation.yield(
+            LiveCapturedAudioBuffer(
+              buffer: copy, samples: samples, sampleRate: copy.format.sampleRate)
           )
+          // why: bounded FIFO — a dropped buffer means the MainActor consumer stalled. Count + log
+          // (rate-limited) so the loss is visible in the field; never a silent truncation.
+          if case .dropped = result {
+            let total = dropCounter.recordDrop()
+            if total == 1 || total.isMultiple(of: LiveAudioCaptureConduit.dropLogInterval) {
+              DspeechLog.engine.error(
+                "live capture buffer dropped slug=capture-queue-overflow totalDropped=\(total, privacy: .public)"
+              )
+            }
+          }
         }
-      }
+    } catch let error as AVAudioEngineTapSession.InvalidInputFormat {
+      DspeechLog.engine.error(
+        "live audio tap install failed slug=invalid-input-format sampleRate=\(error.sampleRate, privacy: .public) channels=\(error.channelCount, privacy: .public)"
+      )
+      throw LiveEngineError.invalidInputFormat
     }
     DspeechLog.engine.info(
       "live audio tap installed sampleRate=\(recordingFormat.sampleRate, privacy: .public) channels=\(recordingFormat.channelCount, privacy: .public)"
     )
-
-    audioEngine.prepare()
-    try audioEngine.start()
     DspeechLog.engine.info("live audio engine run loop started")
   }
 
@@ -286,7 +267,6 @@ final class LiveAudioCaptureConduit {
     guard captureContinuation != nil else { return }
     DspeechLog.engine.info("live audio engine configuration-change rebuild requested")
     do {
-      audioEngine.inputNode.removeTap(onBus: 0)
       try startCurrentAudioEngine()
       guard audioEngine.isRunning else {
         throw LiveEngineError.audioEngineNotRunningAfterConfigurationChange
@@ -361,6 +341,84 @@ final class LiveAudioCaptureConduit {
       captureContinuation?.yield(captured)
     }
   #endif
+}
+
+// MARK: - AVAudioEngineTapSession
+
+// why: the SINGLE source of the two AVAudioEngine realtime-tap hazards that every capture
+// wrapper (live transcription, callsign dictation, voice enrollment, input level meter) must
+// respect — the load-bearing `format: nil` and `@Sendable` decisions live once, in `startTap`
+// below, instead of being copy-pasted four times where any copy could silently drift. It owns
+// ONLY the tap lifecycle (format guard → installTap → prepare/start → idempotent stop); audio
+// session activation/deactivation and arbiter ownership stay with the callers, which differ.
+struct AVAudioEngineTapSession {
+  // why: a dead input route (mic not yet granted, mid route-change, some external interfaces)
+  // reports 0 Hz / 0 channels; installing a tap with it throws deep inside CoreAudio. Surfaced
+  // as a typed error carrying the observed format so each caller logs its own slug + maps to
+  // its own failure taxonomy (throw vs. yield a localized meter failure).
+  struct InvalidInputFormat: Error {
+    let sampleRate: Double
+    let channelCount: AVAudioChannelCount
+  }
+
+  let engine: AVAudioEngine
+
+  init(engine: AVAudioEngine = AVAudioEngine()) {
+    self.engine = engine
+  }
+
+  var isRunning: Bool { engine.isRunning }
+
+  // why: install the realtime tap and start the run loop; returns the input format so callers
+  // that need the sample rate can read it. Repeatable on the same engine — the live conduit
+  // re-invokes it to rebuild the tap after an AVAudioEngineConfigurationChange.
+  @discardableResult
+  func startTap(
+    bufferSize: AVAudioFrameCount,
+    handler: @escaping @Sendable (AVAudioPCMBuffer) -> Void
+  ) throws -> AVAudioFormat {
+    let inputNode = engine.inputNode
+    let recordingFormat = inputNode.outputFormat(forBus: 0)
+    guard recordingFormat.channelCount > 0, recordingFormat.sampleRate > 0 else {
+      throw InvalidInputFormat(
+        sampleRate: recordingFormat.sampleRate,
+        channelCount: recordingFormat.channelCount
+      )
+    }
+
+    inputNode.removeTap(onBus: 0)
+    // why: format:nil — the tap uses the input bus's OWN current format. Passing a
+    // separately-read AVAudioFormat trips an NSException abort inside
+    // AUGraphNodeBaseV3::CreateRecordingTap ("required condition is false:
+    // format.sampleRate == hwFormat.sampleRate") when it doesn't match the live hardware
+    // rate — which .measurement mode reconfigures, so a cached value is stale at tap-build
+    // time. nil removes the mismatch; the guard above still fails-fast on a dead (0 Hz /
+    // 0-channel) input.
+    //
+    // why: the `@Sendable` on this block is LOAD-BEARING, not cosmetic. AVFAudio invokes the
+    // tap on its realtime RealtimeMessenger thread; a bare closure literal captured from a
+    // @MainActor caller inherits @MainActor isolation, so when it runs off-MainActor Swift
+    // asserts swift_task_isCurrentExecutor(MainActor) → false → dispatch_assert_queue_fail
+    // (EXC_BREAKPOINT) and the app crashes on the first captured buffer. `@Sendable` forces
+    // the block nonisolated so it legally runs off-MainActor; it forwards only the
+    // Sendable-by-contract handler (which each caller keeps free of @MainActor state).
+    inputNode.installTap(onBus: 0, bufferSize: bufferSize, format: nil) { @Sendable buffer, _ in
+      handler(buffer)
+    }
+
+    engine.prepare()
+    try engine.start()
+    return recordingFormat
+  }
+
+  // why: idempotent teardown — stop the run loop if running, always remove the tap. Safe to
+  // call when never started (removeTap on an un-tapped bus is a no-op) and safe to call twice.
+  func stop() {
+    if engine.isRunning {
+      engine.stop()
+    }
+    engine.inputNode.removeTap(onBus: 0)
+  }
 }
 
 extension AVAudioPCMBuffer {

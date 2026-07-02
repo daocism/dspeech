@@ -405,7 +405,7 @@ private struct AppleCallsignRecognitionTask: CallsignRecognitionTasking {
 
 @MainActor
 private final class AVAudioEngineCallsignAudioCapture: CallsignAudioCapturing {
-  private let audioEngine = AVAudioEngine()
+  private let tapSession = AVAudioEngineTapSession()
   private var sessionActivated = false
 
   func start(onBuffer: @escaping @Sendable (AVAudioPCMBuffer) -> Void) throws {
@@ -416,24 +416,18 @@ private final class AVAudioEngineCallsignAudioCapture: CallsignAudioCapturing {
       sessionActivated = true
       DspeechLog.engine.info("callsign audio session activation succeeded")
 
-      let inputNode = audioEngine.inputNode
-      let recordingFormat = inputNode.outputFormat(forBus: 0)
-      guard recordingFormat.channelCount > 0, recordingFormat.sampleRate > 0 else {
+      let recordingFormat: AVAudioFormat
+      do {
+        recordingFormat = try tapSession.startTap(bufferSize: 1024, handler: onBuffer)
+      } catch let error as AVAudioEngineTapSession.InvalidInputFormat {
         DspeechLog.engine.error(
-          "callsign audio tap install failed reason=invalid-input-format sampleRate=\(recordingFormat.sampleRate, privacy: .public) channels=\(recordingFormat.channelCount, privacy: .public)"
+          "callsign audio tap install failed reason=invalid-input-format sampleRate=\(error.sampleRate, privacy: .public) channels=\(error.channelCount, privacy: .public)"
         )
         throw CallsignAudioCaptureError.invalidInputFormat
-      }
-
-      inputNode.removeTap(onBus: 0)
-      inputNode.installTap(onBus: 0, bufferSize: 1024, format: nil) { @Sendable buffer, _ in
-        onBuffer(buffer)
       }
       DspeechLog.engine.info(
         "callsign audio tap installed sampleRate=\(recordingFormat.sampleRate, privacy: .public) channels=\(recordingFormat.channelCount, privacy: .public)"
       )
-      audioEngine.prepare()
-      try audioEngine.start()
       DspeechLog.engine.info("callsign audio engine started")
     } catch {
       DspeechLog.engine.error(
@@ -445,10 +439,7 @@ private final class AVAudioEngineCallsignAudioCapture: CallsignAudioCapturing {
   }
 
   func stop(deactivateSession: Bool) {
-    if audioEngine.isRunning {
-      audioEngine.stop()
-    }
-    audioEngine.inputNode.removeTap(onBus: 0)
+    tapSession.stop()
     if deactivateSession, sessionActivated {
       DspeechLog.engine.info("callsign audio session deactivation requested")
       do {
