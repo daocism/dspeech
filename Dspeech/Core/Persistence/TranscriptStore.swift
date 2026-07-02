@@ -42,7 +42,7 @@ struct TranscriptSessionSummary: Identifiable, Equatable, Sendable, Codable {
   }
 }
 
-// why: the transcript is flight data (D4 in the 2026-06-11 spec). Losing it on app kill,
+// why: the transcript is flight data (spec item D4). Losing it on app kill,
 // jetsam, or crash is data loss, so every finalized segment is WRITTEN as it arrives (the
 // bytes survive app-kill/jetsam/crash via the page cache, and recovery tolerates a torn tail).
 // Durability against power-loss/panic is checkpointed — not per-append — via flush() (wired to

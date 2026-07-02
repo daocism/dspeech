@@ -3,7 +3,7 @@ import Testing
 
 @testable import Dspeech
 
-// Behavior contract for the serial pre-ASR routing seam (reviewer W1).
+// Behavior contract for the serial pre-ASR routing seam.
 //
 // Captured audio buffers must be classified off the main actor, but the
 // append/discard decision into Apple Speech must be applied in FIFO order with

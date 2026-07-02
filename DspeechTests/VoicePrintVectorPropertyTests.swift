@@ -267,8 +267,8 @@ struct VoicePrintVectorPropertyTests {
   }
 
   // init(from:) propagates structural Codable failures (missing key / wrong type) rather than
-  // swallowing them — fail-fast at the decode boundary. (Reviewer gap: init(from:) decode-error
-  // paths, distinct from the non-finite validation throws above.)
+  // swallowing them — fail-fast at the decode boundary. Covers the init(from:) decode-error paths,
+  // distinct from the non-finite validation throws above.
   @Test func decodeRejectsStructurallyMalformedJSON() {
     let malformed = [
       "{}",

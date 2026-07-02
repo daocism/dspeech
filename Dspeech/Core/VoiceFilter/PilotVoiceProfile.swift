@@ -47,7 +47,7 @@ struct VoicePrintVector: Equatable, Sendable, Codable {
 }
 
 // why: a variable-length crew roster, not a fixed 2-slot pair — the cockpit may have any number of
-// people on headsets and the pilot adds/removes them at will (2026-06-14 request). Each enrolled
+// people on headsets and the pilot adds/removes them at will. Each enrolled
 // voice is its own profile keyed by `id`; `label` is its display name. Decoding tolerates pre-roster
 // JSON that still carries a `slot` key (Codable ignores unknown keys), so no migration is needed.
 struct PilotVoiceProfile: Identifiable, Equatable, Sendable, Codable {

@@ -6,10 +6,9 @@ enum WhisperKitModelInstallError: Error, Equatable {
   case invalidURL(String)
   case fileMissingAfterDownload(String)
   case insufficientDiskSpace(requiredBytes: Int64, availableBytes: Int64)
-  // why: B4 closed the fail-open integrity gap — WhisperKit now verifies each downloaded file
-  // against a baked-in per-file SHA-256 (pinned HF revision, ADR-0011), exactly like Parakeet. A
-  // mismatch is surfaced, never swallowed and never fail-open: a tampered/corrupt CoreML bundle
-  // must not be loaded.
+  // why: B4 closed the fail-open integrity gap — WhisperKit verifies each downloaded file against a
+  // baked-in per-file SHA-256 (pinned HF revision, ADR-0011). A mismatch is surfaced, never swallowed
+  // and never fail-open: a tampered/corrupt CoreML bundle must not be loaded.
   case checksumMismatch(relativePath: String, expected: String, actual: String)
 }
 

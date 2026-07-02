@@ -30,11 +30,11 @@ struct MainControlBar: View {
 
           // why: the privacy/route chips are mandatory cockpit chrome (ADR 0002) — they may
           // scale via their own minimumScaleFactor but must never be compressed into
-          // letter-wrap fragments by a neighboring hint bubble. The original both-axes
-          // fixedSize made the column incompressible at accessibility type sizes and
-          // shoved the history/settings buttons off the right screen edge, and pure
-          // compression ellipsized the MIC chip (2026-06-12 visual review): side-by-side
-          // chips when they fit at intrinsic size, stacked vertically when they don't.
+          // letter-wrap fragments by a neighboring hint bubble. Both-axes fixedSize would
+          // make the column incompressible at accessibility type sizes and shove the
+          // history/settings buttons off the right screen edge; pure compression ellipsizes
+          // the MIC chip. So: side-by-side chips when they fit at intrinsic size, stacked
+          // vertically when they don't.
           ViewThatFits(in: .horizontal) {
             HStack(spacing: 8) {
               PrivacyBadge(mode: privacyMode, glassNamespace: glassNamespace)
@@ -67,7 +67,7 @@ struct MainControlBar: View {
         .frame(width: diameter, height: diameter)
         // why: .regular glass over the live transcript (never .clear) keeps the icon legible
         // against scrolling content; the white hairline stroke preserves the edge the flat
-        // fill used to give. Disabled state dims via the icon opacity, not a separate fill.
+        // fill would give. Disabled state dims via the icon opacity, not a separate fill.
         .glassEffect(.regular, in: Circle())
         .overlay(
           Circle()
@@ -113,8 +113,8 @@ struct FloatingStartControls: View {
 
   var body: some View {
     // why: at accessibility type sizes hint+button exceed the screen width and the
-    // overflow pushed the PRIMARY start button half off-screen (2026-06-12 visual
-    // review); ViewThatFits drops to a trailing-aligned vertical stack instead.
+    // overflow would push the PRIMARY start button half off-screen; ViewThatFits drops
+    // to a trailing-aligned vertical stack instead.
     ViewThatFits(in: .horizontal) {
       HStack(spacing: 12) {
         hintIfNeeded
@@ -154,8 +154,8 @@ struct BottomLeftControls: View {
             .foregroundStyle(.white.opacity(0.85))
             .padding(.horizontal, 16)
             .frame(minHeight: 44)
-            // why: glass backing for the floating Clear control (D5) — the label used to
-            // float bare over the transcript; a .regular glass capsule gives it a legible
+            // why: glass backing for the floating Clear control (D5) — a bare label would
+            // float illegibly over the transcript; a .regular glass capsule gives it a legible
             // surface without an opaque footer strip. Horizontal padding gives the capsule
             // width; contentShape keeps the whole capsule (not just the label) tappable.
             .glassEffect(.regular, in: Capsule())
@@ -294,9 +294,9 @@ private struct StartButton: View {
     !reduceMotion && !DecorativeMotion.isDisabledForUITests
   }
 
-  // why: .interactive() glass and the tint morph keep the render loop lively enough that
-  // XCUITest quiescence-waits stall past the scripted engine's partial window (caught by
-  // testScriptedEngineShowsPartialFinalAndClearFlow) — gate them exactly like the glow.
+  // why: interactive glass and the tint morph keep the render loop busy, which stalls
+  // XCUITest quiescence waits past the scripted engine's partial window; gate them exactly
+  // like the glow, on Reduce Motion + the UI-test flag.
   private var animatesGlassMorph: Bool {
     !reduceMotion && !DecorativeMotion.isDisabledForUITests
   }
@@ -307,8 +307,8 @@ private struct StartButton: View {
   }
 
   // why: primary-action prominence via tint on .regular glass — accent (cyan) invites the
-  // Start tap, danger (red) signals the Stop affordance. The tint replaces the old flat
-  // gray/red fills so the control reads as one generation with the iOS 26 system chrome.
+  // Start tap, danger (red) signals the Stop affordance. A tint (not a flat gray/red fill)
+  // makes the control read as one generation with the iOS 26 system chrome.
   private var glassTint: Color {
     isStopVisible ? DspeechTheme.danger : DspeechTheme.accent
   }
@@ -387,8 +387,8 @@ private struct LiveFailureBanner: View {
       Text(RecognitionFailureText.userFacing(error))
         .fixedSize(horizontal: false, vertical: true)
         // why: the identifier lives on the message text, NOT the container — a container
-        // identifier propagates onto every child accessibility element and overwrote the
-        // Open Settings button's own identifier (caught by the F10 deep-link UI test).
+        // identifier propagates onto every child accessibility element and would overwrite
+        // the Open Settings button's own identifier (the F10 deep-link UI test guards this).
         .accessibilityIdentifier("error-banner")
       if canOpenSettings {
         Button {

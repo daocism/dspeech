@@ -149,7 +149,7 @@ struct TransmissionAssemblerPropertyTests {
   }
 
   // A fragment sharing a 2+word seam with the existing text appends only the NEW tail — the actual
-  // replay-tail dedup across task restarts, not just the fully-identical case. (Reviewer gap.)
+  // replay-tail dedup across task restarts, not just the fully-identical case.
   @Test func partialOverlapAppendsOnlyTheNewTail() {
     var rng = SeededGenerator(seed: 0x7A55_0007)
     let overlap = 2
@@ -192,7 +192,7 @@ struct TransmissionAssemblerPropertyTests {
   }
 
   // The classification is refreshed as the accumulated text grows: a card flips from filtered to
-  // displayed once an appended fragment makes it relevant. (Reviewer gap — exercises the refresh.)
+  // displayed once an appended fragment makes it relevant.
   @Test func classificationRefreshesAsAccumulatedTextGrows() {
     var rng = SeededGenerator(seed: 0x7A55_0009)
     var exercised = 0

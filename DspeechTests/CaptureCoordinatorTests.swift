@@ -218,9 +218,8 @@ struct CaptureCoordinatorTests {
     #expect(coordinator.routeMonitor.lastNotice?.kind == .lost)
   }
 
-  // why: regression — clearNotice() previously had no production call site, so an alarming
-  // "External source lost — Recording paused" banner lingered over a healthy session forever.
-  // A user-initiated (re)start must clear the stale notice.
+  // why: a user-initiated (re)start must clear the stale route notice, so an alarming
+  // "External source lost — Recording paused" banner never lingers over a healthy session.
   @Test func successfulStartClearsStaleRouteNotice() async {
     let (coordinator, engine, routing) = Self.makeCoordinator(
       route: RouteSnapshot(inputs: [Self.port(.usbAudio, name: "USB Tap")]),

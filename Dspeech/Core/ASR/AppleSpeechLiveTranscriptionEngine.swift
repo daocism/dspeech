@@ -46,12 +46,11 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
   // cancelled task can never flip the live session's state.
   private var taskGeneration = 0
   private var router: UtteranceWindowRouter<AVAudioPCMBuffer>?
-  // why: SFSpeech `.dictation` NEVER self-finalizes on a pause, so a continuous live mic produced
-  // one ever-growing transcription that never split into cards ("пишет лайв в одно сообщение вечно",
-  // 2026-06-14 device report). This DRIVES finalization: an adaptive noise-floor VAD detects the
-  // speech gap (works against a real mic's noise floor, not just digital silence) and recycles the
-  // recognition request per utterance, so each transmission finalizes into its own card. Validated
-  // on real audio (speech + 3s noisy pauses) via `dspeech-replay transcribe --silence-restart on`.
+  // why: SFSpeech `.dictation` NEVER self-finalizes on a pause, so a continuous live mic produces
+  // one ever-growing transcription that never splits into cards. This DRIVES finalization: an
+  // adaptive noise-floor VAD detects the speech gap (works against a real mic's noise floor, not
+  // just digital silence) and recycles the recognition request per utterance, so each transmission
+  // finalizes into its own card.
   private let utteranceBoundaryDetector = EnergySilenceSegmenter(
     minSpeechSeconds: 0.3, minSilenceSeconds: 1.0, maxWindowSeconds: 18,
     requireSpeechForMaxWindow: true)
@@ -332,7 +331,7 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
         append: { [weak self] buffer, generation in
           // why: drop a classified buffer whose recognition request was already recycled at an
           // utterance boundary while it classified off-actor — appending it would bleed the previous
-          // transmission's audio into the next card's request (adversarial-audit HIGH, 2026-06-14).
+          // transmission's audio into the next card's request.
           guard let self, self.taskGeneration == generation else { return }
           self.request?.append(buffer)
         }
@@ -508,7 +507,7 @@ final class AppleSpeechLiveTranscriptionEngine: LiveTranscriptionEngine {
         // from a finished read-back bleed onto the NEXT segment — e.g. a controller clearance
         // whose ASR final arrives before its own audio is classified — and wrongly suppress it.
         // After consuming, a later segment with no fresh classification gets nil => fail-open
-        // (shown). Never hide a controller clearance on a stale decision. (Adversarial review.)
+        // (shown). Never hide a controller clearance on a stale decision.
         lastBufferSpeaker = nil
       } else {
         emit(event)

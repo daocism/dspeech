@@ -109,8 +109,8 @@ struct UserDefaultsVoiceFilterStorage: VoiceFilterStorage, @unchecked Sendable {
       defaults.removeObject(forKey: Self.profilesKey)
     } catch {
       // why: surface to the log/crash-report boundary (`log collect`) instead of swallowing — a
-      // silent persist failure left the UI claiming success while the voiceprint never saved
-      // (2026-06-15 audit). Error is .private (may carry a path); no voiceprint content is logged.
+      // silent persist failure would let the UI claim success while the voiceprint never saved.
+      // Error is .private (may carry a path); no voiceprint content is logged.
       DspeechLog.voiceFilter.error(
         "voiceprint persist failed error=\(String(describing: error), privacy: .private)"
       )
@@ -123,7 +123,7 @@ struct UserDefaultsVoiceFilterStorage: VoiceFilterStorage, @unchecked Sendable {
         try fileManager.removeItem(at: profileStoreURL)
       } catch {
         // why: a silent delete failure leaves personal voiceprints on disk after the user removed
-        // the feature (a privacy/data-retention leak) — surface it rather than swallow (audit).
+        // the feature (a privacy/data-retention leak) — surface it rather than swallow.
         DspeechLog.voiceFilter.error(
           "voiceprint delete failed error=\(String(describing: error), privacy: .private)"
         )
@@ -199,7 +199,7 @@ struct UserDefaultsVoiceFilterStorage: VoiceFilterStorage, @unchecked Sendable {
         // why: a well-formed but semantically-invalid suppress threshold (at or below the SpeakerMatcher
         // match boundary) collapses the [match, suppress) fail-open band and silently reintroduces the
         // hide-a-dispatcher bug. Treat it as corrupt and recover to the safe default, same as a decode
-        // failure. (2026-06-15 adversarial-review defense-in-depth finding.)
+        // failure.
         if decoded.pilotSuppressThreshold > SpeakerMatchConfig.default.pilotMatchThreshold {
           gateConfig = decoded
         } else {

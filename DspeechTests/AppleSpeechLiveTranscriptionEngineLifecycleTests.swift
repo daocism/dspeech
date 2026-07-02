@@ -96,8 +96,7 @@ struct AppleSpeechLiveTranscriptionEngineLifecycleTests {
     #expect(engine.status == .failed("recognition-locale-unavailable"))
   }
 
-  // why: the restart-vs-surface decision is the F1 silent-failure fix and was previously
-  // shipped with zero behavioral coverage. These pin the exact branches: a benign no-speech
+  // why: the restart-vs-surface decision. These pin the exact branches: a benign no-speech
   // timeout (1110) keeps listening; a real fault surfaces as a visible .failed; a normal final
   // (no failure) restarts; and a callback that arrives when not listening / without a recognizer
   // is ignored so a superseded task can't flip a torn-down session.
@@ -424,7 +423,7 @@ struct AppleSpeechLiveTranscriptionEngineLifecycleTests {
   @Test func emptyFinalDoesNotDiscardPendingPartialBeforeRestartBoundary() async {
     // why: the recognizer can RETRACT a faint utterance just after a long silence — emitting an
     // empty final (no segment). The shown live partial must survive so the next restart boundary
-    // commits it as a card, instead of the line dictating then vanishing (2026-06-14 device report).
+    // commits it as a card, instead of the line dictating then vanishing.
     let engine = AppleSpeechLiveTranscriptionEngine(
       localeProvider: { "en-US" },
       requireOnDeviceModel: false,

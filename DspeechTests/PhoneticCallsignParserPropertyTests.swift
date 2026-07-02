@@ -95,9 +95,8 @@ private func separatorGarbage(using rng: inout SeededGenerator) -> String {
 // A free-form messy ASCII string mixing known spoken words, unknown words, digits, and separators —
 // for invariants that must hold on ARBITRARY input (idempotence, uppercase, alnum-only).
 // why: Dictionary.values iteration order is randomized PER PROCESS, so pools built from it
-// silently defeated the seeded PRNG — the same seed generated different inputs per launch
-// (caught 2026-07-02: PR CI hit a counterexample main's run never generated). Sorted pools
-// make the seed actually reproduce.
+// silently defeat the seeded PRNG — the same seed would generate different inputs per launch.
+// Sorted pools make the seed actually reproduce.
 private let arbitraryWordPool: [String] =
   Array(letterSpokenVariants.values.joined()).sorted()
   + Array(englishDigitSpokenVariants.values.joined()).sorted()
@@ -187,16 +186,16 @@ struct PhoneticCallsignParserPropertyTests {
   // Fixed point within two applications: parse(parse(parse(x))) == parse(parse(x)) for ANY x.
   // Single-application idempotence is NOT a current contract: a pure-letter compact output that
   // spells an English digit homophone re-maps on a second parse (letters T,O -> "TO" -> "2") —
-  // that behavior is part of the OPEN owner decision on homophone scope (2026-06-15 note) and is
+  // that behavior is part of the OPEN owner decision on homophone scope and is
   // pinned as a known issue below, not silently exempted. Production parses raw dictation exactly
   // once (VoiceFilterSettingsSection), so the divergence is a latent re-normalization hazard.
   @Test func parseReachesAFixedPointWithinTwoApplications() {
     var rng = SeededGenerator(seed: 0x9E_04_0004)
     let localeChoices: [String?] = [nil, "en-US", "fr-FR"]
     // why: the arbitrary generator almost never assembles a pure-letter output that spells an
-    // English digit homophone (the divergence class this property was weakened around), so the
-    // reach floor is anchored by deterministic exemplars driven through the SAME property —
-    // a purely random floor here was vacuous twice (caught 2026-07-02).
+    // English digit homophone (the divergence class this property covers), so the reach floor is
+    // anchored by deterministic exemplars driven through the SAME property — a purely random floor
+    // here would be vacuous.
     let divergenceExemplars = [
       "tango oscar",  // -> TO -> 2
       "whiskey oscar november",  // -> WON -> 1

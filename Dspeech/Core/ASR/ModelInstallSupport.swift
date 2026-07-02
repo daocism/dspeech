@@ -1,9 +1,9 @@
 import CryptoKit
 import Foundation
 
-/// Shared machinery for the pinned per-file model installers (WhisperKit + Parakeet) and the
-/// Application-Support-relative path rewriting used by all three model-state storages
-/// (WhisperKit / Parakeet / VoiceFilter model-pack).
+/// Shared machinery for the pinned per-file model installers (WhisperKit) and the
+/// Application-Support-relative path rewriting used by the model-state storages
+/// (WhisperKit / VoiceFilter model-pack).
 ///
 /// The concrete installers stay thin: each owns its pinned manifest, HF repo/revision, URL builder,
 /// error taxonomy, and `@Observable` state machine, and delegates the identical download-stage-verify

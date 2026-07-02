@@ -197,7 +197,7 @@ struct VoiceFilterStorageTests {
   // A well-formed but semantically-invalid gate config (suppress threshold at/below the SpeakerMatcher
   // match boundary) collapses the [match, suppress) fail-open band and would silently reintroduce the
   // hide-a-dispatcher bug. loadSnapshot must reject it as corrupt and recover to the safe default,
-  // while preserving a validly-tightened config. (2026-06-15 adversarial-review defense-in-depth.)
+  // while preserving a validly-tightened config.
   @Test func gateConfigCollapsingFailOpenBandIsTreatedCorrupt() throws {
     let suiteName = "dspeech.tests.voicefilter.\(UUID().uuidString)"
     let defaults = UserDefaults(suiteName: suiteName)!

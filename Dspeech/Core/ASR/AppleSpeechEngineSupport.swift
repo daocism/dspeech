@@ -118,7 +118,7 @@ struct PendingRecognitionPartial: Sendable {
     // why: clear ONLY when the final actually produced a committed segment. An EMPTY final
     // (recognizer ended with no text — common when it retracts a faint utterance right after a long
     // silence) must NOT discard the last shown partial; keeping it lets the boundary restart commit
-    // it as a card instead of the live line dictating then silently vanishing (2026-06-14 device).
+    // it as a card instead of the live line dictating then silently vanishing.
     if isFinal, case .segment = event {
       clear()
     }

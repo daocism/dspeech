@@ -102,7 +102,7 @@ struct VoiceFilterPipelineTests {
 
   // .mixed (best cosine in [0.50, 0.72)) is reachable in production and routes through
   // indicator(for:) to its own .mixedSpeakerCandidate badge — the one indicator path not covered at
-  // the pipeline level. Pins it so the mixed-band badge can't silently regress. (2026-06-15 backlog.)
+  // the pipeline level. Pins it so the mixed-band badge can't silently regress.
   @Test func mixedSpeakerDecisionYieldsMixedSpeakerCandidateIndicator() {
     let pipeline = VoiceFilterPipeline(
       identifier: UnavailableLocalSpeakerIdentifier(),
@@ -140,7 +140,7 @@ struct VoiceFilterPipelineTests {
   // An urgency broadcast must be SHOWN even with the filter OFF — the one decision the
   // disabled filter still makes (decide()'s `containsUrgencyBroadcast || enabled` short-circuit).
   // Pinned at the pipeline level (not just the gate); a confident pilot speaker proves urgency wins
-  // over voice classification too. (2026-06-15 audit gap.)
+  // over voice classification too.
   @Test func decideShowsUrgencyEvenWhenFilterDisabled() {
     let store = InMemoryStorage()
     store.callSign = CallSign(raw: "N123AB")
@@ -167,7 +167,7 @@ struct VoiceFilterPipelineTests {
   // An uncertain-band pilot (>= match 0.72, < suppress 0.82) that the gate SHOWS (fail-open) must NOT
   // be badged .pilotSuppressed — the badge must reflect the displayed segment, else the UI audit trail
   // reads "crew suppressed" on a visible clearance. A CONFIDENT pilot still suppresses and badges
-  // .pilotSuppressed. (2026-06-15 adversarial-review indicator finding.)
+  // .pilotSuppressed.
   @Test func uncertainPilotShownIsNotBadgedSuppressed() {
     let store = InMemoryStorage()  // no call sign -> the gate fails open and SHOWS the segment
     let pipeline = VoiceFilterPipeline(
@@ -198,7 +198,7 @@ struct VoiceFilterPipelineTests {
 
   // Deleting the model pack wipes enrolled voiceprints from memory AND storage — voice data
   // must not survive on disk and silently return on reinstall (the privacy/data-retention wipe).
-  // Includes the idempotent second wipe. (2026-06-15 audit gap — was untested.)
+  // Includes the idempotent second wipe.
   @Test func removeAllCrewMembersWipesProfilesAndStorage() {
     let store = InMemoryStorage()
     store.profiles = [
@@ -225,7 +225,6 @@ struct VoiceFilterPipelineTests {
   // The wipe must clear ON-DISK voiceprints even when in-memory profiles are already empty — a
   // corrupted/partial load can leave bytes on disk while `profiles == []` in memory, and an
   // empty-memory early-return would let that personal voice data survive the explicit removal.
-  // (2026-06-15 adversarial-review privacy finding — the old guard short-circuited this.)
   @Test func removeAllCrewMembersWipesStorageEvenWhenMemoryEmpty() {
     let store = InMemoryStorage()
     let pipeline = VoiceFilterPipeline(
@@ -247,10 +246,9 @@ struct VoiceFilterPipelineTests {
       store.profiles.isEmpty, "wipe must clear on-disk voiceprints even when memory was empty")
   }
 
-  // The inconsistent cold-start state the audit flagged: pack-state says installed, but the
+  // Inconsistent cold-start state, two sources of truth: pack-state says installed, but the
   // identifier (built from a stale/recovered state) is unavailable. classify must throw a typed
-  // error rather than classify with the unavailable identifier. (2026-06-15 audit, two sources of
-  // truth.)
+  // error rather than classify with the unavailable identifier.
   @Test func classifyThrowsWhenStateInstalledButIdentifierUnavailable() async {
     let store = InMemoryStorage()
     store.profiles = [
@@ -386,7 +384,7 @@ struct VoiceFilterPipelineTests {
     #expect(store.profiles.count == 2)
   }
 
-  // ENROLLMENT-QUALITY ASYMMETRY (intentional, 2026-06-14 incident): enrollment has NO quality gate
+  // ENROLLMENT-QUALITY ASYMMETRY (intentional): enrollment has NO quality gate
   // — the 0.25 minQuality floor was calibrated to reject received ATC noise for CLASSIFICATION and it
   // wrongly rejected a quietly-spoken on-device enrollment. Matching gates only the INCOMING
   // candidate's quality and never reads the enrolled profile's quality. These pin all three halves so

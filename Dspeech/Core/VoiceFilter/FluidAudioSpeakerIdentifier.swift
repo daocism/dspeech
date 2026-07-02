@@ -109,10 +109,10 @@ struct FluidAudioSpeakerIdentifier: LocalSpeakerIdentifier {
       "fluid audio enrollment requested samples=\(samples.count, privacy: .public) sampleRate=\(sampleRate, privacy: .public)"
     )
     // why: NO quality gate on ENROLLMENT. The recorder already requires real voiced speech, and the
-    // minVoicedQuality 0.25 floor is calibrated to reject noisy RECEIVED ATC for CLASSIFICATION — it
-    // wrongly rejected a perfectly good own-voice recording made a touch quietly (2026-06-14 device
-    // report). The WeSpeaker embedding is the real arbiter; a weak sample just separates less well and
-    // the user can re-record. Classification keeps the gate.
+    // minVoicedQuality 0.25 floor is calibrated to reject noisy RECEIVED ATC for CLASSIFICATION —
+    // applying it to enrollment would wrongly reject a perfectly good own-voice recording made a
+    // touch quietly. The WeSpeaker embedding is the real arbiter; a weak sample just separates less
+    // well and the user can re-record. Classification keeps the gate.
     let prepared = SpeakerAudioPreprocessing.prepare(samples: samples, sampleRate: sampleRate)
     let embedding = try await embedding(for: prepared.samples)
     DspeechLog.modelPack.info(

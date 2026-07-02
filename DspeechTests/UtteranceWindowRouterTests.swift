@@ -6,17 +6,14 @@ import Testing
 
 // Behavior contract for the VAD / silence-gap utterance-segmentation seam.
 //
-// W2 cut the discard decision window at a *fixed sample count*
-// (`minimumChunkSamples`, ~1.0 s of audio). A window that straddles a
-// pilot→dispatcher PTT transition could therefore discard up to ~1 s of
-// co-located dispatcher speech (reviewer NOTE A). This iteration replaces the
-// fixed-count cut with an injected `SpeechActivitySegmenter`: the router feeds
-// every submitted block to the segmenter and only cuts a decision window when
-// the segmenter reports a *trailing-silence utterance edge* (`.cutAfterSilence`)
-// or a *conservative max-window cap* (`.cutAtMaxWindow`). Below an utterance
-// edge the window keeps accumulating; on `finish()` unresolved submitted audio
-// is flushed (fail open) in FIFO order and late classifier results are ignored
-// so no buffer is appended twice.
+// The router feeds every submitted block to an injected `SpeechActivitySegmenter`
+// and only cuts a decision window when the segmenter reports a *trailing-silence
+// utterance edge* (`.cutAfterSilence`) or a *conservative max-window cap*
+// (`.cutAtMaxWindow`) — never merely because a fixed sample count was reached,
+// which could discard up to ~1 s of co-located dispatcher speech straddling a
+// pilot→dispatcher PTT transition. Below an utterance edge the window keeps
+// accumulating; on `finish()` unresolved submitted audio is flushed (fail open) in
+// FIFO order and late classifier results are ignored so no buffer is appended twice.
 //
 // The seam is exercised through injected closures + a scripted segmenter rather
 // than a real `SFSpeechAudioBufferRecognitionRequest` or real audio.

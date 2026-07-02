@@ -152,7 +152,7 @@ struct SpeechActivitySegmenterPropertyTests {
   }
 
   // The default (router) config flushes a silence-only window at the max window — its latency
-  // ceiling must fire even with no speech, unlike the boundary detector. (Reviewer-identified gap.)
+  // ceiling must fire even with no speech, unlike the boundary detector.
   @Test func defaultConfigFlushesPureSilenceAtMaxWindow() {
     var rng = SeededGenerator(seed: 0x5E60_0007)
     var exercised = 0
@@ -177,7 +177,7 @@ struct SpeechActivitySegmenterPropertyTests {
 
   // A sub-minSpeech speech burst (which opens the window, speechSeconds > 0) followed by sustained
   // silence still closes at the max window — the boundary detector must not STICK on .accumulate
-  // forever. (Reviewer-identified gap; guards a documented prior regression.)
+  // forever.
   @Test func boundaryDetectorSubMinSpeechBurstStillCutsAtMaxWindow() {
     var rng = SeededGenerator(seed: 0x5E60_0008)
     var exercised = 0

@@ -4,8 +4,8 @@ import Foundation
 // on-device-model-missing, asr-error: <domain>#<code>, …). Those are correct for logs and
 // tests but must never reach a pilot's screen verbatim. This pure mapper is the single
 // boundary that turns a code into one actionable localized sentence; it is exhaustively
-// unit-tested so a new code can't silently leak raw (the "Ошибка: kLSRErrorDomain#300"
-// the user hit).
+// unit-tested so a new code can't silently leak raw (e.g. a bare "Error:
+// kLSRErrorDomain#300" reaching the screen).
 enum RecognitionFailureText {
   static func userFacing(_ rawCode: String) -> String {
     if rawCode == "speech-permission-denied" {

@@ -335,8 +335,8 @@ struct RouteHealthClassifierPropertyTests {
   }
 
   // Branch 2 with an UNKNOWN capturable: an empty route whose first capturable available input is a
-  // .unknown type is assessed as .unknownExternal, carrying its raw identity. (Reviewer gap — the
-  // .unknown branch reached via the availableInputs-first-capturable path, not just in isolation.)
+  // .unknown type is assessed as .unknownExternal, carrying its raw identity. Reaches the .unknown
+  // branch via the availableInputs-first-capturable path, not just in isolation.
   @Test func emptyRouteWithUnknownCapturableInputIsUnknownExternal() {
     var rng = SeededGenerator(seed: 0x5A0E_0010)
     var exercised = 0

@@ -1,7 +1,7 @@
 import SwiftUI
 
 // why: enrollment targets a member of the variable-length crew roster — either an existing profile
-// (re-record, keep its id) or a brand-new one (append). Replaces the old fixed primary/secondary slot.
+// (re-record, keep its id) or a brand-new one (append).
 enum CrewEnrollmentTarget: Equatable {
   case existing(UUID)
   case new
@@ -240,7 +240,7 @@ struct VoiceFilterSettingsSection: View {
         try installer.uninstall(pack)
       }.value
       // why: wipe enrolled voice prints together with the model — don't leave personal voice data on
-      // disk after the user deleted the feature that uses it (2026-06-14 audit).
+      // disk after the user deleted the feature that uses it.
       pipeline.removeAllCrewMembers()
       crewProfiles = pipeline.profiles
       transition(to: .absent)
@@ -594,8 +594,8 @@ struct VoiceFilterSettingsSection: View {
     let target: CrewEnrollmentTarget = profile.map { .existing($0.id) } ?? .new
     let isRecordingThis = recordingTarget == target
     // why: at large Dynamic Type / the longest locale, name + Re-record + delete don't fit one row and
-    // the button truncated ("Neu aufneh…", 2026-06-14 visual review). ViewThatFits drops to a stacked
-    // layout where the controls get their own full-width line, so the button label never clips.
+    // the button label truncates. ViewThatFits drops to a stacked layout where the controls get their
+    // own full-width line, so the button label never clips.
     ViewThatFits(in: .horizontal) {
       HStack(alignment: .firstTextBaseline, spacing: 8) {
         crewRowName(index: index, isRecording: isRecordingThis)
