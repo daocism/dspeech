@@ -14,9 +14,9 @@ Domain: `dspeech.com`.
   The LOCAL badge on the control bar is a hard product rule. Optional model packs are
   the only network surface: pinned-revision HuggingFace downloads, per-file SHA-256
   verified, resumable, offline-aware.
-- ASR: three engines — Apple `SFSpeechRecognizer` (default), WhisperKit (multilingual,
-  selectable), Parakeet EOU streaming via FluidAudio (English-only, selectable). ADR
-  0009/0011/0012.
+- ASR: Apple `SFSpeechRecognizer` (default) + WhisperKit (multilingual, selectable) —
+  ADR 0009/0011. A third streaming engine was added and then removed the day it was
+  first measured on real audio (ADR 0014): wiring-first-measure-later is banned here.
 - Voice filter: on-device FluidAudio speaker identification separates dispatcher audio
   from own-crew transmissions, with callsign-aware classification (ADR 0007/0008).
 - UI: SwiftUI with the iOS 26 Liquid Glass design language on chrome surfaces (ADR 0013),

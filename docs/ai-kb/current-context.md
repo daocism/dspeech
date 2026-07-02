@@ -2,6 +2,26 @@
 
 > Rolling 1-page pointer. Updated by `knowledge-curator` after every substantive run.
 
+## READ FIRST (2026-07-02, later) — review hardening + PARAKEET REMOVED
+
+**Branch `fix/review-hardening-20260702`.** An adversarial 3-lens review (AI-slop /
+production gaps / mockup-masquerade) drove a hardening wave, and its honesty audit ended
+ADR-0012: the Parakeet engine had NEVER produced a transcript on any target. The first
+real host eval (production adapter, pinned pack — run-note 2026-07-02-parakeet-host-eval)
+measured clean WER **0.760 / 67%** vs WhisperKit **0.176 / 92%** with callsign corruption —
+owner removed the engine same day (**ADR-0014**; roster = Apple default + WhisperKit;
+FluidAudio stays for the speaker pack; persisted "parakeet" choice falls back to .apple,
+test-pinned). Also landed: installer twins collapsed to the policy floor (network bodies +
+SHA manifests pinned to boundary files by release policy — 538/541 lines is the honest
+minimum, not AI bloat), speaker installer on the shared core (its partial-resume rewrite
+DEFERRED as unverifiable without a FluidAudio integration harness), 34 verified-dead l10n
+keys pruned (the review's 63 had naive-grep false positives both directions), ko filter
+term unified, changelog-narration comments stripped, Russian comments translated, one
+seeded PRNG, dead tuning knobs demoted, vacuous reach-floor replaced with exemplar-anchored
+one. Pending next: first-run advisory disclaimer, MetricKit diagnostics + export, cellular
+download guard, JSONL schema version, Reduce-Transparency screenshot check, SettingsView
+split (strings for all of these already in the catalog, translated x11).
+
 ## READ FIRST (2026-07-02) — night-polish mission
 
 **Branch `feat/night-polish-20260702`** (99-task plan: `docs/PLAN-2026-07-02-night-polish.md`,
