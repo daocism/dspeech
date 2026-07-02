@@ -811,7 +811,8 @@ struct ContentView: View {
 
   private func scrollTranscriptToLive(_ proxy: ScrollViewProxy, animated: Bool = true) {
     guard followsLiveTranscript else { return }
-    if animated {
+    // why: D11 — the follow-live scroll is decorative motion; Reduce Motion jumps instead.
+    if animated && !reduceMotion {
       withAnimation(.easeOut(duration: 0.18)) {
         proxy.scrollTo(TranscriptScrollAnchor.bottom, anchor: .bottom)
       }
