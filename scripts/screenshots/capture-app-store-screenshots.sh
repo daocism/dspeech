@@ -206,6 +206,7 @@ install_and_launch() {
     "$BUNDLE_ID" \
     -dspeech.privacy.mode.v1 localOnly \
     -dspeech.voicefilter.modelpack.v1 absent \
+    -dspeech.onboarding.completed.v1 true \
     >/dev/null
 }
 
@@ -240,6 +241,10 @@ capture_profile() {
   mkdir -p "$out_dir"
   ensure_booted "$udid"
   install_and_launch "$udid"
+  # why: on a cold simulator the launch zoom animation is still mid-flight when the
+  # screenshot fires, capturing a white launch frame instead of the cockpit (caught by
+  # the 2026-07-02 full-frame review). Settle before shooting.
+  sleep "${DSPEECH_SCREENSHOT_SETTLE_SECONDS:-8}"
   xcrun simctl io "$udid" screenshot --type=png "$out_file" >/dev/null
   validate_dimensions "$out_file" "$accepted_dimensions"
   echo "$out_file"
