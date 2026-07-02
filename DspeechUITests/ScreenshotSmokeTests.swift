@@ -29,11 +29,11 @@ final class ScreenshotSmokeTests: XCTestCase {
     let app = launchClean(onboardingCompleted: false)
 
     XCTAssertTrue(
-      app.staticTexts["Только приём"].waitForExistence(timeout: 8),
-      "first run must show the onboarding receive-only card")
+      app.staticTexts["Только справочно"].waitForExistence(timeout: 8),
+      "first run must show the safety advisory card first")
     capture(app, "03-onboarding-card-1")
 
-    for index in 2...3 {
+    for index in 2...4 {
       let next = app.buttons["onboarding-next-button"]
       guard next.waitForExistence(timeout: 4) else { break }
       next.tap()
