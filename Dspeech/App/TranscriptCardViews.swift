@@ -249,6 +249,20 @@ struct TransmissionTranscriptCard: View {
         .font(.system(isLandscape ? .title2 : .title, design: .monospaced).weight(.semibold))
         .foregroundStyle(.white)
         .frame(maxWidth: .infinity, alignment: .leading)
+        // why: F14 — the tap-to-expand affordance is invisible to VoiceOver (a bare
+        // onTapGesture exposes no action/hint). The transcript text is where VoiceOver lands,
+        // so it carries the hint + a named custom action mirroring the tap toggle exactly, so a
+        // VoiceOver user can reveal the timing detail without discovering the sighted-only tap.
+        // Kept on the Text (not a combined element) so the utterance stays its own queryable
+        // static-text node for the scripted-flow UI tests.
+        .accessibilityHint(
+          expanded
+            ? String(localized: "Shows or hides the transmission's start and end time")
+            : String(localized: "Shows the transmission's start and end time")
+        )
+        .accessibilityAction(named: Text(String(localized: "Show details"))) {
+          withAnimation(.easeInOut(duration: 0.15)) { expanded.toggle() }
+        }
       if expanded { detailRow }
     }
     .padding(.horizontal, 14)

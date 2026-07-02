@@ -553,6 +553,196 @@ final class DspeechUITests: XCTestCase {
       "settings must expose an audio source section")
   }
 
+  // F9 — scripted live transcript with on-device translation enabled SIMULTANEOUSLY. Proves that
+  // arming translation does not break the transcript flow (partial -> final card render exactly as
+  // without translation) and does not masquerade as a recognition failure. On a simulator with no
+  // downloaded language pack the designed translation path is a rendered gloss, the designed
+  // translation-failure banner, or Apple's system download sheet — never a crash, a blank
+  // transcript, or the recognition error banner. Assertions are existence-based so a system
+  // translation sheet compositing over the app cannot flake the transcript checks.
+  @MainActor
+  func testScriptedLiveWithTranslationEnabledKeepsTranscriptIntact() throws {
+    let app = launchAppWithCleanPrivacyDefaults(
+      extraArguments: [
+        "-AppleLanguages", "(en)", "-AppleLocale", "en_US",
+        "-dspeech.uitest.scripted-engine",
+        "-dspeech.uitest.reduce-animations",
+        "-dspeech.translation.enabled.v1", "true",
+        "-dspeech.translation.target.v1", "de",
+      ])
+
+    let start = app.buttons["start-button"]
+    XCTAssertTrue(start.waitForExistence(timeout: 8))
+    XCTAssertTrue(waitUntilHittable(start))
+    start.tap()
+
+    let partialCard = app.descendants(matching: .any)
+      .matching(identifier: "partial-transcript").firstMatch
+    XCTAssertTrue(
+      partialCard.waitForExistence(timeout: 8),
+      "partial hypothesis must still render live with translation enabled")
+    XCTAssertTrue(app.staticTexts["Tower N123AB"].waitForExistence(timeout: 4))
+
+    XCTAssertTrue(
+      app.staticTexts["Tower N123AB cleared for takeoff"].waitForExistence(timeout: 8),
+      "scripted final segment must still render as a card with translation enabled")
+    let finalTransmission = app.descendants(matching: .any)
+      .matching(identifier: "transmission-card").firstMatch
+    XCTAssertTrue(finalTransmission.waitForExistence(timeout: 4))
+
+    // honest translation outcome — the transcript survived and translation did not surface as a
+    // recognition failure. (This does NOT claim a gloss was produced: the sim may have no de pack.)
+    XCTAssertEqual(
+      app.state, .runningForeground, "translation enabled must not crash the live flow")
+    XCTAssertFalse(
+      app.staticTexts["error-banner"].exists,
+      "translation-enabled must never surface a RECOGNITION failure banner")
+
+    // if a translation failure IS surfaced it must be the DESIGNED banner, and a failed
+    // translation must not simultaneously render a gloss (that would be a fake-AI translation).
+    let translationBanner = app.descendants(matching: .any)
+      .matching(identifier: "translation-failure-banner").firstMatch
+    if translationBanner.exists {
+      XCTAssertFalse(
+        app.descendants(matching: .any)
+          .matching(identifier: "transcript-translation").firstMatch.exists,
+        "a designed translation failure must not also render a gloss line")
+    }
+  }
+
+  // F10 — permission denied -> Open Settings deep link -> honest re-request. The scripted-fail
+  // engine drives a microphone-permission-denied failure; the banner must offer an Open Settings
+  // deep link that backgrounds the app into iOS Settings, and returning must NOT fake a recovery:
+  // re-tapping Start re-attempts and re-fails (only the OS can grant), leaving the same affordance.
+  @MainActor
+  func testPermissionDeniedOpensSettingsDeepLinkAndReRequestStaysHonest() throws {
+    let app = launchAppWithCleanPrivacyDefaults(
+      extraArguments: [
+        "-AppleLanguages", "(en)", "-AppleLocale", "en_US",
+        "-dspeech.uitest.scripted-engine",
+        "-dspeech.uitest.scripted-fail", "microphone-permission-denied",
+        "-dspeech.uitest.reduce-animations",
+      ])
+
+    let start = app.buttons["start-button"]
+    XCTAssertTrue(start.waitForExistence(timeout: 8))
+    XCTAssertTrue(waitUntilHittable(start))
+    start.tap()
+
+    let banner = app.staticTexts["error-banner"]
+    XCTAssertTrue(
+      banner.waitForExistence(timeout: 12), "permission denial must surface the failure banner")
+    XCTAssertFalse(
+      banner.label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+      "denial banner must carry a user-readable message")
+
+    let openSettings = app.buttons["open-settings-button"]
+    XCTAssertTrue(
+      openSettings.waitForExistence(timeout: 6),
+      "permission-denied banner must expose an Open Settings deep link")
+    XCTAssertTrue(waitUntilHittable(openSettings))
+
+    // a failed start must not strand the user in a fake listening state
+    XCTAssertTrue(app.buttons["start-button"].waitForExistence(timeout: 6))
+    XCTAssertFalse(app.buttons["stop-button"].exists)
+
+    openSettings.tap()
+    let settingsApp = XCUIApplication(bundleIdentifier: "com.apple.Preferences")
+    let deepLinkedOut =
+      settingsApp.wait(for: .runningForeground, timeout: 12)
+      || app.wait(for: .runningBackground, timeout: 12)
+    XCTAssertTrue(deepLinkedOut, "Open Settings must deep-link out to the iOS Settings app")
+
+    app.activate()
+    XCTAssertTrue(app.wait(for: .runningForeground, timeout: 12))
+
+    // re-request stays honest: the app cannot self-grant permission, so tapping Start again
+    // re-attempts and re-fails into the same denial affordance — no magical recovery.
+    let startAgain = app.buttons["start-button"]
+    XCTAssertTrue(startAgain.waitForExistence(timeout: 8))
+    XCTAssertTrue(waitUntilHittable(startAgain))
+    startAgain.tap()
+    XCTAssertTrue(
+      app.staticTexts["error-banner"].waitForExistence(timeout: 8),
+      "returning from Settings must not fake a recovery — the denial persists on retry")
+    XCTAssertTrue(
+      app.buttons["open-settings-button"].waitForExistence(timeout: 6),
+      "the Open Settings affordance must remain until the OS actually grants access")
+    XCTAssertFalse(
+      app.buttons["stop-button"].exists,
+      "a still-denied retry must never enter a listening state")
+  }
+
+  // F12 — dark-lock consistency. The app forces `.preferredColorScheme(.dark)`, so its chrome must
+  // render dark regardless of the SYSTEM appearance. XCUITest cannot set the simulator appearance,
+  // so this is a falsifiable RENDER check: the Settings Form uses the system grouped background —
+  // the surface that would render bright if the dark-lock did not hold under a light system. A
+  // light Form averages > 0.6 luminance; a dark-locked Form averages < 0.35. The verification run
+  // forces the simulator to LIGHT appearance to prove the override; the check also stands as a
+  // dark-render regression guard under any system appearance. Screenshots are attached for eyes-on.
+  @MainActor
+  func testDarkLockRendersDarkChromeRegardlessOfSystemAppearance() throws {
+    let app = launchAppWithCleanPrivacyDefaults(
+      extraArguments: ["-dspeech.uitest.reduce-animations"])
+
+    // the LOCAL badge is the hard-gate element (rule 4) — it must be present on the dark chrome
+    XCTAssertTrue(app.staticTexts["privacy-badge"].waitForExistence(timeout: 8))
+    captureAttachment(app, "dark-lock-main")
+
+    openSettings(in: app)
+    captureAttachment(app, "dark-lock-settings")
+
+    let region = CGRect(x: 0.15, y: 0.55, width: 0.70, height: 0.35)
+    let luminance = try XCTUnwrap(
+      meanLuminance(of: app.screenshot(), region: region),
+      "must be able to sample the rendered settings surface")
+    XCTAssertLessThan(
+      luminance, 0.35,
+      "dark-locked settings must render dark chrome (mean luminance \(luminance)) — the app's "
+        + "forced dark scheme must override the system appearance")
+  }
+
+  // F14 — VoiceOver affordance for the transmission card's tap-to-expand. The card now carries an
+  // accessibilityHint + a named "Show details" accessibilityAction that call the SAME
+  // `expanded.toggle()` as the sighted tap. XCUITest cannot invoke a named a11y action or read a
+  // hint, so this drives the shared toggle through the tap and asserts the timing detail row the
+  // action reveals — the affordance's presence/wording is verified by code review + the l10n keys.
+  @MainActor
+  func testTransmissionCardTapToExpandRevealsTimingDetails() throws {
+    let app = launchAppWithCleanPrivacyDefaults(
+      extraArguments: [
+        "-AppleLanguages", "(en)", "-AppleLocale", "en_US",
+        "-dspeech.uitest.scripted-engine",
+        "-dspeech.uitest.reduce-animations",
+      ])
+
+    let start = app.buttons["start-button"]
+    XCTAssertTrue(start.waitForExistence(timeout: 8))
+    XCTAssertTrue(waitUntilHittable(start))
+    start.tap()
+
+    let finalText = app.staticTexts["Tower N123AB cleared for takeoff"]
+    XCTAssertTrue(
+      finalText.waitForExistence(timeout: 10), "scripted final transmission card must render")
+    XCTAssertTrue(
+      app.descendants(matching: .any)
+        .matching(identifier: "transmission-card").firstMatch.waitForExistence(timeout: 4))
+
+    let details = app.descendants(matching: .any)
+      .matching(identifier: "transmission-details").firstMatch
+    XCTAssertFalse(details.exists, "timing detail must be collapsed until the card is activated")
+
+    XCTAssertTrue(waitUntilHittable(finalText))
+    finalText.tap()
+    XCTAssertTrue(
+      details.waitForExistence(timeout: 4),
+      "activating the card must reveal the timing detail row (the accessibilityAction path)")
+
+    finalText.tap()
+    XCTAssertTrue(
+      waitUntilGone(details), "activating the card again must hide the timing detail row")
+  }
+
   // why: the recurring UI-test flake is interacting with a control before it is actually
   // hittable — the settings button tapped at launch before the toolbar settles, or a CTA tapped
   // while still off-screen. `.exists` becomes true before a control is laid out and hit-testable,
@@ -603,6 +793,60 @@ final class DspeechUITests: XCTestCase {
       swipes += 1
     }
     return element.exists && element.isHittable
+  }
+
+  @MainActor
+  private func captureAttachment(_ app: XCUIApplication, _ name: String) {
+    let shot = XCTAttachment(screenshot: app.screenshot())
+    shot.name = name
+    shot.lifetime = .keepAlways
+    add(shot)
+  }
+
+  // why: F12 — XCUITest exposes no color-scheme trait, so dark-lock is verified by sampling the
+  // rendered pixels. Returns the mean perceptual luminance (0…1) over a normalized sub-rectangle
+  // of the screenshot, downsampled on a 4×4 grid for speed. A dark surface averages low, a light
+  // surface averages high — a falsifiable signal, not a color read from the app under test.
+  @MainActor
+  private func meanLuminance(of screenshot: XCUIScreenshot, region: CGRect) -> Double? {
+    guard let cgImage = screenshot.image.cgImage else { return nil }
+    let width = cgImage.width
+    let height = cgImage.height
+    guard width > 0, height > 0 else { return nil }
+    let bytesPerPixel = 4
+    let bytesPerRow = bytesPerPixel * width
+    var raw = [UInt8](repeating: 0, count: bytesPerRow * height)
+    guard
+      let context = CGContext(
+        data: &raw, width: width, height: height, bitsPerComponent: 8, bytesPerRow: bytesPerRow,
+        space: CGColorSpaceCreateDeviceRGB(),
+        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+    else { return nil }
+    context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+
+    let x0 = max(0, Int(Double(width) * Double(region.minX)))
+    let x1 = min(width, Int(Double(width) * Double(region.maxX)))
+    let y0 = max(0, Int(Double(height) * Double(region.minY)))
+    let y1 = min(height, Int(Double(height) * Double(region.maxY)))
+    guard x1 > x0, y1 > y0 else { return nil }
+
+    var sum = 0.0
+    var count = 0
+    var y = y0
+    while y < y1 {
+      var x = x0
+      while x < x1 {
+        let index = y * bytesPerRow + x * bytesPerPixel
+        let r = Double(raw[index])
+        let g = Double(raw[index + 1])
+        let b = Double(raw[index + 2])
+        sum += (0.299 * r + 0.587 * g + 0.114 * b) / 255.0
+        count += 1
+        x += 4
+      }
+      y += 4
+    }
+    return count > 0 ? sum / Double(count) : nil
   }
 
   @MainActor

@@ -385,6 +385,10 @@ private struct LiveFailureBanner: View {
     HStack(spacing: 8) {
       Text(RecognitionFailureText.userFacing(error))
         .fixedSize(horizontal: false, vertical: true)
+        // why: the identifier lives on the message text, NOT the container — a container
+        // identifier propagates onto every child accessibility element and overwrote the
+        // Open Settings button's own identifier (caught by the F10 deep-link UI test).
+        .accessibilityIdentifier("error-banner")
       if canOpenSettings {
         Button {
           if let url = URL(string: UIApplication.openSettingsURLString) {
@@ -402,6 +406,8 @@ private struct LiveFailureBanner: View {
             .glassEffect(.regular, in: Capsule())
         }
         .buttonStyle(.plain)
+        .frame(minHeight: 44)
+        .contentShape(Capsule())
         .accessibilityIdentifier("open-settings-button")
       }
     }
@@ -418,6 +424,5 @@ private struct LiveFailureBanner: View {
       RoundedRectangle(cornerRadius: 9)
         .stroke(DspeechTheme.warning.opacity(DspeechTheme.chipStrokeOpacity), lineWidth: 1)
     )
-    .accessibilityIdentifier("error-banner")
   }
 }
