@@ -1,5 +1,6 @@
 import CryptoKit
 import Foundation
+import PropertyBased
 import Testing
 
 @testable import Dspeech
@@ -563,4 +564,309 @@ struct ResumableStagedDownloadTests {
     #expect(capturedOffset == 5)
     #expect(try Data(contentsOf: destination) == full)
   }
+}
+
+// MARK: - F13 — PropertyBased state-machine properties (WhisperKit installer)
+
+// why: F13 — property-based coverage of the WhisperKit install state machine over generated
+// per-file download-outcome sequences (success / checksum-mismatch / generic-network / offline /
+// cancel at random positions). These are NEW PropertyBased (x-sheep) suites; the existing
+// example-based tests above stay as-is (plan A8). Each property carries a REACH gate (a counter of
+// how many generated sequences actually exercised each branch) so a "green" run can't be vacuous —
+// a branch that was never generated fails the suite (vacuous-guard rule).
+
+// A per-file download outcome the fake downloader enacts.
+private enum WhisperKitDownloadFault: Sendable, Equatable {
+  case success
+  case checksumMismatch
+  case networkError
+  case offline
+  case cancel
+}
+
+// why: file-scope (not a @MainActor static) so the @Sendable generator `.map` closure can capture it.
+private let whisperKitFailureKinds: [WhisperKitDownloadFault] = [
+  .checksumMismatch, .networkError, .offline, .cancel,
+]
+
+// why: MainActor-isolated branch-reach tallies. A property that never generated a given branch is a
+// vacuous property; the post-check `#expect(... > 0)` turns "we exercised it" into a hard gate.
+@MainActor
+private final class WhisperKitInstallerReach {
+  var installed = 0
+  var checksum = 0
+  var network = 0
+  var offline = 0
+  var cancel = 0
+  var converged = 0
+  var resumeSkipped = 0
+}
+
+// A downloader that enacts a per-relative-path fault. Success writes the fixture bytes (which hash to
+// the manifest SHA-256, so the engine's integrity gate accepts them); checksumMismatch writes bytes
+// that can't match; the network/offline/cancel faults throw the mapped error BEFORE writing.
+private final class ProgrammableWhisperKitDownloader: WhisperKitModelFileDownloading,
+  @unchecked Sendable
+{
+  // why: the installer awaits each file sequentially, so this mutable state is only ever touched from
+  // one task at a time (same rationale as ScriptedWhisperKitDownloader above).
+  private let contents: [String: Data]
+  private let faultByPath: [String: WhisperKitDownloadFault]
+  private(set) var attempted: [String] = []
+
+  init(contents: [String: Data], faultByPath: [String: WhisperKitDownloadFault]) {
+    self.contents = contents
+    self.faultByPath = faultByPath
+  }
+
+  func download(from sourceURL: URL, to destinationURL: URL) async throws {
+    let relativePath = Self.modelRelativePath(from: destinationURL)
+    attempted.append(relativePath)
+    switch faultByPath[relativePath] ?? .success {
+    case .networkError:
+      throw URLError(.badServerResponse)
+    case .offline:
+      throw URLError(.notConnectedToInternet)
+    case .cancel:
+      throw CancellationError()
+    case .checksumMismatch, .success:
+      let data =
+        (faultByPath[relativePath] == .checksumMismatch)
+        ? Data("corrupted-\(relativePath)".utf8)
+        : (contents[relativePath] ?? Data())
+      try FileManager.default.createDirectory(
+        at: destinationURL.deletingLastPathComponent(),
+        withIntermediateDirectories: true
+      )
+      try data.write(to: destinationURL, options: .atomic)
+    }
+  }
+
+  private static func modelRelativePath(from url: URL) -> String {
+    let components = url.pathComponents
+    guard
+      let index = components.lastIndex(of: WhisperKitModelInstaller.modelFolderName),
+      index + 1 < components.endIndex
+    else {
+      return url.lastPathComponent
+    }
+    return components[(index + 1)...].joined(separator: "/")
+  }
+}
+
+@MainActor
+struct WhisperKitInstallerPropertyTests {
+  // A small deterministic fixture manifest (6 files, distinct bytes hashing to the manifest SHA-256),
+  // large enough that a fault at index > 0 leaves earlier files staged for the resume-skip property.
+  private static let fileCount = 6
+
+  private static func fixture() -> (
+    files: [WhisperKitModelInstaller.ExpectedModelFile], contents: [String: Data]
+  ) {
+    var files: [WhisperKitModelInstaller.ExpectedModelFile] = []
+    var contents: [String: Data] = [:]
+    for index in 0..<fileCount {
+      let relativePath = "part\(index).mlmodelc/weights/weight.bin"
+      let data = Data("whisperkit-pbt-fixture:\(index)".utf8)
+      contents[relativePath] = data
+      files.append(
+        WhisperKitModelInstaller.ExpectedModelFile(
+          relativePath: relativePath,
+          sizeBytes: Int64(data.count),
+          expectedSHA256: SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        ))
+    }
+    return (files, contents)
+  }
+
+  private static func makeApplicationSupportDirectory() -> URL {
+    let url = FileManager.default.temporaryDirectory
+      .appendingPathComponent("dspeech-whisperkit-pbt-\(UUID().uuidString)", isDirectory: true)
+    try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+    return url
+  }
+
+  private static func makeInstaller(
+    _ storage: any WhisperKitModelStateStorage,
+    _ downloader: any WhisperKitModelFileDownloading,
+    _ appSupport: URL,
+    _ files: [WhisperKitModelInstaller.ExpectedModelFile]
+  ) -> WhisperKitModelInstaller {
+    WhisperKitModelInstaller(
+      stateStorage: storage,
+      fileDownloader: downloader,
+      applicationSupportDirectory: appSupport,
+      availableCapacityProvider: { _ in 1_000_000_000 },
+      now: { Date(timeIntervalSince1970: 1_718_000_000) },
+      expectedFiles: files
+    )
+  }
+
+  private static func finalFolder(_ appSupport: URL) -> URL {
+    appSupport.appendingPathComponent(
+      "WhisperKit/Models/\(WhisperKitModelInstaller.modelFolderName)", isDirectory: true)
+  }
+
+  // Per-file fault generator, biased toward success (~60%) so all-success sequences occur often
+  // enough to reach the .installed branch, while every failure kind is generated frequently.
+  private static func perFileFaultGenerator()
+    -> Generator<WhisperKitDownloadFault, some SendableSequenceType>
+  {
+    Gen.int(in: 0...9).map { code in
+      switch code {
+      case 0, 1, 2, 3, 4, 5: return .success
+      case 6: return .checksumMismatch
+      case 7: return .networkError
+      case 8: return .offline
+      default: return .cancel
+      }
+    }
+  }
+
+  private static func failureKindGenerator()
+    -> Generator<WhisperKitDownloadFault, some SendableSequenceType>
+  {
+    Gen.int(in: 0..<whisperKitFailureKinds.count).map { whisperKitFailureKinds[$0] }
+  }
+
+  // Properties (a) terminal state is ALWAYS installed/failed (never a stuck intermediate),
+  // (b) a checksum mismatch NEVER ends installed, (c) after ANY failure no complete unverified model
+  // dir exists — all follow from: the terminal state deterministically matches the DECISIVE fault
+  // (the first non-success file), and any failure leaves the atomically-moved final folder absent.
+  @Test func terminalStateMatchesDecisiveFaultAndFailureLeavesNoModelFolder() async {
+    let reach = WhisperKitInstallerReach()
+    await propertyCheck(
+      count: 240, input: Self.perFileFaultGenerator().array(of: Self.fileCount)
+    ) { faults in
+      let appSupport = Self.makeApplicationSupportDirectory()
+      defer { try? FileManager.default.removeItem(at: appSupport) }
+      let (files, contents) = Self.fixture()
+      let faultByPath = Dictionary(
+        uniqueKeysWithValues: zip(files.map(\.relativePath), faults))
+      let storage = PBTWhisperKitStateStorage()
+      let downloader = ProgrammableWhisperKitDownloader(
+        contents: contents, faultByPath: faultByPath)
+      let installer = Self.makeInstaller(storage, downloader, appSupport, files)
+
+      await installer.install()
+
+      // (a) terminal: never a stuck intermediate (.downloading) and never still .absent.
+      switch installer.state {
+      case .installed, .failed:
+        break
+      case .absent, .downloading:
+        Issue.record("non-terminal state after install(): \(installer.state)")
+      }
+
+      let decisive = zip(files, faults).first { $0.1 != .success }?.1
+      switch decisive {
+      case nil:
+        guard case .installed = installer.state else {
+          Issue.record("all-success sequence did not install: \(installer.state)")
+          return
+        }
+        reach.installed += 1
+        #expect(FileManager.default.fileExists(atPath: Self.finalFolder(appSupport).path))
+      case .checksumMismatch:
+        // (b) checksum mismatch NEVER ends installed.
+        Self.expectFailed(installer.state, kind: .checksum)
+        reach.checksum += 1
+      case .networkError:
+        Self.expectFailed(installer.state, kind: .network)
+        reach.network += 1
+      case .offline:
+        Self.expectFailed(installer.state, kind: .offline)
+        reach.offline += 1
+      case .cancel:
+        Self.expectFailed(installer.state, kind: .cancelled)
+        reach.cancel += 1
+      case .success:
+        Issue.record("decisive fault should never be .success")
+      }
+
+      // (c) after ANY failure: the atomic move never happened, so no complete model dir exists.
+      if case .failed = installer.state {
+        #expect(installer.installedModelFolderURL == nil)
+        #expect(!FileManager.default.fileExists(atPath: Self.finalFolder(appSupport).path))
+      }
+    }
+
+    // REACH gates — every branch must have been generated, or the property is vacuous.
+    #expect(reach.installed > 0)
+    #expect(reach.checksum > 0)
+    #expect(reach.network > 0)
+    #expect(reach.offline > 0)
+    #expect(reach.cancel > 0)
+  }
+
+  // Property (d) retry after a partial ALWAYS converges to installed when the retry's downloads all
+  // succeed — and the already-staged (verified) files from the first attempt are NOT re-downloaded.
+  // The fault is forced at a generated index so `decisiveIndex > 0` reliably exercises resume-skip.
+  @Test func retryAfterPartialConvergesAndSkipsStagedFiles() async {
+    let reach = WhisperKitInstallerReach()
+    let input = zip(
+      Gen.int(in: 0..<Self.fileCount),
+      Self.failureKindGenerator()
+    )
+    await propertyCheck(count: 180, input: input) { failIndex, failKind in
+      let appSupport = Self.makeApplicationSupportDirectory()
+      defer { try? FileManager.default.removeItem(at: appSupport) }
+      let (files, contents) = Self.fixture()
+      var faults = [WhisperKitDownloadFault](repeating: .success, count: files.count)
+      faults[failIndex] = failKind
+      let faultByPath = Dictionary(
+        uniqueKeysWithValues: zip(files.map(\.relativePath), faults))
+      let storage = PBTWhisperKitStateStorage()
+
+      // First attempt fails at the forced index (all earlier files succeed → staged).
+      let firstDownloader = ProgrammableWhisperKitDownloader(
+        contents: contents, faultByPath: faultByPath)
+      await Self.makeInstaller(storage, firstDownloader, appSupport, files).install()
+      guard case .failed = storage.state else {
+        Issue.record("forced-fault install did not fail: \(storage.state)")
+        return
+      }
+
+      // Retry with an all-success downloader, SAME storage + Application Support (staging persists).
+      let retryDownloader = ProgrammableWhisperKitDownloader(
+        contents: contents, faultByPath: [:])
+      await Self.makeInstaller(storage, retryDownloader, appSupport, files).install()
+      guard case .installed = storage.state else {
+        Issue.record("retry did not converge to installed: \(storage.state)")
+        return
+      }
+      reach.converged += 1
+
+      // Files verified before the failing index are the resume cache — the retry must skip them.
+      if failIndex > 0 {
+        let staged = files[0..<failIndex].map(\.relativePath)
+        #expect(staged.allSatisfy { !retryDownloader.attempted.contains($0) })
+        // The failing file itself IS re-downloaded on retry.
+        #expect(retryDownloader.attempted.contains(files[failIndex].relativePath))
+        reach.resumeSkipped += 1
+      }
+    }
+
+    #expect(reach.converged > 0)
+    #expect(reach.resumeSkipped > 0)
+  }
+
+  private static func expectFailed(
+    _ state: WhisperKitModelInstallState,
+    kind: WhisperKitModelInstallFailure.Kind,
+    sourceLocation: SourceLocation = #_sourceLocation
+  ) {
+    guard case .failed(let failure) = state else {
+      Issue.record("expected .failed(\(kind)), got \(state)", sourceLocation: sourceLocation)
+      return
+    }
+    #expect(failure.kind == kind, sourceLocation: sourceLocation)
+  }
+}
+
+private final class PBTWhisperKitStateStorage: WhisperKitModelStateStorage, @unchecked Sendable {
+  var state: WhisperKitModelInstallState = .absent
+
+  func loadState() -> WhisperKitModelInstallState { state }
+  func saveState(_ state: WhisperKitModelInstallState) { self.state = state }
 }

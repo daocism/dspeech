@@ -42,6 +42,10 @@ jobs:
       SCHEME: Dspeech
       UNIT_RESULT_BUNDLE: UnitTestResults.xcresult
       UI_RESULT_BUNDLE: UITestResults.xcresult
+      # why: G8 — where swift-snapshot-testing writes failure diff images (reference / failure /
+      # difference PNGs) when an image comparison fails. Passed into the simulator test process via
+      # the SIMCTL_CHILD_ prefix in the unit-test step; uploaded failure-only below.
+      SNAPSHOT_ARTIFACTS_DIR: ${{ github.workspace }}/snapshot-artifacts
     steps:
       - name: Checkout
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
@@ -101,8 +105,13 @@ jobs:
       # execution removes the contention at the source — assertions and budgets stay strict,
       # no retry/threshold crutch. Verified on mac24: 856 tests pass serially in 13.8s.
       - name: Unit tests (DspeechTests)
+        # why: G8 — SIMCTL_CHILD_ forwards the var into the simulator's test process (a plain host
+        # env var would NOT reach it), so SnapshotTesting writes failure diffs to a path we upload.
+        env:
+          SIMCTL_CHILD_SNAPSHOT_ARTIFACTS: ${{ env.SNAPSHOT_ARTIFACTS_DIR }}
         run: |
           set -euo pipefail
+          mkdir -p "$SNAPSHOT_ARTIFACTS_DIR"
           rm -rf "$UNIT_RESULT_BUNDLE"
           xcodebuild \
             -project "$PROJECT" \
@@ -152,9 +161,14 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: test-results-${{ github.run_id }}
+          # why: G8 — snapshot-artifacts holds SnapshotTesting's failure diff images (empty unless a
+          # snapshot comparison actually failed, so it adds nothing to the common failure case). The
+          # xcresult bundles also carry snapshot failures as attachments. Failure-only + 3-day
+          # retention keeps the free-tier artifact economics unchanged.
           path: |
             UnitTestResults.xcresult
             UITestResults.xcresult
+            snapshot-artifacts
           retention-days: 3
           if-no-files-found: ignore
 
