@@ -264,6 +264,43 @@ struct SpeakerModelPackInstaller: Sendable {
     $0 + $1.sizeBytes
   }
 
+  // why: C3 read-only resume detection. Pinned files are written directly into the repo cache and
+  // skipped on a subsequent download, so any file present while the pack is NOT fully installed is a
+  // resumable partial. Returns 0 once both models are present (that is the installed path, not a
+  // partial). Never mutates the cache.
+  static func partialDownloadByteCount(fileManager: FileManager = .default) -> Int64 {
+    let repoPath = modelCacheRoot().appendingPathComponent(
+      Repo.diarizer.folderName, isDirectory: true)
+    guard fileManager.fileExists(atPath: repoPath.path) else { return 0 }
+    if locateModelDirectory(fileManager: fileManager) != nil { return 0 }
+    guard
+      let enumerator = fileManager.enumerator(
+        at: repoPath,
+        includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey],
+        options: []
+      )
+    else {
+      return 0
+    }
+    var total: Int64 = 0
+    for case let fileURL as URL in enumerator {
+      guard let values = try? fileURL.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey]),
+        values.isRegularFile == true
+      else {
+        continue
+      }
+      total += Int64(values.fileSize ?? 0)
+    }
+    return total
+  }
+
+  var partialDownloadByteCount: Int64 { Self.partialDownloadByteCount() }
+  var hasPartialDownload: Bool { partialDownloadByteCount > 0 }
+  var stagedFractionKept: Double {
+    guard Self.expectedPackSizeBytes > 0 else { return 0 }
+    return min(1, Double(partialDownloadByteCount) / Double(Self.expectedPackSizeBytes))
+  }
+
   func install(
     progress: @escaping @Sendable (ModelPackAcquisition) -> Void
   ) async throws -> InstalledModelPack {

@@ -313,16 +313,36 @@ struct VoiceFilterSettingsSection: View {
     enrollMessage = nil
   }
 
+  private var modelPackPartialKept: String? {
+    // why: C3 — a paused voice-pack download leaves pinned files in the repo cache; surface how much
+    // is kept so Resume reads as "continue", not "restart". nil when there is no resumable partial.
+    guard installer.hasPartialDownload else { return nil }
+    let percent = Int((installer.stagedFractionKept * 100).rounded())
+    return String(localized: "Paused — \(percent)% kept")
+  }
+
   private var absentContent: some View {
     VStack(alignment: .leading, spacing: 8) {
       HStack(alignment: .firstTextBaseline, spacing: 6) {
         Image(systemName: "arrow.down.circle")
-        Text(String(localized: "Model not installed"))
-          .frame(maxWidth: .infinity, alignment: .leading)
-          .fixedSize(horizontal: false, vertical: true)
+        Text(
+          modelPackPartialKept == nil
+            ? String(localized: "Model not installed")
+            : String(localized: "Download paused")
+        )
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .fixedSize(horizontal: false, vertical: true)
       }
       .font(.subheadline.weight(.semibold))
       .foregroundStyle(.secondary)
+      if let modelPackPartialKept {
+        Text(modelPackPartialKept)
+          .font(.footnote)
+          .foregroundStyle(.secondary)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .fixedSize(horizontal: false, vertical: true)
+          .accessibilityIdentifier("voicefilter-modelpack-paused")
+      }
       Text(
         String(
           localized:
@@ -338,9 +358,13 @@ struct VoiceFilterSettingsSection: View {
       } label: {
         HStack(spacing: 6) {
           Image(systemName: "arrow.down.circle.fill")
-          Text(String(localized: "Download voice filter pack (≈ 15 MB)"))
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .fixedSize(horizontal: false, vertical: true)
+          Text(
+            modelPackPartialKept == nil
+              ? String(localized: "Download voice filter pack (≈ 15 MB)")
+              : String(localized: "Resume download")
+          )
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .fixedSize(horizontal: false, vertical: true)
         }
         .font(.subheadline.weight(.semibold))
         .frame(maxWidth: .infinity)
@@ -384,7 +408,10 @@ struct VoiceFilterSettingsSection: View {
           .font(.caption.monospacedDigit())
           .foregroundStyle(.secondary)
       }
-      Button(String(localized: "Cancel")) {
+      // why: C3 — Pause cancels the in-flight task via the existing cancelDownload; the pinned files
+      // already written to the repo cache survive and are skipped on Resume, so this pauses rather
+      // than discards. The absent state below detects the kept partial and offers Resume.
+      Button(String(localized: "Pause")) {
         modelPackAcquisition.cancelDownload()
       }
       .buttonStyle(.bordered)
