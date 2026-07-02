@@ -193,10 +193,23 @@ struct PhoneticCallsignParserPropertyTests {
   @Test func parseReachesAFixedPointWithinTwoApplications() {
     var rng = SeededGenerator(seed: 0x9E_04_0004)
     let localeChoices: [String?] = [nil, "en-US", "fr-FR"]
+    // why: the arbitrary generator almost never assembles a pure-letter output that spells an
+    // English digit homophone (the divergence class this property was weakened around), so the
+    // reach floor is anchored by deterministic exemplars driven through the SAME property —
+    // a purely random floor here was vacuous twice (caught 2026-07-02).
+    let divergenceExemplars = [
+      "tango oscar",  // -> TO -> 2
+      "whiskey oscar november",  // -> WON -> 1
+      "tango oscar oscar",  // -> TOO -> 2
+      "alpha tango echo",  // -> ATE -> 8
+      "foxtrot oscar romeo",  // -> FOR -> 4
+    ]
     var singleApplicationDivergences = 0
+    var probes: [(text: String, locale: String?)] = divergenceExemplars.map { ($0, nil) }
     for _ in 0..<300 {
-      let text = arbitraryText(using: &rng)
-      let locale = localeChoices.randomElement(using: &rng)!
+      probes.append((arbitraryText(using: &rng), localeChoices.randomElement(using: &rng)!))
+    }
+    for (text, locale) in probes {
       let once = PhoneticCallsignParser.parse(text, localeIdentifier: locale)
       let twice = PhoneticCallsignParser.parse(once, localeIdentifier: locale)
       let thrice = PhoneticCallsignParser.parse(twice, localeIdentifier: locale)
@@ -206,9 +219,7 @@ struct PhoneticCallsignParserPropertyTests {
         "no fixed point by 2nd parse: '\(text)' -> '\(once)' -> '\(twice)' -> '\(thrice)' [\(locale ?? "nil")]"
       )
     }
-    // why: reach floor — the generator must actually exercise the homophone-divergence class
-    // this property was weakened around, else the known-issue pin below is the only coverage.
-    #expect(singleApplicationDivergences >= 0)
+    #expect(singleApplicationDivergences >= divergenceExemplars.count)
   }
 
   // Known issue (red-when-fixed marker): the parser's English homophone table re-maps its own
