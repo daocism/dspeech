@@ -15,18 +15,24 @@ struct HintBubble: View {
   // It always renders at its own intrinsic size; callers place it as a floating overlay.
   // At accessibility sizes the 2-line cap itself truncates — lift it and let the
   // bubble grow vertically instead.
+  // why: D6 — the hint bubble floats over the live transcript, so it is legit glass chrome
+  // (ADR 0013 rule 1). .regular glass (never .clear) over variable content; the text flips
+  // from dark-on-white to WHITE because the glass renders as a dark material in the cockpit's
+  // dark scheme (and degrades to a solid dark material under Reduce Transparency), keeping the
+  // hint high-contrast in both modes. Intrinsic sizing (fixedSize) and the 2-line cap are
+  // preserved — the floating-overlay rule from the 2026-06-11 letter-soup defect stands.
   private var bubbleText: some View {
     Text(text)
       .font(.subheadline.weight(.semibold))
-      .foregroundStyle(.black)
+      .foregroundStyle(.white)
       .multilineTextAlignment(.trailing)
       .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
       .fixedSize(horizontal: false, vertical: true)
       .frame(maxWidth: 230, alignment: .trailing)
       .padding(.horizontal, 14)
       .padding(.vertical, 10)
-      .background(
-        .white,
+      .glassEffect(
+        .regular,
         in: RoundedRectangle(cornerRadius: DspeechTheme.bubbleCornerRadius, style: .continuous))
   }
 
@@ -36,15 +42,11 @@ struct HintBubble: View {
       case .trailing:
         HStack(spacing: 5) {
           bubbleText
-          Circle().fill(.white).frame(width: 9, height: 9)
-          Circle().fill(.white).frame(width: 6, height: 6)
-          Circle().fill(.white).frame(width: 3.5, height: 3.5)
+          tailDots
         }
       case .up:
         VStack(alignment: .trailing, spacing: 5) {
-          Circle().fill(.white).frame(width: 3.5, height: 3.5)
-          Circle().fill(.white).frame(width: 6, height: 6)
-          Circle().fill(.white).frame(width: 9, height: 9)
+          tailDots
           bubbleText
         }
         .padding(.trailing, 22)
@@ -53,6 +55,25 @@ struct HintBubble: View {
     .fixedSize()
     .shadow(color: .black.opacity(0.25), radius: 6, y: 2)
     .transition(.opacity.combined(with: .scale(scale: 0.9)))
+  }
+
+  // why: the pointer dots keep their solid-white fill (kept, not dropped): a tiny glass circle
+  // each would be its own CABackdropLayer (ADR 0013 rule 4 violation) and would visually
+  // dissolve against the glass bubble. Solid-white dots stay crisp against the dark transcript
+  // and preserve the recognizable "hint pointing at the mic button" aesthetic.
+  private var tailDots: some View {
+    Group {
+      switch pointer {
+      case .trailing:
+        Circle().fill(.white).frame(width: 9, height: 9)
+        Circle().fill(.white).frame(width: 6, height: 6)
+        Circle().fill(.white).frame(width: 3.5, height: 3.5)
+      case .up:
+        Circle().fill(.white).frame(width: 3.5, height: 3.5)
+        Circle().fill(.white).frame(width: 6, height: 6)
+        Circle().fill(.white).frame(width: 9, height: 9)
+      }
+    }
   }
 }
 
@@ -140,7 +161,7 @@ struct NoAnchorTransmissionHint: View {
       // (2026-06-12 visual review); fixedSize(vertical) grows the bubble instead.
       Text(text)
         .font(.subheadline.weight(.semibold))
-        .foregroundStyle(.black)
+        .foregroundStyle(.white)
         .multilineTextAlignment(.leading)
         .fixedSize(horizontal: false, vertical: true)
         .frame(maxWidth: 230, alignment: .leading)
@@ -150,7 +171,7 @@ struct NoAnchorTransmissionHint: View {
       } label: {
         Image(systemName: "xmark")
           .font(.caption.weight(.bold))
-          .foregroundStyle(.black.opacity(0.78))
+          .foregroundStyle(.white.opacity(0.85))
           .frame(width: 44, height: 44)
           .contentShape(Rectangle())
       }
@@ -160,8 +181,11 @@ struct NoAnchorTransmissionHint: View {
     }
     .padding(.horizontal, 14)
     .padding(.vertical, 10)
-    .background(
-      .white,
+    // why: D6 — same glass migration as HintBubble; white text on .regular glass (dark
+    // material in the dark scheme, solid under Reduce Transparency) keeps the no-anchor hint
+    // legible over the transcript while it floats as chrome above the scrolling cards.
+    .glassEffect(
+      .regular,
       in: RoundedRectangle(cornerRadius: DspeechTheme.bubbleCornerRadius, style: .continuous)
     )
     // why: vertical-only — both-axes fixedSize measured the wrapped text against an
@@ -181,18 +205,21 @@ struct NoAnchorTransmissionHint: View {
 struct PartialTranscriptCard: View {
   let text: String
   let isLandscape: Bool
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
       HStack(spacing: 8) {
+        // why: D14 Tier 2 (metadata) — LIVE is a status marker, not a state-critical reason,
+        // so it recedes to an outline capsule. The cyan stays at full strength (not dimmed)
+        // and the card's own cyan stroke reinforces "in progress", so the indicator still
+        // reads as active despite the lighter badge weight. Monospaced kept: LIVE is a code.
         Label(String(localized: "LIVE"), systemImage: "waveform")
           .font(.caption.monospaced().weight(.bold))
           .lineLimit(1)
           .fixedSize()
           .foregroundStyle(DspeechTheme.accent)
-          .padding(.horizontal, DspeechTheme.chipHorizontalPadding)
-          .padding(.vertical, DspeechTheme.chipVerticalPadding)
-          .background(DspeechTheme.accent.opacity(DspeechTheme.chipFillOpacity), in: Capsule())
+          .outlineBadge(tint: DspeechTheme.accent)
         Spacer()
       }
       Text(text)
@@ -204,6 +231,7 @@ struct PartialTranscriptCard: View {
     .padding(.vertical, 12)
     .frame(maxWidth: .infinity, alignment: .leading)
     .transcriptCardChrome(stroke: DspeechTheme.accent.opacity(0.35))
+    .transition(cardEntranceTransition(reduceMotion: reduceMotion))
     .accessibilityIdentifier("partial-transcript")
   }
 }
@@ -212,6 +240,7 @@ struct TransmissionTranscriptCard: View {
   let transmission: Transmission
   let isLandscape: Bool
   @State private var expanded = false
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
@@ -235,27 +264,31 @@ struct TransmissionTranscriptCard: View {
         .accessibilityIdentifier("transmission-card")
         .accessibilityLabel(String(localized: "Transmission"))
     }
+    .transition(cardEntranceTransition(reduceMotion: reduceMotion))
   }
 
   private var badgeRow: some View {
     HStack(spacing: 8) {
+      // why: D14 Tier 2 (metadata) — the locale code recedes to an outline capsule so the
+      // Tier 1 reason badge is the visual anchor. Monospaced retained (D15): a 2-letter code
+      // reads as a machine token, not prose, so it stays in the small "code" micro-register.
       Text(localeChipText)
         .font(.caption.monospaced().weight(.bold))
         .lineLimit(1)
         .minimumScaleFactor(0.75)
-        .padding(.horizontal, DspeechTheme.chipHorizontalPadding)
-        .padding(.vertical, DspeechTheme.chipVerticalPadding)
-        .background(.white.opacity(0.12), in: Capsule())
+        .foregroundStyle(.white.opacity(0.7))
+        .outlineBadge(tint: .white)
 
+      // why: D14 Tier 1 (state-critical) — the classification reason is a filled capsule.
+      // D15: reason phrases are PROSE ("No callsign", "Urgent broadcast"), so they drop the
+      // monospaced design and use SF, leaving the utterance text as the single mono register.
       Text(transmissionReasonLabel(for: transmission.classification))
-        .font(.caption.monospaced().weight(.bold))
+        .font(.caption.weight(.bold))
         // why: see review-sheet badge — long localized reasons must wrap, not clip, at AX sizes.
         .lineLimit(2)
         .minimumScaleFactor(0.6)
         .foregroundStyle(reasonColor)
-        .padding(.horizontal, DspeechTheme.chipHorizontalPadding)
-        .padding(.vertical, DspeechTheme.chipVerticalPadding)
-        .background(reasonColor.opacity(0.14), in: Capsule())
+        .filledBadge(tint: reasonColor)
         .accessibilityIdentifier("transmission-reason-badge")
 
       Spacer(minLength: 0)
@@ -272,7 +305,10 @@ struct TransmissionTranscriptCard: View {
       }
       Spacer(minLength: 0)
     }
-    .font(.caption.monospacedDigit())
+    // why: D15 — expanded metadata uses SF footnote with monospaced DIGITS only (tabular
+    // time alignment) rather than the full monospaced font, so it sits below the utterance's
+    // mono register instead of competing with it.
+    .font(.footnote.monospacedDigit())
     .foregroundStyle(.white.opacity(0.85))
     .accessibilityIdentifier("transmission-details")
   }
@@ -305,6 +341,7 @@ struct TranscriptSegmentCard: View {
   // why: PRD F2 -- the transcript honors Dynamic Type via a semantic monospaced text style
   // (.title / .title2) so the audit credits full Dynamic-Type support.
   @State private var expanded = false
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
@@ -319,6 +356,7 @@ struct TranscriptSegmentCard: View {
     .transcriptCardChrome(stroke: .white.opacity(0.10))
     .contentShape(Rectangle())
     .onTapGesture { withAnimation(.easeInOut(duration: 0.15)) { expanded.toggle() } }
+    .transition(cardEntranceTransition(reduceMotion: reduceMotion))
     .accessibilityIdentifier("transcript-segment")
   }
 
@@ -338,51 +376,55 @@ struct TranscriptSegmentCard: View {
       }
       Spacer(minLength: 0)
     }
-    .font(.caption.monospacedDigit())
+    // why: D15 — SF footnote with monospaced DIGITS (not the full monospaced font) keeps the
+    // expanded metadata below the utterance's single mono register while preserving tabular
+    // time/percent alignment.
+    .font(.footnote.monospacedDigit())
     .foregroundStyle(.white.opacity(0.85))
     .accessibilityIdentifier("transcript-segment-details")
   }
 
   private var badgeRow: some View {
     HStack(spacing: 8) {
+      // why: D14 Tier 2 (metadata) — source-language code recedes to an outline capsule;
+      // monospaced kept (D15) because it is a 2-letter machine code, not prose.
       Text(segment.sourceLanguageCode.uppercased())
         .font(.caption.monospaced().weight(.bold))
         .lineLimit(1)
         .fixedSize()
-        .padding(.horizontal, DspeechTheme.chipHorizontalPadding)
-        .padding(.vertical, DspeechTheme.chipVerticalPadding)
-        .background(.white.opacity(0.12), in: Capsule())
+        .foregroundStyle(.white.opacity(0.7))
+        .outlineBadge(tint: .white)
 
       if segment.source == .demo {
+        // why: D14 Tier 2 — DEMO is a provenance marker (metadata), outline capsule.
         Text(String(localized: "DEMO"))
           .font(.caption.monospaced().weight(.bold))
           .lineLimit(1)
           .fixedSize()
           .foregroundStyle(DspeechTheme.accent.opacity(0.9))
-          .padding(.horizontal, DspeechTheme.chipHorizontalPadding)
-          .padding(.vertical, DspeechTheme.chipVerticalPadding)
-          .background(DspeechTheme.accent.opacity(0.14), in: Capsule())
+          .outlineBadge(tint: DspeechTheme.accent)
       }
 
       if segment.requiresVerification {
+        // why: D14 Tier 1 — VERIFY is a state-critical trust signal, so it stays a filled
+        // capsule (the heavier tier the eye lands on first). Monospaced code register kept.
         Text(String(localized: "VERIFY"))
           .font(.caption.monospaced().weight(.bold))
           .lineLimit(1)
           .fixedSize()
           .foregroundStyle(DspeechTheme.filtered)
-          .padding(.horizontal, DspeechTheme.chipHorizontalPadding)
-          .padding(.vertical, DspeechTheme.chipVerticalPadding)
-          .background(DspeechTheme.filtered.opacity(DspeechTheme.chipFillOpacity), in: Capsule())
+          .filledBadge(tint: DspeechTheme.filtered)
       }
 
       Spacer()
 
       // why: confidence 0 = unverified (e.g. a Stop-committed partial) -- hide the
       // meaningless "0%"; the VERIFY badge already carries the "unconfirmed" signal.
+      // D14 Tier 2 metadata: dimmed, no capsule (bare trailing figure).
       if segment.confidence > 0 {
         Text(segment.confidence.formatted(.percent.precision(.fractionLength(0))))
           .font(.caption.monospacedDigit())
-          .foregroundStyle(.white.opacity(0.85))
+          .foregroundStyle(.white.opacity(0.7))
       }
     }
   }
@@ -448,6 +490,38 @@ private func filterReasonLabel(for reason: TransmissionFilterReason) -> String {
 private enum TranscriptCardChrome {
   static let background = DspeechTheme.cardFill
   static let cornerRadius = DspeechTheme.cardCornerRadius
+}
+
+// why: D10 — new transcript/transmission cards fade in and rise a few points instead of
+// popping into the LazyVStack. GATED exactly like every decorative motion in the app
+// (MainControlsView `animatesGlassMorph`): under Reduce Motion OR the UI-test flag the
+// transition collapses to .identity so it can never stall XCUITest quiescence. The actual
+// insertion animation must be driven by a `withAnimation`/`.animation(value:)` around the
+// ForEach in ContentView.transcriptArea — a `.transition` alone is inert without a driver.
+private func cardEntranceTransition(reduceMotion: Bool) -> AnyTransition {
+  if reduceMotion || DecorativeMotion.isDisabledForUITests {
+    return .identity
+  }
+  return .opacity.combined(with: .offset(y: 10))
+}
+
+extension View {
+  // why: D14 Tier 1 — state-critical badge: filled capsule (the current, heavier style) so
+  // reason/VERIFY chips are the first thing the eye lands on in a stacked badge row.
+  fileprivate func filledBadge(tint: Color) -> some View {
+    padding(.horizontal, DspeechTheme.chipHorizontalPadding)
+      .padding(.vertical, DspeechTheme.chipVerticalPadding)
+      .background(tint.opacity(DspeechTheme.chipFillOpacity), in: Capsule())
+  }
+
+  // why: D14 Tier 2 — metadata badge: outline-only capsule (tinted stroke, no fill) so
+  // locale/DEMO/LIVE chips visually recede beneath the filled Tier-1 badges. Callers dim the
+  // foreground to complete the tier separation.
+  fileprivate func outlineBadge(tint: Color) -> some View {
+    padding(.horizontal, DspeechTheme.chipHorizontalPadding)
+      .padding(.vertical, DspeechTheme.chipVerticalPadding)
+      .overlay(Capsule().stroke(tint.opacity(DspeechTheme.chipStrokeOpacity), lineWidth: 1))
+  }
 }
 
 extension View {

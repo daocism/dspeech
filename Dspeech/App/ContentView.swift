@@ -22,6 +22,7 @@ struct ContentView: View {
   @Environment(\.scenePhase) private var scenePhase
   @Environment(\.dynamicTypeSize) private var dynamicTypeSize
   @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   init(
     engine: (any LiveTranscriptionEngine)? = nil,
@@ -387,6 +388,12 @@ struct ContentView: View {
           localized:
             "This clears the cockpit view only. Saved session history stays on this device."))
     }
+    // why: warning haptic on the Clear-confirmation PRESENTATION (false->true edge of the state
+    // flag), not on the destructive tap — it primes the pilot that a confirming action follows.
+    // The closure form keeps dismissal (true->false) silent (D13, ADR 0013 rule 7).
+    .sensoryFeedback(trigger: showClearConfirmation) { wasShown, isShown in
+      isShown && !wasShown ? .warning : nil
+    }
     .onAppear {
       coordinator.beginObservingRouteChanges()
       audioSource.applyPersistedPreference()
@@ -525,6 +532,15 @@ struct ContentView: View {
 
   @ViewBuilder
   private func bannerStack() -> some View {
+    // why: one GlassEffectContainer merges stacked banners into a single render pass
+    // (ADR 0013 rule 4) — each banner is otherwise its own CABackdropLayer.
+    GlassEffectContainer(spacing: 6) {
+      bannerStackContent()
+    }
+  }
+
+  @ViewBuilder
+  private func bannerStackContent() -> some View {
     VStack(spacing: 6) {
       if let message = coordinator.routeBanner ?? coordinator.startBlockedMessage {
         RouteBanner(message: message, canStart: coordinator.canStart)
@@ -613,6 +629,14 @@ struct ContentView: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            // why: drives the gated card entrance .transition on the card views — inert
+            // without an animation bound to the card identity set. Same quiescence gate
+            // as every decorative motion (the scripted-flow UI test is the canary).
+            .animation(
+              reduceMotion || DecorativeMotion.isDisabledForUITests
+                ? nil : .snappy(duration: 0.25),
+              value: displayedTransmissions.map(\.id)
+            )
           }
           // why: floating controls (Start/mic, jump-to-live) overlay the scroll area;
           // a bottom content margin keeps transcript text from ever sliding UNDER them —
