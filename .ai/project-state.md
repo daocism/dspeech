@@ -9,6 +9,16 @@ Canonical registry: `/home/user/projects/MyInfra/config/project-workspaces/proje
 
 ## Current phase
 
+2026-07-02: **Night-polish mission** on `feat/night-polish-20260702` — 99-task plan
+(docs/PLAN-2026-07-02-night-polish.md) executed by a multi-agent overnight run:
+FluidAudio 0.15.4, installer dedup + WhisperKit integrity, resumable downloads,
+interruption causes, Liquid Glass chrome (ADR 0013), iPad split shell, all 11 locales
+confirmed, 969-test suite + snapshots + installer PBT, CI cron lanes. See
+docs/ai-kb/current-context.md READ FIRST for the full inventory + the quiescence-gating
+pattern. PR to main pending final gates.
+
+## Previous phase (2026-06-12, superseded)
+
 2026-06-12: **Core-semantics rebuild** — see docs/PLAN-2026-06-12.md +
 docs/SPEC-2026-06-12-core-semantics-rebuild.md (owner-approved). PR #3 merged but was
 false-ready (D-1 text loss at restarts, D-2 inverted filter semantics). Definition of

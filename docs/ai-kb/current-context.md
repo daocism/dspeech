@@ -2,6 +2,46 @@
 
 > Rolling 1-page pointer. Updated by `knowledge-curator` after every substantive run.
 
+## READ FIRST (2026-07-02) — night-polish mission
+
+**Branch `feat/night-polish-20260702`** (99-task plan: `docs/PLAN-2026-07-02-night-polish.md`,
+~95% executed overnight by a multi-agent run; PR pending). Landed highlights:
+
+- **Deps**: FluidAudio → exact **0.15.4** (semantic audit: StreamingEouAsrManager contract
+  unchanged, reset-after-EOU holds; SpeakerEval lockstep; release-policy updated). New:
+  swift-collections (Deque in SerialBufferRouter), swift-async-algorithms (partial-text
+  throttle), swift-snapshot-testing + PropertyBased (test target).
+- **Dedup**: generic ModelInstallSupport engine (3 installer stacks single-sourced,
+  UserDefaults keys byte-stable), ApplicationSupport helper (8× `.first!` gone),
+  AVAudioEngineTapSession (4 capture wrappers share the format-nil/@Sendable tap core),
+  WhisperKit installer got per-file SHA-256 (17 pinned hashes — fail-open gap closed).
+- **Features**: file-granular resumable downloads (+pause/resume UX, offline taxonomy),
+  interruption-cause classification (call/mic-muted/route), JSONL export, session
+  duration/engine/locale metadata, storage footprint + opt-in retention cleanup,
+  Parakeet installer UI localized (C9).
+- **UI (ADR-0013)**: iOS 26 Liquid Glass on all chrome (controls/chips/banners/bubbles/
+  pill; cards stay opaque), two-tier badges, typography (single mono register), haptics,
+  card entrance transitions, dark+tinted app icons, **iPad NavigationSplitView shell**
+  (sidebar Live/History/Settings; no letterbox; phone layout untouched).
+  CRITICAL PATTERN: `.interactive()` glass / ungated animations stall XCUITest quiescence —
+  every decorative motion must gate on `reduceMotion || DecorativeMotion.isDisabledForUITests`
+  (the scripted-flow test is the canary; it caught this live).
+- **l10n**: ALL 11 locales fully confirmed (1792 needs_review cleared, 268 fixes; pt unified
+  to pt-BR — flip available; register/terminology unified per locale).
+- **Tests**: 969 unit (incl. PropertyBased installer PBT with reach gates, 32 pinned
+  snapshots host-gated to mac24), VoiceFilterTests split into 7 files, new UI tests
+  (translation+scripted, permission deep-link — caught a real a11y identifier-propagation
+  bug on the glass banner, dark-lock, VoiceOver expand), ru a11y sweeps added.
+- **CI**: weekly full-a11y cron + monthly speaker-calibration, toolchain-version artifact,
+  snapshot failure diffs uploaded; pre-push device-arch hook; scripts/local-gate.sh.
+- **Store prep**: privacy-policy DRAFT (publishing = owner call), SDK manifest audit clean
+  (Xcode 26 dropped `privacyreport` CLI — aggregation done directly), listing metadata
+  linter green over 11 listings, release checklist refreshed, README rewritten.
+
+Owner-decision items untouched per plan: background audio (ADR 0010), monetization
+(ADR 0003), ATCVoiceIndicator badges, CDN mirror, paid Developer Program, privacy URL
+publication, pt-PT vs pt-BR confirmation.
+
 ## READ FIRST (2026-06-23)
 
 **Parakeet EOU is now the third ASR engine** (`feat/parakeet-third-engine`, ADR-0012
