@@ -363,6 +363,123 @@ struct WhisperKitModelInstallerTests {
   }
 }
 
+// MARK: - C3 resume-cache accessor tests (hasPartialStaging / byte count / kept fraction)
+
+// why: C3 — the pause/resume UI reads three read-only accessors over the C1 staging cache. They had
+// ZERO direct coverage; these pin their semantics: absent staging → false/0/0; staged bytes present
+// → true/bytes/fraction; the kept fraction is bytes÷manifest-total, clamped to 1 even when more bytes
+// are staged than the manifest expects (a complete-but-unverified staging folder counts fully).
+@MainActor
+struct WhisperKitModelStagingAccessorTests {
+  // Two fixture files summing to 100 bytes so the kept fraction is exact and easy to reason about.
+  private static func fixtureFiles() -> [WhisperKitModelInstaller.ExpectedModelFile] {
+    [
+      WhisperKitModelInstaller.ExpectedModelFile(
+        relativePath: "a.bin", sizeBytes: 60, expectedSHA256: String(repeating: "a", count: 64)),
+      WhisperKitModelInstaller.ExpectedModelFile(
+        relativePath: "b.bin", sizeBytes: 40, expectedSHA256: String(repeating: "b", count: 64)),
+    ]
+  }
+
+  private static func makeApplicationSupportDirectory() -> URL {
+    let url = FileManager.default.temporaryDirectory
+      .appendingPathComponent("dspeech-whisperkit-staging-\(UUID().uuidString)", isDirectory: true)
+    try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+    return url
+  }
+
+  private static func remove(_ url: URL) {
+    if FileManager.default.fileExists(atPath: url.path) {
+      try? FileManager.default.removeItem(at: url)
+    }
+  }
+
+  private static func makeInstaller(
+    appSupport: URL,
+    files: [WhisperKitModelInstaller.ExpectedModelFile] = fixtureFiles()
+  ) -> WhisperKitModelInstaller {
+    WhisperKitModelInstaller(
+      stateStorage: InMemoryWhisperKitModelStateStorage(),
+      fileDownloader: FakeWhisperKitModelFileDownloader(contents: [:]),
+      applicationSupportDirectory: appSupport,
+      availableCapacityProvider: { _ in 1_000_000_000 },
+      expectedFiles: files
+    )
+  }
+
+  // Writes `bytes` of staged content into the model's stable staging root (the C1 resume cache).
+  private static func stage(bytes: Int, named name: String, appSupport: URL) throws {
+    let stagingRoot =
+      appSupport
+      .appendingPathComponent("WhisperKit/Models", isDirectory: true)
+      .appendingPathComponent(
+        ".\(WhisperKitModelInstaller.modelFolderName).staging", isDirectory: true
+      )
+      .appendingPathComponent(WhisperKitModelInstaller.modelFolderName, isDirectory: true)
+    try FileManager.default.createDirectory(at: stagingRoot, withIntermediateDirectories: true)
+    try Data(repeating: 0, count: bytes).write(to: stagingRoot.appendingPathComponent(name))
+  }
+
+  @Test func absentStagingReportsNothingKept() {
+    let appSupport = Self.makeApplicationSupportDirectory()
+    defer { Self.remove(appSupport) }
+    let installer = Self.makeInstaller(appSupport: appSupport)
+
+    #expect(installer.partialStagingByteCount == 0)
+    #expect(installer.hasPartialStaging == false)
+    #expect(installer.stagedFractionKept == 0)
+  }
+
+  @Test func partialStagingReportsByteCountAndFraction() throws {
+    let appSupport = Self.makeApplicationSupportDirectory()
+    defer { Self.remove(appSupport) }
+    try Self.stage(bytes: 25, named: "a.bin.partial", appSupport: appSupport)
+    let installer = Self.makeInstaller(appSupport: appSupport)
+
+    #expect(installer.partialStagingByteCount == 25)
+    #expect(installer.hasPartialStaging)
+    // 25 of 100 expected bytes kept.
+    #expect(abs(installer.stagedFractionKept - 0.25) < 1e-9)
+  }
+
+  @Test func stagedBytesAcrossMultipleFilesSum() throws {
+    let appSupport = Self.makeApplicationSupportDirectory()
+    defer { Self.remove(appSupport) }
+    try Self.stage(bytes: 30, named: "a.bin", appSupport: appSupport)
+    try Self.stage(bytes: 30, named: "b.bin", appSupport: appSupport)
+    let installer = Self.makeInstaller(appSupport: appSupport)
+
+    #expect(installer.partialStagingByteCount == 60)
+    #expect(installer.hasPartialStaging)
+    #expect(abs(installer.stagedFractionKept - 0.6) < 1e-9)
+  }
+
+  @Test func keptFractionClampsToOneWhenStagedExceedsManifestTotal() throws {
+    let appSupport = Self.makeApplicationSupportDirectory()
+    defer { Self.remove(appSupport) }
+    // a complete-but-unverified staging folder can hold more bytes than the manifest sum (e.g. a
+    // `.partial` alongside a completed file); the kept fraction must never exceed 1.0.
+    try Self.stage(bytes: 150, named: "a.bin", appSupport: appSupport)
+    let installer = Self.makeInstaller(appSupport: appSupport)
+
+    #expect(installer.partialStagingByteCount == 150)
+    #expect(installer.stagedFractionKept == 1)
+  }
+
+  @Test func keptFractionIsZeroWhenManifestTotalIsZero() throws {
+    let appSupport = Self.makeApplicationSupportDirectory()
+    defer { Self.remove(appSupport) }
+    try Self.stage(bytes: 50, named: "a.bin", appSupport: appSupport)
+    // an empty manifest → zero expected bytes → the guard returns 0 rather than dividing by zero,
+    // even though staged bytes are present (hasPartialStaging still reflects the real bytes).
+    let installer = Self.makeInstaller(appSupport: appSupport, files: [])
+
+    #expect(installer.partialStagingByteCount == 50)
+    #expect(installer.hasPartialStaging)
+    #expect(installer.stagedFractionKept == 0)
+  }
+}
+
 private final class InMemoryWhisperKitModelStateStorage: WhisperKitModelStateStorage,
   @unchecked Sendable
 {

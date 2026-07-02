@@ -427,6 +427,7 @@ struct TranscriptStoreTests {
     #expect(
       Set(row.keys) == [
         "confidence", "end", "engine", "id", "kind", "reason", "sourceLanguage", "start", "text",
+        "v",
       ])
     #expect(row["id"] as? String == "00000000-0000-0000-0000-0000000006A1")
     #expect(row["start"] as? Double == 5)
@@ -437,6 +438,8 @@ struct TranscriptStoreTests {
     #expect(row["sourceLanguage"] as? String == "en")
     #expect(row["confidence"] as? Double == 0.91)
     #expect(row["text"] as? String == "November One Two Three Alpha Bravo, cleared to land")
+    // M2 — every row carries the schema version as its own `v` field.
+    #expect(row["v"] as? Int == 1)
   }
 
   @Test func exportJSONLForLegacySegmentsOmitsClassificationAndEnd() throws {
@@ -461,6 +464,8 @@ struct TranscriptStoreTests {
     #expect(row["engine"] == nil)
     #expect(row["start"] as? Double == 7)
     #expect(row["text"] as? String == "Cleared for takeoff")
+    // M2 — a legacy-segment row still carries the schema version.
+    #expect(row["v"] as? Int == 1)
   }
 
   @Test func exportJSONLToleratesTornTail() throws {
