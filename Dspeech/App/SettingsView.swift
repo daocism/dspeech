@@ -438,7 +438,7 @@ struct SettingsView: View {
   private var parakeetAbsentContent: some View {
     VStack(alignment: .leading, spacing: 8) {
       parakeetStatusRow(
-        title: String(localized: "Parakeet model not installed"),
+        title: String(localized: "Model not installed"),
         detail: String(localized: "Required download") + ": "
           + byteString(ParakeetModelInstaller.expectedModelSizeBytes)
       )
@@ -476,7 +476,7 @@ struct SettingsView: View {
   {
     VStack(alignment: .leading, spacing: 8) {
       parakeetStatusRow(
-        title: String(localized: "Downloading Parakeet model"),
+        title: String(localized: "Downloading model"),
         detail: "\(progress.percentComplete)% · \(byteString(progress.totalBytes))"
       )
       ProgressView(value: progress.fractionComplete)
@@ -494,7 +494,7 @@ struct SettingsView: View {
   private func parakeetInstalledContent(_ model: ParakeetInstalledModel) -> some View {
     VStack(alignment: .leading, spacing: 8) {
       parakeetStatusRow(
-        title: String(localized: "Parakeet model installed"),
+        title: String(localized: "Model installed"),
         detail: "\(model.name) · \(byteString(model.sizeBytes))"
       )
       Button(String(localized: "Delete Parakeet model")) {
@@ -510,7 +510,7 @@ struct SettingsView: View {
   private func parakeetFailedContent(_ failure: ParakeetModelInstallFailure) -> some View {
     VStack(alignment: .leading, spacing: 8) {
       parakeetStatusRow(
-        title: String(localized: "Parakeet model install failed"),
+        title: String(localized: "Model install failed"),
         detail: failure.userSafeReason
       )
       if failure.isRetryable {
