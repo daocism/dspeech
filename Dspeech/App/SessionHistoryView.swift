@@ -103,6 +103,7 @@ private struct SessionSummaryRow: View {
       VStack(alignment: .leading, spacing: 4) {
         Text(session.startedAt.formatted(date: .abbreviated, time: .shortened))
           .font(.body.weight(.semibold))
+          .foregroundStyle(.primary)
         Text(
           String(localized: "\(session.segmentCount) transmissions - \(session.localeIdentifier)")
         )
@@ -110,18 +111,43 @@ private struct SessionSummaryRow: View {
         .foregroundStyle(.secondary)
       }
       Spacer(minLength: 0)
-      Text(session.endedAt == nil ? String(localized: "Recovered") : String(localized: "Saved"))
-        .font(.caption.weight(.semibold))
-        .lineLimit(1)
-        .fixedSize()
-        .foregroundStyle(session.endedAt == nil ? DspeechTheme.warning : DspeechTheme.success)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(
-          (session.endedAt == nil ? DspeechTheme.warning : DspeechTheme.success).opacity(0.15),
-          in: Capsule()
-        )
+      SessionStatusBadge(recovered: session.endedAt == nil)
     }
+  }
+}
+
+// why: two-tier badge (D14 rule) makes the two states visually distinct at a glance — a recovered
+// session (crash-recovered, no clean end) is the notable state, so it reads as a FILLED warning
+// capsule; a cleanly-saved session is the quiet norm, so it reads as an OUTLINE success capsule.
+// Both derive their colour and insets from DspeechTheme, no per-view literals.
+private struct SessionStatusBadge: View {
+  let recovered: Bool
+
+  private var tint: Color { recovered ? DspeechTheme.warning : DspeechTheme.success }
+
+  private var label: String {
+    recovered ? String(localized: "Recovered") : String(localized: "Saved")
+  }
+
+  var body: some View {
+    Text(label)
+      .font(.caption.weight(.semibold))
+      .lineLimit(1)
+      .fixedSize()
+      .foregroundStyle(tint)
+      .padding(.horizontal, 8)
+      .padding(.vertical, 4)
+      .background {
+        if recovered {
+          Capsule().fill(tint.opacity(DspeechTheme.chipFillOpacity))
+        }
+      }
+      .overlay {
+        if !recovered {
+          Capsule().stroke(tint.opacity(DspeechTheme.chipStrokeOpacity), lineWidth: 1)
+        }
+      }
+      .accessibilityIdentifier(recovered ? "session-status-recovered" : "session-status-saved")
   }
 }
 

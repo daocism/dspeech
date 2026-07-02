@@ -12,8 +12,23 @@ struct OnboardingView: View {
   let onComplete: () -> Void
   @State private var selection = 0
   @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
   // why: the hero icon scales with the user's Dynamic Type setting instead of a fixed 64pt.
   @ScaledMetric(relativeTo: .largeTitle) private var iconSize: CGFloat = 64
+
+  // why: mirror the MainControlsView StartButton glass idiom — .interactive() glass keeps the
+  // render loop lively, which stalls XCUITest quiescence waits, so gate it exactly like the live
+  // control chrome (Reduce Motion OR the UI-test animation-disable flag). ADR 0013 rules 3 + 6.
+  private var animatesGlassMorph: Bool {
+    !reduceMotion && !DecorativeMotion.isDisabledForUITests
+  }
+
+  // why: accent-tinted .regular glass (never .clear) — the floating CTA reads as one generation with
+  // the iOS 26 system chrome; .regular keeps the black label legible over the dark gradient backdrop.
+  private var ctaGlass: Glass {
+    let tinted = Glass.regular.tint(DspeechTheme.accent)
+    return animatesGlassMorph ? tinted.interactive() : tinted
+  }
 
   static let cards: [OnboardingCard] = [
     OnboardingCard(
@@ -71,18 +86,21 @@ struct OnboardingView: View {
           .tabViewStyle(.page(indexDisplayMode: .always))
           .indexViewStyle(.page(backgroundDisplayMode: .always))
 
-          Button(action: advance) {
-            Text(isLastCard ? String(localized: "Get started") : String(localized: "Next"))
-              .font(.headline)
-              .frame(maxWidth: .infinity)
-              .padding(.vertical, 14)
-              .background(Capsule().fill(DspeechTheme.accent))
-              .foregroundStyle(.black)
+          GlassEffectContainer {
+            Button(action: advance) {
+              Text(isLastCard ? String(localized: "Get started") : String(localized: "Next"))
+                .font(.headline)
+                .foregroundStyle(.black)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .glassEffect(ctaGlass, in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .contentShape(Capsule())
+            .accessibilityIdentifier(
+              isLastCard ? "onboarding-done-button" : "onboarding-next-button"
+            )
           }
-          .buttonStyle(.plain)
-          .accessibilityIdentifier(
-            isLastCard ? "onboarding-done-button" : "onboarding-next-button"
-          )
           .padding(.horizontal, 32)
           .padding(.bottom, 24)
         }
