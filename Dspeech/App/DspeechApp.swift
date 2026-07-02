@@ -11,7 +11,14 @@ struct DspeechApp: App {
     private let recognitionAvailabilityOverride: (any OnDeviceLocaleAvailability)?
   #endif
 
+  // why: H5 — the MetricKit subscriber is an app-lifecycle singleton; it lives on the App (not in a
+  // SwiftUI body) and starts once at launch so crash/hang/metric payloads are captured on device.
+  // Settings reads the same Diagnostics directory through its own collector instance for the export
+  // ShareLink. Local-only (ADR 0002): payloads never leave the device.
+  private let diagnostics = DiagnosticsCollector()
+
   init() {
+    diagnostics.start()
     #if DEBUG
       let arguments = CommandLine.arguments
       if let markerIndex = arguments.firstIndex(of: "--dspeech-sfspeech-probe") {

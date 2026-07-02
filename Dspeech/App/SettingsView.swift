@@ -39,6 +39,14 @@ struct SettingsView: View {
   // in-app language switch, no bundle swizzling.
   @State private var appLanguage: String = Self.currentAppLanguagePickerTag()
   @State private var whisperKitInstaller = WhisperKitModelInstaller()
+  // why: M1 — Wi-Fi-only download preference, owned here like the installer (SettingsView is the only
+  // download-control surface). Both pinned downloaders read the same persisted key at install time.
+  @State private var downloadSettings = DownloadSettings()
+  // why: H5 — a read-only collector over the same on-device Diagnostics directory the app-lifecycle
+  // subscriber writes to (mirrors whisperKitInstaller being owned here). Used only to list files for
+  // the export ShareLink; the file list is snapshotted on appear so `body` does no filesystem I/O.
+  @State private var diagnostics = DiagnosticsCollector()
+  @State private var diagnosticFileURLs: [URL] = []
   // why: C3 — the SwiftUI download task is held so Pause can cancel it. Cancellation propagates
   // into the shared installer engine (Task.checkCancellation between files), which preserves the C1
   // staging cache, so Resume continues from the kept bytes instead of restarting at zero. This holds
@@ -282,6 +290,22 @@ struct SettingsView: View {
           .fixedSize(horizontal: false, vertical: true)
         }
         Section {
+          Toggle(
+            String(localized: "Allow downloads over cellular"),
+            isOn: $downloadSettings.allowCellular
+          )
+          .accessibilityIdentifier("cellular-downloads-toggle")
+        } footer: {
+          Text(
+            String(
+              localized:
+                "Model downloads wait for Wi-Fi unless enabled. Packs can be hundreds of megabytes."
+            )
+          )
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .fixedSize(horizontal: false, vertical: true)
+        }
+        Section {
           Toggle(String(localized: "On-device translation"), isOn: $translation.enabled)
             .accessibilityIdentifier("translation-enabled-toggle")
           Picker(String(localized: "Target language"), selection: $translation.targetCode) {
@@ -333,11 +357,15 @@ struct SettingsView: View {
           Text(String(localized: "Restart the app to change the language."))
         }
         storageSection
+        diagnosticsSection
         Section(String(localized: "About")) {
           LabeledContent(String(localized: "Version"), value: Bundle.main.shortVersion)
         }
       }
-      .onAppear { audioSource.refresh() }
+      .onAppear {
+        audioSource.refresh()
+        diagnosticFileURLs = diagnostics.fileURLs()
+      }
       .task { await recognition.refreshCapableLocales() }
       .task(id: retention.autoCleanupEnabled) { await refreshTranscriptStorageUsage() }
       .onChange(of: recognition.localeIdentifier) {
@@ -648,6 +676,37 @@ struct SettingsView: View {
 
   private func retentionWindowLabel(_ window: TranscriptRetentionWindow) -> String {
     String(localized: "\(window.days) days")
+  }
+
+  // MARK: - H5 diagnostics export (local-only; export is the ONLY egress and is user-initiated)
+
+  private var diagnosticsSection: some View {
+    Section {
+      if diagnosticFileURLs.isEmpty {
+        Text(String(localized: "No diagnostics collected yet."))
+          .font(.footnote)
+          .foregroundStyle(.secondary)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .fixedSize(horizontal: false, vertical: true)
+          .accessibilityIdentifier("diagnostics-empty")
+      } else {
+        ShareLink(items: diagnosticFileURLs) {
+          Label(String(localized: "Export diagnostics"), systemImage: "square.and.arrow.up")
+        }
+        .accessibilityIdentifier("diagnostics-export")
+      }
+    } header: {
+      Text(String(localized: "Diagnostics"))
+    } footer: {
+      Text(
+        String(
+          localized:
+            "Crash and performance reports are collected on device by iOS and never leave your iPhone unless you export and share them yourself."
+        )
+      )
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .fixedSize(horizontal: false, vertical: true)
+    }
   }
 }
 

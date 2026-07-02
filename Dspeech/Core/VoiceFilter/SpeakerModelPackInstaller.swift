@@ -53,14 +53,21 @@ struct SpeakerModelPackInstaller: Sendable {
 
   private let voiceFilterStorage: any VoiceFilterStorage
   private let availableCapacityProvider: @Sendable (URL) throws -> Int64
+  // why: M1 — the speaker model pack (also hundreds of MB) obeys the same Wi-Fi-only default as the
+  // WhisperKit installer. Evaluated at install time so a Settings toggle applies to the next attempt.
+  private let allowsCellularDownloads: @Sendable () -> Bool
 
   init(
     voiceFilterStorage: any VoiceFilterStorage = UserDefaultsVoiceFilterStorage(),
     availableCapacityProvider: @escaping @Sendable (URL) throws -> Int64 =
-      { try ModelInstallFileSystem.availableCapacity(at: $0) }
+      { try ModelInstallFileSystem.availableCapacity(at: $0) },
+    allowsCellularDownloads: @escaping @Sendable () -> Bool = {
+      UserDefaultsDownloadSettingsStorage().loadAllowCellular()
+    }
   ) {
     self.voiceFilterStorage = voiceFilterStorage
     self.availableCapacityProvider = availableCapacityProvider
+    self.allowsCellularDownloads = allowsCellularDownloads
   }
 
   // why: ADR 0007/0008 — the model-weight source must be overridable to a mirror under our
@@ -309,11 +316,13 @@ struct SpeakerModelPackInstaller: Sendable {
     )
     let cacheRoot = Self.modelCacheRoot()
     let installSource = Self.resolvedRegistrySource()
+    let allowsCellular = allowsCellularDownloads()
     do {
       try await Self.downloadModelPack(
         to: cacheRoot,
         progress: progress,
-        availableCapacityProvider: availableCapacityProvider
+        availableCapacityProvider: availableCapacityProvider,
+        allowsCellularAccess: allowsCellular
       )
       do {
         let pack = try Self.installedPackAfterVerification(source: installSource)
@@ -334,7 +343,8 @@ struct SpeakerModelPackInstaller: Sendable {
         try await Self.downloadModelPack(
           to: cacheRoot,
           progress: progress,
-          availableCapacityProvider: availableCapacityProvider
+          availableCapacityProvider: availableCapacityProvider,
+          allowsCellularAccess: allowsCellular
         )
         let pack = try Self.installedPackAfterVerification(source: installSource)
         DspeechLog.modelPack.info(
@@ -525,7 +535,8 @@ struct SpeakerModelPackInstaller: Sendable {
   private static func downloadModelPack(
     to cacheRoot: URL,
     progress: @escaping @Sendable (ModelPackAcquisition) -> Void,
-    availableCapacityProvider: @Sendable (URL) throws -> Int64
+    availableCapacityProvider: @Sendable (URL) throws -> Int64,
+    allowsCellularAccess: Bool
   ) async throws {
     DspeechLog.modelPack.info(
       "model pack download started source=\(Self.resolvedRegistrySource(), privacy: .public)"
@@ -535,7 +546,8 @@ struct SpeakerModelPackInstaller: Sendable {
       let availableBytes = try availableCapacityProvider(cacheRoot)
       try preflightSufficientFreeSpace(availableBytes: availableBytes)
       try await withConfiguredRegistryBaseURL {
-        try await downloadPinnedModelFiles(to: cacheRoot, progress: progress)
+        try await downloadPinnedModelFiles(
+          to: cacheRoot, progress: progress, allowsCellularAccess: allowsCellularAccess)
       }
       DspeechLog.modelPack.info("model pack download finished")
     } catch {
@@ -558,7 +570,8 @@ struct SpeakerModelPackInstaller: Sendable {
 
   private static func downloadPinnedModelFiles(
     to cacheRoot: URL,
-    progress: @escaping @Sendable (ModelPackAcquisition) -> Void
+    progress: @escaping @Sendable (ModelPackAcquisition) -> Void,
+    allowsCellularAccess: Bool
   ) async throws {
     let repoPath = cacheRoot.appendingPathComponent(Repo.diarizer.folderName, isDirectory: true)
     try FileManager.default.createDirectory(at: repoPath, withIntermediateDirectories: true)
@@ -584,7 +597,10 @@ struct SpeakerModelPackInstaller: Sendable {
         at: destination.deletingLastPathComponent(),
         withIntermediateDirectories: true
       )
-      let request = URLRequest(url: try pinnedDownloadURL(relativePath: entry.relativePath))
+      var request = URLRequest(url: try pinnedDownloadURL(relativePath: entry.relativePath))
+      // why: M1 — respect the Wi-Fi-only download default; on a cellular-only path with this false,
+      // URLSession throws URLError.dataNotAllowed, mapped to the offline taxonomy upstream.
+      request.allowsCellularAccess = allowsCellularAccess
       let (temporaryURL, response) = try await URLSession.shared.download(for: request)
       guard let httpResponse = response as? HTTPURLResponse,
         (200..<300).contains(httpResponse.statusCode)
