@@ -4,6 +4,16 @@
 # (macOS on-device SFSpeechRecognizer) + REAL TransmissionAssembler + classifier
 # and prints the blocks exactly as the UI would group them. Local gate only —
 # never wired into hosted CI (macOS runner minutes).
+#
+# ENGINES: defaults to `apple whisperkit`. Parakeet (FluidAudio EOU 120M) is
+# English-only and is intentionally NOT in the default set — these fixtures are
+# French (fr-FR). Running `DSPEECH_ENGINES="parakeet"` against these fr-FR
+# fixtures fails fast per fixture with a clear locale message from the CLI
+# ("Parakeet EOU 120M is English-only …"); use Parakeet only against an English
+# fixture path, e.g.:
+#   DSPEECH_ENGINES="parakeet" DSPEECH_LOCALE="en" \
+#     FIXTURES_DIR=<en-wav-dir> scripts/verify-primary-scenario.sh
+# (English WER numbers live in scripts/testdata/run-asr-eval.py --engine parakeet.)
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
