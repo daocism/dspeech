@@ -183,7 +183,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld개 필터됨"
+            "value": "%lld개 필터링됨"
           }
         },
         "pt": {
@@ -208,76 +208,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "已筛选 %lld 条"
-          }
-        }
-      }
-    },
-    "%lld filtered segments": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld gefilterte Segmente"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld filtered segments"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld segmentos filtrados"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld segments filtrés"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld segmenti filtrati"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld 件のフィルター済みセグメント"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld개 필터된 구간"
-          }
-        },
-        "pt": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld segmentos filtrados"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Отфильтровано сегментов: %lld"
-          }
-        },
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Відфільтровано сегментів: %lld"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "已筛选 %lld 个片段"
           }
         }
       }
@@ -489,77 +419,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld%%"
-          }
-        }
-      }
-    },
-    "ASR model": {
-      "extractionState": "manual",
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ASR-Modell"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ASR model"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Modelo ASR"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Modèle ASR"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Modello ASR"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ASRモデル"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ASR 모델"
-          }
-        },
-        "pt": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Modelo ASR"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Модель ASR"
-          }
-        },
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Модель ASR"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ASR 模型"
           }
         }
       }
@@ -777,77 +636,6 @@
         }
       }
     },
-    "Active voice filter": {
-      "extractionState": "manual",
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aktiver Sprachfilter"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Active voice filter"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Filtro de voz activo"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Filtre vocal actif"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Filtro vocale attivo"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "音声フィルター"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "활성 음성 필터"
-          }
-        },
-        "pt": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Filtro de voz ativo"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Активный голосовой фильтр"
-          }
-        },
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Активний голосовий фільтр"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "主动语音筛选器"
-          }
-        }
-      }
-    },
     "Aircraft callsign": {
       "extractionState": "manual",
       "localizations": {
@@ -986,76 +774,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "显示所有 ATC 片段。"
-          }
-        }
-      }
-    },
-    "All transcript segments are visible.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Alle Transkriptsegmente sind sichtbar."
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "All transcript segments are visible."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Todos los segmentos de transcripción están visibles."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tous les segments de transcription sont visibles."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tutti i segmenti della trascrizione sono visibili."
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "すべての文字起こしセグメントが表示されています。"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "모든 전사 구간이 표시됩니다."
-          }
-        },
-        "pt": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Todos os segmentos da transcrição estão visíveis."
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Все сегменты расшифровки видны."
-          }
-        },
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Усі сегменти розшифрування видимі."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "所有转写片段均可见。"
           }
         }
       }
@@ -4526,76 +4244,6 @@
         }
       }
     },
-    "Continuation": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Fortsetzung"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Continuation"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Continuación"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Suite"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Continuazione"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "継続"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "연속 교신"
-          }
-        },
-        "pt": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Continuação"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Продолжение"
-          }
-        },
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Продовження"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "连续通话"
-          }
-        }
-      }
-    },
     "Continue without voice filter": {
       "extractionState": "manual",
       "localizations": {
@@ -4805,77 +4453,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "无法删除模型"
-          }
-        }
-      }
-    },
-    "Couldn't delete the model pack from the device. Check storage access and try again later.": {
-      "extractionState": "manual",
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Das Modellpaket konnte nicht vom Gerät gelöscht werden. Prüfen Sie den Speicherzugriff und versuchen Sie es später erneut."
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Couldn't delete the model pack from the device. Check storage access and try again later."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No se pudo eliminar el paquete del modelo del dispositivo. Comprueba el acceso al almacenamiento e inténtalo más tarde."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Impossible de supprimer le pack du modèle de l'appareil. Vérifiez l'accès au stockage et réessayez plus tard."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Impossibile eliminare il pacchetto del modello dal dispositivo. Controlla l'accesso allo spazio di archiviazione e riprova più tardi."
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "端末からモデルパックを削除できませんでした。ストレージへのアクセスを確認して後でもう一度お試しください。"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "기기에서 모델 팩을 삭제할 수 없습니다. 저장소 접근을 확인하고 나중에 다시 시도하세요."
-          }
-        },
-        "pt": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Não foi possível apagar o pacote do modelo do dispositivo. Verifique o acesso ao armazenamento e tente novamente mais tarde."
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Не удалось удалить пакет модели с устройства. Проверьте доступ к хранилищу и попробуйте позже."
-          }
-        },
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Не вдалося видалити пакет моделі з пристрою. Перевірте доступ до сховища та спробуйте пізніше."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "无法从设备删除模型包。请检查存储权限并稍后重试。"
           }
         }
       }
@@ -6999,76 +6576,6 @@
         }
       }
     },
-    "Dispatcher": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Lotse"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dispatcher"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Controlador"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Contrôleur"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Controllore"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "管制官"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "관제사"
-          }
-        },
-        "pt": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Controlador"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Диспетчер"
-          }
-        },
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Диспетчер"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "管制员"
-          }
-        }
-      }
-    },
     "Dispatcher voice": {
       "extractionState": "manual",
       "localizations": {
@@ -7919,146 +7426,6 @@
         }
       }
     },
-    "Filter off": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Filter aus"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Filter off"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Filtro desactivado"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Filtre désactivé"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Filtro disattivato"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "フィルターオフ"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "필터 꺼짐"
-          }
-        },
-        "pt": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Filtro desligado"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Фильтр выключен"
-          }
-        },
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Фільтр вимкнено"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "筛选器关闭"
-          }
-        }
-      }
-    },
-    "Filtered": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Gefiltert"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Filtered"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Filtrado"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Filtré"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Filtrato"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "フィルター済み"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "필터됨"
-          }
-        },
-        "pt": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Filtrado"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Отфильтровано"
-          }
-        },
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Відфільтровано"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "已筛选"
-          }
-        }
-      }
-    },
     "Follow-up call": {
       "extractionState": "manual",
       "localizations": {
@@ -8171,7 +7538,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "필터된 음성"
+            "value": "필터링된 음성"
           }
         },
         "pt": {
@@ -8979,77 +8346,6 @@
         }
       }
     },
-    "Listening — spell out the callsign (for example: \"november one two three alpha bravo\").": {
-      "extractionState": "manual",
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Höre zu — buchstabieren Sie das Rufzeichen (zum Beispiel: „november one two three alpha bravo“)."
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Listening — spell out the callsign (for example: \"november one two three alpha bravo\")."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Escuchando: deletrea el indicativo (por ejemplo: «november one two three alpha bravo»)."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Écoute — épelez l'indicatif (par exemple : « november one two three alpha bravo »)."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "In ascolto — scandisci il nominativo (per esempio: \"november one two three alpha bravo\")."
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "受信中 — コールサインを一字ずつ読み上げてください（例：「november one two three alpha bravo」）。"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "듣는 중 — 호출부호를 철자로 말하세요(예: \"november one two three alpha bravo\")."
-          }
-        },
-        "pt": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ouvindo — soletre o indicativo (por exemplo: \"november one two three alpha bravo\")."
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Слушаю — продиктуйте позывной по буквам (например: «november one two three alpha bravo»)."
-          }
-        },
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Слухаю — продиктуйте позивний по літерах (наприклад: «новембер один два три альфа браво»)."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "正在聆听——请逐字念出呼号（例如：“november one two three alpha bravo”）。"
-          }
-        }
-      }
-    },
     "Listening…": {
       "extractionState": "manual",
       "localizations": {
@@ -9330,76 +8626,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "本地设置已损坏"
-          }
-        }
-      }
-    },
-    "Mixed speaker": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Gemischte Sprecher"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mixed speaker"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Voz mixta"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Locuteurs mixtes"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Voce mista"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "話者混在"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "혼합 화자"
-          }
-        },
-        "pt": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Falantes mistos"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Смешанная речь"
-          }
-        },
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Змішана мова"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "混合说话人"
           }
         }
       }
@@ -10038,76 +9264,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "没有采集源——请连接输入后重试。"
-          }
-        }
-      }
-    },
-    "No filtered speech": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Keine gefilterte Sprache"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No filtered speech"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No hay voz filtrada"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aucune parole filtrée"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nessuna voce filtrata"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "フィルター済み音声はありません"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "필터된 음성이 없습니다"
-          }
-        },
-        "pt": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nenhuma fala filtrada"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Нет отфильтрованной речи"
-          }
-        },
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Немає відфільтрованої мови"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "没有已筛选语音"
           }
         }
       }
@@ -11388,146 +10544,6 @@
         }
       }
     },
-    "Noise": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Rauschen"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Noise"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ruido"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bruit"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Rumore"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ノイズ"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "소음"
-          }
-        },
-        "pt": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ruído"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Шум"
-          }
-        },
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Шум"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "噪声"
-          }
-        }
-      }
-    },
-    "Not enough voiced speech. Speak clearly for at least %@ seconds and try again.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nicht genug gesprochene Sprache. Sprechen Sie mindestens %@ Sekunden klar und versuchen Sie es erneut."
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Not enough voiced speech. Speak clearly for at least %@ seconds and try again."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No hay suficiente voz. Habla con claridad durante al menos %@ segundos e inténtalo de nuevo."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pas assez de parole audible. Parlez clairement pendant au moins %@ secondes et réessayez."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Voce insufficiente. Parla chiaramente per almeno %@ secondi e riprova."
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "有声音声が不足しています。少なくとも %@ 秒はっきり話して、もう一度試してください。"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "유성 음성이 부족합니다. 최소 %@초 동안 또렷하게 말한 뒤 다시 시도하세요."
-          }
-        },
-        "pt": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Não há fala suficiente. Fale claramente por pelo menos %@ segundos e tente novamente."
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Недостаточно звучащей речи. Говорите чётко не менее %@ секунд и попробуйте снова."
-          }
-        },
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Недостатньо звучного мовлення. Говоріть чітко щонайменше %@ секунд і спробуйте знову."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "有声语音不足。请清晰说话至少 %@ 秒，然后重试。"
-          }
-        }
-      }
-    },
     "Nothing to translate: the segment is empty.": {
       "extractionState": "manual",
       "localizations": {
@@ -12024,76 +11040,6 @@
         }
       }
     },
-    "Other traffic": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Anderer Verkehr"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Other traffic"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Otro tráfico"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Autre trafic"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Altro traffico"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "他機"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "다른 항공기"
-          }
-        },
-        "pt": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Outro tráfego"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Другой борт"
-          }
-        },
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Інший борт"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "其他交通"
-          }
-        }
-      }
-    },
     "Output only — no input": {
       "extractionState": "manual",
       "localizations": {
@@ -12377,76 +11323,6 @@
         }
       }
     },
-    "Pilot": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pilot"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pilot"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Piloto"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pilote"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pilota"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "パイロット"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "조종사"
-          }
-        },
-        "pt": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Piloto"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Пилот"
-          }
-        },
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Пілот"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "飞行员"
-          }
-        }
-      }
-    },
     "Pilot voice": {
       "extractionState": "manual",
       "localizations": {
@@ -12518,361 +11394,6 @@
         }
       }
     },
-    "Pilot 1": {
-      "extractionState": "manual",
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pilot 1"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pilot 1"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Piloto 1"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pilote 1"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pilota 1"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "パイロット 1"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "조종사 1"
-          }
-        },
-        "pt": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Piloto 1"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Пилот 1"
-          }
-        },
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Пілот 1"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "飞行员 1"
-          }
-        }
-      }
-    },
-    "Pilot 1 (Captain)": {
-      "extractionState": "manual",
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pilot 1 (Kapitän)"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pilot 1 (Captain)"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Piloto 1 (capitán)"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pilote 1 (commandant)"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pilota 1 (comandante)"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "パイロット 1（機長）"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "조종사 1(기장)"
-          }
-        },
-        "pt": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Piloto 1 (comandante)"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Пилот 1 (капитан)"
-          }
-        },
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Пілот 1 (капітан)"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "飞行员 1（机长）"
-          }
-        }
-      }
-    },
-    "Pilot 2": {
-      "extractionState": "manual",
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pilot 2"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pilot 2"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Piloto 2"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pilote 2"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pilota 2"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "パイロット 2"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "조종사 2"
-          }
-        },
-        "pt": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Piloto 2"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Пилот 2"
-          }
-        },
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Пілот 2"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "飞行员 2"
-          }
-        }
-      }
-    },
-    "Pilot 2 (First Officer)": {
-      "extractionState": "manual",
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pilot 2 (Erster Offizier)"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pilot 2 (First Officer)"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Piloto 2 (primer oficial)"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pilote 2 (copilote)"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pilota 2 (primo ufficiale)"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "パイロット 2（副操縦士）"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "조종사 2(부기장)"
-          }
-        },
-        "pt": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Piloto 2 (primeiro oficial)"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Пилот 2 (второй пилот)"
-          }
-        },
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Пілот 2 (другий пілот)"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "飞行员 2（副驾驶）"
-          }
-        }
-      }
-    },
-    "Pilot slot unavailable": {
-      "extractionState": "manual",
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Piloten-Slot nicht verfügbar"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pilot slot unavailable"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Espacio de piloto no disponible"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Emplacement pilote indisponible"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Slot pilota non disponibile"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "パイロット枠が利用できません"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "조종사 슬롯을 사용할 수 없음"
-          }
-        },
-        "pt": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Slot de piloto indisponível"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Слот пилота недоступен"
-          }
-        },
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Слот пілота недоступний"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "飞行员槽位不可用"
-          }
-        }
-      }
-    },
     "Pilot speaker classification": {
       "extractionState": "manual",
       "localizations": {
@@ -12940,77 +11461,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "飞行员语音分类"
-          }
-        }
-      }
-    },
-    "Pre-ASR filter is off; all audio buffers are passed to recognition.": {
-      "extractionState": "manual",
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pre-ASR-Filter ist aus; alle Audiopuffer werden an die Erkennung weitergegeben."
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pre-ASR filter is off; all audio buffers are passed to recognition."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "El filtro previo al ASR está desactivado; todos los búferes de audio pasan al reconocimiento."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Le filtre pré-ASR est désactivé ; tous les tampons audio sont transmis à la reconnaissance."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Filtro pre-ASR disattivato; tutti i buffer audio vengono passati al riconoscimento."
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ASR前フィルターはオフです。すべての音声バッファが認識に渡されます。"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pre-ASR 필터가 꺼져 있습니다. 모든 오디오 버퍼가 인식으로 전달됩니다."
-          }
-        },
-        "pt": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "O filtro pré-ASR está desligado; todos os buffers de áudio são enviados para reconhecimento."
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Пред-ASR фильтр выключен; все аудиобуферы передаются в распознавание."
-          }
-        },
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Фільтр до ASR вимкнено; усі аудіобуфери передаються на розпізнавання."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ASR 前筛选已关闭；所有音频缓冲都将送入识别。"
           }
         }
       }
@@ -13299,290 +11749,6 @@
         }
       }
     },
-    "Record a voice sample for recognition.": {
-      "extractionState": "manual",
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nehmen Sie eine Stimmprobe für die Erkennung auf."
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Record a voice sample for recognition."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Graba una muestra de voz para el reconocimiento."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Enregistrez un échantillon vocal pour la reconnaissance."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Registra un campione vocale per il riconoscimento."
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "認識用の音声サンプルを録音してください。"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "인식을 위한 음성 샘플을 녹음하세요."
-          }
-        },
-        "pt": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Grave uma amostra de voz para reconhecimento."
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Запишите образец голоса для распознавания."
-          }
-        },
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Запишіть голосовий зразок для розпізнавання."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "录制用于识别的语音样本。"
-          }
-        }
-      }
-    },
-    "Record voice": {
-      "extractionState": "manual",
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Stimme aufnehmen"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Record voice"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Grabar voz"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Enregistrer la voix"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Registra voce"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "音声を録音"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "음성 녹음"
-          }
-        },
-        "pt": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Gravar voz"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Записать голос"
-          }
-        },
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Записати голос"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "录制语音"
-          }
-        }
-      }
-    },
-    "Recording -- speak for a few seconds, then tap Stop.": {
-      "extractionState": "manual",
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aufnahme -- sprechen Sie einige Sekunden und tippen Sie dann auf Stopp."
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Recording -- speak for a few seconds, then tap Stop."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Grabando -- habla durante unos segundos y luego toca Detener."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Enregistrement -- parlez quelques secondes, puis touchez Arrêter."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Registrazione -- parla per alcuni secondi, poi tocca Ferma."
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "録音中 -- 数秒話してから停止をタップしてください。"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "녹음 중 -- 몇 초 동안 말한 다음 중지를 탭하세요."
-          }
-        },
-        "pt": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Gravando -- fale por alguns segundos e toque em Parar."
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Идёт запись -- говорите несколько секунд, затем нажмите «Стоп»."
-          }
-        },
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Триває запис -- говоріть кілька секунд, потім натисніть «Стоп»."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "正在录制 -- 请说几秒钟，然后轻点停止。"
-          }
-        }
-      }
-    },
-    "Recording becomes available once the recognizer is connected.": {
-      "extractionState": "manual",
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aufnahme ist verfügbar, sobald der Erkenner verbunden ist."
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Recording becomes available once the recognizer is connected."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "La grabación estará disponible una vez que el reconocedor esté conectado."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "L'enregistrement sera disponible une fois le moteur de reconnaissance connecté."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "La registrazione è disponibile una volta connesso il riconoscitore."
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "認識エンジンが接続されると録音が可能になります。"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "인식기가 연결되면 녹음을 사용할 수 있습니다."
-          }
-        },
-        "pt": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "A gravação fica disponível assim que o reconhecedor estiver ligado."
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Запись станет доступна, когда распознаватель будет подключён."
-          }
-        },
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Запис стане доступним після підключення розпізнавача."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "识别器连接后即可录制。"
-          }
-        }
-      }
-    },
     "Recording failed -- try again.": {
       "extractionState": "manual",
       "localizations": {
@@ -13650,148 +11816,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "录制失败 -- 请重试。"
-          }
-        }
-      }
-    },
-    "Recording failed — try again.": {
-      "extractionState": "manual",
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aufnahme fehlgeschlagen — versuchen Sie es erneut."
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Recording failed — try again."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "La grabación falló: inténtalo de nuevo."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Échec de l'enregistrement — réessayez."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Registrazione non riuscita — riprova."
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "録音に失敗しました — もう一度お試しください。"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "녹음에 실패했습니다 — 다시 시도하세요."
-          }
-        },
-        "pt": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "A gravação falhou — tente novamente."
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Запись не получилась — попробуйте снова."
-          }
-        },
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Не вдалося записати — спробуйте ще раз."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "录制失败——请重试。"
-          }
-        }
-      }
-    },
-    "Recording — speak for a few seconds, then tap Stop.": {
-      "extractionState": "manual",
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aufnahme — sprechen Sie einige Sekunden und tippen Sie dann auf Stopp."
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Recording — speak for a few seconds, then tap Stop."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Grabando: habla durante unos segundos y luego toca Detener."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Enregistrement — parlez quelques secondes, puis appuyez sur Arrêter."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Registrazione — parla per qualche secondo, poi tocca Ferma."
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "録音中 — 数秒間話してから停止をタップしてください。"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "녹음 중 — 몇 초 동안 말한 다음 중지를 탭하세요."
-          }
-        },
-        "pt": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Gravando — fale durante alguns segundos e depois toque em Parar."
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Идёт запись — говорите несколько секунд, затем «Остановить»."
-          }
-        },
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Запис — говоріть кілька секунд, потім натисніть «Стоп»."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "录制中——讲几秒钟，然后点击停止。"
           }
         }
       }
@@ -15920,77 +13944,6 @@
         }
       }
     },
-    "The FluidAudio model (%@) is downloaded once at this request. Only the model download request leaves the device — audio, transcripts and voice samples are not transmitted.": {
-      "extractionState": "manual",
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Das FluidAudio-Modell (%@) wird auf diese Anforderung einmalig geladen. Nur die Modelldownload-Anforderung verlässt das Gerät — Audio, Transkripte und Stimmproben werden nicht übertragen."
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The FluidAudio model (%@) is downloaded once at this request. Only the model download request leaves the device — audio, transcripts and voice samples are not transmitted."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "El modelo FluidAudio (%@) se descarga una sola vez con esta solicitud. Del dispositivo solo sale la solicitud de descarga del modelo: el audio, las transcripciones y las muestras de voz no se transmiten."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Le modèle FluidAudio (%@) est téléchargé une seule fois à cette demande. Seule la requête de téléchargement du modèle quitte l’appareil — l’audio, les transcriptions et les échantillons vocaux ne sont pas transmis."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Il modello FluidAudio (%@) viene scaricato una sola volta con questa richiesta. Dal dispositivo esce solo la richiesta di download del modello: audio, trascrizioni e campioni vocali non vengono trasmessi."
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "FluidAudio モデル（%@）はこのリクエスト時に一度だけダウンロードされます。デバイスから送信されるのはモデルのダウンロードリクエストのみで、音声・文字起こし・音声サンプルは送信されません。"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "FluidAudio 모델(%@)은 이 요청에서 한 번만 다운로드됩니다. 모델 다운로드 요청만 기기를 떠나며, 오디오·전사·음성 샘플은 전송되지 않습니다."
-          }
-        },
-        "pt": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "O modelo FluidAudio (%@) é baixado uma única vez com esta solicitação. Do dispositivo sai apenas a solicitação de download do modelo — áudio, transcrições e amostras de voz não são transmitidos."
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Модель FluidAudio (%@) загружается один раз по этому запросу. С устройства уходит только запрос на скачивание модели — аудио, расшифровки и образцы голоса не передаются."
-          }
-        },
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Модель FluidAudio (%@) завантажується один раз за цим запитом. З пристрою йде лише запит на завантаження моделі — аудіо, розшифрування та зразки голосу не передаються."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "FluidAudio 模型（%@）会在此次请求时下载一次。仅有模型下载请求会离开设备——音频、转写文本和语音样本不会被传输。"
-          }
-        }
-      }
-    },
     "The audio session is available again. Check the input before starting again.": {
       "extractionState": "manual",
       "localizations": {
@@ -16174,7 +14127,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "필터는 전사 후 다른 항공기에 호출된 교신만 숨깁니다. 아무것도 삭제되지 않으며, 숨겨진 교신은 필터된 목록과 기록에 남습니다."
+            "value": "필터는 전사 후 다른 항공기에 호출된 교신만 숨깁니다. 아무것도 삭제되지 않으며, 숨겨진 교신은 필터링된 목록과 기록에 남습니다."
           }
         },
         "pt": {
@@ -16911,77 +14864,6 @@
         }
       }
     },
-    "The model pack failed its checksum or integrity check. Retry the download to get a verified copy.": {
-      "extractionState": "manual",
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Das Modellpaket hat seine Prüfsumme oder Integritätsprüfung nicht bestanden. Wiederholen Sie den Download, um eine verifizierte Kopie zu erhalten."
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The model pack failed its checksum or integrity check. Retry the download to get a verified copy."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "El paquete del modelo no superó su comprobación de suma de verificación o integridad. Reintenta la descarga para obtener una copia verificada."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Le pack du modèle a échoué à sa vérification de somme de contrôle ou d'intégrité. Relancez le téléchargement pour obtenir une copie vérifiée."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Il pacchetto del modello non ha superato il controllo di checksum o integrità. Riprova il download per ottenere una copia verificata."
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "モデルパックのチェックサムまたは整合性チェックに失敗しました。検証済みのコピーを取得するためダウンロードを再試行してください。"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "모델 팩이 체크섬 또는 무결성 검사를 통과하지 못했습니다. 검증된 복사본을 받으려면 다운로드를 다시 시도하세요."
-          }
-        },
-        "pt": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "O pacote do modelo falhou a verificação de checksum ou integridade. Repita o download para obter uma cópia verificada."
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Пакет модели не прошёл проверку контрольной суммы или целостности. Повторите загрузку, чтобы скачать проверенную копию."
-          }
-        },
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Пакет моделі не пройшов перевірку контрольної суми або цілісності. Повторіть завантаження, щоб отримати перевірену копію."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "模型包未通过校验和或完整性检查。请重试下载以获取经验证的副本。"
-          }
-        }
-      }
-    },
     "The model “%@” stays on the device. Enable the filter above or delete the pack to free up space.": {
       "extractionState": "manual",
       "localizations": {
@@ -17262,77 +15144,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "飞行员语音筛选器仅在安装本地模型包后才能使用。下载为一次性、明确且应您要求进行；音频绝不离开您的设备。"
-          }
-        }
-      }
-    },
-    "The pre-ASR filter can only hide speech confidently recognized as the pilot's.": {
-      "extractionState": "manual",
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Der Pre-ASR-Filter kann nur Sprache ausblenden, die sicher als die des Piloten erkannt wurde."
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The pre-ASR filter can only hide speech confidently recognized as the pilot's."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "El filtro previo al ASR solo puede ocultar voz reconocida con seguridad como la del piloto."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Le filtre pré-ASR ne peut masquer que la parole reconnue avec certitude comme étant celle du pilote."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Il filtro pre-ASR può nascondere solo il parlato riconosciuto con certezza come quello del pilota."
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ASR前フィルターは、確実にパイロットの音声と認識された場合のみ非表示にできます。"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pre-ASR 필터는 조종사 음성으로 확실히 인식된 말만 숨길 수 있습니다."
-          }
-        },
-        "pt": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "O filtro pré-ASR só pode ocultar a fala reconhecida com confiança como sendo do piloto."
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Пред-ASR фильтр может скрывать только уверенно распознанную речь пилота."
-          }
-        },
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Фільтр до ASR може приховати лише мовлення, впевнено розпізнане як ваше пілотське."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ASR 前筛选仅能隐藏被确定识别为飞行员的语音。"
           }
         }
       }
@@ -17976,77 +15787,6 @@
         }
       }
     },
-    "Then: General → Keyboard → Dictation Languages — turn on Dictation and add this language. The model downloads, and recognition works offline.": {
-      "extractionState": "manual",
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dann: Allgemein → Tastatur → Diktiersprachen — aktivieren Sie das Diktat und fügen Sie diese Sprache hinzu. Das Modell wird geladen und die Erkennung funktioniert offline."
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Then: General → Keyboard → Dictation Languages — turn on Dictation and add this language. The model downloads, and recognition works offline."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Luego: General → Teclado → Idiomas de dictado: activa el Dictado y añade este idioma. El modelo se descarga y el reconocimiento funciona sin conexión."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Puis : Général → Clavier → Langues de dictée — activez la Dictée et ajoutez cette langue. Le modèle se télécharge et la reconnaissance fonctionne hors ligne."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Poi: Generali → Tastiera → Lingue dettatura — attiva Dettatura e aggiungi questa lingua. Il modello si scarica e il riconoscimento funziona offline."
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "次に：一般 → キーボード → 音声入力の言語 — 音声入力をオンにし、この言語を追加します。モデルがダウンロードされ、オフラインで認識できます。"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "그다음: 일반 → 키보드 → 받아쓰기 언어 — 받아쓰기를 켜고 이 언어를 추가하세요. 모델이 다운로드되고 인식은 오프라인으로 작동합니다."
-          }
-        },
-        "pt": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Depois: Geral → Teclado → Idiomas de Ditado — ative o Ditado e adicione este idioma. O modelo é baixado e o reconhecimento funciona offline."
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Затем: Основные → Клавиатура → «Языки диктовки» — включите диктовку и добавьте этот язык. Модель скачается, и распознавание заработает офлайн."
-          }
-        },
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Далі: Основні → Клавіатура → Мови диктування — увімкніть диктування й додайте цю мову. Модель завантажиться, і розпізнавання працюватиме офлайн."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "然后：通用 → 键盘 → 听写语言——开启听写并添加此语言。模型会下载，识别即可离线工作。"
-          }
-        }
-      }
-    },
     "There isn't enough device storage to install the voice filter model pack. Free storage and try again.": {
       "localizations": {
         "de": {
@@ -18539,77 +16279,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "太轻或太短 -- 请录制更清晰的样本。"
-          }
-        }
-      }
-    },
-    "Too quiet or too short — record a clearer sample.": {
-      "extractionState": "manual",
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Zu leise oder zu kurz — nehmen Sie eine deutlichere Probe auf."
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Too quiet or too short — record a clearer sample."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Demasiado bajo o demasiado corto: graba una muestra más clara."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Trop faible ou trop court — enregistrez un échantillon plus clair."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Troppo debole o troppo breve — registra un campione più chiaro."
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "音量が小さすぎるか短すぎます — より明瞭なサンプルを録音してください。"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "너무 작거나 짧습니다 — 더 명확한 샘플을 녹음하세요."
-          }
-        },
-        "pt": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Demasiado baixo ou demasiado curto — grave uma amostra mais nítida."
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Слишком тихо или коротко — запишите образец чётче."
-          }
-        },
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Надто тихо або надто коротко — запишіть чіткіший зразок."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "太轻或太短——请录制更清晰的样本。"
           }
         }
       }
@@ -19667,77 +17336,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "语音筛选器已关闭。模型已安装并就绪。"
-          }
-        }
-      }
-    },
-    "Voice sample recorded. Record again to update it.": {
-      "extractionState": "manual",
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Stimmprobe aufgenommen. Erneut aufnehmen, um sie zu aktualisieren."
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Voice sample recorded. Record again to update it."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Muestra de voz grabada. Vuelve a grabar para actualizarla."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Échantillon vocal enregistré. Enregistrez à nouveau pour le mettre à jour."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Campione vocale registrato. Registra di nuovo per aggiornarlo."
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "音声サンプルを録音しました。更新するにはもう一度録音してください。"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "음성 샘플이 녹음되었습니다. 업데이트하려면 다시 녹음하세요."
-          }
-        },
-        "pt": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Amostra de voz gravada. Grave novamente para a atualizar."
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Образец голоса записан. Запишите заново, чтобы обновить."
-          }
-        },
-        "uk": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Голосовий зразок записано. Запишіть знову, щоб оновити."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "已录制语音样本。再次录制可更新。"
           }
         }
       }
@@ -23247,6 +20845,574 @@
           "stringUnit": {
             "state": "translated",
             "value": "实时转写"
+          }
+        }
+      }
+    },
+    "Advisory only": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Advisory only"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nur zur Orientierung"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Solo orientativo"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "À titre indicatif"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Solo indicativo"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "参考用のみ"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "참고용 안내"
+          }
+        },
+        "pt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apenas orientativo"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Только справочно"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Лише довідково"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅供参考"
+          }
+        }
+      }
+    },
+    "Transcripts can be wrong or incomplete. Dspeech is an advisory aid and never replaces listening to the radio or ATC instructions.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcripts can be wrong or incomplete. Dspeech is an advisory aid and never replaces listening to the radio or ATC instructions."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transkripte können falsch oder unvollständig sein. Dspeech ist eine Hilfe zur Orientierung und ersetzt niemals das Mithören von Funk und ATC-Anweisungen."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Las transcripciones pueden ser erróneas o incompletas. Dspeech es una ayuda orientativa y nunca sustituye a la escucha de la radio ni a las instrucciones del ATC."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les transcriptions peuvent être erronées ou incomplètes. Dspeech est une aide indicative et ne remplace jamais l'écoute de la radio ni les instructions de l'ATC."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le trascrizioni possono essere errate o incomplete. Dspeech è un ausilio indicativo e non sostituisce mai l'ascolto della radio né le istruzioni ATC."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文字起こしは誤りや欠落があることがあります。Dspeech は参考用の補助であり、無線の聴取や ATC の指示に代わるものではありません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "전사 내용은 틀리거나 불완전할 수 있습니다. Dspeech는 참고용 보조 도구이며 무선 청취나 ATC 지시를 절대 대체하지 않습니다."
+          }
+        },
+        "pt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As transcrições podem estar erradas ou incompletas. O Dspeech é um auxílio orientativo e nunca substitui a escuta da rádio nem as instruções do ATC."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Расшифровки могут быть неверными или неполными. Dspeech — вспомогательное справочное средство и никогда не заменяет прослушивание радио и указания ATC."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Розшифрування можуть бути помилковими або неповними. Dspeech — допоміжний довідковий засіб і ніколи не замінює прослуховування радіо та вказівки ATC."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "转写可能有误或不完整。Dspeech 仅为辅助参考，绝不替代收听无线电或 ATC 指令。"
+          }
+        }
+      }
+    },
+    "Allow downloads over cellular": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow downloads over cellular"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Downloads über Mobilfunk erlauben"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permitir descargas con datos móviles"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Autoriser les téléchargements en données cellulaires"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Consenti download su rete cellulare"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "モバイル通信でのダウンロードを許可"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "셀룰러 네트워크에서 다운로드 허용"
+          }
+        },
+        "pt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permitir downloads via dados móveis"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Разрешить загрузку по сотовой сети"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Дозволити завантаження через мобільну мережу"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "允许通过蜂窝网络下载"
+          }
+        }
+      }
+    },
+    "Model downloads wait for Wi-Fi unless enabled. Packs can be hundreds of megabytes.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Model downloads wait for Wi-Fi unless enabled. Packs can be hundreds of megabytes."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modelldownloads warten auf WLAN, sofern nicht aktiviert. Pakete können mehrere Hundert Megabyte groß sein."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Las descargas de modelos esperan a una red Wi-Fi salvo que se active. Los paquetes pueden ocupar cientos de megabytes."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les téléchargements de modèles attendent le Wi-Fi, sauf si activé. Les packs peuvent peser plusieurs centaines de mégaoctets."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I download dei modelli attendono il Wi-Fi se non abilitato. I pacchetti possono pesare centinaia di megabyte."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "モデルのダウンロードは、有効にしない限り Wi-Fi を待ちます。パックは数百メガバイトになることがあります。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "모델 다운로드는 켜지 않으면 Wi-Fi를 기다립니다. 팩은 수백 메가바이트에 이를 수 있습니다."
+          }
+        },
+        "pt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Os downloads de modelos aguardam o Wi-Fi, a menos que ativado. Os pacotes podem ter centenas de megabytes."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Загрузка моделей ждёт Wi-Fi, если не включено. Пакеты могут занимать сотни мегабайт."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Завантаження моделей очікує на Wi-Fi, якщо не ввімкнено. Пакети можуть важити сотні мегабайтів."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "除非启用，否则模型下载会等待 Wi-Fi。资源包可能有数百兆字节。"
+          }
+        }
+      }
+    },
+    "Diagnostics": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diagnostics"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diagnose"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diagnósticos"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diagnostics"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diagnostica"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "診断"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "진단"
+          }
+        },
+        "pt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diagnóstico"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Диагностика"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Діагностика"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "诊断"
+          }
+        }
+      }
+    },
+    "Export diagnostics": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export diagnostics"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diagnose exportieren"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exportar diagnósticos"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exporter les diagnostics"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esporta diagnostica"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "診断を書き出す"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "진단 내보내기"
+          }
+        },
+        "pt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exportar diagnóstico"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Экспортировать диагностику"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Експортувати діагностику"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导出诊断"
+          }
+        }
+      }
+    },
+    "Crash and performance reports are collected on device by iOS and never leave your iPhone unless you export and share them yourself.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Crash and performance reports are collected on device by iOS and never leave your iPhone unless you export and share them yourself."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Absturz- und Leistungsberichte werden von iOS auf dem Gerät erfasst und verlassen Ihr iPhone nie, sofern Sie sie nicht selbst exportieren und teilen."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iOS recopila los informes de fallos y rendimiento en el dispositivo, y nunca salen de tu iPhone a menos que los exportes y compartas tú mismo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les rapports de plantage et de performance sont collectés sur l'appareil par iOS et ne quittent jamais votre iPhone, sauf si vous les exportez et les partagez vous-même."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I rapporti su arresti anomali e prestazioni vengono raccolti sul dispositivo da iOS e non lasciano mai il tuo iPhone, a meno che tu non li esporti e li condivida di persona."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "クラッシュおよびパフォーマンスのレポートは iOS によって端末内で収集され、ご自身で書き出して共有しない限り、iPhone の外に出ることはありません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "충돌 및 성능 보고서는 iOS가 기기에서 수집하며, 사용자가 직접 내보내 공유하지 않는 한 iPhone을 떠나지 않습니다."
+          }
+        },
+        "pt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Os relatórios de falhas e desempenho são coletados no dispositivo pelo iOS e nunca saem do seu iPhone, a menos que você mesmo os exporte e compartilhe."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Отчёты о сбоях и производительности собираются на устройстве средствами iOS и никогда не покидают ваш iPhone, если вы сами их не экспортируете и не поделитесь ими."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Звіти про збої та продуктивність збираються на пристрої засобами iOS і ніколи не залишають ваш iPhone, доки ви самі їх не експортуєте та не поділитеся ними."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "崩溃和性能报告由 iOS 在设备上收集，除非您自行导出并分享，否则绝不会离开您的 iPhone。"
+          }
+        }
+      }
+    },
+    "No diagnostics collected yet.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No diagnostics collected yet."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Noch keine Diagnosedaten erfasst."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aún no se han recopilado diagnósticos."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucun diagnostic collecté pour le moment."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessun dato diagnostico raccolto finora."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "診断データはまだ収集されていません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "아직 수집된 진단 데이터가 없습니다."
+          }
+        },
+        "pt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nenhum diagnóstico coletado ainda."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Диагностика пока не собрана."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Діагностику ще не зібрано."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚未收集任何诊断数据。"
           }
         }
       }
