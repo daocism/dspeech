@@ -39,13 +39,11 @@ struct SettingsView: View {
   // in-app language switch, no bundle swizzling.
   @State private var appLanguage: String = Self.currentAppLanguagePickerTag()
   @State private var whisperKitInstaller = WhisperKitModelInstaller()
-  @State private var parakeetInstaller = ParakeetModelInstaller()
-  // why: C3 — the SwiftUI download tasks are held so Pause can cancel them. Cancellation propagates
+  // why: C3 — the SwiftUI download task is held so Pause can cancel it. Cancellation propagates
   // into the shared installer engine (Task.checkCancellation between files), which preserves the C1
   // staging cache, so Resume continues from the kept bytes instead of restarting at zero. This holds
   // no download logic — it only owns the task handle.
   @State private var whisperKitDownloadTask: Task<Void, Never>?
-  @State private var parakeetDownloadTask: Task<Void, Never>?
   // why: C8 — transcript-store footprint computed OFF the main actor in a detached task and cached
   // here; a nil value renders as "Calculating…". Recomputed on appear and after a cleanup toggle.
   @State private var transcriptStorageBytes: Int64?
@@ -264,20 +262,12 @@ struct SettingsView: View {
         Section {
           Picker(String(localized: "Engine"), selection: $recognition.engineChoice) {
             ForEach(TranscriptionEngineChoice.allCases) { choice in
-              // why: Parakeet EOU is English-only — never offer it for a non-en recognition
-              // locale (the model would hallucinate on other languages). Hiding the option (vs
-              // disabling) avoids implying a configuration that can't apply. (ADR-0012.)
-              if choice != .parakeet || isParakeetSelectable {
-                Text(choice.displayName).tag(choice)
-              }
+              Text(choice.displayName).tag(choice)
             }
           }
           .accessibilityIdentifier("recognition-engine-picker")
           if shouldShowWhisperKitModelRows {
             whisperKitModelContent
-          }
-          if shouldShowParakeetModelRows {
-            parakeetModelContent
           }
         } header: {
           Text(String(localized: "Recognition engine"))
@@ -352,13 +342,6 @@ struct SettingsView: View {
       .task(id: retention.autoCleanupEnabled) { await refreshTranscriptStorageUsage() }
       .onChange(of: recognition.localeIdentifier) {
         Task { await recognition.refreshSelectedDownloadState() }
-        // why: if the user switches to a non-English recognition locale while Parakeet is the
-        // selected engine, the (English-only) Parakeet tag disappears from the picker. Reset to
-        // Apple so the picker never shows a selection that no longer exists. This is deselection,
-        // never auto-selection. (ADR-0012.)
-        if recognition.engineChoice == .parakeet, !isParakeetSelectable {
-          recognition.engineChoice = .apple
-        }
       }
       .onDisappear { audioSource.stopMetering() }
       .navigationTitle(String(localized: "Settings"))
@@ -379,9 +362,6 @@ struct SettingsView: View {
     // success. The closure form fires only on the false->true edge, so deleting the model
     // (installed -> absent) stays silent (D13, ADR 0013 rule 7).
     .sensoryFeedback(trigger: whisperKitInstaller.state.isInstalled) { wasInstalled, isInstalled in
-      isInstalled && !wasInstalled ? .success : nil
-    }
-    .sensoryFeedback(trigger: parakeetInstaller.state.isInstalled) { wasInstalled, isInstalled in
       isInstalled && !wasInstalled ? .success : nil
     }
   }
@@ -424,169 +404,6 @@ struct SettingsView: View {
 
   private var shouldShowWhisperKitModelRows: Bool {
     recognition.engineChoice == .whisperKit || whisperKitInstaller.state.isInstalled
-  }
-
-  // why: Parakeet EOU is English-only — selectable only when the recognition locale is en-*.
-  private var isParakeetSelectable: Bool {
-    recognition.localeIdentifier?.hasPrefix("en") == true
-  }
-
-  private var shouldShowParakeetModelRows: Bool {
-    recognition.engineChoice == .parakeet || parakeetInstaller.state.isInstalled
-  }
-
-  @ViewBuilder
-  private var parakeetModelContent: some View {
-    switch parakeetInstaller.state {
-    case .absent:
-      parakeetAbsentContent
-    case .downloading(let progress):
-      parakeetDownloadingContent(progress)
-    case .installed(let model):
-      parakeetInstalledContent(model)
-    case .failed(let failure):
-      parakeetFailedContent(failure)
-    }
-  }
-
-  @ViewBuilder
-  private var parakeetAbsentContent: some View {
-    if parakeetInstaller.hasPartialStaging {
-      parakeetPausedResumeContent
-    } else {
-      VStack(alignment: .leading, spacing: 8) {
-        parakeetStatusRow(
-          title: String(localized: "Model not installed"),
-          detail: String(localized: "Required download") + ": "
-            + byteString(ParakeetModelInstaller.expectedModelSizeBytes)
-        )
-        if recognition.engineChoice == .parakeet {
-          Text(
-            String(
-              localized:
-                "Download the Parakeet model before using it. Until then, Dspeech falls back to Apple Speech."
-            )
-          )
-          .font(.footnote)
-          .foregroundStyle(DspeechTheme.warning)
-          .frame(maxWidth: .infinity, alignment: .leading)
-          .fixedSize(horizontal: false, vertical: true)
-        }
-        Button {
-          startParakeetDownload()
-        } label: {
-          Label(
-            String(
-              localized:
-                "Install Parakeet (English, \(byteString(ParakeetModelInstaller.expectedModelSizeBytes)))"
-            ),
-            systemImage: "arrow.down.circle.fill"
-          )
-        }
-        .buttonStyle(.borderedProminent)
-        .accessibilityIdentifier("parakeet-model-download")
-      }
-      .frame(maxWidth: .infinity, alignment: .leading)
-    }
-  }
-
-  private var parakeetPausedResumeContent: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      parakeetStatusRow(
-        title: String(localized: "Download paused"),
-        detail: pausedKeptDetail(fraction: parakeetInstaller.stagedFractionKept)
-      )
-      Button {
-        startParakeetDownload()
-      } label: {
-        Label(String(localized: "Resume download"), systemImage: "arrow.down.circle.fill")
-      }
-      .buttonStyle(.borderedProminent)
-      .accessibilityIdentifier("parakeet-model-resume")
-    }
-    .frame(maxWidth: .infinity, alignment: .leading)
-  }
-
-  private func parakeetDownloadingContent(_ progress: ParakeetModelDownloadProgress)
-    -> some View
-  {
-    VStack(alignment: .leading, spacing: 8) {
-      parakeetStatusRow(
-        title: String(localized: "Downloading model"),
-        detail: "\(progress.percentComplete)% · \(byteString(progress.totalBytes))"
-      )
-      ProgressView(value: progress.fractionComplete)
-      Label(
-        String(localized: "Downloading") + " \(progress.percentComplete)%",
-        systemImage: "arrow.down.circle.fill"
-      )
-      .font(.footnote.weight(.medium))
-      .foregroundStyle(.secondary)
-      .accessibilityIdentifier("parakeet-model-downloading")
-      Button {
-        pauseParakeetDownload()
-      } label: {
-        Label(String(localized: "Pause"), systemImage: "pause.circle")
-      }
-      .buttonStyle(.bordered)
-      .accessibilityIdentifier("parakeet-model-pause")
-    }
-    .frame(maxWidth: .infinity, alignment: .leading)
-  }
-
-  private func parakeetInstalledContent(_ model: ParakeetInstalledModel) -> some View {
-    VStack(alignment: .leading, spacing: 8) {
-      parakeetStatusRow(
-        title: String(localized: "Model installed"),
-        detail: "\(model.name) · \(byteString(model.sizeBytes))"
-      )
-      Button(String(localized: "Delete Parakeet model")) {
-        Task { await parakeetInstaller.deleteInstalledModel() }
-      }
-      .buttonStyle(.bordered)
-      .tint(DspeechTheme.danger)
-      .accessibilityIdentifier("parakeet-model-delete")
-    }
-    .frame(maxWidth: .infinity, alignment: .leading)
-  }
-
-  @ViewBuilder
-  private func parakeetFailedContent(_ failure: ParakeetModelInstallFailure) -> some View {
-    // why: a paused (cancelled) download is not an error — surface it as a resumable pause with the
-    // kept-bytes copy, not a red "install failed" retry.
-    if failure.kind == .cancelled {
-      parakeetPausedResumeContent
-    } else {
-      VStack(alignment: .leading, spacing: 8) {
-        parakeetStatusRow(
-          title: String(localized: "Model install failed"),
-          detail: failure.userSafeReason
-        )
-        if failure.isRetryable {
-          Button(String(localized: "Retry Parakeet download")) {
-            startParakeetDownload()
-          }
-          .buttonStyle(.bordered)
-          .accessibilityIdentifier("parakeet-model-retry")
-        }
-      }
-      .frame(maxWidth: .infinity, alignment: .leading)
-    }
-  }
-
-  private func parakeetStatusRow(title: String, detail: String) -> some View {
-    VStack(alignment: .leading, spacing: 2) {
-      Text(title)
-        .font(.body.weight(.medium))
-      Text(detail)
-        .font(.footnote)
-        .foregroundStyle(.secondary)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .fixedSize(horizontal: false, vertical: true)
-    }
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .accessibilityElement(children: .combine)
-    .accessibilityIdentifier("parakeet-model-status")
   }
 
   @ViewBuilder
@@ -755,16 +572,6 @@ struct SettingsView: View {
   private func pauseWhisperKitDownload() {
     whisperKitDownloadTask?.cancel()
     whisperKitDownloadTask = nil
-  }
-
-  private func startParakeetDownload() {
-    parakeetDownloadTask?.cancel()
-    parakeetDownloadTask = Task { await parakeetInstaller.install() }
-  }
-
-  private func pauseParakeetDownload() {
-    parakeetDownloadTask?.cancel()
-    parakeetDownloadTask = nil
   }
 
   private func pausedKeptDetail(fraction: Double) -> String {

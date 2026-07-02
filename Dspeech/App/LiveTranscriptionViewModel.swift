@@ -127,8 +127,7 @@ final class LiveTranscriptionViewModel {
   private(set) var translationFailure: TranslationFailure?
   private(set) var persistenceFailure: String?
   // why: the demo/mockup transcript is a first-run illustration only. Once the user has
-  // started a real session it must never reappear over (or instead of) real content — the
-  // "press Stop and the transcript turns back into demo" confusion.
+  // started a real session it must never reappear over (or instead of) real content.
   private(set) var hasEverStarted = false
   var oneTimeNoAnchorHintVisible = false
 
@@ -497,8 +496,8 @@ final class LiveTranscriptionViewModel {
 
   private func upsertTransmission(_ transmission: Transmission) {
     // why: an open transmission is upserted every tick; scanning BOTH arrays to remove its prior
-    // copy was O(n) per tick. The hot path (updating the still-open transmission, which sits at the
-    // tail of its array) is now O(1); only a rare reclassification falls back to a full scan.
+    // copy would be O(n) per tick. The hot path (updating the still-open transmission, which sits at
+    // the tail of its array) is O(1); only a rare reclassification falls back to a full scan.
     removeExistingTransmission(id: transmission.id)
     let display = compactingCallSign(in: transmission)
     guard !display.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -721,15 +720,13 @@ final class LiveTranscriptionViewModel {
   }
 
   // why: history metadata records the RESOLVED engine (post-fallback), not the settings
-  // choice — a Parakeet selection that fell back to Apple must read "Apple Speech".
+  // choice — a WhisperKit selection that fell back to Apple must read "Apple Speech".
   private static func engineDisplayName(for engine: any LiveTranscriptionEngine) -> String? {
     switch engine {
     case is AppleSpeechLiveTranscriptionEngine:
       return TranscriptionEngineChoice.apple.displayName
     case is WhisperKitLiveTranscriptionEngine:
       return TranscriptionEngineChoice.whisperKit.displayName
-    case is ParakeetLiveTranscriptionEngine:
-      return TranscriptionEngineChoice.parakeet.displayName
     default:
       return nil
     }

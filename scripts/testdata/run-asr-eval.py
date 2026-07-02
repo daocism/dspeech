@@ -3,12 +3,11 @@
 score word error rate on its ACTUAL output (not ground-truth-through-a-gate).
 
 For each manifest item it invokes `dspeech-replay transcribe` with the real engine
-(whisperkit, apple, or parakeet), parses the assembled transmissions, computes ATC-normalized
+(whisperkit or apple), parses the assembled transmissions, computes ATC-normalized
 token WER against the exact spoken reference, and records the displayed/filtered classification.
 
-The pass/fail thresholds in voice-corpus.json are tuned against WhisperKit and gate only the
-whisperkit/apple runs. Parakeet (FluidAudio EOU 120M, English-only) is reported for comparison but
-NOT gated on those WhisperKit-tuned thresholds — see --engine parakeet handling in main().
+The pass/fail thresholds in voice-corpus.json are tuned against WhisperKit and gate both the
+whisperkit and apple runs (both are on-device recognizers sharing that budget).
 
 Categories:
   clean   — studio TTS (gates on thresholds.cleanMaxAvgWER + minClassificationAccuracy)
@@ -144,7 +143,7 @@ def build_items(manifest: dict, audio_dir: Path, categories: set[str]):
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--audio-dir", required=True)
-    ap.add_argument("--engine", default="whisperkit", choices=["whisperkit", "apple", "parakeet"])
+    ap.add_argument("--engine", default="whisperkit", choices=["whisperkit", "apple"])
     ap.add_argument("--manifest", default=str(REPO_ROOT / "scripts/testdata/voice-corpus.json"))
     ap.add_argument("--categories", default="clean,radio,overlap")
     args = ap.parse_args()
@@ -199,32 +198,15 @@ def main() -> int:
             failures.append(f"clean classification {acc:.0%} < {th['minClassificationAccuracy']:.0%}")
 
     # Per-engine gating. The thresholds in voice-corpus.json are tuned against WhisperKit (the
-    # production ASR); apple shares that on-device-recognition budget. Parakeet (FluidAudio EOU 120M,
-    # English-only) is a DIFFERENT model with materially different behavior on this synthetic-TTS ATC
-    # corpus — gating it on WhisperKit-tuned numbers would either be a false red or pressure someone
-    # to loosen the WhisperKit gate (forbidden). So Parakeet is REPORTED, never gated, and the
-    # WhisperKit gates stay exactly as-is.
+    # production ASR); apple shares that same on-device-recognition budget, so both engines are gated.
     #   engine      | clean WER | radio WER | clean class | gated  (thresholds from voice-corpus.json)
     #   ------------+-----------+-----------+-------------+------
     #   whisperkit  | <= 0.20   | <= 0.55   | >= 80%      | YES
     #   apple       | <= 0.20   | <= 0.55   | >= 80%      | YES
-    #   parakeet    |  reported |  reported |  reported   | NO
-    GATED_ENGINES = {"whisperkit", "apple"}
     print(
         f"\nthreshold source: WhisperKit-tuned (clean WER <= {th['cleanMaxAvgWER']}, "
         f"radio WER <= {th['radioMaxAvgWER']}, clean class >= {th['minClassificationAccuracy']:.0%})"
     )
-    if args.engine not in GATED_ENGINES:
-        print(
-            f"engine '{args.engine}' is REPORTED, NOT gated on the WhisperKit-tuned thresholds "
-            "(different model)."
-        )
-        if failures:
-            print("  vs the WhisperKit gate it would miss:")
-            for f in failures:
-                print(f"    - {f}")
-        print("\nREPORTED (ungated)")
-        return 0
 
     if failures:
         print("\nFAIL:", file=sys.stderr)

@@ -187,6 +187,33 @@ struct RecognitionSettingsTests {
     #expect(storage.loadEngineChoice() == .apple)
   }
 
+  // why: "parakeet" is a retired engine raw value (removed 2026-07-02). A user who had it selected
+  // must migrate silently to Apple Speech on upgrade — NOT decode-fail into a stale-settings warning.
+  // "parakeet" is a legacy-data literal; it justifiably lives only in this test.
+  @Test func retiredParakeetEngineChoiceMigratesToAppleWithoutCorruptionFlag() throws {
+    let suiteName = "dspeech.tests.recognition.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    defaults.set("parakeet", forKey: UserDefaultsRecognitionSettingsStorage.engineChoiceKey)
+    let storage = UserDefaultsRecognitionSettingsStorage(defaults: defaults)
+
+    #expect(storage.loadEngineChoice() == .apple)
+    #expect(storage.loadIssue() == nil)
+  }
+
+  // why: the retired-value guard must not swallow GENUINE corruption — an unknown, non-retired raw
+  // value still surfaces the corruption issue (keeps the migration guard non-vacuous).
+  @Test func unknownEngineRawValueStillFlagsCorruption() {
+    let suiteName = "dspeech.tests.recognition.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    defaults.set("bogus-engine", forKey: UserDefaultsRecognitionSettingsStorage.engineChoiceKey)
+    let storage = UserDefaultsRecognitionSettingsStorage(defaults: defaults)
+
+    #expect(storage.loadEngineChoice() == .apple)
+    #expect(storage.loadIssue() == .recognitionEngineCorrupted)
+  }
+
   @MainActor @Test func settingsIgnoreUnsupportedStoredValueOnLoad() {
     let storage = InMemoryRecognitionSettingsStorage()
     storage.stored = "ru-RU"
