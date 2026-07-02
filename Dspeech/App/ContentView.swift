@@ -12,6 +12,7 @@ struct ContentView: View {
   @State private var transcriptStore: (any TranscriptStoring)?
   @State private var showSettings: Bool = false
   @State private var showHistory: Bool = false
+  @State private var sidebarSelection: SidebarDestination? = .live
   @State private var showClearConfirmation: Bool = false
   @State private var showSuppressedReview: Bool = false
   @State private var followsLiveTranscript: Bool = true
@@ -196,10 +197,6 @@ struct ContentView: View {
       || !liveViewModel.filteredTransmissions.isEmpty || !liveViewModel.partialText.isEmpty
   }
 
-  private var readableContentMaxWidth: CGFloat {
-    horizontalSizeClass == .regular ? 720 : .infinity
-  }
-
   private var demoTranscriptSegmentsForDisplay: [TranscriptSegment] {
     // why: the demo transcript is a first-run illustration ONLY — show it solely before the
     // first Start, never over real content and never again after a real session (the
@@ -254,11 +251,13 @@ struct ContentView: View {
     }
   }
 
-  var body: some View {
+  @ViewBuilder
+  private func cockpitSurface(context: CockpitLayoutContext) -> some View {
     GeometryReader { geometry in
       let isLandscape = geometry.size.width > geometry.size.height
+      let measure = context.contentMaxWidth
 
-      ZStack {
+      ZStack(alignment: context.zStackAlignment) {
         LinearGradient(
           colors: [DspeechTheme.backgroundTop, DspeechTheme.backgroundBottom],
           startPoint: .top,
@@ -272,8 +271,8 @@ struct ContentView: View {
             privacyMode: privacy.mode,
             routeHealth: coordinator.routeMonitor.health,
             isSessionActive: liveViewModel.canStopCurrentSession,
-            openHistory: { showHistory = true },
-            openSettings: { showSettings = true }
+            openHistory: { presentHistory() },
+            openSettings: { presentSettings() }
           )
           bannerStack()
           filteredCountPill()
@@ -287,7 +286,7 @@ struct ContentView: View {
           }
           transcriptArea(isLandscape: isLandscape)
         }
-        .frame(maxWidth: readableContentMaxWidth, maxHeight: .infinity, alignment: .top)
+        .frame(maxWidth: measure, maxHeight: .infinity, alignment: .top)
         .padding(.horizontal, isLandscape ? 16 : 18)
         .padding(.top, isLandscape ? 6 : 10)
         .padding(.bottom, isLandscape ? 8 : 14)
@@ -323,14 +322,14 @@ struct ContentView: View {
         // the transcript fills the full height and scrolls its content clear of them.
         BottomLeftControls(
           isLandscape: isLandscape,
-          maxWidth: readableContentMaxWidth,
+          maxWidth: measure,
           canClearTranscriptView: canClearTranscriptView,
           error: liveViewModel.lastErrorMessage,
           clearTranscript: { showClearConfirmation = true }
         )
         FloatingStartControls(
           isLandscape: isLandscape,
-          maxWidth: readableContentMaxWidth,
+          maxWidth: measure,
           showHints: showHints,
           isStopVisible: liveViewModel.canStopCurrentSession,
           // why: NEVER disable the control while permission is being requested — that left the pilot
@@ -340,6 +339,16 @@ struct ContentView: View {
         ) {
           Task { await toggleListening() }
         }
+      }
+    }
+  }
+
+  var body: some View {
+    Group {
+      if horizontalSizeClass == .regular {
+        iPadSplitLayout
+      } else {
+        cockpitSurface(context: .standalone)
       }
     }
     .statusBarHidden(true)
@@ -478,6 +487,87 @@ struct ContentView: View {
     }
   }
 
+  // why: E1/E2 — on regular width (iPad, iPad slide-over stays compact) the letterboxed phone
+  // layout is replaced by a real NavigationSplitView: the sidebar is the navigation (Live /
+  // History / Settings), the detail column hosts the cockpit or the re-housed History/Settings
+  // views (NOT sheets). The sidebar is system chrome, so it gets automatic glass — no custom
+  // glass is added (ADR 0013). The cockpit surface is the SAME `cockpitSurface` used on compact,
+  // so there is one live-transcript implementation, not a duplicate.
+  @ViewBuilder
+  private var iPadSplitLayout: some View {
+    NavigationSplitView {
+      List(selection: $sidebarSelection) {
+        Label(String(localized: "Live transcript"), systemImage: "waveform")
+          .tag(SidebarDestination.live)
+          .accessibilityIdentifier("sidebar-live")
+        Label(String(localized: "Session history"), systemImage: "clock.arrow.circlepath")
+          .tag(SidebarDestination.history)
+          .accessibilityIdentifier("sidebar-history")
+        Label(String(localized: "Settings"), systemImage: "gearshape")
+          .tag(SidebarDestination.settings)
+          .accessibilityIdentifier("sidebar-settings")
+      }
+      .navigationTitle("Dspeech")
+    } detail: {
+      switch sidebarSelection ?? .live {
+      case .live:
+        cockpitSurface(context: .splitDetail)
+      case .history:
+        historyColumn
+      case .settings:
+        settingsColumn
+      }
+    }
+  }
+
+  @ViewBuilder
+  private var settingsColumn: some View {
+    // why: same bindings/params the sheet passes; `.presentationSizing(.form)` is intentionally
+    // absent here — that modifier is sheet-only, meaningless (and a no-op) in a detail column.
+    SettingsView(
+      privacy: privacy, recognition: recognition, translation: translation,
+      audioSource: audioSource,
+      translationFailure: liveViewModel.translationFailure,
+      captureActive: liveViewModel.isListening,
+      voiceFilter: voiceFilter,
+      onVoiceFilterDisabled: { liveViewModel.unhideAllSuppressedSegments() }
+    )
+  }
+
+  @ViewBuilder
+  private var historyColumn: some View {
+    if let transcriptStore {
+      SessionHistoryView(store: transcriptStore)
+    } else {
+      ContentUnavailableView(
+        String(localized: "Session history unavailable"),
+        systemImage: "clock.badge.questionmark",
+        description: Text(String(localized: "Transcript storage is not available."))
+      )
+      .preferredColorScheme(.dark)
+    }
+  }
+
+  // why: on regular width the History/Settings surfaces are sidebar-driven detail columns, so
+  // "open" means selecting the sidebar destination, not presenting a sheet. On compact the sheet
+  // path is unchanged (zero iPhone regression). Banners and the control-bar buttons both route
+  // through here so every entry point adapts to the active layout.
+  private func presentSettings() {
+    if horizontalSizeClass == .regular {
+      sidebarSelection = .settings
+    } else {
+      showSettings = true
+    }
+  }
+
+  private func presentHistory() {
+    if horizontalSizeClass == .regular {
+      sidebarSelection = .history
+    } else {
+      showHistory = true
+    }
+  }
+
   private var onboardingPresented: Binding<Bool> {
     Binding(get: { !onboarding.hasCompletedOnboarding }, set: { _ in })
   }
@@ -577,7 +667,7 @@ struct ContentView: View {
         TranslationFailureBanner(
           message: TranslationFailureText.userFacing(translationFailure),
           isUnavailable: liveViewModel.translationUnavailable,
-          onOpenSettings: { showSettings = true })
+          onOpenSettings: { presentSettings() })
       }
     }
   }
@@ -753,6 +843,39 @@ struct ContentView: View {
     await coordinator.toggle()
   }
 
+}
+
+// why: the three navigation destinations of the iPad split shell. `.live` is the default so a
+// fresh regular-width launch lands on the cockpit; the control-bar buttons and banners drive the
+// same selection so both the sidebar and in-cockpit affordances stay in sync.
+enum SidebarDestination: Hashable {
+  case live
+  case history
+  case settings
+}
+
+// why: E3 — the 720pt centered letterbox is gone. On compact the cockpit is full-bleed
+// (.infinity, centered is moot). In the split detail the column IS the width constraint, so the
+// content is capped to a comfortable reading measure and ANCHORED LEADING (topLeading ZStack)
+// instead of centered — the transcript, Clear control, and Start button all share the same
+// leading-anchored measure so they stay aligned.
+enum CockpitLayoutContext {
+  case standalone
+  case splitDetail
+
+  var contentMaxWidth: CGFloat {
+    switch self {
+    case .standalone: return .infinity
+    case .splitDetail: return 760
+    }
+  }
+
+  var zStackAlignment: Alignment {
+    switch self {
+    case .standalone: return .center
+    case .splitDetail: return .topLeading
+    }
+  }
 }
 
 private enum TranscriptScrollAnchor {
