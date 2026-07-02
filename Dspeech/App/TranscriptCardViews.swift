@@ -11,8 +11,8 @@ struct HintBubble: View {
   @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
   // why: a hint must NEVER be laid out inline with contested chrome — squeezed, it
-  // degrades into letter-soup or "На…" truncation (the 2026-06-11 visual-review defect).
-  // It always renders at its own intrinsic size; callers place it as a floating overlay.
+  // degrades into letter-soup or mid-word truncation. It always renders at its own
+  // intrinsic size; callers place it as a floating overlay.
   // At accessibility sizes the 2-line cap itself truncates — lift it and let the
   // bubble grow vertically instead.
   // why: D6 — the hint bubble floats over the live transcript, so it is legit glass chrome
@@ -20,7 +20,7 @@ struct HintBubble: View {
   // from dark-on-white to WHITE because the glass renders as a dark material in the cockpit's
   // dark scheme (and degrades to a solid dark material under Reduce Transparency), keeping the
   // hint high-contrast in both modes. Intrinsic sizing (fixedSize) and the 2-line cap are
-  // preserved — the floating-overlay rule from the 2026-06-11 letter-soup defect stands.
+  // preserved — the floating-overlay rule stands.
   private var bubbleText: some View {
     Text(text)
       .font(.subheadline.weight(.semibold))
@@ -114,7 +114,7 @@ struct FilteredTransmissionsReviewSheet: View {
                   .font(.caption.weight(.semibold))
                   // why: localized reason phrases (de "An anderes Luftfahrzeug gerichtet") overflow a
                   // single line at accessibility Dynamic Type; allow a 2-line wrap + more shrink so the
-                  // badge never clips (caught by the de · AX-XL audit).
+                  // badge never clips at the longest locale and largest Dynamic Type.
                   .lineLimit(2)
                   .minimumScaleFactor(0.6)
                   .foregroundStyle(DspeechTheme.filtered)
@@ -157,8 +157,8 @@ struct NoAnchorTransmissionHint: View {
 
   var body: some View {
     HStack(alignment: .top, spacing: 8) {
-      // why: no line limit — a capped hint truncated mid-word at default type size
-      // (2026-06-12 visual review); fixedSize(vertical) grows the bubble instead.
+      // why: no line limit — a capped hint truncates mid-word at default type size;
+      // fixedSize(vertical) grows the bubble instead.
       Text(text)
         .font(.subheadline.weight(.semibold))
         .foregroundStyle(.white)
@@ -190,7 +190,7 @@ struct NoAnchorTransmissionHint: View {
     )
     // why: vertical-only — both-axes fixedSize measured the wrapped text against an
     // intrinsic single-line width and the background stayed 2 lines tall while the
-    // text drew 4 (2026-06-12 visual review).
+    // text drew 4.
     .fixedSize(horizontal: false, vertical: true)
     .shadow(color: .black.opacity(0.25), radius: 6, y: 2)
     .transition(.opacity.combined(with: .scale(scale: 0.9)))

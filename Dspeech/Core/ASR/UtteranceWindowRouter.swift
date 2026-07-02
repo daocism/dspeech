@@ -21,7 +21,7 @@ final class UtteranceWindowRouter<Buffer> {
     // why: the recognition generation captured when each buffer was submitted is carried to the
     // append sink. Classification runs off-actor and can resolve AFTER the recognition request was
     // recycled at an utterance boundary; the engine sink no-ops a stale append so utterance-N audio
-    // can't bleed into the next card's request N+1 (adversarial-audit HIGH, 2026-06-14).
+    // can't bleed into the next card's request N+1.
     append: @escaping (Buffer, Int) -> Void
   ) {
     self.segmenter = segmenter

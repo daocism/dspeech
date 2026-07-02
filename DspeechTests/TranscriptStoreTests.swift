@@ -522,10 +522,10 @@ struct TranscriptStoreTests {
     let summary = try store.beginSession(localeIdentifier: "en-US")
     #expect(try store.sessions().first?.engineDisplayName == nil)
 
-    try store.setEngine("Parakeet (EN)", for: summary.id)
+    try store.setEngine("WhisperKit", for: summary.id)
 
     let reopened = try FileTranscriptStore(rootDirectory: root)
-    #expect(try reopened.sessions().first?.engineDisplayName == "Parakeet (EN)")
+    #expect(try reopened.sessions().first?.engineDisplayName == "WhisperKit")
   }
 
   @Test func durationSecondsIsNilForRecoveredSessionAndSetForEnded() throws {

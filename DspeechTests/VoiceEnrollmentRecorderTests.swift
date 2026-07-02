@@ -185,9 +185,8 @@ struct VoiceEnrollmentRecorderTests {
 
   @Test func acceptsRealisticRecordingWithNaturalPausesAtProductionFloor() async {
     // why: real speech is only ~70% voiced (pauses between words), so a 4s recording registers
-    // ~2.8s voiced. The PRODUCTION floor (VoiceEnrollmentRecorder.targetSeconds) must accept it; the
-    // old 4s VOICED floor rejected every normal recording ("слишком…", 2026-06-14 device report,
-    // root-caused against the real voice via `SpeakerEval probe`).
+    // ~2.8s voiced. The PRODUCTION floor (VoiceEnrollmentRecorder.targetSeconds) must accept a
+    // realistic recording rather than rejecting it as too short.
     let audioCapture = FakeEnrollmentAudioCapture()
     let recorder = makeRecorder(
       audioCapture: audioCapture, targetSeconds: VoiceEnrollmentRecorder.targetSeconds)

@@ -14,9 +14,9 @@ final class VoiceEnrollmentRecorder {
 
   // why: the minimum DETECTED-VOICED-speech floor — a lenient garbage filter, NOT the recording
   // length. Real speech is ~70% voiced (natural pauses between words), so a 4s recording the UI asks
-  // for only registers ~2.9s voiced (measured on a real voice). The old 4s VOICED floor therefore
-  // rejected every normal ~4s recording ("слишком…", 2026-06-14 device report). 1.5s of voiced speech
-  // still yields a usable WeSpeaker embedding; the settings UI guides ~4–5s wall-clock for a good one.
+  // for only registers ~2.9s voiced. A 4s VOICED floor would reject every normal ~4s recording as
+  // "too short"; 1.5s of voiced speech still yields a usable WeSpeaker embedding, and the settings
+  // UI guides ~4–5s wall-clock for a good one.
   static let targetSeconds: Double = 1.5
 
   private(set) var status: Status = .idle {
@@ -235,7 +235,7 @@ final class VoiceEnrollmentRecorder {
     // why: stop the mic tap BEFORE finishing the sample stream. Finishing first means tail buffers the
     // tap is still delivering get yielded to an already-finished continuation and silently dropped —
     // which can push a borderline recording under the voiced-duration floor and surface a wrong "too
-    // short" error (2026-06-14 audit). Stop the producer, then finish, then drain what it produced.
+    // short" error. Stop the producer, then finish, then drain what it produced.
     let deactivateSession = releaseCaptureLease()
     if captureStarted || captureStartAttempted {
       audioCapture.stop(deactivateSession: deactivateSession)

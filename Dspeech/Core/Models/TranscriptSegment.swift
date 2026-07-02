@@ -51,11 +51,10 @@ struct TranscriptSegment: Identifiable, Equatable, Sendable, Codable {
     self.isInterimRestartCommit = isInterimRestartCommit
   }
 
-  // why: C10 review (2026-07-02) — Parakeet EOU segments carry confidence 0 (FluidAudio's
-  // streaming callback yields text only), so EVERY Parakeet segment badges VERIFY. That is
-  // deliberate: the badge tells the truth ("unconfirmed by the engine") and the alternative —
-  // faking a confidence or exempting an engine — violates the no-fake-AI rule. Revisit only
-  // when FluidAudio surfaces a real per-segment confidence (PLAN-2026-06-22 open Q1).
+  // why: an engine whose streaming callback yields text only carries confidence 0, so EVERY such
+  // segment badges VERIFY. That is deliberate: the badge tells the truth ("unconfirmed by the
+  // engine") and the alternative — faking a confidence or exempting an engine — violates the
+  // no-fake-AI rule.
   var requiresVerification: Bool {
     isStopCommittedPlaceholder || isInterimRestartCommit || confidence < 0.82
   }

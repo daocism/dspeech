@@ -3,7 +3,7 @@ import Testing
 
 @testable import Dspeech
 
-// why: this is the guard that the user's "Ошибка: recognizer-unavailable" /
+// why: this is the guard that the user's "Error: recognizer-unavailable" /
 // "asr-error:kLSRErrorDomain#300" can never reach the screen as a raw code again. It runs
 // on the Simulator (pure logic) and covers every code the engine emits.
 struct RecognitionFailureTextTests {

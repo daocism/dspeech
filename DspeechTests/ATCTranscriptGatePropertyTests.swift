@@ -74,7 +74,7 @@ struct ATCTranscriptGatePropertyTests {
   // SAFETY: a pilot match BELOW the suppress threshold is not confident enough to hide — it falls
   // through to the relevance check instead of being suppressed before the callsign check. With no
   // callsign anchor it fails OPEN (shown), so a controller false-accepted as crew in the uncertain
-  // band is never silently hidden. (2026-06-15 audit fix.)
+  // band is never silently hidden.
   @Test func uncertainPilotBelowSuppressThresholdFailsOpen() {
     var rng = SeededGenerator(seed: 0x0A11_0009)
     let suppress = ATCTranscriptGateConfig.default.pilotSuppressThreshold
@@ -175,7 +175,7 @@ struct ATCTranscriptGatePropertyTests {
 
   // Stateful: after a hit, a following non-matching segment stays visible within the continuation
   // window and is suppressed once it lapses — the gate's only time-dependent branch. A re-addressed
-  // follow-up refreshes the hit. (Reviewer-identified coverage gap.)
+  // follow-up refreshes the hit.
   @Test func continuationWindowKeepsRecentExchangeVisibleThenLapses() {
     var rng = SeededGenerator(seed: 0x0A11_0007)
     let window = ATCTranscriptGateConfig.default.continuationWindowSeconds
@@ -210,7 +210,7 @@ struct ATCTranscriptGatePropertyTests {
   }
 
   // A non-urgency segment naming a DIFFERENT aircraft (own callsign not matched, other-callsign
-  // detector fires) is suppressed as addressedToOther. (Reviewer-identified coverage gap.)
+  // detector fires) is suppressed as addressedToOther.
   @Test func otherCallSignDetectorSuppressesForeignTraffic() {
     var rng = SeededGenerator(seed: 0x0A11_0008)
     let marker = "ZZOTHERZZ"

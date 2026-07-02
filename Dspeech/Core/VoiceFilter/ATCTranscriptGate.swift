@@ -9,7 +9,7 @@ struct ATCTranscriptGateConfig: Equatable, Sendable, Codable {
   // check; it falls through to the relevance test and fails open. So a controller false-accepted as
   // crew is never silently suppressed: a hidden clearance is the one unacceptable failure, while
   // showing an extra crew read-back is mere noise. The synthetic calibration corpus understates the
-  // real cross-speaker tail, so this margin is deliberate. See the 2026-06-15 crew-voice audit.
+  // real cross-speaker tail, so this margin is deliberate.
   var pilotSuppressThreshold: Float
 
   static let `default` = ATCTranscriptGateConfig(

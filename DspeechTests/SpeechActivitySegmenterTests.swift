@@ -48,8 +48,8 @@ struct SpeechActivitySegmenterTests {
   }
 
   // why: the live-engine utterance-boundary detector sets requireSpeechForMaxWindow so a long
-  // inter-transmission silence never recycles the recognition request (the churn that made the
-  // post-silence utterance dictate then vanish, 2026-06-14). A window of pure silence must NOT cut.
+  // inter-transmission silence never recycles the recognition request. A window of pure silence
+  // must NOT cut.
   private func makeBoundarySegmenter() -> EnergySilenceSegmenter {
     EnergySilenceSegmenter(
       minSpeechSeconds: 0.3,
@@ -149,9 +149,8 @@ struct SpeechActivitySegmenterTests {
   @Test func cutsAfterSilenceEvenWhenSilenceCarriesRealisticDeviceNoiseFloor() {
     // why: on a real iPhone the gap between transmissions is NOT digital zero — the mic noise
     // floor / AGC sits well above a naive absolute threshold. A fixed-threshold detector reads
-    // that ambient as speech and NEVER cuts -> the whole flight is one un-segmented window
-    // (2026-06-13 device report: "works like a dictaphone, new text replaces old"). Silence must
-    // be detected RELATIVE to the floating noise floor, never against an absolute constant.
+    // that ambient as speech and NEVER cuts -> the whole flight is one un-segmented window. Silence
+    // must be detected RELATIVE to the floating noise floor, never against an absolute constant.
     let segmenter = makeSegmenter()
     _ = segmenter.update(block: block(seconds: 0.3, amplitude: 0.4), sampleRate: Self.sampleRate)
     #expect(

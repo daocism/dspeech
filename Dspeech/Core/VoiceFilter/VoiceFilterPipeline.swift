@@ -97,7 +97,7 @@ final class VoiceFilterPipeline {
     // why: modelPackState is the source of truth, but enroll/classify use the IDENTIFIER (built
     // from the state at construction). A cold-start load that recovered or corrupted the state can
     // leave them disagreeing; assert agreement so a mismatch throws a typed error HERE instead of
-    // classifying with an unavailable identifier (2026-06-15 audit, two sources of truth).
+    // classifying with an unavailable identifier (two sources of truth).
     if case .unavailable(let reason) = identifier.availability {
       DspeechLog.voiceFilter.error(
         "voice filter state/identifier disagree state=installed identifier=unavailable")
@@ -150,7 +150,7 @@ final class VoiceFilterPipeline {
   // why: one entry point for both adding a new crew member and re-recording an existing one. When
   // `replacing` names an enrolled profile its voice print is refreshed in place (id + display label
   // preserved); otherwise a new crew member is appended. The roster is variable length — any number
-  // of cockpit voices can be enrolled and removed (2026-06-14 request).
+  // of cockpit voices can be enrolled and removed.
   func enrollCrewMember(
     replacing id: UUID? = nil,
     label: String,
@@ -208,12 +208,12 @@ final class VoiceFilterPipeline {
 
   // why: deleting the model pack must also wipe enrolled voice prints — personal voice data must not
   // survive on disk (and silently return on reinstall) after the user removed the feature that uses
-  // it (2026-06-14 audit, privacy/data-retention).
+  // it (privacy/data-retention).
   func removeAllCrewMembers() {
     // why: wipe storage UNCONDITIONALLY, not just when in-memory profiles are non-empty — a corrupted
     // or partially-loaded snapshot can leave voiceprint bytes on disk while `profiles` is empty in
     // memory; an empty-memory early-return would let that personal voice data survive the explicit
-    // removal. deleteAllProfiles() is idempotent. (2026-06-15 adversarial-review privacy finding.)
+    // removal. deleteAllProfiles() is idempotent.
     profiles = []
     storage.deleteAllProfiles()
     DspeechLog.voiceFilter.info("crew enrollment removed all reason=pack-deleted")
@@ -305,7 +305,7 @@ final class VoiceFilterPipeline {
     // why: no score-blind .pilot early-exit — a CONFIDENT pilot is suppressed by the gate and badged
     // via the .suppress(reason: .pilotReadback) arm below; an UNCERTAIN pilot in the [match, suppress)
     // band that the gate SHOWED (fail-open) must take the relevance-derived badge, not a misleading
-    // .pilotSuppressed stamped on a visible segment. (2026-06-15 audit / adversarial-review finding.)
+    // .pilotSuppressed stamped on a visible segment.
 
     switch relevance {
     case .display(reason: .callSignMatch):

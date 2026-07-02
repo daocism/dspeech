@@ -90,13 +90,11 @@ struct WhisperKitLiveTranscriptionEngineTests {
     engine.stop()
   }
 
-  // why: THE 2026-06-13 device failure reproduced on the REAL live path — one mic press, several
-  // spoken transmissions separated by realistic (non-zero) gaps, must finalize as SEVERAL segments,
-  // not one rolling "dictaphone" line. The gaps carry a real device noise floor (RMS 0.03), the
-  // exact condition the old fixed-threshold segmenter mis-read as continuous speech. With the old
-  // absolute floor this stream produced no in-stream cuts at all; the adaptive segmenter closes
-  // each utterance at its trailing gap. Existing append tests used value:0 perfect silence and were
-  // blind to this — that is why it shipped.
+  // why: one mic press, several spoken transmissions separated by realistic (non-zero) gaps, must
+  // finalize as SEVERAL segments, not one rolling "dictaphone" line. The gaps carry a real device
+  // noise floor (RMS 0.03), which a fixed-threshold segmenter mis-reads as continuous speech (no
+  // in-stream cuts at all); the adaptive segmenter closes each utterance at its trailing gap.
+  // Perfect-silence (value:0) fixtures cannot exercise this.
   @Test func continuousMultiUtteranceStreamWithRealisticGapsSegmentsEachTransmission() async {
     let transcriber = FakeWhisperLiveTranscriber { samples, _ in
       guard samples.contains(where: { $0 > 0.1 }) else { return [] }

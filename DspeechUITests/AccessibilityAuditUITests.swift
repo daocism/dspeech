@@ -147,8 +147,8 @@ final class AccessibilityAuditUITests: XCTestCase {
         // passed" (within its measurement tolerance). The borderline case is reported with NO
         // attributable element (issue.element == nil) — an unfixable, non-deterministic region
         // measurement, NOT a defect users hit — so we acknowledge+log it on any screen while still
-        // HARD-GATING real contrast failures everywhere. (Plus the long-standing acknowledgement of
-        // contrast on the translucent main/onboarding surfaces the audit cannot composite.)
+        // HARD-GATING real contrast failures everywhere. (Plus the acknowledgement of contrast on
+        // the translucent main/onboarding surfaces the audit cannot composite.)
         let isBorderlineContrast = description.localizedCaseInsensitiveContains("nearly")
         if isContrast && (isBorderlineContrast || acknowledgeContrast) {
           print(
@@ -161,8 +161,8 @@ final class AccessibilityAuditUITests: XCTestCase {
         // the filtered-review-sheet's scaled reason badge (de "An anderes Luftfahrzeug gerichtet")
         // + monospaced transcript wrapping in the narrow column beside the Show button. All visually
         // verified intact via the test's de·AX-XL screenshot attachments. Acknowledged+LOGGED on
-        // those two screens only; clipping stays HARD-gated everywhere else — it correctly caught the
-        // card reason badge before its 2-line wrap fix — and every other audit type stays hard-gated.
+        // those two screens only; clipping stays HARD-gated everywhere else, and every other audit
+        // type stays hard-gated.
         let isClippedText = description.localizedCaseInsensitiveContains("clipped")
         // the centered empty-state guidance message wraps fully (verified readable) but the detector
         // still flags it like the settings footnotes; acknowledged by id so clipping stays HARD on the
@@ -174,12 +174,10 @@ final class AccessibilityAuditUITests: XCTestCase {
         // wraps to several lines but is fully readable (verified by the de·AX-XL screenshot). Only
         // textClipped is acknowledged here — elementDetection (banner obscured by the mic) stays
         // HARD-gated, since that is the real risk for this critical element.
-        // (2026-07-02: the Open Settings button inside the same banner used to inherit the
-        // container's "error-banner" identifier and rode this acknowledgement; the identifier
-        // propagation bug was fixed, so the button's own id joins the SAME acknowledged class —
-        // its caption label scales at compact sizes / wraps freely at AX inside the narrow
-        // banner column and is screenshot-verified readable. elementDetection + hitRegion for
-        // the button stay HARD-gated.)
+        // The Open Settings button inside the same banner joins the SAME acknowledged class: its
+        // caption label scales at compact sizes / wraps freely at AX inside the narrow banner
+        // column and is screenshot-verified readable. elementDetection + hitRegion for the button
+        // stay HARD-gated.
         let isErrorBanner = id == "error-banner" || id == "open-settings-button"
         if isClippedText
           && (screen.hasPrefix("settings") || screen.contains("review sheet")
@@ -233,9 +231,9 @@ final class AccessibilityAuditUITests: XCTestCase {
     audit(app, "settings · ru · default")
   }
 
-  // THE reported defect: a recognition failure shows the orange error banner at the bottom,
-  // where the floating mic button used to overlap it. Drive Start → failure (no recognizer on
-  // the sim), handle the permission prompt, then audit; elementDetection must stay clean.
+  // A recognition failure shows the orange error banner at the bottom; the floating mic button
+  // must not overlap it. Drive Start → failure (no recognizer on the sim), handle the permission
+  // prompt, then audit; elementDetection must stay clean.
   @MainActor func testMainFailureState_errorBannerNotObscured() {
     let app = launch(locale: "en", extra: ["--dspeech-recognition-no-locales"])
     let start = app.buttons["start-button"]
@@ -255,8 +253,7 @@ final class AccessibilityAuditUITests: XCTestCase {
     acceptPermissionAlertsIfPresent(in: app)
     // why: the audit must run against the SETTLED failure state, not a transient frame mid-launch
     // of the recognizer. Assert the error banner actually appeared with non-empty copy, and that
-    // the surface settled back to idle (Start visible, Stop gone) before measuring layout — an
-    // ignored `waitForExistence` previously let the audit fire before the banner rendered.
+    // the surface settled back to idle (Start visible, Stop gone) before measuring layout.
     let errorBanner = app.staticTexts["error-banner"]
     XCTAssertTrue(
       errorBanner.waitForExistence(timeout: 20),
@@ -343,7 +340,7 @@ final class AccessibilityAuditUITests: XCTestCase {
   // why: the variable-count crew roster (name + Re-record + delete rows + Add button) is the most
   // contested layout on the default-on voice-filter surface; seed the installed-pack state + 2 crew
   // members, scroll to the roster, and audit clip/overlap/contrast/hit-region at the longest locale ×
-  // a large type size (2026-06-14 audit P4 — close the crew-roster coverage gap).
+  // a large type size.
   @MainActor func testSettingsCrewRoster_de_large() {
     let app = launch(
       locale: "de", contentSize: Self.largeType,
@@ -379,7 +376,7 @@ final class AccessibilityAuditUITests: XCTestCase {
     audit(app, "onboarding · en · AX-XXXL")
   }
 
-  // why: gap states where visual defects historically hid (letter-soup reason badges on cards,
+  // why: gap states where visual defects can hide (letter-soup reason badges on cards,
   // the filtered-transmissions pill/review sheet, model-pack download/failed). Capture BEFORE the
   // audit so the screenshot is attached for eyes-on review even when the objective gate trips.
 
