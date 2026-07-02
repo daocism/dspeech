@@ -278,13 +278,15 @@ struct CaptureCoordinatorTests {
     await coordinator.start()
     await Self.wait(for: { coordinator.live.isListening })
 
-    coordinator.handleRouteEvent(.interruptionBegan)
+    coordinator.handleRouteEvent(.interruptionBegan(cause: .competingAudioSession))
 
     await Self.wait(for: { engine.stopCallCount == 1 })
     #expect(engine.stopCallCount == 1)
     #expect(coordinator.routeMonitor.isAudioSessionInterrupted)
     #expect(coordinator.canStart == false)
-    #expect(coordinator.routeMonitor.lastNotice?.kind == .interruptionBegan)
+    #expect(
+      coordinator.routeMonitor.lastNotice?.kind == .interruptionBegan(cause: .competingAudioSession)
+    )
     #expect(coordinator.routeBanner != nil)
   }
 
@@ -295,7 +297,7 @@ struct CaptureCoordinatorTests {
     )
     await coordinator.start()
     await Self.wait(for: { coordinator.live.isListening })
-    coordinator.handleRouteEvent(.interruptionBegan)
+    coordinator.handleRouteEvent(.interruptionBegan(cause: .competingAudioSession))
     await Self.wait(for: { engine.stopCallCount == 1 })
 
     coordinator.handleRouteEvent(.interruptionEnded(shouldResume: true))
@@ -312,7 +314,7 @@ struct CaptureCoordinatorTests {
     )
     await coordinator.start()
     await Self.wait(for: { coordinator.live.isListening })
-    coordinator.handleRouteEvent(.interruptionBegan)
+    coordinator.handleRouteEvent(.interruptionBegan(cause: .competingAudioSession))
     await Self.wait(for: { engine.stopCallCount == 1 })
 
     coordinator.handleRouteEvent(.interruptionEnded(shouldResume: false))
@@ -332,7 +334,7 @@ struct CaptureCoordinatorTests {
     )
     await coordinator.start()
     await Self.wait(for: { coordinator.live.isListening })
-    coordinator.handleRouteEvent(.interruptionBegan)
+    coordinator.handleRouteEvent(.interruptionBegan(cause: .competingAudioSession))
     await Self.wait(for: { engine.stopCallCount == 1 })
 
     coordinator.stop()
@@ -535,7 +537,7 @@ struct CaptureCoordinatorTests {
       route: RouteSnapshot(inputs: [Self.port(.usbAudio, name: "USB Tap")]),
       availableInputs: [Self.port(.usbAudio, name: "USB Tap")]
     )
-    coordinator.handleRouteEvent(.interruptionBegan)
+    coordinator.handleRouteEvent(.interruptionBegan(cause: .competingAudioSession))
     #expect(coordinator.canStart == false)
 
     coordinator.refreshOnForeground()
@@ -617,7 +619,7 @@ struct CaptureCoordinatorTests {
     let startTask = Task { @MainActor in await coordinator.start() }
     await Self.wait(for: { engine.startCallCount == 1 && coordinator.live.canStopCurrentSession })
 
-    coordinator.handleRouteEvent(.interruptionBegan)
+    coordinator.handleRouteEvent(.interruptionBegan(cause: .competingAudioSession))
 
     await Self.wait(for: { coordinator.live.status == .stopped })
     #expect(engine.stopCallCount == 1)

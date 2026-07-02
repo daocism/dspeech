@@ -144,10 +144,10 @@ final class RouteHealthMonitor {
         portName: nil,
         timestamp: now()
       )
-    case .interruptionBegan:
+    case .interruptionBegan(let cause):
       isAudioSessionInterrupted = true
       lastNotice = RouteChangeNotice(
-        kind: .interruptionBegan,
+        kind: .interruptionBegan(cause: cause),
         portName: recomputed.primaryInputName,
         timestamp: now()
       )
@@ -281,8 +281,20 @@ extension RouteChangeNotice {
       return String(localized: "External source lost — switching to \(name). Recording paused.")
     case .noSuitableRoute:
       return String(localized: "No suitable capture source.")
-    case .interruptionBegan:
-      return String(localized: "Audio capture was interrupted by the system. Recording paused.")
+    case .interruptionBegan(let cause):
+      switch cause {
+      case .competingAudioSession:
+        return String(
+          localized:
+            "Audio capture was interrupted by a phone call or another app. Recording paused."
+        )
+      case .builtInMicMuted:
+        return String(localized: "The microphone was muted. Recording paused.")
+      case .routeDisconnected:
+        return String(localized: "The audio input was disconnected. Recording paused.")
+      case .unknown:
+        return String(localized: "Audio capture was interrupted by the system. Recording paused.")
+      }
     case .interruptionEnded(let shouldResume):
       if shouldResume {
         return String(
