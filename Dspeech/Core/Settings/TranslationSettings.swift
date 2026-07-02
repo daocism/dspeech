@@ -92,7 +92,9 @@ struct UserDefaultsTranslationSettingsStorage: TranslationSettingsStorage, @unch
 
   func loadEnabled() -> Bool {
     if let enabled = defaults.object(forKey: Self.enabledKey) as? Bool { return enabled }
-    if let raw = defaults.string(forKey: Self.enabledKey) { return Self.parseBool(raw) ?? false }
+    if let raw = defaults.string(forKey: Self.enabledKey) {
+      return SettingsBoolParsing.parse(raw) ?? false
+    }
     return false
   }
 
@@ -103,7 +105,7 @@ struct UserDefaultsTranslationSettingsStorage: TranslationSettingsStorage, @unch
   func loadIssue() -> SettingsStorageIssue? {
     let rawEnabled = defaults.object(forKey: Self.enabledKey)
     if rawEnabled != nil, !(rawEnabled is Bool) {
-      if let raw = rawEnabled as? String, Self.parseBool(raw) != nil {
+      if let raw = rawEnabled as? String, SettingsBoolParsing.parse(raw) != nil {
       } else {
         return .translationEnabledCorrupted
       }
@@ -114,17 +116,6 @@ struct UserDefaultsTranslationSettingsStorage: TranslationSettingsStorage, @unch
       return .translationTargetCorrupted
     }
     return nil
-  }
-
-  private static func parseBool(_ raw: String) -> Bool? {
-    switch raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
-    case "1", "true", "yes":
-      return true
-    case "0", "false", "no":
-      return false
-    default:
-      return nil
-    }
   }
 }
 

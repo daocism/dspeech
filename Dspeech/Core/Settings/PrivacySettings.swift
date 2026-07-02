@@ -1,6 +1,23 @@
 import Foundation
 import Observation
 
+/// Parses a defaults value that was written as a string (legacy / MDM-pushed config) into a Bool,
+/// returning nil for anything that isn't a recognized boolean literal. Shared by the settings
+/// storages that must tolerate a string-typed value where a Bool is expected (and flag the rest as
+/// corrupted).
+enum SettingsBoolParsing {
+  static func parse(_ raw: String) -> Bool? {
+    switch raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+    case "1", "true", "yes":
+      return true
+    case "0", "false", "no":
+      return false
+    default:
+      return nil
+    }
+  }
+}
+
 enum PrivacyMode: String, CaseIterable, Sendable, Codable {
   case localOnly
 
@@ -76,7 +93,7 @@ struct UserDefaultsPrivacySettingsStorage: PrivacySettingsStorage, @unchecked Se
       return active
     }
     if let raw = defaults.string(forKey: Self.voiceFilterActiveKey) {
-      return Self.parseBool(raw) ?? false
+      return SettingsBoolParsing.parse(raw) ?? false
     }
     if defaults.object(forKey: Self.voiceFilterActiveKey) != nil { return false }
     return true
@@ -94,19 +111,8 @@ struct UserDefaultsPrivacySettingsStorage: PrivacySettingsStorage, @unchecked Se
     }
     let rawVoiceFilter = defaults.object(forKey: Self.voiceFilterActiveKey)
     if rawVoiceFilter == nil || rawVoiceFilter is Bool { return nil }
-    if let raw = rawVoiceFilter as? String, Self.parseBool(raw) != nil { return nil }
+    if let raw = rawVoiceFilter as? String, SettingsBoolParsing.parse(raw) != nil { return nil }
     return .voiceFilterActiveCorrupted
-  }
-
-  private static func parseBool(_ raw: String) -> Bool? {
-    switch raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
-    case "1", "true", "yes":
-      return true
-    case "0", "false", "no":
-      return false
-    default:
-      return nil
-    }
   }
 }
 
