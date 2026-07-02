@@ -22,8 +22,8 @@ enum SegmentationDecision: Equatable, Sendable {
 // why ADAPTIVE, not a fixed energy threshold: a real iPhone's "silence" between
 // transmissions is NOT digital zero — the mic noise floor / AGC sits well above any
 // fixed absolute RMS constant, so a fixed threshold reads ambient as speech and NEVER
-// closes the window (the 2026-06-13 device report: the whole flight became one
-// un-segmented "dictaphone" line). Silence is detected RELATIVE to a floating noise
+// closes the window (a whole flight becomes one un-segmented "dictaphone" line).
+// Silence is detected RELATIVE to a floating noise
 // floor: the minimum RMS over a recent window. Speech is a block sufficiently louder
 // than that floor. The floor is capped so a bootstrap window of pure speech can't
 // inflate it above the very speech we must detect.
@@ -39,15 +39,21 @@ final class EnergySilenceSegmenter: SpeechActivitySegmenter {
   private let minSpeechSeconds: Double
   private let minSilenceSeconds: Double
   private let maxWindowSeconds: Double
-  private let noiseWindowSeconds: Double
-  private let speechRatio: Float
-  private let absoluteFloor: Float
-  private let noiseFloorCap: Float
+  // why: adaptive-threshold tuning. Constants, not init knobs: no caller varies them — the
+  // noise floor is the minimum
+  // RMS over a trailing window long enough to span an inter-transmission gap; a block counts
+  // as speech at speechRatio x floor (relative, holds at any mic level); absoluteFloor keeps a
+  // non-zero gate over digital silence; the cap keeps a speech-only bootstrap window from
+  // hiding the first utterance.
+  private let noiseWindowSeconds: Double = 2.0
+  private let speechRatio: Float = 2.0
+  private let absoluteFloor: Float = 0.006
+  private let noiseFloorCap: Float = 0.08
   // why: when true, the max-window cap fires ONLY after real speech opened the window. The
   // utterance-boundary detector that recycles the live recognition request must never cut on a
   // window of pure silence — otherwise a long inter-transmission pause churns the SFSpeech request
   // every maxWindow seconds (recreating tasks endlessly, destabilising on-device recognition so the
-  // next real utterance dictates then vanishes, 2026-06-14 device report). The pre-ASR router keeps
+  // next real utterance dictates then vanishes). The pre-ASR router keeps
   // the default (false): its max-window is a latency ceiling that must flush silence windows too.
   private let requireSpeechForMaxWindow: Bool
   private let state = Mutex(State())
@@ -56,27 +62,11 @@ final class EnergySilenceSegmenter: SpeechActivitySegmenter {
     minSpeechSeconds: Double,
     minSilenceSeconds: Double,
     maxWindowSeconds: Double,
-    requireSpeechForMaxWindow: Bool = false,
-    // why: the noise floor is the minimum RMS over this trailing window — long enough to
-    // span an inter-transmission gap, short enough to track a changing cabin ambient.
-    noiseWindowSeconds: Double = 2.0,
-    // why: a block must be this many times the floor to count as speech. Relative, so it
-    // holds at any absolute mic level (quiet room or noisy cockpit alike).
-    speechRatio: Float = 2.0,
-    // why: floor for the speech threshold so true digital silence (floor ~0) still has a
-    // non-zero gate and a faint hiss never reads as speech.
-    absoluteFloor: Float = 0.006,
-    // why: cap the estimated floor so a bootstrap window containing only speech can't push
-    // the threshold above the speech itself (which would hide the first utterance).
-    noiseFloorCap: Float = 0.08
+    requireSpeechForMaxWindow: Bool = false
   ) {
     self.minSpeechSeconds = max(minSpeechSeconds, 0)
     self.minSilenceSeconds = max(minSilenceSeconds, 0)
     self.maxWindowSeconds = max(maxWindowSeconds, 0)
-    self.noiseWindowSeconds = max(noiseWindowSeconds, 0.1)
-    self.speechRatio = max(speechRatio, 1)
-    self.absoluteFloor = max(absoluteFloor, 0)
-    self.noiseFloorCap = max(noiseFloorCap, max(absoluteFloor, 0))
     self.requireSpeechForMaxWindow = requireSpeechForMaxWindow
   }
 
