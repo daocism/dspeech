@@ -22184,7 +22184,7 @@
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Транскрипты на устройстве"
+            "value": "Расшифровки на устройстве"
           }
         },
         "uk": {
@@ -22744,7 +22744,7 @@
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Транскрипт (текст)"
+            "value": "Расшифровка (текст)"
           }
         },
         "uk": {
@@ -22814,7 +22814,7 @@
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Транскрипт (JSONL)"
+            "value": "Расшифровка (JSONL)"
           }
         },
         "uk": {
@@ -23177,6 +23177,76 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ · %@"
+          }
+        }
+      }
+    },
+    "Live transcript": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live transcript"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Живая расшифровка"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live-Transkript"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcripción en vivo"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcription en direct"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrizione dal vivo"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ライブ文字起こし"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "실시간 전사"
+          }
+        },
+        "pt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrição ao vivo"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Живе розшифрування"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "实时转写"
           }
         }
       }

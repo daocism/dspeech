@@ -44,28 +44,102 @@ final class DspeechUITests: XCTestCase {
       "history button must be reachable on the main surface")
   }
 
+  // E4 — the iPad split shell. On regular width the app adopts a NavigationSplitView: the sidebar
+  // is the navigation (Live / History / Settings) and the detail column hosts the cockpit or the
+  // re-housed History/Settings views as COLUMNS (not sheets). Landscape is forced so the sidebar is
+  // shown alongside the detail (portrait collapses it behind the system toggle). The LOCAL badge is
+  // the hard-gate element (rule 4) and must stay visible on the live cockpit column.
   @MainActor
-  func testIPadMainSettingsAndHistoryRenderOnRegularWidth() throws {
+  func testIPadSplitShellSidebarNavigatesLiveHistoryAndSettingsColumns() throws {
     guard UIDevice.current.userInterfaceIdiom == .pad else {
-      throw XCTSkip("iPad-only regular-width smoke")
+      throw XCTSkip("iPad-only regular-width split-shell smoke")
     }
+    XCUIDevice.shared.orientation = .landscapeLeft
     let app = launchAppWithCleanPrivacyDefaults(
       extraArguments: ["-dspeech.uitest.reduce-animations"])
 
+    // the split sidebar exposes the three navigation destinations
+    let liveItem = sidebarItem("sidebar-live", in: app)
+    let historyItem = sidebarItem("sidebar-history", in: app)
+    let settingsItem = sidebarItem("sidebar-settings", in: app)
+    XCTAssertTrue(
+      liveItem.waitForExistence(timeout: 10), "split sidebar must expose a Live destination")
+    XCTAssertTrue(historyItem.exists, "split sidebar must expose a History destination")
+    XCTAssertTrue(settingsItem.exists, "split sidebar must expose a Settings destination")
+
+    // the default column is the live cockpit — the transcript surface is reachable and the
+    // LOCAL badge is visible on it (hard rule 4 holds on iPad)
     XCTAssertTrue(app.buttons["start-button"].waitForExistence(timeout: 8))
-    XCTAssertTrue(app.buttons["settings-button"].waitForExistence(timeout: 4))
-    app.buttons["settings-button"].tap()
-    XCTAssertTrue(app.buttons["settings-done-button"].waitForExistence(timeout: 8))
-    app.buttons["settings-done-button"].tap()
+    assertLocalOnlyBadgeIsVisible(in: app)
+    captureAttachment(app, "ipad-landscape-live-sidebar")
+
+    // Settings opens as a DETAIL COLUMN, not a sheet
+    tapSidebar(settingsItem)
+    XCTAssertTrue(
+      app.buttons["settings-done-button"].waitForExistence(timeout: 8),
+      "Settings must render as a detail column on iPad regular width")
+    captureAttachment(app, "ipad-landscape-settings-column")
+
+    // History opens as a DETAIL COLUMN, not a sheet
+    tapSidebar(historyItem)
+    XCTAssertTrue(
+      app.descendants(matching: .any)
+        .matching(identifier: "session-history-list").firstMatch.waitForExistence(timeout: 8),
+      "Session history must render as a detail column on iPad regular width")
+    captureAttachment(app, "ipad-landscape-history-column")
+
+    // back to the live cockpit — the badge and start control are present again
+    tapSidebar(liveItem)
+    XCTAssertTrue(app.buttons["start-button"].waitForExistence(timeout: 8))
+    assertLocalOnlyBadgeIsVisible(in: app)
+  }
+
+  // the in-cockpit control-bar gear/history buttons also drive the sidebar selection on iPad —
+  // tapping the gear navigates the detail column to Settings (no sheet), proving the adaptive
+  // routing (presentSettings/presentHistory) keeps every entry point coherent with the layout.
+  @MainActor
+  func testIPadControlBarButtonsNavigateDetailColumnsNotSheets() throws {
+    guard UIDevice.current.userInterfaceIdiom == .pad else {
+      throw XCTSkip("iPad-only regular-width routing smoke")
+    }
+    XCUIDevice.shared.orientation = .landscapeLeft
+    let app = launchAppWithCleanPrivacyDefaults(
+      extraArguments: ["-dspeech.uitest.reduce-animations"])
+
+    let settingsButton = app.buttons["settings-button"]
+    XCTAssertTrue(settingsButton.waitForExistence(timeout: 10))
+    XCTAssertTrue(waitUntilHittable(settingsButton))
+    settingsButton.tap()
+    XCTAssertTrue(
+      app.buttons["settings-done-button"].waitForExistence(timeout: 8),
+      "control-bar gear must navigate to the Settings detail column on iPad")
+
+    // return to Live via the sidebar, then exercise the history control-bar button
+    tapSidebar(sidebarItem("sidebar-live", in: app))
 
     let historyButton = app.buttons["session-history-button"]
-    XCTAssertTrue(historyButton.waitForExistence(timeout: 4))
+    XCTAssertTrue(historyButton.waitForExistence(timeout: 8))
     XCTAssertTrue(waitUntilHittable(historyButton))
     historyButton.tap()
     XCTAssertTrue(
       app.descendants(matching: .any)
         .matching(identifier: "session-history-list").firstMatch.waitForExistence(timeout: 8),
-      "history sheet must render on iPad regular width")
+      "control-bar history button must navigate to the History detail column on iPad")
+  }
+
+  @MainActor
+  private func sidebarItem(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
+    app.descendants(matching: .any).matching(identifier: identifier).firstMatch
+  }
+
+  // why: a split-view sidebar row's accessibilityIdentifier resolves to its label text, which
+  // reports isHittable == false inside a selectable List row (the row/cell is the interactive
+  // element, not the label). A coordinate tap on the resolved frame drives the same
+  // NavigationSplitView selection a user tap would, without gating on the label's hittability.
+  @MainActor
+  private func tapSidebar(_ element: XCUIElement) {
+    XCTAssertTrue(element.waitForExistence(timeout: 8), "sidebar row must exist before tap")
+    element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
   }
 
   @MainActor
