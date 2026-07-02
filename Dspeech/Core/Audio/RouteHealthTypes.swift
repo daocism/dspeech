@@ -105,6 +105,18 @@ struct RouteHealthAssessment: Equatable, Sendable {
   }
 }
 
+// why: C4 — the honest cause of an AVAudioSession interruption, read from
+// AVAudioSessionInterruptionReasonKey / wasSuspended. The product has no CallKit entitlement, so it
+// can never claim "a phone call" specifically; a competing session (a call, Siri, an alarm, or
+// another app grabbing audio) is the honest classification for the `.default` reason. Each cause
+// drives its own stop-notice copy so the pilot is told what actually paused capture.
+enum AudioInterruptionCause: Equatable, Sendable {
+  case competingAudioSession
+  case builtInMicMuted
+  case routeDisconnected
+  case unknown(UInt)
+}
+
 enum RouteChangeEvent: Equatable, Sendable {
   case newDeviceAvailable
   case oldDeviceUnavailable
@@ -113,7 +125,7 @@ enum RouteChangeEvent: Equatable, Sendable {
   case wakeFromSleep
   case noSuitableRouteForCategory
   case routeConfigurationChange
-  case interruptionBegan
+  case interruptionBegan(cause: AudioInterruptionCause)
   case interruptionEnded(shouldResume: Bool)
   case mediaServicesWereReset
   case unknown(Int)
@@ -124,7 +136,7 @@ struct RouteChangeNotice: Equatable, Sendable {
     case improved
     case lost
     case noSuitableRoute
-    case interruptionBegan
+    case interruptionBegan(cause: AudioInterruptionCause)
     case interruptionEnded(shouldResume: Bool)
     case mediaServicesReset
     case silent

@@ -170,13 +170,38 @@ import Foundation
       }
       switch type {
       case .began:
-        return .interruptionBegan
+        return .interruptionBegan(cause: interruptionCause(forInterruptionUserInfo: userInfo))
       case .ended:
         let rawOptions = unsignedValue(userInfo?[AVAudioSessionInterruptionOptionKey]) ?? 0
         let options = AVAudioSession.InterruptionOptions(rawValue: rawOptions)
         return .interruptionEnded(shouldResume: options.contains(.shouldResume))
       @unknown default:
         return .unknown(Int(rawType))
+      }
+    }
+
+    // why: C4 — classify the honest cause of a began interruption from the reason key. `.default`
+    // (another session activated — a call, Siri, alarm, or another app) is the closest honest signal
+    // to "phone call" the OS gives a CallKit-less receive-only app. A missing/unrecognized reason
+    // stays `.unknown` rather than over-claiming a call. A plain `default` (not `@unknown default`)
+    // avoids referencing deprecated reason cases while staying forward-compatible.
+    static func interruptionCause(
+      forInterruptionUserInfo userInfo: [AnyHashable: Any]?
+    ) -> AudioInterruptionCause {
+      guard let rawReason = unsignedValue(userInfo?[AVAudioSessionInterruptionReasonKey]),
+        let reason = AVAudioSession.InterruptionReason(rawValue: rawReason)
+      else {
+        return .unknown(unsignedValue(userInfo?[AVAudioSessionInterruptionReasonKey]) ?? 0)
+      }
+      switch reason {
+      case .default:
+        return .competingAudioSession
+      case .builtInMicMuted:
+        return .builtInMicMuted
+      case .routeDisconnected:
+        return .routeDisconnected
+      default:
+        return .unknown(rawReason)
       }
     }
 

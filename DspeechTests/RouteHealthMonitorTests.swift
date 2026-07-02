@@ -101,11 +101,11 @@ struct RouteHealthMonitorTests {
     let monitor = RouteHealthMonitor(routing: fake)
     #expect(!monitor.blocksStart)
 
-    monitor.handle(event: .interruptionBegan)
+    monitor.handle(event: .interruptionBegan(cause: .competingAudioSession))
 
     #expect(monitor.isAudioSessionInterrupted)
     #expect(monitor.blocksStart)
-    #expect(monitor.lastNotice?.kind == .interruptionBegan)
+    #expect(monitor.lastNotice?.kind == .interruptionBegan(cause: .competingAudioSession))
     #expect(monitor.lastNotice?.isUserVisible == true)
     #expect(monitor.lastNotice?.bannerText.isEmpty == false)
   }
@@ -116,7 +116,7 @@ struct RouteHealthMonitorTests {
       availableInputs: [Self.port(.usbAudio, name: "USB Tap")]
     )
     let monitor = RouteHealthMonitor(routing: fake)
-    monitor.handle(event: .interruptionBegan)
+    monitor.handle(event: .interruptionBegan(cause: .competingAudioSession))
     #expect(monitor.blocksStart)
 
     monitor.handle(event: .interruptionEnded(shouldResume: true))
@@ -133,7 +133,7 @@ struct RouteHealthMonitorTests {
       availableInputs: [Self.port(.usbAudio, name: "USB Tap")]
     )
     let monitor = RouteHealthMonitor(routing: fake)
-    monitor.handle(event: .interruptionBegan)
+    monitor.handle(event: .interruptionBegan(cause: .competingAudioSession))
     #expect(monitor.blocksStart)
 
     monitor.handle(event: .categoryChange)
@@ -149,7 +149,7 @@ struct RouteHealthMonitorTests {
       availableInputs: [Self.port(.usbAudio, name: "USB Tap")]
     )
     let monitor = RouteHealthMonitor(routing: fake)
-    monitor.handle(event: .interruptionBegan)
+    monitor.handle(event: .interruptionBegan(cause: .competingAudioSession))
     #expect(monitor.blocksStart)
 
     monitor.refreshOnForeground()
@@ -165,7 +165,7 @@ struct RouteHealthMonitorTests {
       availableInputs: [Self.port(.usbAudio, name: "USB Tap")]
     )
     let monitor = RouteHealthMonitor(routing: fake)
-    monitor.handle(event: .interruptionBegan)
+    monitor.handle(event: .interruptionBegan(cause: .competingAudioSession))
     fake.updateRoute(
       RouteSnapshot(inputs: [Self.port(.builtInMic, name: "iPhone Mic")]),
       availableInputs: [Self.port(.builtInMic, name: "iPhone Mic")]
@@ -203,9 +203,56 @@ struct RouteHealthMonitorTests {
         ]
       )
 
-      #expect(began == .interruptionBegan)
+      #expect(began == .interruptionBegan(cause: .unknown(0)))
       #expect(endedWithoutResume == .interruptionEnded(shouldResume: false))
       #expect(endedWithResume == .interruptionEnded(shouldResume: true))
+    }
+
+    // why: C4 — the began interruption carries the honest cause read from the reason key /
+    // wasSuspended flag, so the stop notice names what actually paused capture.
+    @Test func interruptionBeganClassifiesCauseFromReasonKey() {
+      func began(_ userInfo: [AnyHashable: Any]) -> RouteChangeEvent {
+        LiveAudioSessionRouting.event(forInterruptionUserInfo: userInfo)
+      }
+      let typeKey = AVAudioSessionInterruptionTypeKey
+      let beganType = NSNumber(value: AVAudioSession.InterruptionType.began.rawValue)
+
+      #expect(
+        began([
+          typeKey: beganType,
+          AVAudioSessionInterruptionReasonKey:
+            NSNumber(value: AVAudioSession.InterruptionReason.default.rawValue),
+        ]) == .interruptionBegan(cause: .competingAudioSession))
+      #expect(
+        began([
+          typeKey: beganType,
+          AVAudioSessionInterruptionReasonKey:
+            NSNumber(value: AVAudioSession.InterruptionReason.builtInMicMuted.rawValue),
+        ]) == .interruptionBegan(cause: .builtInMicMuted))
+      #expect(
+        began([
+          typeKey: beganType,
+          AVAudioSessionInterruptionReasonKey:
+            NSNumber(value: AVAudioSession.InterruptionReason.routeDisconnected.rawValue),
+        ]) == .interruptionBegan(cause: .routeDisconnected))
+      // why: a began interruption with no reason key stays honest as `.unknown` rather than
+      // over-claiming a phone call.
+      #expect(began([typeKey: beganType]) == .interruptionBegan(cause: .unknown(0)))
+
+      // honest, distinct stop-notice copy per cause; none empty; competing/micMuted/routeDisconnected
+      // are distinct while `.unknown` uses the generic copy (4 distinct banners across 4 causes).
+      let causes: [AudioInterruptionCause] = [
+        .competingAudioSession, .builtInMicMuted, .routeDisconnected, .unknown(9),
+      ]
+      var banners = Set<String>()
+      for cause in causes {
+        let notice = RouteChangeNotice(
+          kind: .interruptionBegan(cause: cause), portName: nil, timestamp: Date())
+        #expect(!notice.bannerText.isEmpty)
+        #expect(notice.isUserVisible)
+        banners.insert(notice.bannerText)
+      }
+      #expect(banners.count == 4)
     }
   #endif
 
@@ -247,7 +294,7 @@ struct RouteHealthMonitorTests {
       .improved,
       .lost,
       .noSuitableRoute,
-      .interruptionBegan,
+      .interruptionBegan(cause: .competingAudioSession),
       .interruptionEnded(shouldResume: true),
       .interruptionEnded(shouldResume: false),
       .mediaServicesReset,
@@ -275,7 +322,7 @@ struct RouteHealthMonitorTests {
       RouteChangeNotice.Kind.improved,
       .lost,
       .noSuitableRoute,
-      .interruptionBegan,
+      .interruptionBegan(cause: .competingAudioSession),
       .interruptionEnded(shouldResume: true),
       .interruptionEnded(shouldResume: false),
       .mediaServicesReset,
