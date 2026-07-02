@@ -19,8 +19,11 @@ keys pruned (the review's 63 had naive-grep false positives both directions), ko
 term unified, changelog-narration comments stripped, Russian comments translated, one
 seeded PRNG, dead tuning knobs demoted, vacuous reach-floor replaced with exemplar-anchored
 one. Pending next: first-run advisory disclaimer, MetricKit diagnostics + export, cellular
-download guard, JSONL schema version, Reduce-Transparency screenshot check, SettingsView
-split (strings for all of these already in the catalog, translated x11).
+download guard, JSONL schema version, SettingsView split (strings already in the catalog,
+translated x11). Reduce-Transparency: NOW SCREENSHOT-VERIFIED (2026-07-02, sim, RT on):
+control bar, LOCAL/MIC chips, failure banner + Open Settings, hint bubbles, cards all
+degrade to solid and stay legible — scratchpad rt-idle/rt-failure/rt-hints frames reviewed
+full-frame; the ADR-0013 rule-4 guarantee holds under RT.
 
 ## READ FIRST (2026-07-02) — night-polish mission
 
